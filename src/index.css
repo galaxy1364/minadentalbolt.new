@@ -1,0 +1,780 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+* { -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; box-sizing: border-box; -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }
+
+body {
+  font-family: 'Vazirmatn', sans-serif;
+  background: #f0fdfa;
+  overscroll-behavior-y: none;
+  -webkit-tap-highlight-color: transparent;
+  overflow-x: hidden;
+}
+html { overflow-x: hidden; max-width: 100vw; }
+
+input, textarea, select { font-size: 16px !important; }
+
+/* ── Dark Mode ─────────────────────────────────────────── */
+.dark body {
+  background: #0f172a;
+  color: #e2e8f0;
+}
+.dark .card-ios { background: #1e293b; box-shadow: 0 2px 20px rgba(0,0,0,0.3); }
+.dark .card-shadow { box-shadow: 0 1px 4px rgba(0,0,0,0.2); }
+.dark .card-shadow-lg { box-shadow: 0 8px 40px rgba(0,0,0,0.4); }
+.dark .glass { background: rgba(30,41,59,0.72); }
+.dark .glass-ultra { background: rgba(30,41,59,0.55); }
+.dark .tab-bar { background: rgba(15,23,42,0.88); border-top-color: rgba(255,255,255,0.08); }
+.dark .appt-card { background: rgba(30,41,59,0.96); border-color: rgba(255,255,255,0.05); }
+.dark .quick-stat { background: rgba(30,41,59,0.96); border-color: rgba(255,255,255,0.04); }
+.dark .segmented { background: rgba(30,41,59,0.8); }
+.dark .segmented-item.active { background: #1e293b; color: #2dd4bf; }
+.dark .filter-tab { background: #1e293b; border-color: #334155; color: #94a3b8; }
+.dark .filter-tab.active { background: #0d9488; border-color: #0d9488; color: #fff; }
+.dark .shimmer { background: linear-gradient(90deg, #1e293b 25%, #334155 50%, #1e293b 75%); }
+.dark .wizard-step { background: #1e293b; border-color: #334155; color: #64748b; }
+.dark .wizard-step.done { background: rgba(13,148,136,0.15); border-color: rgba(45,212,191,0.3); color: #2dd4bf; }
+.dark ::-webkit-scrollbar-thumb { background: #334155; }
+.dark ::-webkit-scrollbar-thumb:hover { background: #475569; }
+
+/* ── Scrollbar ─────────────────────────────────────────── */
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+
+/* ── iOS 27 Liquid Glass ─────────────────────────────── */
+.glass {
+  background: rgba(255,255,255,0.72);
+  backdrop-filter: blur(40px) saturate(200%);
+  -webkit-backdrop-filter: blur(40px) saturate(200%);
+}
+
+.glass-dark {
+  background: rgba(15, 118, 110, 0.88);
+  backdrop-filter: blur(40px) saturate(200%);
+  -webkit-backdrop-filter: blur(40px) saturate(200%);
+}
+
+.glass-teal {
+  background: rgba(13, 148, 136, 0.08);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+}
+
+.glass-ultra {
+  background: rgba(255,255,255,0.55);
+  backdrop-filter: blur(60px) saturate(240%);
+  -webkit-backdrop-filter: blur(60px) saturate(240%);
+}
+
+/* Specular highlight — the liquid-glass "edge light" */
+.glass-specular {
+  position: relative;
+}
+.glass-specular::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  padding: 1px;
+  background: linear-gradient(180deg, rgba(255,255,255,0.5), rgba(255,255,255,0.05));
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+  pointer-events: none;
+}
+
+/* ── Cards ──────────────────────────────────────────── */
+.card-ios {
+  background: #ffffff;
+  border-radius: 18px;
+  box-shadow: 0 2px 20px rgba(0,0,0,0.05), 0 1px 3px rgba(0,0,0,0.04);
+}
+
+.card-shadow  { box-shadow: 0 1px 4px rgba(0,0,0,0.05), 0 1px 2px rgba(0,0,0,0.03); }
+.card-shadow-lg { box-shadow: 0 8px 40px rgba(0,0,0,0.09), 0 2px 8px rgba(0,0,0,0.05); }
+
+/* ── Spring Physics Motion ───────────────────────────── */
+.transition-all-smooth { transition: all 0.28s cubic-bezier(0.4,0,0.2,1); }
+.transition-spring     { transition: all 0.38s cubic-bezier(0.34,1.56,0.64,1); }
+.transition-spring-lg  { transition: all 0.5s cubic-bezier(0.34,1.56,0.64,1); }
+.transition-bounce     { transition: all 0.45s cubic-bezier(0.68,-0.55,0.27,1.55); }
+
+/* ── Active press scale (haptic-like visual) ─────────── */
+.press-scale { transition: transform 0.12s cubic-bezier(0.4,0,0.2,1); }
+.press-scale:active { transform: scale(0.95); }
+
+.press-scale-lg { transition: transform 0.15s cubic-bezier(0.4,0,0.2,1); }
+.press-scale-lg:active { transform: scale(0.92); }
+
+/* ── Scrollable rows (no bar) ───────────────────────── */
+.dock-scroll { overflow-x: auto; overflow-y: hidden; scrollbar-width: none; -ms-overflow-style: none; }
+.dock-scroll::-webkit-scrollbar { display: none; }
+
+/* ── Safe area bottom padding ───────────────────────── */
+.pb-safe { padding-bottom: env(safe-area-inset-bottom, 0px); }
+.mb-safe { margin-bottom: env(safe-area-inset-bottom, 0px); }
+
+/* ── Bottom tab bar (iOS 27 liquid glass) ───────────── */
+.tab-bar {
+  background: rgba(255,255,255,0.88);
+  backdrop-filter: blur(50px) saturate(200%);
+  -webkit-backdrop-filter: blur(50px) saturate(200%);
+  border-top: 0.5px solid rgba(0,0,0,0.08);
+  box-shadow: 0 -4px 30px rgba(0,0,0,0.04);
+}
+
+/* ── Appointment card ───────────────────────────────── */
+.appt-card {
+  background: rgba(255,255,255,0.96);
+  border-radius: 18px;
+  border: 0.5px solid rgba(0,0,0,0.05);
+  box-shadow: 0 2px 12px rgba(0,0,0,0.04);
+  transition: box-shadow 0.22s ease, transform 0.12s cubic-bezier(0.4,0,0.2,1);
+}
+.appt-card:active { transform: scale(0.985); }
+
+/* ── Status pill ────────────────────────────────────── */
+.status-pill {
+  display: inline-flex;
+  align-items: center;
+  padding: 3px 10px;
+  border-radius: 20px;
+  font-size: 11px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+/* ── Teal gradient button ───────────────────────────── */
+.btn-teal {
+  background: linear-gradient(135deg, #0d9488, #0f766e);
+  color: #fff;
+  border-radius: 14px;
+  font-weight: 700;
+  box-shadow: 0 4px 14px rgba(13,148,136,0.35);
+  transition: transform 0.12s cubic-bezier(0.4,0,0.2,1), box-shadow 0.2s ease;
+}
+.btn-teal:hover { box-shadow: 0 6px 20px rgba(13,148,136,0.45); transform: translateY(-1px); }
+.btn-teal:active { transform: scale(0.95); box-shadow: 0 2px 8px rgba(13,148,136,0.3); }
+
+/* ── Filter tab ─────────────────────────────────────── */
+.filter-tab {
+  padding: 6px 14px;
+  border-radius: 20px;
+  font-size: 12px;
+  font-weight: 600;
+  border: 1.5px solid #e2e8f0;
+  background: #fff;
+  color: #475569;
+  white-space: nowrap;
+  transition: all 0.18s ease;
+}
+.filter-tab:active { transform: scale(0.93); }
+.filter-tab.active {
+  background: #0d9488;
+  border-color: #0d9488;
+  color: #fff;
+  box-shadow: 0 2px 8px rgba(13,148,136,0.3);
+}
+
+/* ── Wizard step ────────────────────────────────────── */
+.wizard-step {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  border-radius: 20px;
+  font-size: 11px;
+  font-weight: 600;
+  border: 1.5px solid #e2e8f0;
+  background: #f8fafc;
+  color: #94a3b8;
+  white-space: nowrap;
+  transition: all 0.2s;
+}
+.wizard-step.active {
+  background: #0d9488;
+  border-color: #0d9488;
+  color: #fff;
+}
+.wizard-step.done {
+  background: #f0fdfa;
+  border-color: #99f6e4;
+  color: #0d9488;
+}
+
+/* ── Page enter animation ───────────────────────────── */
+@keyframes page-in {
+  from { opacity: 0; transform: translateY(12px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.page-in { animation: page-in 0.3s cubic-bezier(0.4,0,0.2,1) both; }
+
+/* ── Toast animate-in ───────────────────────────────── */
+@keyframes animate-in-kf {
+  from { opacity: 0; transform: translateX(20px); }
+  to   { opacity: 1; transform: translateX(0); }
+}
+.animate-in { animation: animate-in-kf 0.25s cubic-bezier(0.4,0,0.2,1); }
+
+/* ── Modal enter ────────────────────────────────────── */
+@keyframes modal-in {
+  from { opacity: 0; transform: scale(0.92) translateY(20px); }
+  to   { opacity: 1; transform: scale(1) translateY(0); }
+}
+.modal-in { animation: modal-in 0.35s cubic-bezier(0.34,1.56,0.64,1) both; }
+
+/* ── Drawer enter ───────────────────────────────────── */
+@keyframes drawer-in {
+  from { transform: translateY(100%); }
+  to   { transform: translateY(0); }
+}
+.drawer-in { animation: drawer-in 0.35s cubic-bezier(0.32,0.72,0,1) both; }
+
+/* ── Success check pop ──────────────────────────────── */
+@keyframes check-pop {
+  0%   { transform: scale(0); opacity: 0; }
+  60%  { transform: scale(1.15); opacity: 1; }
+  100% { transform: scale(1); }
+}
+.check-pop { animation: check-pop 0.4s cubic-bezier(0.34,1.56,0.64,1) both; }
+
+/* ── Ripple effect ──────────────────────────────────── */
+@keyframes ripple {
+  to { transform: scale(4); opacity: 0; }
+}
+.ripple {
+  position: absolute;
+  border-radius: 50%;
+  background: rgba(255,255,255,0.4);
+  pointer-events: none;
+  transform: scale(0);
+  animation: ripple 0.6s ease-out;
+}
+
+/* ── Shimmer (loading) ──────────────────────────────── */
+@keyframes shimmer {
+  0%   { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+.shimmer {
+  background: linear-gradient(90deg, #f1f5f9 25%, #e2e8f0 50%, #f1f5f9 75%);
+  background-size: 200% 100%;
+  animation: shimmer 1.5s infinite;
+}
+
+/* ── Pulse glow ─────────────────────────────────────── */
+@keyframes pulse-glow {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(13,148,136,0.4); }
+  50%      { box-shadow: 0 0 0 8px rgba(13,148,136,0); }
+}
+.pulse-glow { animation: pulse-glow 2s infinite; }
+
+/* ── Slide in from right (detail views) ─────────────── */
+@keyframes slide-in-right {
+  from { opacity: 0; transform: translateX(30px); }
+  to   { opacity: 1; transform: translateX(0); }
+}
+.slide-in-right { animation: slide-in-right 0.3s cubic-bezier(0.32,0.72,0,1) both; }
+
+/* ── Time badge ─────────────────────────────────────── */
+.time-badge {
+  background: linear-gradient(135deg, #0d9488, #0f766e);
+  color: #fff;
+  border-radius: 12px;
+  min-width: 58px;
+  text-align: center;
+  padding: 8px 10px;
+  font-weight: 800;
+  font-size: 16px;
+  box-shadow: 0 3px 10px rgba(13,148,136,0.3);
+  flex-shrink: 0;
+}
+
+/* ── Waiting badge ──────────────────────────────────── */
+.waiting-badge {
+  background: linear-gradient(135deg, #fff7ed, #fed7aa);
+  border: 1.5px solid #fb923c;
+  border-radius: 12px;
+  padding: 8px 10px;
+  flex-shrink: 0;
+  min-width: 58px;
+  text-align: center;
+}
+
+/* ── Quick stat card ────────────────────────────────── */
+.quick-stat {
+  background: rgba(255,255,255,0.96);
+  border-radius: 16px;
+  border: 0.5px solid rgba(0,0,0,0.04);
+  padding: 14px 16px;
+  box-shadow: 0 1px 8px rgba(0,0,0,0.03);
+}
+
+/* ── Avatar gradient ring ───────────────────────────── */
+.avatar-ring {
+  padding: 2px;
+  border-radius: 22px;
+  background: linear-gradient(135deg, #99f6e4, #0d9488);
+}
+
+/* ── Segmented control (iOS style) ──────────────────── */
+.segmented {
+  display: flex;
+  padding: 3px;
+  background: rgba(241,245,249,0.8);
+  border-radius: 12px;
+  gap: 2px;
+}
+.segmented-item {
+  flex: 1;
+  padding: 7px 12px;
+  border-radius: 9px;
+  font-size: 12px;
+  font-weight: 600;
+  text-align: center;
+  color: #64748b;
+  transition: all 0.2s cubic-bezier(0.4,0,0.2,1);
+  white-space: nowrap;
+}
+.segmented-item.active {
+  background: #fff;
+  color: #0d9488;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.08);
+}
+.segmented-item:active { transform: scale(0.95); }
+
+/* ── Floating action button ─────────────────────────── */
+.fab {
+  position: fixed;
+  bottom: 84px;
+  left: 16px;
+  z-index: 30;
+  width: 56px;
+  height: 56px;
+  border-radius: 18px;
+  background: linear-gradient(135deg, #0d9488, #0f766e);
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 6px 20px rgba(13,148,136,0.4);
+  transition: transform 0.15s cubic-bezier(0.4,0,0.2,1);
+}
+.fab:active { transform: scale(0.88); }
+
+/* ── Swipe action reveal ────────────────────────────── */
+.swipe-item {
+  position: relative;
+  overflow: hidden;
+  transition: transform 0.3s cubic-bezier(0.32,0.72,0,1);
+}
+.swipe-actions {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 12px;
+}
+
+/* ── iOS 27 Shadow ───────────────────────────────────────────── */
+.shadow-ios-xl {
+  box-shadow: 0 20px 60px rgba(0,0,0,0.18), 0 8px 24px rgba(0,0,0,0.10), 0 2px 8px rgba(0,0,0,0.06);
+}
+
+/* ── Full-screen modal slide-up ──────────────────────────────── */
+@keyframes fullmodal-slide-up {
+  from { transform: translateY(100%); }
+  to   { transform: translateY(0); }
+}
+.fullmodal-in { animation: fullmodal-slide-up 0.38s cubic-bezier(0.32,0.72,0,1) both; }
+
+/* ── Wizard enter (bottom sheet morph) ───────────────────────── */
+@keyframes wizard-enter {
+  0%   { opacity: 0; transform: translateY(100%) scale(0.95); }
+  60%  { opacity: 1; transform: translateY(-8px) scale(0.98); }
+  100% { opacity: 1; transform: translateY(0) scale(1); }
+}
+.wizard-enter { animation: wizard-enter 0.42s cubic-bezier(0.32,0.72,0,1) both; }
+
+/* ── Wizard step slide-up (content morph between steps) ──────── */
+@keyframes wizard-slide-up {
+  from { opacity: 0; transform: translateY(16px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.wizard-slide-up { animation: wizard-slide-up 0.3s cubic-bezier(0.32,0.72,0,1) both; }
+
+/* ── Wizard done pop (success celebration) ───────────────────── */
+@keyframes wizard-done-pop {
+  0%   { opacity: 0; transform: scale(0.7); }
+  50%  { opacity: 1; transform: scale(1.06); }
+  100% { opacity: 1; transform: scale(1); }
+}
+.wizard-done-pop { animation: wizard-done-pop 0.5s cubic-bezier(0.34,1.56,0.64,1) both; }
+
+/* ── Sparkle confetti ────────────────────────────────────────── */
+@keyframes sparkle-out {
+  0%   { opacity: 1; transform: scale(0) translateY(0); }
+  40%  { opacity: 1; transform: scale(1.4) translateY(-20px); }
+  100% { opacity: 0; transform: scale(0.6) translateY(-60px); }
+}
+
+/* ── Field stagger entrance ──────────────────────────────────── */
+@keyframes field-stagger {
+  from { opacity: 0; transform: translateX(-12px); }
+  to   { opacity: 1; transform: translateX(0); }
+}
+.field-stagger { animation: field-stagger 0.3s cubic-bezier(0.32,0.72,0,1) both; }
+
+/* ── Stagger item (list entrance) ────────────────────────────── */
+@keyframes stagger-item {
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.stagger-item { animation: stagger-item 0.35s cubic-bezier(0.32,0.72,0,1) both; }
+
+/* ── Enterprise Dashboard Animations ──────────────────────────── */
+
+/* Gradient shift for hero backgrounds */
+@keyframes gradient-shift {
+  0%   { background-position: 0% 50%; }
+  50%  { background-position: 100% 50%; }
+  100% { background-position: 0% 50%; }
+}
+.gradient-animate {
+  background-size: 200% 200%;
+  animation: gradient-shift 8s ease infinite;
+}
+
+/* Glow pulse for stat tiles */
+@keyframes glow-pulse {
+  0%, 100% { box-shadow: 0 4px 20px rgba(13,148,136,0.15); }
+  50%      { box-shadow: 0 8px 30px rgba(13,148,136,0.30); }
+}
+.glow-pulse { animation: glow-pulse 3s ease-in-out infinite; }
+
+/* Card lift on hover */
+.card-lift {
+  transition: transform 0.25s cubic-bezier(0.34,1.56,0.64,1), box-shadow 0.25s ease;
+}
+.card-lift:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 12px 40px rgba(0,0,0,0.08), 0 4px 12px rgba(0,0,0,0.04);
+}
+.card-lift:active {
+  transform: translateY(-1px) scale(0.98);
+}
+
+/* Tile entrance with stagger delay */
+@keyframes tile-in {
+  from { opacity: 0; transform: translateY(16px) scale(0.96); }
+  to   { opacity: 1; transform: translateY(0) scale(1); }
+}
+.tile-in { animation: tile-in 0.45s cubic-bezier(0.34,1.56,0.64,1) both; }
+
+/* Count-up glow text */
+@keyframes count-glow {
+  0%   { text-shadow: 0 0 0 transparent; }
+  50%  { text-shadow: 0 0 12px rgba(13,148,136,0.4); }
+  100% { text-shadow: 0 0 0 transparent; }
+}
+.count-glow { animation: count-glow 1.2s ease-out; }
+
+/* Sparkline draw */
+@keyframes sparkline-draw {
+  from { stroke-dashoffset: 200; }
+  to   { stroke-dashoffset: 0; }
+}
+.sparkline-draw {
+  stroke-dasharray: 200;
+  animation: sparkline-draw 1.5s ease-out forwards;
+}
+
+/* Shimmer sweep on gradient tiles */
+@keyframes shimmer-sweep {
+  0%   { transform: translateX(-100%) skewX(-15deg); }
+  100% { transform: translateX(200%) skewX(-15deg); }
+}
+.shimmer-sweep::after {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; bottom: 0;
+  width: 50%;
+  background: linear-gradient(90deg, transparent, rgba(255,255,255,0.15), transparent);
+  animation: shimmer-sweep 4s ease-in-out infinite;
+  pointer-events: none;
+}
+
+/* Alert pulse ring */
+@keyframes alert-ring {
+  0%   { box-shadow: 0 0 0 0 rgba(239,68,68,0.4); }
+  100% { box-shadow: 0 0 0 12px rgba(239,68,68,0); }
+}
+.alert-ring { animation: alert-ring 1.8s infinite; }
+
+/* Floating bounce for icons */
+@keyframes float-bounce {
+  0%, 100% { transform: translateY(0); }
+  50%      { transform: translateY(-3px); }
+}
+.float-bounce { animation: float-bounce 2.5s ease-in-out infinite; }
+
+/* Progress bar fill */
+@keyframes progress-fill {
+  from { width: 0%; }
+}
+.progress-fill { animation: progress-fill 1s cubic-bezier(0.32,0.72,0,1) both; }
+
+/* Ring rotate */
+@keyframes ring-rotate {
+  from { transform: rotate(0deg); }
+  to   { transform: rotate(360deg); }
+}
+.ring-rotate { animation: ring-rotate 12s linear infinite; }
+
+/* ── Reduced Motion ──────────────────────────────────────── */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+  .ring-rotate, .float-bounce, .alert-ring, .shimmer-sweep::after, .gradient-animate {
+    animation: none !important;
+  }
+}
+
+/* ── Dark mode chart tooltip ─────────────────────────────── */
+.dark .recharts-tooltip-wrapper .recharts-default-tooltip {
+  background: #1e293b !important;
+  border: 1px solid #334155 !important;
+  color: #e2e8f0 !important;
+}
+.dark .recharts-tooltip-wrapper .recharts-tooltip-label,
+.dark .recharts-tooltip-wrapper .recharts-tooltip-item {
+  color: #e2e8f0 !important;
+}
+.dark .recharts-cartesian-axis-tick text {
+  fill: #64748b !important;
+}
+.dark .recharts-radial-bar-background {
+  fill: #334155 !important;
+}
+
+/* ── Skeleton shimmer ────────────────────────────────────── */
+.skeleton {
+  background: linear-gradient(90deg, #f1f5f9 25%, #e2e8f0 50%, #f1f5f9 75%);
+  background-size: 200% 100%;
+  animation: shimmer-sweep 1.5s ease-in-out infinite;
+}
+.dark .skeleton {
+  background: linear-gradient(90deg, #1e293b 25%, #334155 50%, #1e293b 75%);
+  background-size: 200% 100%;
+}
+
+/* ── Dark mode auto-dark for common light-only patterns ──── */
+/* Pages that haven't been individually dark-modeified yet get auto-darkened */
+.dark .bg-white:not([class*="dark:"]):not(.recharts-tooltip-wrapper) {
+  background-color: #1e293b;
+}
+.dark .bg-slate-50:not([class*="dark:"]):not(.recharts-tooltip-wrapper) {
+  background-color: #0f172a;
+}
+.dark .bg-slate-100:not([class*="dark:"]):not(.recharts-tooltip-wrapper) {
+  background-color: #1e293b;
+}
+.dark .text-slate-800:not([class*="dark:"]):not(.recharts-cartesian-axis-tick) {
+  color: #e2e8f0;
+}
+.dark .text-slate-700:not([class*="dark:"]) {
+  color: #cbd5e1;
+}
+.dark .text-slate-600:not([class*="dark:"]) {
+  color: #94a3b8;
+}
+.dark .text-slate-500:not([class*="dark:"]):not(.recharts-cartesian-axis-tick) {
+  color: #64748b;
+}
+.dark .text-slate-400:not([class*="dark:"]):not(.recharts-cartesian-axis-tick) {
+  color: #475569;
+}
+.dark .border-slate-200:not([class*="dark:"]) {
+  border-color: #334155;
+}
+.dark .border-slate-100:not([class*="dark:"]) {
+  border-color: #1e293b;
+}
+
+/* ── iOS 27 Scroll-Driven Animations ─────────────────────── */
+@supports (animation-timeline: scroll()) {
+  @keyframes scroll-fade-in {
+    from { opacity: 0; transform: translateY(20px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+  .scroll-reveal {
+    animation: scroll-fade-in linear both;
+    animation-timeline: view();
+    animation-range: entry 0% entry 40%;
+  }
+  @keyframes scroll-scale {
+    from { transform: scale(0.95); opacity: 0.7; }
+    to   { transform: scale(1); opacity: 1; }
+  }
+  .scroll-scale-in {
+    animation: scroll-scale linear both;
+    animation-timeline: view();
+    animation-range: entry 0% entry 30%;
+  }
+}
+
+/* Fallback for browsers without scroll-driven animations */
+@supports not (animation-timeline: scroll()) {
+  .scroll-reveal, .scroll-scale-in {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+/* ── Container Queries (latest responsive tech) ──────────── */
+@supports (container-type: inline-size) {
+  .card-container { container-type: inline-size; }
+  @container (max-width: 200px) {
+    .card-compact { padding: 8px; font-size: 11px; }
+    .card-compact .card-title { font-size: 13px; }
+  }
+}
+
+/* ── iOS 27 Pull-to-Refresh ──────────────────────────────── */
+.pull-indicator {
+  position: absolute;
+  top: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 10;
+  pointer-events: none;
+  transition: opacity 0.2s ease;
+}
+
+/* ── iOS 27 Liquid Tab Indicator ─────────────────────────── */
+.liquid-indicator {
+  position: relative;
+  overflow: hidden;
+}
+.liquid-indicator::after {
+  content: '';
+  position: absolute;
+  bottom: 2px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: currentColor;
+  opacity: 0;
+  transition: opacity 0.2s, width 0.3s cubic-bezier(0.34,1.56,0.64,1);
+}
+.liquid-indicator.active::after {
+  opacity: 1;
+  width: 24px;
+  border-radius: 3px;
+}
+
+/* ── iOS 27 Haptic Press Feedback ────────────────────────── */
+.haptic-press {
+  transition: transform 0.1s cubic-bezier(0.4,0,0.2,1);
+}
+.haptic-press:active {
+  transform: scale(0.97);
+}
+
+/* ── View Transition API (latest CSS navigation tech) ────── */
+@supports (view-transition-name: none) {
+  ::view-transition-old(root),
+  ::view-transition-new(root) {
+    animation-duration: 0.3s;
+    animation-timing-function: cubic-bezier(0.32,0.72,0,1);
+  }
+}
+
+/* ── Module Theme System ─────────────────────────────────── */
+:root {
+  --module-color: #0d9488;
+  --module-color-light: #f0fdfa;
+  --module-color-dark: #134e4a;
+  --module-gradient-from: #14b8a6;
+  --module-gradient-to: #0d9488;
+}
+
+.module-gradient-bg {
+  background: linear-gradient(135deg, var(--module-gradient-from), var(--module-gradient-to));
+}
+
+.module-text { color: var(--module-color); }
+.module-bg-light { background-color: var(--module-color-light); }
+.module-border { border-color: var(--module-color); }
+
+.module-icon-bg {
+  background: linear-gradient(135deg, var(--module-gradient-from), var(--module-gradient-to));
+  color: #fff;
+  box-shadow: 0 4px 14px color-mix(in srgb, var(--module-color) 35%, transparent);
+}
+
+.module-card-accent {
+  border-top: 3px solid var(--module-color);
+}
+
+.module-fab {
+  background: linear-gradient(135deg, var(--module-gradient-from), var(--module-gradient-to));
+  box-shadow: 0 6px 20px color-mix(in srgb, var(--module-color) 40%, transparent);
+}
+
+.module-tab-active {
+  color: var(--module-color);
+}
+
+.dark .module-bg-light {
+  background-color: color-mix(in srgb, var(--module-color-dark) 25%, transparent);
+}
+
+/* Module-colored filter tab */
+.filter-tab.module-active {
+  background: var(--module-color);
+  border-color: var(--module-color);
+  color: #fff;
+  box-shadow: 0 2px 8px color-mix(in srgb, var(--module-color) 30%, transparent);
+}
+
+/* Module-colored segmented active */
+.segmented-item.active.module-active {
+  color: var(--module-color);
+}
+
+/* Module stat card */
+.module-stat-card {
+  background: linear-gradient(135deg, var(--module-color-light), #fff);
+  border: 1px solid color-mix(in srgb, var(--module-color) 15%, transparent);
+  border-radius: 16px;
+  padding: 14px 16px;
+  box-shadow: 0 2px 12px color-mix(in srgb, var(--module-color) 8%, transparent);
+  transition: transform 0.25s cubic-bezier(0.34,1.56,0.64,1), box-shadow 0.25s ease;
+}
+.dark .module-stat-card {
+  background: linear-gradient(135deg, color-mix(in srgb, var(--module-color-dark) 30%, #1e293b), #1e293b);
+  border-color: color-mix(in srgb, var(--module-color) 20%, transparent);
+}
+.module-stat-card:active {
+  transform: scale(0.97);
+}
+
+/* Module page header banner */
+.module-banner {
+  background: linear-gradient(135deg, var(--module-gradient-from), var(--module-gradient-to));
+  border-radius: 20px;
+  color: #fff;
+  box-shadow: 0 8px 30px color-mix(in srgb, var(--module-color) 25%, transparent);
+}

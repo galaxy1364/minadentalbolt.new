@@ -1,0 +1,502 @@
+import { useState, useEffect, useCallback, useMemo } from 'react'
+import { useNavigate } from 'react-router-dom'
+import { Plus, Search, Edit2, Phone, Filter, Users, Award, AlertCircle, Smile, FileText, User, Trash2, Heart, Shield, MapPin } from 'lucide-react'
+import { fetchPatients, createPatient, updatePatient, deletePatient, fetchDoctors, fetchPayments, fetchTreatments, peekNextFileNumber } from '../lib/api'
+import { toJalaliStringPretty, formatCurrency, toPersianDigits } from '../lib/persianDate'
+import { Patient, Doctor, Payment, Treatment } from '../types'
+import { Modal, Card, Button, Input, Select, Textarea, Spinner, EmptyState, showToast } from '../components/ui'
+import { useConfirmAction, ConfirmActionConfig } from '../components/ConfirmAction'
+import { h } from '../lib/haptics'
+import { usePullToRefresh } from '../lib/usePullToRefresh'
+
+const vipLevels: { value: number; label: string; color: string; icon: string }[] = [
+  { value: 0, label: 'عادی', color: 'slate', icon: '' },
+  { value: 1, label: 'نقره‌ای', color: 'secondary', icon: '🥈' },
+  { value: 2, label: 'طلایی', color: 'warning', icon: '🥇' },
+  { value: 3, label: 'پلاتین', color: 'accent', icon: '💎' },
+]
+
+const bloodTypes = ['O-', 'O+', 'A-', 'A+', 'B-', 'B+', 'AB-', 'AB+']
+const genderOptions = [{ value: 'male', label: 'آقا' }, { value: 'female', label: 'خانم' }]
+
+function getVipMeta(level: number | null) { return vipLevels.find((v) => v.value === (level ?? 0)) || vipLevels[0] }
+
+const avatarColors = [
+  'from-primary-400 to-primary-600',
+  'from-accent-400 to-accent-600',
+  'from-success-400 to-success-600',
+  'from-warning-400 to-warning-600',
+  'from-secondary-400 to-secondary-600',
+  'from-error-400 to-error-600',
+]
+
+function getAvatarColor(id: string): string {
+  let hash = 0
+  for (let i = 0; i < id.length; i++) hash = id.charCodeAt(i) + ((hash << 5) - hash)
+  return avatarColors[Math.abs(hash) % avatarColors.length]
+}
+
+function getInitials(p: Patient): string {
+  const f = p.first_name?.charAt(0) || ''
+  const l = p.last_name?.charAt(0) || ''
+  return (f + l).trim() || '?'
+}
+
+function calcBalance(payments: Payment[], treatments: Treatment[]): { balance: number; paid: number; totalCost: number } {
+  const totalCost = treatments.reduce((s, t) => s + (t.total_price || 0), 0)
+  const paid = payments.filter((p) => p.status === 'completed').reduce((s, p) => s + (p.amount || 0), 0)
+  return { balance: totalCost - paid, paid, totalCost }
+}
+
+function calculateAge(birthDate: string | null): number | null {
+  if (!birthDate) return null
+  const d = new Date(birthDate)
+  if (isNaN(d.getTime())) return null
+  const now = new Date()
+  let age = now.getFullYear() - d.getFullYear()
+  const m = now.getMonth() - d.getMonth()
+  if (m < 0 || (m === 0 && now.getDate() < d.getDate())) age--
+  return age >= 0 && age < 150 ? age : null
+}
+
+const emptyForm = {
+  first_name: '', last_name: '', national_id: '', phone: '', phone2: '', email: '',
+  birth_date: '', gender: '', blood_type: '', address: '', city: '', province: '',
+  postal_code: '', medical_history: '', allergies: '', medications: '', medical_conditions: '',
+  insurance_info: '', insurance_number: '', notes: '', vip_level: '0',
+  file_number: '', file_number_manual: false, is_active: 'true', primary_doctor_id: '', tags: '',
+}
+
+export default function Patients() {
+  const navigate = useNavigate()
+  const [patients, setPatients] = useState<Patient[]>([])
+  const [doctors, setDoctors] = useState<Doctor[]>([])
+  const [payments, setPayments] = useState<Payment[]>([])
+  const [treatments, setTreatments] = useState<Treatment[]>([])
+  const [loading, setLoading] = useState(true)
+
+  const [searchQuery, setSearchQuery] = useState('')
+  const [filterVip, setFilterVip] = useState('')
+  const [filterGender, setFilterGender] = useState('')
+  const [filterActive, setFilterActive] = useState('')
+  const [showFilters, setShowFilters] = useState(false)
+
+  const [modalOpen, setModalOpen] = useState(false)
+  const [editingPatient, setEditingPatient] = useState<Patient | null>(null)
+  const [saving, setSaving] = useState(false)
+  const [formData, setFormData] = useState(emptyForm)
+
+  const { confirmAction, close, ConfirmActionModal } = useConfirmAction()
+
+  const loadData = useCallback(async () => {
+    setLoading(true)
+    try {
+      const [pats, docs, pays, trts] = await Promise.all([fetchPatients(), fetchDoctors(), fetchPayments(), fetchTreatments()])
+      setPatients(pats); setDoctors(docs); setPayments(pays); setTreatments(trts)
+    } catch { showToast('error', 'خطا در بارگذاری بیماران') }
+    finally { setLoading(false) }
+  }, [])
+
+  useEffect(() => { loadData() }, [loadData])
+
+  const patientFinances = useMemo(() => {
+    const map = new Map<string, { balance: number; paid: number; totalCost: number }>()
+    for (const p of patients) {
+      const pPays = payments.filter((py) => py.patient_id === p.id)
+      const pTrts = treatments.filter((t) => t.patient_id === p.id)
+      map.set(p.id, calcBalance(pPays, pTrts))
+    }
+    return map
+  }, [patients, payments, treatments])
+
+  const filteredPatients = useMemo(() => {
+    return patients.filter((p) => {
+      if (searchQuery) {
+        const q = searchQuery.toLowerCase()
+        const fullName = `${p.first_name} ${p.last_name}`.toLowerCase()
+        const phone = (p.phone || '').toLowerCase()
+        const fileNum = (p.file_number || '').toLowerCase()
+        const nationalId = (p.national_id || '').toLowerCase()
+        if (!fullName.includes(q) && !phone.includes(q) && !fileNum.includes(q) && !nationalId.includes(q)) return false
+      }
+      if (filterVip !== '' && (p.vip_level ?? 0) !== Number(filterVip)) return false
+      if (filterGender && p.gender !== filterGender) return false
+      if (filterActive !== '' && p.is_active !== (filterActive === 'true')) return false
+      return true
+    })
+  }, [patients, searchQuery, filterVip, filterGender, filterActive])
+
+  const stats = useMemo(() => {
+    const total = patients.length
+    const vip = patients.filter((p) => (p.vip_level ?? 0) > 0).length
+    const now = new Date()
+    const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString()
+    const newThisMonth = patients.filter((p) => p.created_at >= monthStart).length
+    const active = patients.filter((p) => p.is_active).length
+    return { total, vip, newThisMonth, active }
+  }, [patients])
+
+  const [nextFileNumber, setNextFileNumber] = useState('')
+
+  const openCreateModal = async () => {
+    setEditingPatient(null)
+    setFormData(emptyForm)
+    try {
+      const fn = await peekNextFileNumber()
+      setNextFileNumber(fn)
+      setFormData((p) => ({ ...p, file_number: fn, file_number_manual: false }))
+    } catch {}
+    setModalOpen(true)
+    h.pop()
+  }
+
+  const openEditModal = (patient: Patient) => {
+    setEditingPatient(patient)
+    setFormData({
+      first_name: patient.first_name || '', last_name: patient.last_name || '', national_id: patient.national_id || '',
+      phone: patient.phone || '', phone2: patient.phone2 || '', email: patient.email || '',
+      birth_date: patient.birth_date || '', gender: patient.gender || '', blood_type: patient.blood_type || '',
+      address: patient.address || '', city: patient.city || '', province: patient.province || '',
+      postal_code: patient.postal_code || '', medical_history: patient.medical_history || '',
+      allergies: patient.allergies || '', medications: patient.medications || '',
+      medical_conditions: patient.medical_conditions || '', insurance_info: patient.insurance_info || '',
+      insurance_number: patient.insurance_number || '', notes: patient.notes || '',
+      vip_level: String(patient.vip_level ?? 0), file_number: patient.file_number || '',
+      file_number_manual: patient.file_number_manual ?? false, is_active: String(patient.is_active),
+      primary_doctor_id: patient.primary_doctor_id || '', tags: (patient.tags || []).join(', '),
+    })
+    setModalOpen(true)
+    h.pop()
+  }
+
+  // ── Preview + Confirm for create/edit ──
+  const handleSave = () => {
+    if (!formData.first_name.trim() || !formData.last_name.trim()) { h.error(); showToast('error', 'نام و نام خانوادگی الزامی است'); return }
+
+    const vipMeta = getVipMeta(Number(formData.vip_level) || 0)
+    const genderLabel = formData.gender ? (formData.gender === 'male' ? 'آقا' : 'خانم') : '—'
+    const age = calculateAge(formData.birth_date)
+
+    const fields: ConfirmActionConfig['fields'] = [
+      { label: 'نام کامل', value: `${formData.first_name} ${formData.last_name}`, icon: <User size={16} />, highlight: true },
+      { label: 'سطح VIP', value: `${vipMeta.icon} ${vipMeta.label}` },
+      { label: 'جنسیت', value: genderLabel },
+    ]
+    if (age !== null) fields.push({ label: 'سن', value: `${toPersianDigits(age)} سال` })
+    if (formData.phone) fields.push({ label: 'تلفن', value: toPersianDigits(formData.phone), icon: <Phone size={16} /> })
+    if (formData.national_id) fields.push({ label: 'کد ملی', value: toPersianDigits(formData.national_id) })
+    if (formData.blood_type) fields.push({ label: 'گروه خونی', value: formData.blood_type, icon: <Heart size={16} /> })
+    if (formData.insurance_info) fields.push({ label: 'بیمه', value: formData.insurance_info, icon: <Shield size={16} /> })
+    if (formData.allergies) fields.push({ label: 'حساسیت‌ها', value: formData.allergies, icon: <AlertCircle size={16} /> })
+    if (formData.address) fields.push({ label: 'آدرس', value: `${formData.city || ''} ${formData.address}`.trim(), icon: <MapPin size={16} /> })
+    if (formData.notes) fields.push({ label: 'یادداشت', value: formData.notes })
+
+    confirmAction({
+      type: editingPatient ? 'edit' : 'create',
+      title: editingPatient ? 'ویرایش بیمار' : 'ثبت بیمار جدید',
+      fields,
+      confirmLabel: editingPatient ? 'تایید ویرایش' : 'تایید و ثبت',
+      onConfirm: async () => {
+        const payload = {
+          first_name: formData.first_name.trim(), last_name: formData.last_name.trim(),
+          national_id: formData.national_id || null, phone: formData.phone || null, phone2: formData.phone2 || null,
+          email: formData.email || null, birth_date: formData.birth_date || null, gender: formData.gender || null,
+          blood_type: formData.blood_type || null, address: formData.address || null, city: formData.city || null,
+          province: formData.province || null, postal_code: formData.postal_code || null,
+          medical_history: formData.medical_history || null, allergies: formData.allergies || null,
+          medications: formData.medications || null, medical_conditions: formData.medical_conditions || null,
+          insurance_info: formData.insurance_info || null, insurance_number: formData.insurance_number || null,
+          notes: formData.notes || null, vip_level: Number(formData.vip_level) || 0,
+          file_number: formData.file_number || undefined,
+          file_number_manual: formData.file_number_manual, is_active: formData.is_active === 'true',
+          primary_doctor_id: formData.primary_doctor_id || null,
+          tags: formData.tags ? formData.tags.split(',').map((t) => t.trim()).filter(Boolean) : [],
+          avatar_url: null, credit_limit: null, referral_source: null,
+        } as any
+        if (editingPatient) await updatePatient(editingPatient.id, payload)
+        else await createPatient(payload)
+        setModalOpen(false)
+        await loadData()
+      },
+    })
+  }
+
+  // ── Preview + Confirm for delete ──
+  const handleDelete = (patient: Patient) => {
+    const fin = patientFinances.get(patient.id) || { balance: 0, paid: 0, totalCost: 0 }
+    confirmAction({
+      type: 'delete',
+      title: 'حذف بیمار',
+      warning: fin.totalCost > 0 ? `این بیمار ${formatCurrency(fin.totalCost)} هزینه درمان و ${formatCurrency(fin.paid)} پرداخت ثبت شده دارد` : 'این عملیات قابل بازگشت نیست',
+      fields: [
+        { label: 'نام', value: `${patient.first_name} ${patient.last_name}`, icon: <User size={16} />, highlight: true },
+        { label: 'شماره پرونده', value: patient.file_number || '—', icon: <FileText size={16} /> },
+        { label: 'تلفن', value: patient.phone ? toPersianDigits(patient.phone) : '—', icon: <Phone size={16} /> },
+      ],
+      confirmLabel: 'تایید حذف',
+      onConfirm: async () => { await deletePatient(patient.id); await loadData() },
+    })
+  }
+
+  const ptr = usePullToRefresh(async () => { await loadData() })
+
+  if (loading) {
+    return (
+      <div className="space-y-4 max-w-2xl mx-auto" aria-busy="true" aria-live="polite">
+        <div className="skeleton h-10 w-full rounded-2xl" />
+        <div className="grid grid-cols-4 gap-2">
+          {[0,1,2,3].map((i) => <div key={i} className="skeleton h-16 rounded-2xl" />)}
+        </div>
+        <div className="skeleton h-12 rounded-xl" />
+        <div className="space-y-2">
+          {[0,1,2,3,4].map((i) => <div key={i} className="skeleton h-20 rounded-2xl" />)}
+        </div>
+      </div>
+    )
+  }
+
+  return (
+    <div className="space-y-4 max-w-2xl mx-auto" {...ptr.handlers}>
+      {ptr.pullDistance > 0 && (
+        <div className="pull-indicator" style={{ opacity: ptr.isRefreshing ? 1 : ptr.pullProgress, top: -4 }}>
+          <div className="flex flex-col items-center gap-1">
+            <div className={`w-7 h-7 rounded-full border-2 border-primary-300 dark:border-primary-600 border-t-primary-600 dark:border-t-primary-400 ${ptr.isRefreshing ? 'animate-spin' : ''}`} style={{ transform: `scale(${0.6 + ptr.pullProgress * 0.4})` }} />
+            <span className="text-[10px] text-primary-500 font-medium">{ptr.isRefreshing ? 'در حال به‌روزرسانی...' : 'برای به‌روزرسانی بکشید'}</span>
+          </div>
+        </div>
+      )}
+      {/* Header */}
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-xl font-extrabold text-slate-800">بیماران</h1>
+          <p className="text-xs text-slate-500 mt-0.5">{toPersianDigits(filteredPatients.length)} بیمار</p>
+        </div>
+        <button onClick={openCreateModal} className="btn-teal px-4 py-2.5 text-sm flex items-center gap-1.5">
+          <Plus size={18} /> بیمار جدید
+        </button>
+      </div>
+
+      {/* Stats */}
+      <div className="grid grid-cols-4 gap-2">
+        <div className="quick-stat !p-3">
+          <div className="flex items-center gap-1 mb-0.5"><Users size={12} className="text-primary-600" /><span className="text-[9px] text-slate-500">کل</span></div>
+          <p className="text-lg font-extrabold text-slate-800">{toPersianDigits(stats.total)}</p>
+        </div>
+        <div className="quick-stat !p-3">
+          <div className="flex items-center gap-1 mb-0.5"><Award size={12} className="text-warning-600" /><span className="text-[9px] text-slate-500">VIP</span></div>
+          <p className="text-lg font-extrabold text-slate-800">{toPersianDigits(stats.vip)}</p>
+        </div>
+        <div className="quick-stat !p-3">
+          <div className="flex items-center gap-1 mb-0.5"><Plus size={12} className="text-success-600" /><span className="text-[9px] text-slate-500">این ماه</span></div>
+          <p className="text-lg font-extrabold text-slate-800">{toPersianDigits(stats.newThisMonth)}</p>
+        </div>
+        <div className="quick-stat !p-3">
+          <div className="flex items-center gap-1 mb-0.5"><Smile size={12} className="text-accent-600" /><span className="text-[9px] text-slate-500">فعال</span></div>
+          <p className="text-lg font-extrabold text-slate-800">{toPersianDigits(stats.active)}</p>
+        </div>
+      </div>
+
+      {/* Search & Filter */}
+      <div className="flex items-center gap-2">
+        <div className="relative flex-1">
+          <Search size={16} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400" />
+          <input
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            placeholder="جستجو بر اساس نام، تلفن، پرونده..."
+            className="w-full pr-10 pl-3 py-2.5 rounded-xl border border-slate-200 bg-white text-sm focus:outline-none focus:ring-2 focus:ring-primary-400"
+          />
+        </div>
+        <button onClick={() => { h.tap(); setShowFilters(!showFilters) }} className="p-2.5 rounded-xl bg-white border border-slate-200 text-slate-500 hover:text-primary-600 transition-all-smooth press-scale flex-shrink-0">
+          <Filter size={16} />
+        </button>
+      </div>
+
+      {/* Filters */}
+      {showFilters && (
+        <Card className="p-3">
+          <div className="grid grid-cols-3 gap-2">
+            <Select label="VIP" value={filterVip} onChange={(v) => { h.select(); setFilterVip(v) }} options={vipLevels.map((v) => ({ value: String(v.value), label: v.label }))} placeholder="همه" />
+            <Select label="جنسیت" value={filterGender} onChange={(v) => { h.select(); setFilterGender(v) }} options={genderOptions} placeholder="همه" />
+            <Select label="وضعیت" value={filterActive} onChange={(v) => { h.select(); setFilterActive(v) }} options={[{ value: 'true', label: 'فعال' }, { value: 'false', label: 'غیرفعال' }]} placeholder="همه" />
+          </div>
+          {(filterVip || filterGender || filterActive) && (
+            <button onClick={() => { h.cancel(); setFilterVip(''); setFilterGender(''); setFilterActive('') }} className="text-xs text-primary-600 mt-2">پاک کردن فیلترها</button>
+          )}
+        </Card>
+      )}
+
+      {/* Patient list */}
+      {filteredPatients.length === 0 ? (
+        <Card className="p-6">
+          <EmptyState
+            icon={<Users size={32} />}
+            title="بیماری یافت نشد"
+            description={searchQuery || filterVip || filterGender || filterActive ? "فیلترها را تغییر دهید" : "برای ثبت بیمار جدید کلیک کنید"}
+            action={!searchQuery && !filterVip && !filterGender && !filterActive ? <Button size="sm" onClick={openCreateModal}><Plus size={16} /> افزودن</Button> : undefined}
+          />
+        </Card>
+      ) : (
+        <div className="space-y-2">
+          {filteredPatients.map((patient) => {
+            const vipMeta = getVipMeta(patient.vip_level)
+            const age = calculateAge(patient.birth_date)
+            const fin = patientFinances.get(patient.id) || { balance: 0, paid: 0, totalCost: 0 }
+            const hasAllergies = patient.allergies && patient.allergies.trim().length > 0
+            const hasConditions = patient.medical_conditions && patient.medical_conditions.trim().length > 0
+
+            return (
+              <div
+                key={patient.id}
+                className="appt-card p-3.5 cursor-pointer"
+                onClick={() => { h.tap(); navigate(`/patients/${patient.id}`) }}
+              >
+                <div className="flex items-center gap-3">
+                  {/* Avatar */}
+                  <div className={`w-11 h-11 rounded-2xl bg-gradient-to-br ${getAvatarColor(patient.id)} flex items-center justify-center text-white font-bold text-sm flex-shrink-0 shadow-ios`}>
+                    {getInitials(patient)}
+                  </div>
+
+                  {/* Content */}
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 mb-0.5">
+                      <h3 className="font-bold text-sm text-slate-800 truncate">{patient.first_name} {patient.last_name}</h3>
+                      {vipMeta.value > 0 && <span className="text-[10px]">{vipMeta.icon}</span>}
+                    </div>
+                    <div className="flex items-center gap-2 flex-wrap text-[11px] text-slate-500">
+                      {patient.file_number && (
+                        <span className="flex items-center gap-0.5 font-mono">
+                          <FileText size={10} /> {patient.file_number}
+                        </span>
+                      )}
+                      {age !== null && <span>{toPersianDigits(age)} سال</span>}
+                      {patient.gender && <span>{patient.gender === 'male' ? 'آقا' : 'خانم'}</span>}
+                      {patient.phone && (
+                        <span className="flex items-center gap-0.5" dir="ltr">
+                          <Phone size={10} /> {toPersianDigits(patient.phone)}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Financial + edit + delete */}
+                  <div className="flex items-center gap-1.5 flex-shrink-0" onClick={(e) => e.stopPropagation()}>
+                    <button
+                      onClick={() => openEditModal(patient)}
+                      className="p-1.5 rounded-lg text-slate-400 hover:bg-slate-100 hover:text-slate-600 transition-all-smooth press-scale"
+                    >
+                      <Edit2 size={14} />
+                    </button>
+                    <button
+                      onClick={() => handleDelete(patient)}
+                      className="p-1.5 rounded-lg text-error-400 hover:bg-error-50 hover:text-error-600 transition-all-smooth press-scale"
+                    >
+                      <Trash2 size={14} />
+                    </button>
+                    {fin.totalCost > 0 ? (
+                      fin.balance <= 0 ? (
+                        <span className="status-pill bg-success-100 text-success-700">تسویه</span>
+                      ) : (
+                        <span className="status-pill bg-error-100 text-error-700">بدهکار</span>
+                      )
+                    ) : (
+                      <span className="status-pill bg-slate-100 text-slate-500">بدون تراکنش</span>
+                    )}
+                  </div>
+                </div>
+
+                {/* Medical alerts row */}
+                {(hasAllergies || hasConditions || !patient.is_active) && (
+                  <div className="flex items-center gap-1.5 mt-2 pt-2 border-t border-slate-100">
+                    {hasAllergies && <span className="status-pill bg-error-50 text-error-600"><AlertCircle size={10} className="ml-0.5" /> حساسیت</span>}
+                    {hasConditions && <span className="status-pill bg-warning-50 text-warning-600"><AlertCircle size={10} className="ml-0.5" /> بیماری زمینه‌ای</span>}
+                    {!patient.is_active && <span className="status-pill bg-slate-100 text-slate-500">غیرفعال</span>}
+                  </div>
+                )}
+              </div>
+            )
+          })}
+        </div>
+      )}
+
+      {/* Modal */}
+      {modalOpen && (
+        <Modal open={modalOpen} onClose={() => setModalOpen(false)} title={editingPatient ? 'ویرایش بیمار' : 'بیمار جدید'} size="full">
+          <div className="space-y-4">
+            {/* ── File number at top, always editable ── */}
+            <div className="flex items-center gap-3 p-4 rounded-2xl bg-gradient-to-br from-teal-50 to-sky-50 border border-teal-100">
+              <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-teal-500 to-teal-700 flex items-center justify-center text-white shadow-md flex-shrink-0">
+                <FileText size={22} />
+              </div>
+              <div className="flex-1">
+                <label className="block text-[10px] font-bold text-teal-700 mb-1 uppercase tracking-wider">شماره پرونده</label>
+                <input
+                  value={formData.file_number}
+                  onChange={(e) => { h.tap(); setFormData((p) => ({ ...p, file_number: e.target.value, file_number_manual: true })) }}
+                  placeholder="شماره پرونده"
+                  dir="ltr"
+                  className="w-full px-3 py-2 rounded-xl border border-teal-200 bg-white text-lg font-extrabold text-teal-800 focus:outline-none focus:ring-2 focus:ring-teal-400"
+                />
+              </div>
+              {!editingPatient && !formData.file_number_manual && (
+                <span className="text-[10px] text-teal-600 font-medium whitespace-nowrap">خودکار پیشنهاد شد</span>
+              )}
+            </div>
+            <div>
+              <h4 className="text-xs font-bold text-slate-500 mb-3 uppercase tracking-wider">اطلاعات شخصی</h4>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                <Input label="نام" value={formData.first_name} onChange={(v) => setFormData((p) => ({ ...p, first_name: v }))} placeholder="نام" />
+                <Input label="نام خانوادگی" value={formData.last_name} onChange={(v) => setFormData((p) => ({ ...p, last_name: v }))} placeholder="نام خانوادگی" />
+                <Input label="کد ملی" value={formData.national_id} onChange={(v) => setFormData((p) => ({ ...p, national_id: v }))} placeholder="کد ملی" dir="ltr" />
+                <Input label="تلفن" value={formData.phone} onChange={(v) => setFormData((p) => ({ ...p, phone: v }))} placeholder="09xxxxxxxxx" dir="ltr" />
+                <Input label="تلفن دوم" value={formData.phone2} onChange={(v) => setFormData((p) => ({ ...p, phone2: v }))} placeholder="تلفن ثانویه" dir="ltr" />
+                <Input label="ایمیل" type="email" value={formData.email} onChange={(v) => setFormData((p) => ({ ...p, email: v }))} placeholder="email@example.com" dir="ltr" />
+                <Input label="تاریخ تولد" type="date" value={formData.birth_date} onChange={(v) => setFormData((p) => ({ ...p, birth_date: v }))} />
+                <Select label="جنسیت" value={formData.gender} onChange={(v) => setFormData((p) => ({ ...p, gender: v }))} options={genderOptions} placeholder="انتخاب" />
+                <Select label="گروه خونی" value={formData.blood_type} onChange={(v) => setFormData((p) => ({ ...p, blood_type: v }))} options={bloodTypes.map((bt) => ({ value: bt, label: bt }))} placeholder="انتخاب" />
+              </div>
+            </div>
+            <div>
+              <h4 className="text-xs font-bold text-slate-500 mb-3 uppercase tracking-wider">آدرس</h4>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                <Input label="استان" value={formData.province} onChange={(v) => setFormData((p) => ({ ...p, province: v }))} placeholder="استان" />
+                <Input label="شهر" value={formData.city} onChange={(v) => setFormData((p) => ({ ...p, city: v }))} placeholder="شهر" />
+                <Input label="کد پستی" value={formData.postal_code} onChange={(v) => setFormData((p) => ({ ...p, postal_code: v }))} placeholder="کد پستی" dir="ltr" />
+                <Input label="آدرس کامل" value={formData.address} onChange={(v) => setFormData((p) => ({ ...p, address: v }))} placeholder="آدرس" className="md:col-span-3" />
+              </div>
+            </div>
+            <div>
+              <h4 className="text-xs font-bold text-slate-500 mb-3 uppercase tracking-wider">اطلاعات پزشکی</h4>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                <Textarea label="تاریخچه پزشکی" value={formData.medical_history} onChange={(v) => setFormData((p) => ({ ...p, medical_history: v }))} placeholder="بیماری‌های قبلی..." rows={2} />
+                <Textarea label="حساسیت‌ها" value={formData.allergies} onChange={(v) => setFormData((p) => ({ ...p, allergies: v }))} placeholder="حساسیت به دارو، غذا و..." rows={2} />
+                <Textarea label="داروهای مصرفی" value={formData.medications} onChange={(v) => setFormData((p) => ({ ...p, medications: v }))} placeholder="داروهای فعلی..." rows={2} />
+                <Textarea label="بیماری‌های زمینه‌ای" value={formData.medical_conditions} onChange={(v) => setFormData((p) => ({ ...p, medical_conditions: v }))} placeholder="بیماری‌های زمینه‌ای..." rows={2} />
+              </div>
+            </div>
+            <div>
+              <h4 className="text-xs font-bold text-slate-500 mb-3 uppercase tracking-wider">بیمه و دسته‌بندی</h4>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                <Input label="اطلاعات بیمه" value={formData.insurance_info} onChange={(v) => setFormData((p) => ({ ...p, insurance_info: v }))} placeholder="نام بیمه" />
+                <Input label="شماره بیمه" value={formData.insurance_number} onChange={(v) => setFormData((p) => ({ ...p, insurance_number: v }))} placeholder="شماره بیمه" dir="ltr" />
+                <Select label="سطح VIP" value={formData.vip_level} onChange={(v) => setFormData((p) => ({ ...p, vip_level: v }))} options={vipLevels.map((v) => ({ value: String(v.value), label: v.label }))} />
+                <Select label="پزشک اصلی" value={formData.primary_doctor_id} onChange={(v) => setFormData((p) => ({ ...p, primary_doctor_id: v }))} options={doctors.map((d) => ({ value: d.id, label: `دکتر ${d.name || d.specialty || 'پزشک'}` }))} placeholder="بدون پزشک اصلی" />
+                <Input label="برچسب‌ها" value={formData.tags} onChange={(v) => setFormData((p) => ({ ...p, tags: v }))} placeholder="برچسب۱, برچسب۲" />
+                <Select label="وضعیت" value={formData.is_active} onChange={(v) => setFormData((p) => ({ ...p, is_active: v }))} options={[{ value: 'true', label: 'فعال' }, { value: 'false', label: 'غیرفعال' }]} />
+              </div>
+            </div>
+            <Textarea label="یادداشت" value={formData.notes} onChange={(v) => setFormData((p) => ({ ...p, notes: v }))} placeholder="یادداشت‌های بیمار..." />
+            <div className="flex gap-2 justify-end pt-2 border-t border-slate-100">
+              <Button variant="secondary" onClick={() => { h.cancel(); setModalOpen(false) }}>انصراف</Button>
+              <Button variant="primary" onClick={handleSave} disabled={saving}>
+                {saving ? <Spinner size={16} /> : 'پیش‌نمایش و تایید'}
+              </Button>
+            </div>
+          </div>
+        </Modal>
+      )}
+
+      {ConfirmActionModal}
+    </div>
+  )
+}

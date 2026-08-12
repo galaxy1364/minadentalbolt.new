@@ -1,0 +1,708 @@
+// DentalChart.tsx — Professional interactive dental chart with SVG tooth shapes
+// Supports: FDI numbering, surfaces, conditions, treatment history, primary teeth
+import { useState, useMemo } from 'react'
+import { createPortal } from 'react-dom'
+import { Smile, Plus, Activity, AlertCircle, Clock, Grid3x3 } from 'lucide-react'
+import { h } from '../lib/haptics'
+import { ToothRecord, Treatment } from '../types'
+import { toPersianDigits, toJalaliStringPretty } from '../lib/persianDate'
+import { Badge } from './ui'
+
+// ── Types ─────────────────────────────────────────────────────
+export type ToothCondition =
+  | 'healthy'
+  | 'caries'
+  | 'restored'
+  | 'rct'
+  | 'crown'
+  | 'implant'
+  | 'extraction'
+  | 'missing'
+  | 'bridge'
+  | 'veneer'
+  | 'sealant'
+
+export type ToothSurface = 'occlusal' | 'mesial' | 'distal' | 'buccal' | 'lingual'
+
+interface ToothSurfaceCondition {
+  surface: ToothSurface
+  condition: ToothCondition
+  treatmentId?: string
+  date?: string
+}
+
+interface ToothData {
+  number: number
+  condition: ToothCondition
+  surfaces: ToothSurfaceCondition[]
+  notes?: string
+  record?: ToothRecord
+  treatments: Treatment[]
+}
+
+// ── Constants ─────────────────────────────────────────────────
+const upperRight = [18, 17, 16, 15, 14, 13, 12, 11]
+const upperLeft = [21, 22, 23, 24, 25, 26, 27, 28]
+const lowerLeft = [31, 32, 33, 34, 35, 36, 37, 38]
+const lowerRight = [48, 47, 46, 45, 44, 43, 42, 41]
+
+// Palmer notation: each quadrant uses 1-8, displayed with quadrant symbols
+// Upper Right ┘, Upper Left └, Lower Left ┐, Lower Right ┌
+const palmerUpperRight = [8, 7, 6, 5, 4, 3, 2, 1]
+const palmerUpperLeft = [1, 2, 3, 4, 5, 6, 7, 8]
+const palmerLowerLeft = [1, 2, 3, 4, 5, 6, 7, 8]
+const palmerLowerRight = [8, 7, 6, 5, 4, 3, 2, 1]
+
+const palmerPrimaryUpperRight = ['E', 'D', 'C', 'B', 'A']
+const palmerPrimaryUpperLeft = ['A', 'B', 'C', 'D', 'E']
+const palmerPrimaryLowerLeft = ['A', 'B', 'C', 'D', 'E']
+const palmerPrimaryLowerRight = ['E', 'D', 'C', 'B', 'A']
+
+const palmerSymbols: Record<string, string> = {
+  upperRight: '┘', upperLeft: '└', lowerLeft: '┐', lowerRight: '┌',
+  primaryUpperRight: '┘', primaryUpperLeft: '└', primaryLowerLeft: '┐', primaryLowerRight: '┌',
+}
+
+// Convert FDI number to Palmer display string
+function fdiToPalmer(fdi: number): string {
+  const quad = Math.floor(fdi / 10)
+  const num = fdi % 10
+  if (fdi >= 51 && fdi <= 85) {
+    // Primary teeth: FDI 51-55=UR, 61-65=UL, 71-75=LL, 81-85=LR
+    const primaryMap: Record<number, string> = {
+      51: 'A', 52: 'B', 53: 'C', 54: 'D', 55: 'E',
+      61: 'A', 62: 'B', 63: 'C', 64: 'D', 65: 'E',
+      71: 'A', 72: 'B', 73: 'C', 74: 'D', 75: 'E',
+      81: 'A', 82: 'B', 83: 'C', 84: 'D', 85: 'E',
+    }
+    return primaryMap[fdi] || String(num)
+  }
+  return String(num)
+}
+
+const primaryUpperRight = [55, 54, 53, 52, 51]
+const primaryUpperLeft = [61, 62, 63, 64, 65]
+const primaryLowerLeft = [71, 72, 73, 74, 75]
+const primaryLowerRight = [85, 84, 83, 82, 81]
+
+const conditionMeta: Record<ToothCondition, { label: string; color: string; bg: string; border: string; dot: string }> = {
+  healthy: { label: 'سالم', color: 'text-slate-600', bg: 'bg-white', border: 'border-slate-200', dot: 'bg-slate-300' },
+  caries: { label: 'پوسیدگی', color: 'text-error-700', bg: 'bg-error-50', border: 'border-error-300', dot: 'bg-error-500' },
+  restored: { label: 'ترمیم شده', color: 'text-primary-700', bg: 'bg-primary-50', border: 'border-primary-300', dot: 'bg-primary-500' },
+  rct: { label: 'عصب‌کشی', color: 'text-warning-700', bg: 'bg-warning-50', border: 'border-warning-400', dot: 'bg-warning-500' },
+  crown: { label: 'روکش', color: 'text-accent-700', bg: 'bg-accent-50', border: 'border-accent-400', dot: 'bg-accent-500' },
+  implant: { label: 'ایمپلنت', color: 'text-secondary-700', bg: 'bg-secondary-50', border: 'border-secondary-400', dot: 'bg-secondary-500' },
+  extraction: { label: 'کشیده شده', color: 'text-slate-500', bg: 'bg-slate-200', border: 'border-slate-400', dot: 'bg-slate-500' },
+  missing: { label: 'مفقود', color: 'text-slate-400', bg: 'bg-slate-100', border: 'border-slate-300', dot: 'bg-slate-400' },
+  bridge: { label: 'بریج', color: 'text-primary-600', bg: 'bg-primary-50', border: 'border-primary-400', dot: 'bg-primary-400' },
+  veneer: { label: 'ونیر', color: 'text-accent-600', bg: 'bg-accent-50', border: 'border-accent-300', dot: 'bg-accent-400' },
+  sealant: { label: 'سیلنت', color: 'text-success-700', bg: 'bg-success-50', border: 'border-success-300', dot: 'bg-success-500' },
+}
+
+const surfaceLabels: Record<ToothSurface, string> = {
+  occlusal: 'اکلوزال (جونده)',
+  mesial: 'مزیال',
+  distal: 'دیستال',
+  buccal: 'باکال (بیرونی)',
+  lingual: 'لینگوال (داخلی)',
+}
+
+const conditionOptions: { value: ToothCondition; label: string }[] = [
+  { value: 'healthy', label: 'سالم' },
+  { value: 'caries', label: 'پوسیدگی' },
+  { value: 'restored', label: 'ترمیم شده' },
+  { value: 'rct', label: 'عصب‌کشی' },
+  { value: 'crown', label: 'روکش' },
+  { value: 'implant', label: 'ایمپلنت' },
+  { value: 'extraction', label: 'کشیده شده' },
+  { value: 'missing', label: 'مفقود' },
+  { value: 'bridge', label: 'بریج' },
+  { value: 'veneer', label: 'ونیر' },
+  { value: 'sealant', label: 'سیلنت' },
+]
+
+// ── SVG Tooth Component ──────────────────────────────────────
+function ToothSVG({
+  number,
+  condition,
+  surfaces,
+  size = 48,
+  onClick,
+  selected,
+  labelOverride,
+}: {
+  number: number
+  condition: ToothCondition
+  surfaces: ToothSurfaceCondition[]
+  size?: number
+  onClick?: () => void
+  selected?: boolean
+  labelOverride?: string
+}) {
+  const meta = conditionMeta[condition]
+  const isUpper = number <= 28 || (number >= 51 && number <= 65)
+  const isMolar = number % 10 >= 6
+  const isPremolar = number % 10 >= 4 && number % 10 <= 5
+  const isAnterior = number % 10 <= 3
+
+  // Colors based on condition
+  const fillColors: Record<ToothCondition, string> = {
+    healthy: '#ffffff',
+    caries: '#fef2f2',
+    restored: '#eff6ff',
+    rct: '#fffbeb',
+    crown: '#f0fdfa',
+    implant: '#f5f3ff',
+    extraction: '#e2e8f0',
+    missing: '#f1f5f9',
+    bridge: '#eff6ff',
+    veneer: '#f0fdfa',
+    sealant: '#f0fdf4',
+  }
+
+  const strokeColors: Record<ToothCondition, string> = {
+    healthy: '#cbd5e1',
+    caries: '#f87171',
+    restored: '#3b82f6',
+    rct: '#f59e0b',
+    crown: '#06b6d4',
+    implant: '#8b5cf6',
+    extraction: '#64748b',
+    missing: '#94a3b8',
+    bridge: '#3b82f6',
+    veneer: '#06b6d4',
+    sealant: '#22c55e',
+  }
+
+  const fillColor = fillColors[condition]
+  const strokeColor = strokeColors[condition]
+  const sw = selected ? 3 : 1.5
+
+  // Surface fill colors (for caries on specific surfaces)
+  const getSurfaceFill = (surface: ToothSurface): string => {
+    const sc = surfaces.find((s) => s.surface === surface)
+    if (!sc || sc.condition === 'healthy') return fillColor
+    return fillColors[sc.condition] || fillColor
+  }
+
+  if (condition === 'missing' || condition === 'extraction') {
+    return (
+      <svg width={size} height={size * 1.2} viewBox="0 0 48 56" onClick={onClick} className="cursor-pointer transition-all">
+        <g opacity="0.4">
+          <text x="24" y="30" textAnchor="middle" fontSize="14" fill="#94a3b8" fontWeight="bold">
+            ✕
+          </text>
+        </g>
+        <text x="24" y="50" textAnchor="middle" fontSize="9" fill="#94a3b8" fontWeight="600">
+          {labelOverride || toPersianDigits(number)}
+        </text>
+      </svg>
+    )
+  }
+
+  // Draw tooth based on type
+  if (isMolar) {
+    // Molar: wide crown with multiple cusps
+    return (
+      <svg width={size} height={size * 1.2} viewBox="0 0 48 56" onClick={onClick} className="cursor-pointer transition-all">
+        {/* Root */}
+        <path
+          d="M 14 28 Q 12 40, 16 48 M 34 28 Q 36 40, 32 48"
+          fill="none"
+          stroke={strokeColor}
+          strokeWidth={sw}
+          strokeLinecap="round"
+          opacity="0.5"
+        />
+        {/* Crown outline */}
+        <path
+          d="M 8 14 Q 6 8, 12 6 L 36 6 Q 42 8, 40 14 L 40 26 Q 38 30, 34 28 L 14 28 Q 10 30, 8 26 Z"
+          fill={fillColor}
+          stroke={strokeColor}
+          strokeWidth={sw}
+          strokeLinejoin="round"
+        />
+        {/* Occlusal surface (center) */}
+        <ellipse cx="24" cy="17" rx="10" ry="6" fill={getSurfaceFill('occlusal')} stroke={strokeColor} strokeWidth="0.8" opacity="0.7" />
+        {/* Cusps */}
+        <circle cx="16" cy="13" r="2.5" fill={getSurfaceFill('occlusal')} stroke={strokeColor} strokeWidth="0.6" opacity="0.5" />
+        <circle cx="32" cy="13" r="2.5" fill={getSurfaceFill('occlusal')} stroke={strokeColor} strokeWidth="0.6" opacity="0.5" />
+        <circle cx="16" cy="22" r="2.5" fill={getSurfaceFill('occlusal')} stroke={strokeColor} strokeWidth="0.6" opacity="0.5" />
+        <circle cx="32" cy="22" r="2.5" fill={getSurfaceFill('occlusal')} stroke={strokeColor} strokeWidth="0.6" opacity="0.5" />
+        {/* Mesial (right side) */}
+        <line x1="40" y1="14" x2="40" y2="26" stroke={strokeColor} strokeWidth="1" opacity="0.3" />
+        {/* Distal (left side) */}
+        <line x1="8" y1="14" x2="8" y2="26" stroke={strokeColor} strokeWidth="1" opacity="0.3" />
+        {/* Number */}
+        <text x="24" y="50" textAnchor="middle" fontSize="9" fill={strokeColor} fontWeight="700">
+          {labelOverride || toPersianDigits(number)}
+        </text>
+      </svg>
+    )
+  } else if (isPremolar) {
+    // Premolar: smaller crown, 2 cusps
+    return (
+      <svg width={size} height={size * 1.2} viewBox="0 0 48 56" onClick={onClick} className="cursor-pointer transition-all">
+        {/* Root */}
+        <path d="M 20 28 Q 18 42, 22 48 M 28 28 Q 30 42, 26 48" fill="none" stroke={strokeColor} strokeWidth={sw} strokeLinecap="round" opacity="0.5" />
+        {/* Crown */}
+        <path
+          d="M 12 12 Q 10 6, 16 5 L 32 5 Q 38 6, 36 12 L 36 26 Q 34 30, 30 28 L 18 28 Q 14 30, 12 26 Z"
+          fill={fillColor}
+          stroke={strokeColor}
+          strokeWidth={sw}
+          strokeLinejoin="round"
+        />
+        {/* Occlusal */}
+        <ellipse cx="24" cy="16" rx="7" ry="5" fill={getSurfaceFill('occlusal')} stroke={strokeColor} strokeWidth="0.8" opacity="0.7" />
+        {/* 2 cusps */}
+        <circle cx="18" cy="13" r="2" fill={getSurfaceFill('occlusal')} stroke={strokeColor} strokeWidth="0.5" opacity="0.5" />
+        <circle cx="30" cy="13" r="2" fill={getSurfaceFill('occlusal')} stroke={strokeColor} strokeWidth="0.5" opacity="0.5" />
+        <text x="24" y="50" textAnchor="middle" fontSize="9" fill={strokeColor} fontWeight="700">
+          {labelOverride || toPersianDigits(number)}
+        </text>
+      </svg>
+    )
+  } else {
+    // Anterior (incisor/canine): single root, narrow crown
+    const isCanine = number % 10 === 3
+    return (
+      <svg width={size} height={size * 1.2} viewBox="0 0 48 56" onClick={onClick} className="cursor-pointer transition-all">
+        {/* Root */}
+        <path
+          d={isCanine ? "M 24 28 Q 22 44, 24 50" : "M 20 28 Q 18 44, 22 50 M 28 28 Q 30 44, 26 50"}
+          fill="none"
+          stroke={strokeColor}
+          strokeWidth={sw}
+          strokeLinecap="round"
+          opacity="0.5"
+        />
+        {/* Crown */}
+        {isCanine ? (
+          <path
+            d="M 16 8 Q 14 4, 20 3 L 28 3 Q 34 4, 32 8 L 30 28 Q 24 32, 18 28 Z"
+            fill={fillColor}
+            stroke={strokeColor}
+            strokeWidth={sw}
+            strokeLinejoin="round"
+          />
+        ) : (
+          <path
+            d="M 14 6 Q 12 3, 18 2 L 30 2 Q 36 3, 34 6 L 32 28 Q 24 31, 16 28 Z"
+            fill={fillColor}
+            stroke={strokeColor}
+            strokeWidth={sw}
+            strokeLinejoin="round"
+          />
+        )}
+        {/* Lingual surface (back) */}
+        <path d="M 18 8 Q 24 12, 30 8" fill="none" stroke={strokeColor} strokeWidth="0.8" opacity="0.4" />
+        <text x="24" y="50" textAnchor="middle" fontSize="9" fill={strokeColor} fontWeight="700">
+          {labelOverride || toPersianDigits(number)}
+        </text>
+      </svg>
+    )
+  }
+}
+
+// ── Tooth Detail Panel ────────────────────────────────────────
+function ToothDetailPanel({
+  tooth,
+  onClose,
+  onUpdate,
+  onAddTreatment,
+}: {
+  tooth: ToothData
+  onClose: () => void
+  onUpdate: (condition: ToothCondition, surfaceConditions: ToothSurfaceCondition[], notes: string) => void
+  onAddTreatment?: (toothNumber: string) => void
+}) {
+  const [condition, setCondition] = useState<ToothCondition>(tooth.condition)
+  const [surfaceConditions, setSurfaceConditions] = useState<ToothSurfaceCondition[]>(tooth.surfaces)
+  const [notes, setNotes] = useState(tooth.notes || '')
+  const [activeSurface, setActiveSurface] = useState<ToothSurface | null>(null)
+
+  const toggleSurfaceCondition = (surface: ToothSurface, cond: ToothCondition) => {
+    setSurfaceConditions((prev) => {
+      const existing = prev.find((s) => s.surface === surface)
+      if (existing && existing.condition === cond) {
+        return prev.filter((s) => s.surface !== surface)
+      }
+      if (existing) {
+        return prev.map((s) => (s.surface === surface ? { ...s, condition: cond } : s))
+      }
+      return [...prev, { surface, condition: cond }]
+    })
+  }
+
+  const getSurfaceCondition = (surface: ToothSurface): ToothCondition => {
+    return surfaceConditions.find((s) => s.surface === surface)?.condition || 'healthy'
+  }
+
+  return createPortal(
+    <div className="fixed inset-0 z-50 flex items-end md:items-center justify-center bg-black/30 backdrop-blur-sm" onClick={onClose}>
+      <div
+        className="bg-white rounded-t-3xl md:rounded-3xl shadow-2xl w-full max-w-lg max-h-[85vh] overflow-y-auto"
+        onClick={(e) => e.stopPropagation()}
+      >
+        {/* Header */}
+        <div className="sticky top-0 bg-white border-b border-slate-100 px-5 py-4 flex items-center justify-between z-10">
+          <div className="flex items-center gap-3">
+            <div className="w-12 h-12 rounded-xl bg-primary-50 flex items-center justify-center">
+              <Smile size={24} className="text-primary-600" />
+            </div>
+            <div>
+              <h3 className="text-base font-bold text-slate-800">دندان {toPersianDigits(tooth.number)}</h3>
+              <p className="text-xs text-slate-500">{conditionMeta[condition].label}</p>
+            </div>
+          </div>
+          <button onClick={onClose} className="p-2 rounded-lg hover:bg-slate-100 text-slate-400">
+            <span className="text-xl">✕</span>
+          </button>
+        </div>
+
+        <div className="p-5 space-y-5">
+          {/* Tooth Visual */}
+          <div className="flex justify-center py-2">
+            <div className="bg-slate-50 rounded-2xl p-4">
+              <ToothSVG number={tooth.number} condition={condition} surfaces={surfaceConditions} size={80} />
+            </div>
+          </div>
+
+          {/* Overall Condition */}
+          <div>
+            <h4 className="text-xs font-bold text-slate-500 mb-2">وضعیت کلی دندان</h4>
+            <div className="grid grid-cols-3 gap-2">
+              {conditionOptions.map((opt) => {
+                const meta = conditionMeta[opt.value]
+                const isActive = condition === opt.value
+                return (
+                  <button
+                    key={opt.value}
+                    onClick={() => setCondition(opt.value)}
+                    className={`px-3 py-2 rounded-xl border-2 text-xs font-medium transition-all-smooth ${
+                      isActive ? `${meta.bg} ${meta.border} ${meta.color} scale-105` : 'bg-white border-slate-100 text-slate-500 hover:border-slate-200'
+                    }`}
+                  >
+                    <span className={`inline-block w-2 h-2 rounded-full ${meta.dot} ml-1`} />
+                    {opt.label}
+                  </button>
+                )
+              })}
+            </div>
+          </div>
+
+          {/* Surface Conditions */}
+          {condition !== 'missing' && condition !== 'extraction' && (
+            <div>
+              <h4 className="text-xs font-bold text-slate-500 mb-2">سطوح دندان</h4>
+              <div className="space-y-2">
+                {(Object.keys(surfaceLabels) as ToothSurface[]).map((surface) => {
+                  const sc = getSurfaceCondition(surface)
+                  const meta = conditionMeta[sc]
+                  return (
+                    <div key={surface} className={`p-3 rounded-xl border-2 ${meta.bg} ${meta.border}`}>
+                      <div className="flex items-center justify-between mb-2">
+                        <span className="text-sm font-medium text-slate-700">{surfaceLabels[surface]}</span>
+                        <Badge color={sc === 'healthy' ? 'slate' : sc === 'caries' ? 'error' : 'primary'}>
+                          {meta.label}
+                        </Badge>
+                      </div>
+                      <div className="flex flex-wrap gap-1">
+                        {conditionOptions.filter((o) => o.value !== 'missing' && o.value !== 'extraction').map((opt) => {
+                          const isActive = sc === opt.value
+                          return (
+                            <button
+                              key={opt.value}
+                              onClick={() => toggleSurfaceCondition(surface, opt.value)}
+                              className={`px-2 py-1 rounded-lg text-[10px] font-medium transition-all-smooth ${
+                                isActive ? `${conditionMeta[opt.value].bg} ${conditionMeta[opt.value].border} ${conditionMeta[opt.value].color}` : 'bg-white/60 text-slate-400 hover:bg-white'
+                              }`}
+                            >
+                              {opt.label}
+                            </button>
+                          )
+                        })}
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+            </div>
+          )}
+
+          {/* Treatment History */}
+          {tooth.treatments.length > 0 && (
+            <div>
+              <h4 className="text-xs font-bold text-slate-500 mb-2 flex items-center gap-1">
+                <Activity size={14} /> تاریخچه درمان
+              </h4>
+              <div className="space-y-2">
+                {tooth.treatments.map((t) => (
+                  <div key={t.id} className="flex items-center justify-between p-2 rounded-lg bg-slate-50 border border-slate-100">
+                    <div>
+                      <p className="text-sm text-slate-700">{t.procedure_name || t.description || 'درمان'}</p>
+                      <p className="text-xs text-slate-400">{toJalaliStringPretty(t.created_at)}</p>
+                    </div>
+                    {t.total_price != null && (
+                      <span className="text-xs font-bold text-slate-600">{toPersianDigits(t.total_price.toLocaleString('en-US'))} ت</span>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Notes */}
+          <div>
+            <h4 className="text-xs font-bold text-slate-500 mb-2">یادداشت</h4>
+            <textarea
+              value={notes}
+              onChange={(e) => setNotes(e.target.value)}
+              placeholder="یادداشت درباره این دندان..."
+              className="w-full p-3 rounded-xl border border-slate-200 text-sm text-slate-700 focus:border-primary-400 focus:ring-2 focus:ring-primary-100 outline-none resize-none"
+              rows={2}
+            />
+          </div>
+
+          {/* Save */}
+          <button
+            onClick={() => onUpdate(condition, surfaceConditions, notes)}
+            className="w-full py-3 rounded-xl bg-primary-600 text-white font-medium text-sm hover:bg-primary-700 transition-all-smooth"
+          >
+            ذخیره تغییرات
+          </button>
+
+          {/* Add treatment for this tooth */}
+          {onAddTreatment && (
+            <button
+              onClick={() => { onAddTreatment(String(tooth.number)); onClose() }}
+              className="w-full py-3 rounded-xl bg-accent-50 text-accent-700 font-medium text-sm hover:bg-accent-100 transition-all-smooth flex items-center justify-center gap-1.5 border border-accent-200"
+            >
+              <Plus size={16} /> افزودن درمان برای دندان {toPersianDigits(tooth.number)}
+            </button>
+          )}
+        </div>
+      </div>
+    </div>,
+    document.body
+  )
+}
+
+// ── Main Component ────────────────────────────────────────────
+interface DentalChartProps {
+  toothRecords: ToothRecord[]
+  treatments: Treatment[]
+  onUpdateTooth: (toothNumber: string, data: { is_missing: boolean; is_implant: boolean; notes: string; condition?: string; surfaces?: string }) => void
+  onAddTreatment?: (toothNumber: string) => void
+}
+
+type NotationSystem = 'fdi' | 'palmer'
+
+export default function DentalChart({ toothRecords, treatments, onUpdateTooth, onAddTreatment }: DentalChartProps) {
+  const [selectedTooth, setSelectedTooth] = useState<ToothData | null>(null)
+  const [showPrimary, setShowPrimary] = useState(false)
+  const [notation, setNotation] = useState<NotationSystem>('palmer')
+
+  const allTeeth = useMemo(() => {
+    const permanent = [...upperRight, ...upperLeft, ...lowerLeft, ...lowerRight]
+    const primary = [...primaryUpperRight, ...primaryUpperLeft, ...primaryLowerLeft, ...primaryLowerRight]
+    return showPrimary ? [...permanent, ...primary] : permanent
+  }, [showPrimary])
+
+  const getToothData = (number: number): ToothData => {
+    const record = toothRecords.find((r) => r.tooth_number === String(number))
+    const toothTreatments = treatments.filter((t) => String(t.tooth_number) === String(number))
+
+    // Load saved surfaces from record
+    let savedSurfaces: ToothSurfaceCondition[] = []
+    try {
+      if (record?.surfaces) {
+        const parsed = JSON.parse(record.surfaces)
+        if (Array.isArray(parsed)) savedSurfaces = parsed
+      }
+    } catch {}
+
+    // Load saved condition from record, fall back to derivation from treatments
+    let condition: ToothCondition = 'healthy'
+    if (record?.condition && record.condition !== 'healthy') {
+      condition = record.condition as ToothCondition
+    } else if (record?.is_missing) {
+      condition = 'missing'
+    } else if (record?.is_implant) {
+      condition = 'implant'
+    } else if (toothTreatments.some((t) => t.procedure_name?.includes('عصب') || t.description?.includes('RCT'))) {
+      condition = 'rct'
+    } else if (toothTreatments.some((t) => t.procedure_name?.includes('روکش') || t.description?.includes('crown'))) {
+      condition = 'crown'
+    } else if (toothTreatments.some((t) => t.procedure_name?.includes('ترمیم') || t.description?.includes('restoration'))) {
+      condition = 'restored'
+    } else if (toothTreatments.some((t) => t.procedure_name?.includes('کشید') || t.description?.includes('extract'))) {
+      condition = 'extraction'
+    }
+
+    return {
+      number,
+      condition,
+      surfaces: savedSurfaces,
+      notes: record?.notes || '',
+      record,
+      treatments: toothTreatments,
+    }
+  }
+
+  const handleUpdate = (condition: ToothCondition, surfaces: ToothSurfaceCondition[], notes: string) => {
+    if (!selectedTooth) return
+    onUpdateTooth(String(selectedTooth.number), {
+      is_missing: condition === 'missing' || condition === 'extraction',
+      is_implant: condition === 'implant',
+      notes,
+      condition,
+      surfaces: JSON.stringify(surfaces),
+    })
+    setSelectedTooth(null)
+  }
+
+  const getToothLabel = (fdiNumber: number): string => {
+    if (notation === 'palmer') return fdiToPalmer(fdiNumber)
+    return toPersianDigits(fdiNumber)
+  }
+
+  const renderQuadrant = (teeth: number[], _label: string, palmerSymbol?: string) => (
+    <div className="flex items-center gap-0.5 relative">
+      {palmerSymbol && notation === 'palmer' && (
+        <span className="text-2xl font-bold text-slate-400 ml-0.5 mr-0.5 select-none">{palmerSymbol}</span>
+      )}
+      {teeth.map((num) => {
+        const data = getToothData(num)
+        return (
+          <div
+            key={num}
+            onClick={() => setSelectedTooth(data)}
+            className={`rounded-lg p-0.5 cursor-pointer transition-all-smooth hover:bg-slate-100 ${selectedTooth?.number === num ? 'bg-primary-50 ring-2 ring-primary-300' : ''}`}
+          >
+            <ToothSVG
+              number={num}
+              condition={data.condition}
+              surfaces={data.surfaces}
+              size={36}
+              selected={selectedTooth?.number === num}
+              labelOverride={getToothLabel(num)}
+            />
+          </div>
+        )
+      })}
+    </div>
+  )
+
+  return (
+    <div className="space-y-4">
+      {/* Legend */}
+      <div className="flex items-center gap-3 flex-wrap text-xs">
+        {(['healthy', 'caries', 'restored', 'rct', 'crown', 'implant', 'extraction', 'missing'] as ToothCondition[]).map((c) => {
+          const meta = conditionMeta[c]
+          return (
+            <span key={c} className="flex items-center gap-1">
+              <span className={`w-3 h-3 rounded ${meta.dot}`} />
+              <span className="text-slate-600">{meta.label}</span>
+            </span>
+          )
+        })}
+      </div>
+
+      {/* Controls */}
+      <div className="flex items-center justify-between flex-wrap gap-2">
+        <div className="flex items-center gap-1 p-1 rounded-xl bg-slate-100">
+          <button
+            onClick={() => { h.select(); setNotation('palmer') }}
+            className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all-smooth ${notation === 'palmer' ? 'bg-white text-primary-600 shadow-sm' : 'text-slate-500'}`}
+          >پالمر</button>
+          <button
+            onClick={() => { h.select(); setNotation('fdi') }}
+            className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all-smooth ${notation === 'fdi' ? 'bg-white text-primary-600 shadow-sm' : 'text-slate-500'}`}
+          >FDI</button>
+        </div>
+        <label className="flex items-center gap-2 text-xs text-slate-500 cursor-pointer">
+          <input
+            type="checkbox"
+            checked={showPrimary}
+            onChange={(e) => setShowPrimary(e.target.checked)}
+            className="rounded border-slate-300 text-primary-600 focus:ring-primary-500"
+          />
+          نمایش دندان‌های شیری
+        </label>
+      </div>
+
+      {/* Permanent Teeth Chart */}
+      <div className="bg-white rounded-2xl border border-slate-100 p-4 md:p-6">
+        {/* Upper Jaw */}
+        <div className="mb-6">
+          <p className="text-xs text-slate-400 mb-3 text-center font-medium">فک بالا (ماکسیلاری)</p>
+          <div className="flex items-center justify-center gap-1 flex-wrap">
+            {renderQuadrant(upperRight, 'فوق راست', palmerSymbols.upperRight)}
+            <div className="w-px h-12 bg-slate-200 mx-2" />
+            {renderQuadrant(upperLeft, 'فوق چپ', palmerSymbols.upperLeft)}
+          </div>
+        </div>
+
+        {/* Lower Jaw */}
+        <div>
+          <p className="text-xs text-slate-400 mb-3 text-center font-medium">فک پایین (ماندیبول)</p>
+          <div className="flex items-center justify-center gap-1 flex-wrap">
+            {renderQuadrant(lowerRight, 'تحت راست', palmerSymbols.lowerRight)}
+            <div className="w-px h-12 bg-slate-200 mx-2" />
+            {renderQuadrant(lowerLeft, 'تحت چپ', palmerSymbols.lowerLeft)}
+          </div>
+        </div>
+      </div>
+
+      {/* Primary Teeth Chart */}
+      {showPrimary && (
+        <div className="bg-amber-50/30 rounded-2xl border border-amber-100 p-4 md:p-6">
+          <p className="text-xs text-amber-600 mb-3 text-center font-medium">دندان‌های شیری</p>
+          <div className="mb-4">
+            <div className="flex items-center justify-center gap-1 flex-wrap">
+              {renderQuadrant(primaryUpperRight, 'شیری فوق راست', palmerSymbols.primaryUpperRight)}
+              <div className="w-px h-10 bg-amber-200 mx-2" />
+              {renderQuadrant(primaryUpperLeft, 'شیری فوق چپ', palmerSymbols.primaryUpperLeft)}
+            </div>
+          </div>
+          <div>
+            <div className="flex items-center justify-center gap-1 flex-wrap">
+              {renderQuadrant(primaryLowerRight, 'شیری تحت راست', palmerSymbols.primaryLowerRight)}
+              <div className="w-px h-10 bg-amber-200 mx-2" />
+              {renderQuadrant(primaryLowerLeft, 'شیری تحت چپ', palmerSymbols.primaryLowerLeft)}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Summary */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+        {(['caries', 'rct', 'crown', 'implant'] as ToothCondition[]).map((c) => {
+          const count = allTeeth.filter((n) => getToothData(n).condition === c).length
+          const meta = conditionMeta[c]
+          return (
+            <div key={c} className={`p-3 rounded-xl ${meta.bg} border ${meta.border}`}>
+              <div className="flex items-center gap-2">
+                <span className={`w-3 h-3 rounded-full ${meta.dot}`} />
+                <span className="text-xs text-slate-600">{meta.label}</span>
+              </div>
+              <p className={`text-xl font-bold ${meta.color} mt-1`}>{toPersianDigits(count)}</p>
+            </div>
+          )
+        })}
+      </div>
+
+      {/* Tooth Detail Panel */}
+      {selectedTooth && (
+        <ToothDetailPanel
+          tooth={selectedTooth}
+          onClose={() => setSelectedTooth(null)}
+          onUpdate={handleUpdate}
+          onAddTreatment={onAddTreatment}
+        />
+      )}
+    </div>
+  )
+}
