@@ -1,0 +1,20 @@
+{
+  "name": "مینادنت - سیستم مدیریت مطب دندانپزشکی",
+  "short_name": "مینادنت",
+  "description": "سیستم فوق‌هوشمند مدیریت مطب دندانپزشکی",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#f8fafc",
+  "theme_color": "#0d9488",
+  "orientation": "portrait-primary",
+  "dir": "rtl",
+  "lang": "fa",
+  "icons": [
+    {
+      "src": "/favicon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}
