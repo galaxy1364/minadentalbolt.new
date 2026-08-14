@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom'
 import { X, AlertCircle, CheckCircle2, Info, Loader2, ChevronRight, ChevronLeft } from 'lucide-react'
 import { h } from '../lib/haptics'
 import { toPersianDigits } from '../lib/persianDate'
+import { matchRanges } from '../lib/fuzzySearch'
 
 export function Spinner({ size = 24 }: { size?: number }) {
   return <Loader2 size={size} className="animate-spin text-primary-500 mx-auto" />
@@ -299,6 +300,40 @@ type ToastMsg = { id: number; type: 'success' | 'error' | 'info'; message: strin
 let toastId = 0
 const toastListeners: ((toasts: ToastMsg[]) => void)[] = []
 let currentToasts: ToastMsg[] = []
+
+export function HighlightText({ text, query, className = '' }: { text: string; query: string; className?: string }) {
+  if (!query.trim()) return <span className={className}>{text}</span>
+  const ranges = matchRanges(query, text)
+  if (ranges.length === 0) return <span className={className}>{text}</span>
+  const [start, end] = ranges[0]
+  return (
+    <span className={className}>
+      {text.slice(0, start)}
+      <mark className="bg-primary-100 dark:bg-primary-900/50 text-primary-800 dark:text-primary-300 rounded px-0.5">{text.slice(start, end)}</mark>
+      {text.slice(end)}
+    </span>
+  )
+}
+
+export function SkeletonRow({ className = '' }: { className?: string }) {
+  return (
+    <div className={`animate-pulse flex items-center gap-3 p-3 rounded-2xl bg-white dark:bg-slate-800 card-shadow ${className}`}>
+      <div className="w-11 h-11 rounded-full bg-slate-200 dark:bg-slate-700 shrink-0" />
+      <div className="flex-1 min-w-0 space-y-2">
+        <div className="h-3 w-2/5 rounded bg-slate-200 dark:bg-slate-700" />
+        <div className="h-2.5 w-3/5 rounded bg-slate-200 dark:bg-slate-700" />
+      </div>
+    </div>
+  )
+}
+
+export function SkeletonList({ count = 5 }: { count?: number }) {
+  return (
+    <div className="space-y-2">
+      {Array.from({ length: count }).map((_, i) => <SkeletonRow key={i} />)}
+    </div>
+  )
+}
 
 export function showToast(type: 'success' | 'error' | 'info', message: string) {
   const id = ++toastId

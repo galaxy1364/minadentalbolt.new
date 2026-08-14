@@ -15,6 +15,19 @@ import { ModuleHeader, ModuleStatCard } from '../components/ModuleHeader'
 // Constants
 // ============================================================================
 
+// Quick-add suggestions for common dental prescriptions — tap to insert a
+// pre-formatted line instead of typing it out.
+const COMMON_DENTAL_MEDS = [
+  'آموکسی‌سیلین | ۵۰۰mg | ۳ بار در روز به مدت ۷ روز',
+  'آموکسی‌سیلین + کلاوولانیک اسید | ۶۲۵mg | ۳ بار در روز به مدت ۷ روز',
+  'مترونیدازول | ۴۰۰mg | ۳ بار در روز به مدت ۷ روز',
+  'کلیندامایسین | ۳۰۰mg | ۴ بار در روز به مدت ۷ روز',
+  'ایبوپروفن | ۴۰۰mg | هر ۶-۸ ساعت در صورت درد',
+  'استامینوفن کدئین | ۱ قرص | هر ۶ ساعت در صورت درد شدید',
+  'دگزامتازون | ۰.۵mg | ۲ بار در روز به مدت ۳ روز',
+  'کلرهگزیدین دهان‌شویه | ۰.۲٪ | ۲ بار در روز بعد از مسواک',
+]
+
 const prescriptionStatuses: { value: string; label: string; color: string }[] = [
   { value: 'active', label: 'فعال', color: 'success' },
   { value: 'completed', label: 'تکمیل شده', color: 'slate' },
@@ -390,6 +403,19 @@ export default function Prescriptions() {
             validate: () => (!formData.medications.trim() ? 'ورود حداقل یک دارو الزامی است' : null),
             content: (
               <div>
+                <label className="block text-xs font-medium text-slate-600 dark:text-slate-300 mb-1.5">داروهای پرمصرف (لمس کن تا اضافه شود)</label>
+                <div className="flex flex-wrap gap-1.5 mb-3">
+                  {COMMON_DENTAL_MEDS.map((med) => (
+                    <button
+                      key={med}
+                      type="button"
+                      onClick={() => setFormData((p) => ({ ...p, medications: p.medications ? `${p.medications}\n${med}` : med }))}
+                      className="px-2.5 py-1 rounded-lg text-xs font-medium bg-primary-50 dark:bg-primary-900/20 text-primary-700 dark:text-primary-400 hover:bg-primary-100 dark:hover:bg-primary-900/40 transition-all-smooth press-scale"
+                    >
+                      + {med.split(' | ')[0]}
+                    </button>
+                  ))}
+                </div>
                 <label className="block text-xs font-medium text-slate-600 dark:text-slate-300 mb-1.5">داروها (هر خط یک دارو، با فرمت: نام | دوز | بسامد)</label>
                 <textarea
                   autoFocus

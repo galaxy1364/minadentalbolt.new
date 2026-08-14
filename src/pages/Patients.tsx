@@ -4,10 +4,11 @@ import { Plus, Search, Edit2, Phone, Filter, Users, Award, AlertCircle, Smile, F
 import { fetchPatients, createPatient, updatePatient, deletePatient, fetchDoctors, fetchPayments, fetchTreatments, peekNextFileNumber } from '../lib/api'
 import { toJalaliStringPretty, formatCurrency, toPersianDigits } from '../lib/persianDate'
 import { Patient, Doctor, Payment, Treatment } from '../types'
-import { Modal, Card, Button, Input, Select, Textarea, Spinner, EmptyState, showToast } from '../components/ui'
+import { Modal, Card, Button, Input, Select, Textarea, Spinner, EmptyState, showToast, HighlightText, SkeletonList } from '../components/ui'
 import { useConfirmAction, ConfirmActionConfig } from '../components/ConfirmAction'
 import { h } from '../lib/haptics'
 import { usePullToRefresh } from '../lib/usePullToRefresh'
+import { scoreFields } from '../lib/fuzzySearch'
 
 const vipLevels: { value: number; label: string; color: string; icon: string }[] = [
   { value: 0, label: 'عادی', color: 'slate', icon: '' },
@@ -110,20 +111,31 @@ export default function Patients() {
   }, [patients, payments, treatments])
 
   const filteredPatients = useMemo(() => {
-    return patients.filter((p) => {
-      if (searchQuery) {
-        const q = searchQuery.toLowerCase()
-        const fullName = `${p.first_name} ${p.last_name}`.toLowerCase()
-        const phone = (p.phone || '').toLowerCase()
-        const fileNum = (p.file_number || '').toLowerCase()
-        const nationalId = (p.national_id || '').toLowerCase()
-        if (!fullName.includes(q) && !phone.includes(q) && !fileNum.includes(q) && !nationalId.includes(q)) return false
-      }
+    let result = patients.filter((p) => {
       if (filterVip !== '' && (p.vip_level ?? 0) !== Number(filterVip)) return false
       if (filterGender && p.gender !== filterGender) return false
       if (filterActive !== '' && p.is_active !== (filterActive === 'true')) return false
       return true
     })
+
+    if (searchQuery.trim()) {
+      const scored = result
+        .map((p) => ({
+          patient: p,
+          score: scoreFields(searchQuery, [
+            { value: `${p.first_name} ${p.last_name}`, weight: 1.2 },
+            { value: `${p.last_name} ${p.first_name}`, weight: 1 },
+            { value: p.phone || '', weight: 1 },
+            { value: p.file_number || '', weight: 1 },
+            { value: p.national_id || '', weight: 0.8 },
+          ]),
+        }))
+        .filter((r) => r.score !== null) as { patient: Patient; score: number }[]
+      scored.sort((a, b) => b.score - a.score)
+      result = scored.map((r) => r.patient)
+    }
+
+    return result
   }, [patients, searchQuery, filterVip, filterGender, filterActive])
 
   const stats = useMemo(() => {
@@ -338,7 +350,7 @@ export default function Patients() {
         </Card>
       ) : (
         <div className="space-y-2">
-          {filteredPatients.map((patient) => {
+          {filteredPatients.map((patient, idx) => {
             const vipMeta = getVipMeta(patient.vip_level)
             const age = calculateAge(patient.birth_date)
             const fin = patientFinances.get(patient.id) || { balance: 0, paid: 0, totalCost: 0 }
@@ -348,7 +360,8 @@ export default function Patients() {
             return (
               <div
                 key={patient.id}
-                className="appt-card p-3.5 cursor-pointer"
+                className="appt-card p-3.5 cursor-pointer list-stagger-item"
+                style={{ animationDelay: `${Math.min(idx, 10) * 30}ms` }}
                 onClick={() => { h.tap(); navigate(`/patients/${patient.id}`) }}
               >
                 <div className="flex items-center gap-3">
@@ -360,20 +373,22 @@ export default function Patients() {
                   {/* Content */}
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 mb-0.5">
-                      <h3 className="font-bold text-sm text-slate-800 truncate">{patient.first_name} {patient.last_name}</h3>
+                      <h3 className="font-bold text-sm text-slate-800 truncate">
+                        <HighlightText text={`${patient.first_name} ${patient.last_name}`} query={searchQuery} />
+                      </h3>
                       {vipMeta.value > 0 && <span className="text-[10px]">{vipMeta.icon}</span>}
                     </div>
                     <div className="flex items-center gap-2 flex-wrap text-[11px] text-slate-500">
                       {patient.file_number && (
                         <span className="flex items-center gap-0.5 font-mono">
-                          <FileText size={10} /> {patient.file_number}
+                          <FileText size={10} /> <HighlightText text={patient.file_number} query={searchQuery} />
                         </span>
                       )}
                       {age !== null && <span>{toPersianDigits(age)} سال</span>}
                       {patient.gender && <span>{patient.gender === 'male' ? 'آقا' : 'خانم'}</span>}
                       {patient.phone && (
                         <span className="flex items-center gap-0.5" dir="ltr">
-                          <Phone size={10} /> {toPersianDigits(patient.phone)}
+                          <Phone size={10} /> <HighlightText text={toPersianDigits(patient.phone)} query={searchQuery} />
                         </span>
                       )}
                     </div>

@@ -9,6 +9,7 @@ import type { Staff as StaffType, StaffInput, EncounterWithRelations, LabOrderWi
 import { Modal, Wizard, Card, Button, Input, Select, Badge, Spinner, EmptyState, showToast } from '../components/ui'
 import { ModuleHeader, ModuleStatCard } from '../components/ModuleHeader'
 import { ROLES } from '../lib/permissions'
+import { scoreFields } from '../lib/fuzzySearch'
 
 const staffRoles: { value: string; label: string; color: string }[] = [
   { value: 'doctor', label: 'پزشک', color: 'primary' },
@@ -109,14 +110,25 @@ export default function Staff() {
   }, [loadData])
 
   const filteredStaff = useMemo(() => {
-    return staff.filter((s) => {
-      if (searchQuery) {
-        const q = searchQuery.toLowerCase()
-        if (!s.full_name.toLowerCase().includes(q) && !(s.phone || '').toLowerCase().includes(q) && !(s.email || '').toLowerCase().includes(q)) return false
-      }
+    let result = staff.filter((s) => {
       if (filterRole && s.role !== filterRole) return false
       return true
     })
+    if (searchQuery.trim()) {
+      const scored = result
+        .map((s) => ({
+          item: s,
+          score: scoreFields(searchQuery, [
+            { value: s.full_name, weight: 1.2 },
+            { value: s.phone || '', weight: 1 },
+            { value: s.email || '', weight: 1 },
+          ]),
+        }))
+        .filter((r) => r.score !== null) as { item: StaffType; score: number }[]
+      scored.sort((a, b) => b.score - a.score)
+      result = scored.map((r) => r.item)
+    }
+    return result
   }, [staff, searchQuery, filterRole])
 
   const doctors = useMemo(() => staff.filter((s) => s.is_doctor || s.role === 'doctor'), [staff])

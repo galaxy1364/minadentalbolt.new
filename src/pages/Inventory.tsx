@@ -9,6 +9,7 @@ import { h } from '../lib/haptics'
 import { useConfirmAction } from '../components/ConfirmAction'
 import { InventoryItem, InventoryItemWithRelations, InventoryCategory } from '../types'
 import { Wizard, Card, Button, Input, Select, Textarea, Badge, Spinner, EmptyState, Tabs, showToast } from '../components/ui'
+import { scoreFields } from '../lib/fuzzySearch'
 import { ModuleHeader, ModuleStatCard } from '../components/ModuleHeader'
 
 // ============================================================================
@@ -109,11 +110,7 @@ export default function Inventory() {
   // ===========================================================================
 
   const filteredItems = useMemo(() => {
-    return items.filter((i) => {
-      if (searchQuery) {
-        const q = searchQuery.toLowerCase()
-        if (!i.name.toLowerCase().includes(q) && !(i.brand || '').toLowerCase().includes(q)) return false
-      }
+    let result = items.filter((i) => {
       if (lowStockOnly) {
         const qty = i.quantity ?? 0
         const min = i.min_quantity ?? 0
@@ -122,6 +119,20 @@ export default function Inventory() {
       if (filterCategory && i.category_id !== filterCategory) return false
       return true
     })
+    if (searchQuery.trim()) {
+      const scored = result
+        .map((i) => ({
+          item: i,
+          score: scoreFields(searchQuery, [
+            { value: i.name, weight: 1.2 },
+            { value: i.brand || '', weight: 0.9 },
+          ]),
+        }))
+        .filter((r) => r.score !== null) as { item: typeof result[number]; score: number }[]
+      scored.sort((a, b) => b.score - a.score)
+      result = scored.map((r) => r.item)
+    }
+    return result
   }, [items, searchQuery, lowStockOnly, filterCategory])
 
   const stats = useMemo(() => {
