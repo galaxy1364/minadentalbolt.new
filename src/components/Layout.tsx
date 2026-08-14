@@ -1,13 +1,15 @@
 import React, { useState, useEffect } from 'react'
 import { HashRouter, Routes, Route, useNavigate, useLocation } from 'react-router-dom'
 import {
-  MoreHorizontal, X, Wifi, WifiOff, RefreshCw, Cloud, Moon, Sun,
+  MoreHorizontal, X, Wifi, WifiOff, RefreshCw, Cloud, Moon, Sun, LogOut,
 } from 'lucide-react'
 import { Spinner, ToastContainer, Button } from './ui'
 import AICommandBar from './AICommandBar'
 import { DynamicIsland, pushIslandNotification } from './DynamicIsland'
 import { ErrorBoundary } from './ErrorBoundary'
 import { MinadentLogo } from './MinadentLogo'
+import Login from '../pages/Login'
+import { useAuth } from '../lib/auth'
 import {
   primaryModules, secondaryModules, allModules,
   getModuleByPath, setModuleTheme, type ModuleIdentity,
@@ -216,6 +218,21 @@ function BottomTabBar() {
 }
 
 // ── Main layout ──────────────────────────────────────────
+// ── Logout button ───────────────────────────────────
+function LogoutButton() {
+  const { signOut, profile } = useAuth()
+  return (
+    <button
+      onClick={() => { h.tap(); if (window.confirm('از حساب کاربری خارج شوید؟')) signOut() }}
+      aria-label="خروج"
+      title={profile?.full_name || 'خروج از حساب'}
+      className="flex items-center justify-center w-9 h-9 rounded-xl glass border border-white/60 dark:border-white/10 text-slate-600 dark:text-slate-300 transition-all-smooth active:scale-90"
+    >
+      <LogOut size={16} />
+    </button>
+  )
+}
+
 function LayoutInner({ children }: { children: React.ReactNode }) {
   const location = useLocation()
   const navigate = useNavigate()
@@ -250,6 +267,7 @@ function LayoutInner({ children }: { children: React.ReactNode }) {
           </button>
           <div className="flex items-center gap-2">
             <DarkModeToggle />
+            <LogoutButton />
             <SyncIndicator />
           </div>
         </div>
@@ -343,6 +361,20 @@ function NotFound() {
 }
 
 export function Layout() {
+  const { session, loading } = useAuth()
+
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-slate-50 dark:bg-slate-900">
+        <Spinner size={32} />
+      </div>
+    )
+  }
+
+  if (!session) {
+    return <Login />
+  }
+
   return (
     <HashRouter>
       <LayoutInner>

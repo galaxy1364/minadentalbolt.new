@@ -1,10 +1,20 @@
 import React, { useEffect } from 'react'
 import { Layout } from './components/Layout'
+import { AuthProvider } from './lib/auth'
 import { initialSync } from './lib/sync'
 
-export default function App() {
+function SyncOnMount() {
   useEffect(() => {
     initialSync()
   }, [])
-  return <Layout />
+  return null
+}
+
+export default function App() {
+  return (
+    <AuthProvider>
+      <SyncOnMount />
+      <Layout />
+    </AuthProvider>
+  )
 }
