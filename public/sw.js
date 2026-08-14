@@ -1,18 +1,21 @@
-const CACHE_NAME = 'minadent-v1'
+// Bump this on every deploy-worthy change so old caches are dropped and
+// clients pick up fresh JS/CSS immediately instead of being stuck on a
+// stale cached bundle.
+const CACHE_NAME = 'minadent-v2'
 const STATIC_ASSETS = [
   '/',
   '/index.html',
   'https://cdn.jsdelivr.net/gh/rastikerdar/vazirmatn@v33.003/Vazirmatn-font-face.css',
 ]
 
-self.addEventListener('install', (event: any) => {
+self.addEventListener('install', (event) => {
   event.waitUntil(
     caches.open(CACHE_NAME).then((cache) => cache.addAll(STATIC_ASSETS).catch(() => {}))
   )
   self.skipWaiting()
 })
 
-self.addEventListener('activate', (event: any) => {
+self.addEventListener('activate', (event) => {
   event.waitUntil(
     caches.keys().then((names) =>
       Promise.all(names.filter((n) => n !== CACHE_NAME).map((n) => caches.delete(n)))
@@ -21,23 +24,27 @@ self.addEventListener('activate', (event: any) => {
   self.clients.claim()
 })
 
-self.addEventListener('fetch', (event: any) => {
+// Network-first for same-origin requests: always try to fetch the latest
+// version first, and only fall back to the cache when the network fails
+// (i.e. genuinely offline). This is the opposite of cache-first — it
+// guarantees that a new deploy is visible on the very next load instead
+// of potentially being masked by an old cached bundle indefinitely.
+self.addEventListener('fetch', (event) => {
   const { request } = event
   if (request.method !== 'GET') return
 
   const url = new URL(request.url)
   if (url.origin === self.location.origin) {
     event.respondWith(
-      caches.match(request).then((cached) => {
-        const fetchPromise = fetch(request).then((response) => {
+      fetch(request)
+        .then((response) => {
           if (response && response.status === 200) {
             const clone = response.clone()
             caches.open(CACHE_NAME).then((cache) => cache.put(request, clone))
           }
           return response
-        }).catch(() => cached)
-        return cached || fetchPromise
-      })
+        })
+        .catch(() => caches.match(request))
     )
   }
 })

@@ -458,35 +458,8 @@ export default function Dashboard() {
   const [timeRange, setTimeRange] = useState<TimeRange>('today')
   const [doctorFilter, setDoctorFilter] = useState<string>('all')
 
-  // Dark mode
-  const [darkMode, setDarkMode] = useState<boolean>(() => {
-    const stored = localStorage.getItem('minadent-dark')
-    if (stored !== null) return stored === 'true'
-    return window.matchMedia?.('(prefers-color-scheme: dark)').matches ?? false
-  })
-
   // Auto-refresh
   const [autoRefresh, setAutoRefresh] = useState(true)
-
-  // ── Dark Mode Effect ───────────────────────────────────────────
-
-  useEffect(() => {
-    if (darkMode) {
-      document.documentElement.classList.add('dark')
-    } else {
-      document.documentElement.classList.remove('dark')
-    }
-    localStorage.setItem('minadent-dark', String(darkMode))
-  }, [darkMode])
-
-  // Sync dark mode across components via storage event
-  useEffect(() => {
-    const onStorage = (e: StorageEvent) => {
-      if (e.key === 'minadent-dark') setDarkMode(e.newValue === 'true')
-    }
-    window.addEventListener('storage', onStorage)
-    return () => window.removeEventListener('storage', onStorage)
-  }, [])
 
   const [labOrdersState, setLabOrdersState] = useState<LabOrder[]>([])
 
@@ -924,15 +897,6 @@ export default function Dashboard() {
             className="flex items-center gap-1 px-3 py-2 rounded-xl text-xs font-bold bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700 transition-all-smooth disabled:opacity-50"
           >
             <RefreshCw size={14} className={refreshing ? 'animate-spin' : ''} />
-          </button>
-
-          {/* Dark Mode Toggle */}
-          <button
-            onClick={() => { h.tap(); setDarkMode(!darkMode) }}
-            aria-label={darkMode ? 'حالت روشن' : 'حالت تاریک'}
-            className="flex items-center justify-center w-10 h-10 rounded-xl bg-white dark:bg-slate-800 text-slate-600 dark:text-amber-400 border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700 transition-all-smooth"
-          >
-            {darkMode ? <Sun size={18} /> : <Moon size={18} />}
           </button>
         </div>
       </div>
