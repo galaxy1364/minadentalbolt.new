@@ -170,7 +170,7 @@ export function initSyncEngine(): () => void {
     if (typeof navigator !== 'undefined' && navigator.onLine) {
       fullSync()
     }
-  }, 30000)
+  }, 60000)
 
   return () => {
     window.removeEventListener('online', handleOnline)

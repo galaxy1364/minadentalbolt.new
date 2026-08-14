@@ -487,8 +487,8 @@ export default function Dashboard() {
 
   // ── Data Fetching ──────────────────────────────────────────────
 
-  const loadData = useCallback(async (isRefresh = false) => {
-    if (isRefresh) { setRefreshing(true); h.tap() } else { setLoading(true) }
+  const loadData = useCallback(async (isRefresh = false, silent = false) => {
+    if (isRefresh) { setRefreshing(true); if (!silent) h.tap() } else { setLoading(true) }
     try {
       const [s, appts, pats, pays, encs, items, labOrders, waiting, docs, feed] = await Promise.all([
         fetchDashboardStats(),
@@ -524,7 +524,7 @@ export default function Dashboard() {
   useEffect(() => {
     loadData()
     const clockTimer = setInterval(() => setCurrentTime(new Date()), 30000)
-    const autoTimer = autoRefresh ? setInterval(() => loadData(true), 60000) : null
+    const autoTimer = autoRefresh ? setInterval(() => loadData(true, true), 90000) : null
     return () => {
       clearInterval(clockTimer)
       if (autoTimer) clearInterval(autoTimer)
@@ -816,7 +816,7 @@ export default function Dashboard() {
 
   return (
     <ErrorBoundary>
-    <div className="space-y-6" aria-live="polite" {...ptr.handlers}>
+    <div ref={ptr.containerRef} className="space-y-6" aria-live="polite" {...ptr.handlers}>
       {/* ═══ Pull-to-refresh indicator ═══ */}
       {ptr.pullDistance > 0 && (
         <div className="pull-indicator" style={{ opacity: ptr.isRefreshing ? 1 : ptr.pullProgress, top: -4 }}>

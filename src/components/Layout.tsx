@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useRef } from 'react'
 import { HashRouter, Routes, Route, useNavigate, useLocation } from 'react-router-dom'
 import {
   MoreHorizontal, X, Wifi, WifiOff, RefreshCw, Cloud, Moon, Sun, LogOut,
@@ -49,15 +49,22 @@ function SyncIndicator() {
   const [status, setStatus] = useState<SyncStatus>('idle')
   const [pending, setPending] = useState(0)
   const [spinning, setSpinning] = useState(false)
+  const prevStatus = useRef<SyncStatus>('idle')
 
   useEffect(() => {
     const unsub = subscribeSync((s, p) => {
       setStatus(s); setPending(p); setSpinning(s === 'syncing')
-      if (s === 'online' && p === 0) {
+      // Only notify on an actual transition (e.g. offline -> online, or a
+      // sync that just finished pushing real changes) — not on every
+      // background poll tick, which would otherwise pop up a toast every
+      // ~30s even when nothing changed.
+      const changed = prevStatus.current !== s
+      if (s === 'online' && p === 0 && changed) {
         pushIslandNotification({ id: 'sync-done', title: 'همگام‌سازی کامل', message: 'داده‌ها به‌روزرسانی شد', icon: <CheckCircle2 size={16} />, color: '#0d9488', duration: 3000 })
-      } else if (s === 'offline' || s === 'error') {
+      } else if ((s === 'offline' || s === 'error') && changed) {
         pushIslandNotification({ id: 'sync-off', title: 'حالت آفلاین', message: 'تغییرات بعداً همگام می‌شوند', icon: <CloudOff size={16} />, color: '#f59e0b', duration: 3000 })
       }
+      prevStatus.current = s
     })
     return unsub
   }, [])
