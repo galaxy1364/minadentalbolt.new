@@ -150,30 +150,45 @@ export default function Insurance() {
     setCompanyModalOpen(true)
   }
 
-  const handleSaveCompany = async () => {
+  const handleSaveCompany = () => {
     if (!companyForm.name.trim()) { showToast('error', 'نام شرکت الزامی است'); return }
-    setSavingCompany(true)
-    try {
-      const payload: InsuranceCompanyInput = {
-        clinic_id: CLINIC_ID,
-        name: companyForm.name.trim(),
-        code: companyForm.code || null,
-        phone: companyForm.phone || null,
-        address: companyForm.address || null,
-        coverage_percentage: companyForm.coverage_percentage ? Number(companyForm.coverage_percentage) : null,
-        discount_percentage: companyForm.discount_percentage ? Number(companyForm.discount_percentage) : null,
-        is_active: companyForm.is_active === 'true',
-      }
-      if (editingCompany) {
-        await updateInsuranceCompany(editingCompany.id, payload)
-        showToast('success', 'شرکت بیمه ویرایش شد')
-      } else {
-        await createInsuranceCompany(payload)
-        showToast('success', 'شرکت بیمه اضافه شد')
-      }
-      setCompanyModalOpen(false)
-      loadData()
-    } catch { showToast('error', 'خطا در ذخیره') } finally { setSavingCompany(false) }
+    const payload: InsuranceCompanyInput = {
+      clinic_id: CLINIC_ID,
+      name: companyForm.name.trim(),
+      code: companyForm.code || null,
+      phone: companyForm.phone || null,
+      address: companyForm.address || null,
+      coverage_percentage: companyForm.coverage_percentage ? Number(companyForm.coverage_percentage) : null,
+      discount_percentage: companyForm.discount_percentage ? Number(companyForm.discount_percentage) : null,
+      is_active: companyForm.is_active === 'true',
+    }
+    confirmAction({
+      type: editingCompany ? 'edit' : 'create',
+      title: editingCompany ? 'ویرایش شرکت بیمه' : 'شرکت بیمه جدید',
+      fields: [
+        { label: 'نام شرکت', value: companyForm.name.trim(), highlight: true },
+        { label: 'کد', value: companyForm.code || '-' },
+        { label: 'تلفن', value: companyForm.phone || '-' },
+        { label: 'درصد پوشش', value: companyForm.coverage_percentage ? `${toPersianDigits(companyForm.coverage_percentage)}٪` : '-' },
+        { label: 'درصد تخفیف', value: companyForm.discount_percentage ? `${toPersianDigits(companyForm.discount_percentage)}٪` : '-' },
+        { label: 'وضعیت', value: companyForm.is_active === 'true' ? 'فعال' : 'غیرفعال' },
+      ],
+      confirmLabel: editingCompany ? 'ذخیره تغییرات' : 'افزودن',
+      onConfirm: async () => {
+        setSavingCompany(true)
+        try {
+          if (editingCompany) {
+            await updateInsuranceCompany(editingCompany.id, payload)
+            showToast('success', 'شرکت بیمه ویرایش شد')
+          } else {
+            await createInsuranceCompany(payload)
+            showToast('success', 'شرکت بیمه اضافه شد')
+          }
+          setCompanyModalOpen(false)
+          loadData()
+        } catch { showToast('error', 'خطا در ذخیره') } finally { setSavingCompany(false) }
+      },
+    })
   }
 
   const handleDeleteCompany = (c: InsuranceCompany) => {
@@ -209,33 +224,49 @@ export default function Insurance() {
     setClaimModalOpen(true)
   }
 
-  const handleSaveClaim = async () => {
+  const handleSaveClaim = () => {
     if (!claimForm.patient_id) { showToast('error', 'انتخاب بیمار الزامی است'); return }
-    setSavingClaim(true)
-    try {
-      const payload: any = {
-        clinic_id: CLINIC_ID,
-        patient_id: claimForm.patient_id,
-        company_id: claimForm.company_id || null,
-        encounter_id: null,
-        claim_number: null,
-        amount: claimForm.amount ? Number(claimForm.amount) : null,
-        approved_amount: claimForm.approved_amount ? Number(claimForm.approved_amount) : null,
-        status: claimForm.status,
-        submitted_at: claimForm.status !== 'draft' ? new Date().toISOString() : null,
-        response_at: null,
-        notes: claimForm.notes || null,
-      }
-      if (editingClaim) {
-        await updateInsuranceClaim(editingClaim.id, payload)
-        showToast('success', 'ادعا ویرایش شد')
-      } else {
-        await createInsuranceClaim(payload)
-        showToast('success', 'ادعا ثبت شد')
-      }
-      setClaimModalOpen(false)
-      loadData()
-    } catch { showToast('error', 'خطا در ذخیره') } finally { setSavingClaim(false) }
+    const payload: any = {
+      clinic_id: CLINIC_ID,
+      patient_id: claimForm.patient_id,
+      company_id: claimForm.company_id || null,
+      encounter_id: null,
+      claim_number: null,
+      amount: claimForm.amount ? Number(claimForm.amount) : null,
+      approved_amount: claimForm.approved_amount ? Number(claimForm.approved_amount) : null,
+      status: claimForm.status,
+      submitted_at: claimForm.status !== 'draft' ? new Date().toISOString() : null,
+      response_at: null,
+      notes: claimForm.notes || null,
+    }
+    const patientObj = patients.find((p) => p.id === claimForm.patient_id)
+    const companyObj = companies.find((c) => c.id === claimForm.company_id)
+    confirmAction({
+      type: editingClaim ? 'edit' : 'create',
+      title: editingClaim ? 'ویرایش ادعا' : 'ادعای بیمه جدید',
+      fields: [
+        { label: 'بیمار', value: patientObj ? `${patientObj.first_name} ${patientObj.last_name}` : '-', highlight: true },
+        { label: 'شرکت بیمه', value: companyObj?.name || '-' },
+        { label: 'مبلغ ادعا', value: claimForm.amount ? `${formatCurrency(Number(claimForm.amount))} ت` : '-' },
+        { label: 'مبلغ تایید شده', value: claimForm.approved_amount ? `${formatCurrency(Number(claimForm.approved_amount))} ت` : '-' },
+        { label: 'وضعیت', value: claimStatuses.find((s) => s.value === claimForm.status)?.label || claimForm.status },
+      ],
+      confirmLabel: editingClaim ? 'ذخیره تغییرات' : 'افزودن',
+      onConfirm: async () => {
+        setSavingClaim(true)
+        try {
+          if (editingClaim) {
+            await updateInsuranceClaim(editingClaim.id, payload)
+            showToast('success', 'ادعا ویرایش شد')
+          } else {
+            await createInsuranceClaim(payload)
+            showToast('success', 'ادعا ثبت شد')
+          }
+          setClaimModalOpen(false)
+          loadData()
+        } catch { showToast('error', 'خطا در ذخیره') } finally { setSavingClaim(false) }
+      },
+    })
   }
 
   const handleDeleteClaim = (c: InsuranceClaimWithRelations) => {

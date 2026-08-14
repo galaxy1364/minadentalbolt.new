@@ -9,6 +9,7 @@ import { toJalaliString, toJalaliStringPretty, formatNumber, toPersianDigits } f
 import { RadiologyImage, Patient } from '../types'
 import { Card, Button, Badge, Spinner, EmptyState, Modal, Wizard, Input, Select, Textarea, showToast } from '../components/ui'
 import { ModuleHeader, ModuleStatCard } from '../components/ModuleHeader'
+import { useConfirmAction } from '../components/ConfirmAction'
 
 // ============================================================================
 // Constants
@@ -36,6 +37,7 @@ function getTypeMeta(type: string | null) {
 
 export default function Radiology() {
   const navigate = useNavigate()
+  const { confirmAction, ConfirmActionModal } = useConfirmAction()
 
   const [images, setImages] = useState<RadiologyImage[]>([])
   const [patients, setPatients] = useState<Patient[]>([])
@@ -60,33 +62,58 @@ export default function Radiology() {
     setUploadModalOpen(true)
   }
 
-  const handleSaveImage = async () => {
+  const handleSaveImage = () => {
     if (!uploadForm.patient_id) { showToast('error', 'انتخاب بیمار الزامی است'); return }
-    setSavingImage(true)
-    try {
-      await createRadiologyImage({
-        clinic_id: undefined as any,
-        patient_id: uploadForm.patient_id,
-        doctor_id: null,
-        encounter_id: null,
-        image_type: uploadForm.image_type,
-        tooth_number: uploadForm.tooth_number || null,
-        image_url: uploadForm.image_url || null,
-        description: uploadForm.description || null,
-        taken_at: uploadForm.taken_at || null,
-        notes: uploadForm.notes || null,
-      })
-      showToast('success', 'تصویر رادیولوژی ثبت شد')
-      setUploadModalOpen(false)
-      loadData()
-    } catch { showToast('error', 'خطا در ثبت تصویر') } finally { setSavingImage(false) }
+    const patientObj = patients.find((p) => p.id === uploadForm.patient_id)
+    confirmAction({
+      type: 'create',
+      title: 'ثبت تصویر رادیولوژی',
+      fields: [
+        { label: 'بیمار', value: patientObj ? `${patientObj.first_name} ${patientObj.last_name}` : '-', highlight: true },
+        { label: 'نوع تصویر', value: imageTypes.find((t) => t.value === uploadForm.image_type)?.label || uploadForm.image_type },
+        { label: 'شماره دندان', value: uploadForm.tooth_number || '-' },
+        { label: 'تاریخ تصویربرداری', value: uploadForm.taken_at ? toJalaliString(uploadForm.taken_at) : '-' },
+      ],
+      confirmLabel: 'ثبت تصویر',
+      onConfirm: async () => {
+        setSavingImage(true)
+        try {
+          await createRadiologyImage({
+            clinic_id: undefined as any,
+            patient_id: uploadForm.patient_id,
+            doctor_id: null,
+            encounter_id: null,
+            image_type: uploadForm.image_type,
+            tooth_number: uploadForm.tooth_number || null,
+            image_url: uploadForm.image_url || null,
+            description: uploadForm.description || null,
+            taken_at: uploadForm.taken_at || null,
+            notes: uploadForm.notes || null,
+          })
+          showToast('success', 'تصویر رادیولوژی ثبت شد')
+          setUploadModalOpen(false)
+          loadData()
+        } catch { showToast('error', 'خطا در ثبت تصویر') } finally { setSavingImage(false) }
+      },
+    })
   }
 
   const handleDeleteImage = (img: RadiologyImage) => {
     setSelectedImage(null)
-    if (window.confirm(`حذف تصویر رادیولوژی ${patientName(img)}؟`)) {
-      deleteRadiologyImage(img.id).then(() => { showToast('success', 'تصویر حذف شد'); loadData() }).catch(() => showToast('error', 'خطا در حذف'))
-    }
+    confirmAction({
+      type: 'delete',
+      title: 'حذف تصویر رادیولوژی',
+      warning: 'این عملیات قابل بازگشت نیست',
+      fields: [{ label: 'بیمار', value: patientName(img), highlight: true }],
+      confirmLabel: 'تایید حذف',
+      onConfirm: async () => {
+        try {
+          await deleteRadiologyImage(img.id)
+          showToast('success', 'تصویر حذف شد')
+          loadData()
+        } catch { showToast('error', 'خطا در حذف') }
+      },
+    })
   }
 
   // ===========================================================================
@@ -463,6 +490,7 @@ export default function Radiology() {
           },
         ]}
       />
+      {ConfirmActionModal}
     </div>
   )
 }

@@ -10,6 +10,8 @@ import { Modal, Wizard, Card, Button, Input, Select, Badge, Spinner, EmptyState,
 import { ModuleHeader, ModuleStatCard } from '../components/ModuleHeader'
 import { ROLES } from '../lib/permissions'
 import { scoreFields } from '../lib/fuzzySearch'
+import { useConfirmAction } from '../components/ConfirmAction'
+import { h } from '../lib/haptics'
 
 const staffRoles: { value: string; label: string; color: string }[] = [
   { value: 'doctor', label: 'پزشک', color: 'primary' },
@@ -52,6 +54,7 @@ interface ShareResult {
 }
 
 export default function Staff() {
+  const { confirmAction, ConfirmActionModal } = useConfirmAction()
   const [staff, setStaff] = useState<StaffType[]>([])
   const [encounters, setEncounters] = useState<EncounterWithRelations[]>([])
   const [labOrders, setLabOrders] = useState<LabOrderWithRelations[]>([])
@@ -62,7 +65,6 @@ export default function Staff() {
   const [staffWizardStep, setStaffWizardStep] = useState(0)
   const [saving, setSaving] = useState(false)
   const [editingId, setEditingId] = useState<string | null>(null)
-  const [confirmDelete, setConfirmDelete] = useState<StaffType | null>(null)
   const [showSharePanel, setShowSharePanel] = useState(false)
   const [shareResults, setShareResults] = useState<ShareResult[]>([])
   const [calculating, setCalculating] = useState(false)
@@ -249,85 +251,115 @@ export default function Staff() {
     }))
   }
 
-  const handleSave = async () => {
+  const handleSave = () => {
     if (!formData.full_name.trim()) {
       showToast('error', 'نام و نام خانوادگی الزامی است')
       return
     }
-    setSaving(true)
-    try {
-      const payload: StaffInput = {
-        clinic_id: CLINIC_ID,
-        full_name: formData.full_name.trim(),
-        role: formData.role,
-        phone: formData.phone || null,
-        email: formData.email || null,
-        hire_date: formData.hire_date || null,
-        salary: formData.salary ? Number(formData.salary) : null,
-        is_active: true,
-        is_doctor: formData.is_doctor,
-        share_percentage: formData.is_doctor ? Number(formData.share_percentage) : null,
-        share_type: formData.is_doctor ? formData.share_type : null,
-        fixed_share_amount: formData.is_doctor && formData.share_type === 'fixed' ? Number(formData.fixed_share_amount) : null,
-        specialty: formData.is_doctor ? formData.specialty : null,
-        license_number: formData.is_doctor ? formData.license_number : null,
-        is_clinic_owner: formData.is_clinic_owner,
-      }
-      if (editingId) {
-        await updateStaff(editingId, payload)
-        showToast('success', 'پرسنل با موفقیت ویرایش شد')
-      } else {
-        await createStaff(payload)
-        showToast('success', 'پرسنل با موفقیت اضافه شد')
-      }
-
-      if (formData.create_login) {
-        if (!formData.email && !formData.phone) {
-          showToast('error', 'برای ساخت حساب ورود، ایمیل یا موبایل لازم است')
-        } else if (!formData.login_password || formData.login_password.length < 6) {
-          showToast('error', 'رمز عبور موقت باید حداقل ۶ کاراکتر باشد')
-        } else {
-          try {
-            const { error: inviteError } = await supabase.functions.invoke('invite-staff', {
-              body: {
-                email: formData.email || null,
-                phone: formData.phone || null,
-                password: formData.login_password,
-                full_name: formData.full_name.trim(),
-                access_role: formData.access_role,
-                clinic_id: CLINIC_ID,
-              },
-            })
-            if (inviteError) throw inviteError
-            showToast('success', 'حساب ورود ساخته شد')
-          } catch (inviteErr) {
-            console.error('Error creating login:', inviteErr)
-            showToast('error', 'خطا در ساخت حساب ورود — تابع invite-staff را دیپلوی کرده‌اید؟')
-          }
-        }
-      }
-
-      setModalOpen(false)
-      loadData()
-    } catch (err) {
-      console.error('Error saving staff:', err)
-      showToast('error', 'خطا در ذخیره پرسنل')
-    } finally {
-      setSaving(false)
+    const payload: StaffInput = {
+      clinic_id: CLINIC_ID,
+      full_name: formData.full_name.trim(),
+      role: formData.role,
+      phone: formData.phone || null,
+      email: formData.email || null,
+      hire_date: formData.hire_date || null,
+      salary: formData.salary ? Number(formData.salary) : null,
+      is_active: true,
+      is_doctor: formData.is_doctor,
+      share_percentage: formData.is_doctor ? Number(formData.share_percentage) : null,
+      share_type: formData.is_doctor ? formData.share_type : null,
+      fixed_share_amount: formData.is_doctor && formData.share_type === 'fixed' ? Number(formData.fixed_share_amount) : null,
+      specialty: formData.is_doctor ? formData.specialty : null,
+      license_number: formData.is_doctor ? formData.license_number : null,
+      is_clinic_owner: formData.is_clinic_owner,
     }
+
+    const roleLabel = staffRoles.find((r) => r.value === formData.role)?.label || formData.role
+    const previewFields = [
+      { label: 'نام و نام خانوادگی', value: formData.full_name.trim(), highlight: true },
+      { label: 'نقش', value: roleLabel },
+      { label: 'تلفن', value: formData.phone || '-' },
+      { label: 'ایمیل', value: formData.email || '-' },
+      ...(formData.is_doctor ? [{ label: 'سهم', value: formData.share_type === 'fixed' ? `${formatCurrency(Number(formData.fixed_share_amount))} ت (ثابت)` : `${toPersianDigits(formData.share_percentage)}٪` }] : []),
+      ...(formData.create_login ? [{ label: 'حساب ورود', value: `${formData.email || formData.phone} — نقش: ${ROLES[formData.access_role as keyof typeof ROLES] || formData.access_role}` }] : []),
+    ]
+
+    confirmAction({
+      type: editingId ? 'edit' : 'create',
+      title: editingId ? 'ویرایش پرسنل' : 'افزودن پرسنل جدید',
+      fields: previewFields,
+      confirmLabel: editingId ? 'ذخیره تغییرات' : 'افزودن پرسنل',
+      onConfirm: async () => {
+        setSaving(true)
+        try {
+          if (editingId) {
+            await updateStaff(editingId, payload)
+            showToast('success', 'پرسنل با موفقیت ویرایش شد')
+          } else {
+            await createStaff(payload)
+            showToast('success', 'پرسنل با موفقیت اضافه شد')
+          }
+
+          if (formData.create_login) {
+            if (!formData.email && !formData.phone) {
+              showToast('error', 'برای ساخت حساب ورود، ایمیل یا موبایل لازم است')
+            } else if (!formData.login_password || formData.login_password.length < 6) {
+              showToast('error', 'رمز عبور موقت باید حداقل ۶ کاراکتر باشد')
+            } else {
+              try {
+                const { error: inviteError } = await supabase.functions.invoke('invite-staff', {
+                  body: {
+                    email: formData.email || null,
+                    phone: formData.phone || null,
+                    password: formData.login_password,
+                    full_name: formData.full_name.trim(),
+                    access_role: formData.access_role,
+                    clinic_id: CLINIC_ID,
+                  },
+                })
+                if (inviteError) throw inviteError
+                showToast('success', 'حساب ورود ساخته شد')
+              } catch (inviteErr) {
+                console.error('Error creating login:', inviteErr)
+                showToast('error', 'خطا در ساخت حساب ورود — تابع invite-staff را دیپلوی کرده‌اید؟')
+              }
+            }
+          }
+
+          setModalOpen(false)
+          loadData()
+        } catch (err) {
+          console.error('Error saving staff:', err)
+          showToast('error', 'خطا در ذخیره پرسنل')
+        } finally {
+          setSaving(false)
+        }
+      },
+    })
   }
 
-  const handleDelete = async () => {
-    if (!confirmDelete) return
-    try {
-      await deleteStaff(confirmDelete.id)
-      showToast('success', 'پرسنل حذف شد')
-      setConfirmDelete(null)
-      loadData()
-    } catch (err) {
-      console.error('Error deleting staff:', err)
-      showToast('error', 'خطا در حذف پرسنل')
-    }
+  const handleDelete = (s: StaffType) => {
+    h.tap()
+    confirmAction({
+      type: 'delete',
+      title: 'حذف پرسنل',
+      warning: 'این عملیات قابل بازگشت نیست',
+      fields: [
+        { label: 'نام', value: s.full_name, highlight: true },
+        { label: 'نقش', value: staffRoles.find((r) => r.value === s.role)?.label || s.role || '-' },
+      ],
+      confirmLabel: 'تایید حذف',
+      onConfirm: async () => {
+        try {
+          await deleteStaff(s.id)
+          showToast('success', 'پرسنل حذف شد')
+          loadData()
+        } catch (err) {
+          console.error('Error deleting staff:', err)
+          showToast('error', 'خطا در حذف پرسنل')
+        }
+      },
+    })
   }
 
   // ── Share Summary ──────────────────────────────────────────────
@@ -521,7 +553,7 @@ export default function Staff() {
                         <button onClick={() => openEditModal(s)} className="p-1.5 rounded-lg text-slate-400 hover:text-primary-600 hover:bg-primary-50 transition-colors">
                           <Edit2 size={15} />
                         </button>
-                        <button onClick={() => setConfirmDelete(s)} className="p-1.5 rounded-lg text-slate-400 hover:text-error-600 hover:bg-error-50 transition-colors">
+                        <button onClick={() => handleDelete(s)} className="p-1.5 rounded-lg text-slate-400 hover:text-error-600 hover:bg-error-50 transition-colors">
                           <Trash2 size={15} />
                         </button>
                       </div>
@@ -751,14 +783,7 @@ export default function Staff() {
         ]}
       />
 
-      {/* Delete Confirmation */}
-      <Modal open={!!confirmDelete} onClose={() => setConfirmDelete(null)} title="حذف پرسنل" size="full">
-        <p className="text-sm text-slate-600 mb-4">آیا از حذف «{confirmDelete?.full_name}» مطمئن هستید؟ این عملیات قابل بازگشت نیست.</p>
-        <div className="flex justify-end gap-2">
-          <Button variant="secondary" onClick={() => setConfirmDelete(null)}>انصراف</Button>
-          <Button variant="danger" onClick={handleDelete}>حذف</Button>
-        </div>
-      </Modal>
+      {ConfirmActionModal}
     </div>
   )
 }
