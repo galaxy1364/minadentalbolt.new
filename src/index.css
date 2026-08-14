@@ -778,3 +778,55 @@ input, textarea, select { font-size: 16px !important; }
   color: #fff;
   box-shadow: 0 8px 30px color-mix(in srgb, var(--module-color) 25%, transparent);
 }
+
+/* ── Login page: animated gradient background blobs ────────────── */
+.login-blob {
+  position: absolute;
+  border-radius: 50%;
+  filter: blur(90px);
+  opacity: 0.55;
+  will-change: transform;
+}
+.login-blob-1 {
+  width: 55vmax; height: 55vmax;
+  top: -20%; right: -15%;
+  background: radial-gradient(circle, #8b5cf6, transparent 70%);
+  animation: login-float-1 22s ease-in-out infinite;
+}
+.login-blob-2 {
+  width: 50vmax; height: 50vmax;
+  bottom: -25%; left: -15%;
+  background: radial-gradient(circle, #3b82f6, transparent 70%);
+  animation: login-float-2 26s ease-in-out infinite;
+}
+.login-blob-3 {
+  width: 40vmax; height: 40vmax;
+  top: 30%; left: 10%;
+  background: radial-gradient(circle, #ec4899, transparent 70%);
+  animation: login-float-3 19s ease-in-out infinite;
+}
+.login-blob-4 {
+  width: 38vmax; height: 38vmax;
+  bottom: 5%; right: 5%;
+  background: radial-gradient(circle, #a3e635, transparent 70%);
+  animation: login-float-4 24s ease-in-out infinite;
+}
+@keyframes login-float-1 {
+  0%, 100% { transform: translate(0, 0) scale(1); }
+  50% { transform: translate(-8%, 10%) scale(1.15); }
+}
+@keyframes login-float-2 {
+  0%, 100% { transform: translate(0, 0) scale(1); }
+  50% { transform: translate(10%, -8%) scale(1.1); }
+}
+@keyframes login-float-3 {
+  0%, 100% { transform: translate(0, 0) scale(1); }
+  50% { transform: translate(12%, 12%) scale(0.9); }
+}
+@keyframes login-float-4 {
+  0%, 100% { transform: translate(0, 0) scale(1); }
+  50% { transform: translate(-10%, -10%) scale(1.2); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .login-blob { animation: none !important; }
+}

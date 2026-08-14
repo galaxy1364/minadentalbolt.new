@@ -47,8 +47,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return () => sub.subscription.unsubscribe()
   }, [])
 
-  async function signIn(email: string, password: string) {
-    const { error } = await supabase.auth.signInWithPassword({ email, password })
+  async function signIn(identifier: string, password: string) {
+    const isPhone = identifier.startsWith('+')
+    const { error } = isPhone
+      ? await supabase.auth.signInWithPassword({ phone: identifier, password })
+      : await supabase.auth.signInWithPassword({ email: identifier, password })
     return { error: error ? mapAuthError(error.message) : null }
   }
 

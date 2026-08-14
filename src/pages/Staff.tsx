@@ -3,11 +3,12 @@ import { useState, useEffect, useCallback, useMemo } from 'react'
 import { Users, Search, Plus, Phone, Mail, Calendar, DollarSign, Smile, Briefcase, Edit2, Trash2, Stethoscope, Calculator, Award, TrendingUp, Percent, UserCheck, ChevronDown, ChevronUp } from 'lucide-react'
 import { PieChart, Pie, Cell, Tooltip as RTooltip, ResponsiveContainer } from 'recharts'
 import { fetchStaff, createStaff, updateStaff, deleteStaff, fetchEncounters, fetchLabOrders } from '../lib/api'
-import { CLINIC_ID } from '../lib/supabase'
+import { CLINIC_ID, supabase } from '../lib/supabase'
 import { toJalaliString, formatCurrency, formatNumber, toPersianDigits } from '../lib/persianDate'
 import type { Staff as StaffType, StaffInput, EncounterWithRelations, LabOrderWithRelations } from '../types'
 import { Modal, Wizard, Card, Button, Input, Select, Badge, Spinner, EmptyState, showToast } from '../components/ui'
 import { ModuleHeader, ModuleStatCard } from '../components/ModuleHeader'
+import { ROLES } from '../lib/permissions'
 
 const staffRoles: { value: string; label: string; color: string }[] = [
   { value: 'doctor', label: 'پزشک', color: 'primary' },
@@ -79,6 +80,9 @@ export default function Staff() {
     specialty: 'عمومی',
     license_number: '',
     is_clinic_owner: false,
+    create_login: false,
+    access_role: 'receptionist',
+    login_password: '',
   })
 
   const loadData = useCallback(async () => {
@@ -193,6 +197,7 @@ export default function Staff() {
       full_name: '', role: 'receptionist', phone: '', email: '', hire_date: '', salary: '',
       is_doctor: false, share_percentage: '50', share_type: 'net_split', fixed_share_amount: '0',
       specialty: 'عمومی', license_number: '', is_clinic_owner: false,
+      create_login: false, access_role: 'receptionist', login_password: '',
     })
     setModalOpen(true)
   }
@@ -213,6 +218,9 @@ export default function Staff() {
       specialty: s.specialty || 'عمومی',
       license_number: s.license_number || '',
       is_clinic_owner: s.is_clinic_owner ?? false,
+      create_login: false,
+      access_role: 'receptionist',
+      login_password: '',
     })
     setStaffWizardStep(0)
     setModalOpen(true)
@@ -260,6 +268,33 @@ export default function Staff() {
         await createStaff(payload)
         showToast('success', 'پرسنل با موفقیت اضافه شد')
       }
+
+      if (formData.create_login) {
+        if (!formData.email && !formData.phone) {
+          showToast('error', 'برای ساخت حساب ورود، ایمیل یا موبایل لازم است')
+        } else if (!formData.login_password || formData.login_password.length < 6) {
+          showToast('error', 'رمز عبور موقت باید حداقل ۶ کاراکتر باشد')
+        } else {
+          try {
+            const { error: inviteError } = await supabase.functions.invoke('invite-staff', {
+              body: {
+                email: formData.email || null,
+                phone: formData.phone || null,
+                password: formData.login_password,
+                full_name: formData.full_name.trim(),
+                access_role: formData.access_role,
+                clinic_id: CLINIC_ID,
+              },
+            })
+            if (inviteError) throw inviteError
+            showToast('success', 'حساب ورود ساخته شد')
+          } catch (inviteErr) {
+            console.error('Error creating login:', inviteErr)
+            showToast('error', 'خطا در ساخت حساب ورود — تابع invite-staff را دیپلوی کرده‌اید؟')
+          }
+        }
+      }
+
       setModalOpen(false)
       loadData()
     } catch (err) {
@@ -659,6 +694,45 @@ export default function Staff() {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <Input label="تاریخ استخدام" type="date" value={formData.hire_date} onChange={(v) => setFormData({ ...formData, hire_date: v })} />
                 <Input label="حقوق (تومان)" type="number" value={formData.salary} onChange={(v) => setFormData({ ...formData, salary: v })} placeholder="0" />
+              </div>
+            ),
+          },
+          {
+            label: 'دسترسی به سیستم',
+            content: (
+              <div className="space-y-4">
+                <label className="flex items-center gap-2 cursor-pointer p-3 rounded-xl bg-violet-50 dark:bg-violet-900/20 border border-violet-100 dark:border-violet-800">
+                  <input
+                    type="checkbox"
+                    checked={formData.create_login}
+                    onChange={(e) => setFormData({ ...formData, create_login: e.target.checked })}
+                    className="w-4 h-4 rounded accent-violet-600"
+                  />
+                  <span className="text-sm font-medium text-slate-700 dark:text-slate-200">
+                    برای این شخص حساب ورود به سیستم بساز (با ایمیل یا موبایل بالا)
+                  </span>
+                </label>
+                {formData.create_login && (
+                  <div className="space-y-3 p-4 rounded-2xl border-2 border-dashed border-violet-200 dark:border-violet-800">
+                    <Select
+                      label="سطح دسترسی"
+                      value={formData.access_role}
+                      onChange={(v) => setFormData({ ...formData, access_role: v })}
+                      options={Object.entries(ROLES).map(([value, label]) => ({ value, label }))}
+                    />
+                    <Input
+                      label="رمز عبور موقت (حداقل ۶ کاراکتر)"
+                      type="text"
+                      value={formData.login_password}
+                      onChange={(v) => setFormData({ ...formData, login_password: v })}
+                      placeholder="رمز موقت را اینجا بنویس و به او بگو"
+                      dir="ltr"
+                    />
+                    <p className="text-xs text-slate-500 dark:text-slate-400">
+                      این شخص با {formData.email ? 'ایمیل' : formData.phone ? 'شماره موبایل' : 'ایمیل یا موبایل بالا'} و همین رمز موقت وارد می‌شود.
+                    </p>
+                  </div>
+                )}
               </div>
             ),
           },

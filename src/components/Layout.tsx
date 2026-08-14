@@ -10,6 +10,7 @@ import { ErrorBoundary } from './ErrorBoundary'
 import { MinadentLogo } from './MinadentLogo'
 import Login from '../pages/Login'
 import { useAuth } from '../lib/auth'
+import { canAccess } from '../lib/permissions'
 import {
   primaryModules, secondaryModules, allModules,
   getModuleByPath, setModuleTheme, type ModuleIdentity,
@@ -100,7 +101,9 @@ function OfflineBanner() {
 function MoreDrawer({ open, onClose }: { open: boolean; onClose: () => void }) {
   const navigate = useNavigate()
   const location = useLocation()
+  const { profile } = useAuth()
   const isActive = (path: string) => path === '/' ? location.pathname === '/' : location.pathname.startsWith(path)
+  const visibleModules = secondaryModules.filter((item: ModuleIdentity) => canAccess(profile?.role, item.path))
 
   if (!open) return null
   return (
@@ -120,7 +123,7 @@ function MoreDrawer({ open, onClose }: { open: boolean; onClose: () => void }) {
           </button>
         </div>
         <div className="grid grid-cols-4 gap-2 px-4 pb-6">
-          {secondaryModules.map((item: ModuleIdentity) => {
+          {visibleModules.map((item: ModuleIdentity) => {
             const Icon = item.icon
             const active = isActive(item.path)
             return (
@@ -157,16 +160,19 @@ function MoreDrawer({ open, onClose }: { open: boolean; onClose: () => void }) {
 function BottomTabBar() {
   const navigate = useNavigate()
   const location = useLocation()
+  const { profile } = useAuth()
   const [moreOpen, setMoreOpen] = useState(false)
   const isActive = (path: string) => path === '/' ? location.pathname === '/' : location.pathname.startsWith(path)
-  const isMoreActive = secondaryModules.some((n) => isActive(n.path))
+  const visiblePrimary = primaryModules.filter((item: ModuleIdentity) => canAccess(profile?.role, item.path))
+  const visibleSecondary = secondaryModules.filter((item: ModuleIdentity) => canAccess(profile?.role, item.path))
+  const isMoreActive = visibleSecondary.some((n) => isActive(n.path))
   const currentMod = getModuleByPath(location.pathname)
 
   return (
     <>
       <nav className="fixed bottom-0 left-0 right-0 z-40 tab-bar pb-safe">
         <div className="flex items-stretch h-16">
-          {primaryModules.map((item: ModuleIdentity) => {
+          {visiblePrimary.map((item: ModuleIdentity) => {
             const Icon = item.icon
             const active = isActive(item.path)
             return (
@@ -334,7 +340,17 @@ const Reports      = lazyPage('/reports')
 const Settings     = lazyPage('/settings')
 const WaitingList  = lazyPage('/waiting-list')
 
-function LL({ children }: { children: React.ReactNode }) {
+function LL({ children, path }: { children: React.ReactNode; path: string }) {
+  const { profile } = useAuth()
+  const navigate = useNavigate()
+  const allowed = canAccess(profile?.role, path)
+
+  useEffect(() => {
+    if (!allowed) navigate('/', { replace: true })
+  }, [allowed])
+
+  if (!allowed) return null
+
   return (
     <React.Suspense fallback={
       <div className="flex items-center justify-center h-64">
@@ -379,22 +395,22 @@ export function Layout() {
     <HashRouter>
       <LayoutInner>
         <Routes>
-          <Route path="/"                element={<LL><Dashboard /></LL>} />
-          <Route path="/appointments"    element={<LL><Appointments /></LL>} />
-          <Route path="/patients"        element={<LL><Patients /></LL>} />
-          <Route path="/patients/:id"    element={<LL><PatientDetail /></LL>} />
-          <Route path="/treatments"      element={<LL><Treatments /></LL>} />
-          <Route path="/billing"         element={<LL><Billing /></LL>} />
-          <Route path="/laboratory"      element={<LL><Laboratory /></LL>} />
-          <Route path="/implants"        element={<LL><Implants /></LL>} />
-          <Route path="/insurance"       element={<LL><Insurance /></LL>} />
-          <Route path="/inventory"       element={<LL><Inventory /></LL>} />
-          <Route path="/prescriptions"   element={<LL><Prescriptions /></LL>} />
-          <Route path="/radiology"       element={<LL><Radiology /></LL>} />
-          <Route path="/staff"           element={<LL><Staff /></LL>} />
-          <Route path="/reports"         element={<LL><Reports /></LL>} />
-          <Route path="/settings"        element={<LL><Settings /></LL>} />
-          <Route path="/waiting-list"    element={<LL><WaitingList /></LL>} />
+          <Route path="/"                element={<LL path="/"><Dashboard /></LL>} />
+          <Route path="/appointments"    element={<LL path="/appointments"><Appointments /></LL>} />
+          <Route path="/patients"        element={<LL path="/patients"><Patients /></LL>} />
+          <Route path="/patients/:id"    element={<LL path="/patients/:id"><PatientDetail /></LL>} />
+          <Route path="/treatments"      element={<LL path="/treatments"><Treatments /></LL>} />
+          <Route path="/billing"         element={<LL path="/billing"><Billing /></LL>} />
+          <Route path="/laboratory"      element={<LL path="/laboratory"><Laboratory /></LL>} />
+          <Route path="/implants"        element={<LL path="/implants"><Implants /></LL>} />
+          <Route path="/insurance"       element={<LL path="/insurance"><Insurance /></LL>} />
+          <Route path="/inventory"       element={<LL path="/inventory"><Inventory /></LL>} />
+          <Route path="/prescriptions"   element={<LL path="/prescriptions"><Prescriptions /></LL>} />
+          <Route path="/radiology"       element={<LL path="/radiology"><Radiology /></LL>} />
+          <Route path="/staff"           element={<LL path="/staff"><Staff /></LL>} />
+          <Route path="/reports"         element={<LL path="/reports"><Reports /></LL>} />
+          <Route path="/settings"        element={<LL path="/settings"><Settings /></LL>} />
+          <Route path="/waiting-list"    element={<LL path="/waiting-list"><WaitingList /></LL>} />
           <Route path="*"                element={<NotFound />} />
         </Routes>
       </LayoutInner>

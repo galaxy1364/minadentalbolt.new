@@ -26,7 +26,7 @@ CREATE TABLE IF NOT EXISTS users (
   id uuid PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
   clinic_id uuid NOT NULL,
   full_name text,
-  role text NOT NULL DEFAULT 'staff',
+  role text NOT NULL DEFAULT 'receptionist' CHECK (role IN ('owner', 'doctor', 'receptionist', 'assistant', 'lab', 'accountant')),
   is_active boolean NOT NULL DEFAULT true,
   created_at timestamptz NOT NULL DEFAULT now()
 );
