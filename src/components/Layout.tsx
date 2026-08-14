@@ -10,7 +10,7 @@ import { ErrorBoundary } from './ErrorBoundary'
 import { MinadentLogo } from './MinadentLogo'
 import Login from '../pages/Login'
 import { useAuth } from '../lib/auth'
-import { canAccess } from '../lib/permissions'
+import { canAccess, REQUIRE_LOGIN } from '../lib/permissions'
 import {
   primaryModules, secondaryModules, allModules,
   getModuleByPath, setModuleTheme, type ModuleIdentity,
@@ -376,10 +376,15 @@ function NotFound() {
   )
 }
 
+// Login is built and ready, but temporarily disabled until Supabase Auth
+// is configured (users table populated, etc). Flip REQUIRE_LOGIN in
+// lib/permissions.ts to true once that's done — both the route gate below
+// and the role-based nav filtering read from that same flag.
+
 export function Layout() {
   const { session, loading } = useAuth()
 
-  if (loading) {
+  if (REQUIRE_LOGIN && loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-slate-50 dark:bg-slate-900">
         <Spinner size={32} />
@@ -387,7 +392,7 @@ export function Layout() {
     )
   }
 
-  if (!session) {
+  if (REQUIRE_LOGIN && !session) {
     return <Login />
   }
 

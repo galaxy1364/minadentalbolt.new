@@ -15,6 +15,10 @@ export const ROLES = {
   accountant: 'حسابدار',
 } as const
 
+// Mirrors Layout's REQUIRE_LOGIN flag: while login is disabled, nobody has
+// a role yet, so role-based restrictions must not block navigation either.
+export const REQUIRE_LOGIN = false
+
 export type Role = keyof typeof ROLES
 
 const ALL_PATHS = [
@@ -34,6 +38,7 @@ const ROLE_ACCESS: Record<Role, string[]> = {
 }
 
 export function canAccess(role: string | null | undefined, path: string): boolean {
+  if (!REQUIRE_LOGIN) return true
   if (!role || !(role in ROLE_ACCESS)) return path === '/' // unknown/missing role: dashboard only
   const allowed = ROLE_ACCESS[role as Role]
   if (path === '/') return true
