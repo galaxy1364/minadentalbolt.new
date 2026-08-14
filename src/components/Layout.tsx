@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react'
 import { HashRouter, Routes, Route, useNavigate, useLocation } from 'react-router-dom'
 import {
-  MoreHorizontal, X, Wifi, WifiOff, RefreshCw, Cloud, Moon, Sun, LogOut,
+  MoreHorizontal, X, Wifi, WifiOff, RefreshCw, Moon, Sun, LogOut,
 } from 'lucide-react'
 import { Spinner, ToastContainer, Button } from './ui'
 import AICommandBar from './AICommandBar'
@@ -70,12 +70,14 @@ function SyncIndicator() {
   }, [])
 
   const isOnline = status === 'online' || status === 'syncing' || status === 'idle'
+  const label = spinning ? 'در حال همگام‌سازی' : isOnline ? 'آنلاین' : 'حالت آفلاین — تغییرات با اتصال اینترنت سینک می‌شود'
 
   return (
     <button
       onClick={() => { if (isOnline) { h.tap(); syncNow() } }}
-      aria-label="وضعیت همگام‌سازی"
-      className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl glass border border-white/60 dark:border-white/10 transition-all-smooth active:scale-95"
+      aria-label={label}
+      title={label}
+      className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl glass border transition-all-smooth active:scale-95 ${isOnline ? 'border-white/60 dark:border-white/10' : 'border-warning-300 dark:border-warning-700 bg-warning-50/80 dark:bg-warning-900/20'}`}
     >
       {spinning
         ? <RefreshCw size={13} className="animate-spin text-primary-600" />
@@ -90,20 +92,6 @@ function SyncIndicator() {
 }
 
 // ── Offline banner ──────────────────────────────────────
-function OfflineBanner() {
-  const [offline, setOffline] = useState(false)
-  useEffect(() => { const u = subscribeSync((s) => setOffline(s === 'offline' || s === 'error')); return u }, [])
-  if (!offline) return null
-  return (
-    <div className="bg-warning-50 dark:bg-warning-900/30 border-b border-warning-200 dark:border-warning-700 px-4 py-2">
-      <p className="text-xs text-warning-700 dark:text-warning-300 flex items-center justify-center gap-2">
-        <Cloud size={13} />
-        حالت آفلاین — تغییرات ذخیره شده و با اتصال اینترنت سینک می‌شود
-      </p>
-    </div>
-  )
-}
-
 // ── More drawer ─────────────────────────────────────────
 function MoreDrawer({ open, onClose }: { open: boolean; onClose: () => void }) {
   const navigate = useNavigate()
@@ -284,7 +272,6 @@ function LayoutInner({ children }: { children: React.ReactNode }) {
             <SyncIndicator />
           </div>
         </div>
-        <OfflineBanner />
       </header>
 
       <main className="flex-1 min-w-0 overflow-x-hidden px-3 pt-3 pb-24">
