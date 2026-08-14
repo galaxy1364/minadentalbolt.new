@@ -17,7 +17,7 @@ import {
 import {
   fetchDashboardStats, fetchAppointments, fetchPatients, fetchPayments,
   fetchEncounters, fetchInventoryItems, fetchLabOrders, fetchWaitingList,
-  fetchActivityFeed, fetchDoctors,
+  fetchActivityFeed, fetchDoctors, fetchAllInstallments,
 } from '../lib/api'
 import {
   toJalaliStringPretty, getJalaliMonthYear, formatCurrency, formatNumber,
@@ -25,8 +25,11 @@ import {
 } from '../lib/persianDate'
 import type {
   AppointmentWithRelations, Patient, Payment, DashboardStats, Doctor, LabOrder,
+  Encounter, Installment,
 } from '../types'
 import { Card, Badge, EmptyState, showToast } from '../components/ui'
+import { findBirthdays, findDebtors, findLapsedPatients, findDueInstallments, REMINDER_CATEGORY_META, SmartReminder } from '../lib/smartReminders'
+import { supabase } from '../lib/supabase'
 import { ErrorBoundary } from '../components/ErrorBoundary'
 import { h } from '../lib/haptics'
 import { usePullToRefresh } from '../lib/usePullToRefresh'
@@ -438,6 +441,8 @@ export default function Dashboard() {
   const [appointments, setAppointments] = useState<AppointmentWithRelations[]>([])
   const [patients, setPatients] = useState<Patient[]>([])
   const [payments, setPayments] = useState<Payment[]>([])
+  const [encounters, setEncounters] = useState<Encounter[]>([])
+  const [installments, setInstallments] = useState<Installment[]>([])
   const [doctors, setDoctors] = useState<Doctor[]>([])
   const [activity, setActivity] = useState<ActivityItem[]>([])
   const [outstandingBalance, setOutstandingBalance] = useState(0)
@@ -490,7 +495,7 @@ export default function Dashboard() {
   const loadData = useCallback(async (isRefresh = false, silent = false) => {
     if (isRefresh) { setRefreshing(true); if (!silent) h.tap() } else { setLoading(true) }
     try {
-      const [s, appts, pats, pays, encs, items, labOrders, waiting, docs, feed] = await Promise.all([
+      const [s, appts, pats, pays, encs, items, labOrders, waiting, docs, feed, insts] = await Promise.all([
         fetchDashboardStats(),
         fetchAppointments(),
         fetchPatients(),
@@ -501,9 +506,11 @@ export default function Dashboard() {
         fetchWaitingList(),
         fetchDoctors(),
         fetchActivityFeed(15),
+        fetchAllInstallments(),
       ])
       setStats(s); setAppointments(appts); setPatients(pats); setPayments(pays)
       setDoctors(docs); setActivity(feed as ActivityItem[])
+      setEncounters(encs); setInstallments(insts)
       setLabOrdersState(labOrders as LabOrder[])
       const outstanding = encs.reduce((sum, e) => sum + Math.max(0, (e.total_amount ?? 0) - (e.paid_amount ?? 0)), 0)
       setOutstandingBalance(outstanding)
@@ -581,6 +588,34 @@ export default function Dashboard() {
       .filter((a) => doctorFilter === 'all' || a.doctor_id === doctorFilter)
       .sort((a, b) => a.start_time.localeCompare(b.start_time))
   }, [appointments, todayStr, doctorFilter])
+
+  // ── Smart reminders (birthdays, debtors, lapsed patients, due installments) ──
+  const smartReminders = useMemo(() => {
+    return {
+      birthday: findBirthdays(patients),
+      debtor: findDebtors(patients, encounters),
+      lapsed: findLapsedPatients(patients, encounters),
+      installment_due: findDueInstallments(installments, patients),
+    }
+  }, [patients, encounters, installments])
+
+  const [sendingReminderId, setSendingReminderId] = useState<string | null>(null)
+  const handleSendReminderSms = async (reminder: SmartReminder) => {
+    if (!reminder.patient.phone) { showToast('error', 'این بیمار شماره تلفن ثبت‌شده ندارد'); return }
+    setSendingReminderId(reminder.patient.id + reminder.category)
+    try {
+      const { error } = await supabase.functions.invoke('send-sms', {
+        body: { to: reminder.patient.phone, message: reminder.smsMessage, type: 'reminder' },
+      })
+      if (error) throw error
+      showToast('success', 'پیامک ارسال شد')
+    } catch (err) {
+      console.error('SMS send error:', err)
+      showToast('error', 'خطا در ارسال پیامک — تابع send-sms را بررسی کنید')
+    } finally {
+      setSendingReminderId(null)
+    }
+  }
 
   // ── Recent Patients (always recent regardless of filter) ───────
 
@@ -1260,6 +1295,63 @@ export default function Dashboard() {
           )}
         </Card>
       </div>
+
+      {/* ═══ Smart Reminders ════════════════════════════════════════ */}
+      {(smartReminders.birthday.length + smartReminders.debtor.length + smartReminders.lapsed.length + smartReminders.installment_due.length) > 0 && (
+        <Card className="p-5 tile-in">
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-base font-bold text-slate-800 dark:text-slate-100 flex items-center gap-2">
+              <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-amber-400 to-orange-500 flex items-center justify-center text-white">
+                <Bell size={16} />
+              </div>
+              یادآوری‌های هوشمند امروز
+            </h2>
+          </div>
+          <div className="space-y-4">
+            {(Object.keys(REMINDER_CATEGORY_META) as (keyof typeof REMINDER_CATEGORY_META)[]).map((cat) => {
+              const items = smartReminders[cat]
+              if (items.length === 0) return null
+              const meta = REMINDER_CATEGORY_META[cat]
+              return (
+                <div key={cat}>
+                  <div className="flex items-center gap-2 mb-2">
+                    <span className="text-base">{meta.icon}</span>
+                    <h3 className="text-xs font-bold text-slate-600 dark:text-slate-300">{meta.label}</h3>
+                    <Badge color="slate">{toPersianDigits(items.length)}</Badge>
+                  </div>
+                  <div className="space-y-1.5 max-h-[220px] overflow-y-auto pr-1 -mr-1">
+                    {items.slice(0, 10).map((r) => {
+                      const key = r.patient.id + r.category
+                      return (
+                        <div
+                          key={key}
+                          className="flex items-center gap-2.5 p-2.5 rounded-xl bg-slate-50 dark:bg-slate-800/60 hover:bg-slate-100 dark:hover:bg-slate-800 transition-all-smooth cursor-pointer"
+                          onClick={() => navigate(`/patients/${r.patient.id}`)}
+                        >
+                          <div className="w-8 h-8 rounded-full flex items-center justify-center text-white text-xs font-bold shrink-0" style={{ background: meta.color }}>
+                            {r.patient.first_name[0]}
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <p className="text-sm font-semibold text-slate-800 dark:text-slate-100 truncate">{r.title}</p>
+                            <p className="text-[11px] text-slate-500 dark:text-slate-400 truncate">{r.detail}</p>
+                          </div>
+                          <button
+                            onClick={(e) => { e.stopPropagation(); handleSendReminderSms(r) }}
+                            disabled={sendingReminderId === key}
+                            className="shrink-0 px-2.5 py-1.5 rounded-lg bg-primary-50 dark:bg-primary-900/30 text-primary-700 dark:text-primary-400 text-[11px] font-semibold hover:bg-primary-100 dark:hover:bg-primary-900/50 transition-all-smooth press-scale disabled:opacity-50"
+                          >
+                            {sendingReminderId === key ? '...' : 'ارسال پیامک'}
+                          </button>
+                        </div>
+                      )
+                    })}
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+        </Card>
+      )}
 
       {/* ═══ Recent Patients + Activity Feed ════════════════════════ */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">

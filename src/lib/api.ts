@@ -581,6 +581,11 @@ export async function fetchPaymentPlans(patientId?: string): Promise<PaymentPlan
   }))
 }
 
+/** All installments for the clinic, flat (not grouped by plan) — used by the dashboard's due/overdue reminders. */
+export async function fetchAllInstallments(): Promise<Installment[]> {
+  return db.installments.where('clinic_id').equals(CLINIC_ID).toArray()
+}
+
 export async function createPaymentPlan(p: PaymentPlanInput, installments: InstallmentInput[]): Promise<PaymentPlan> {
   const { clinic_id, ...rest } = p
   const planId = uid()
