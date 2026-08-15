@@ -24,17 +24,17 @@ export type Role = keyof typeof ROLES
 const ALL_PATHS = [
   '/', '/patients', '/appointments', '/treatments', '/billing', '/laboratory',
   '/implants', '/insurance', '/inventory', '/prescriptions', '/radiology',
-  '/staff', '/reports', '/waiting-list', '/settings',
+  '/staff', '/reports', '/waiting-list', '/settings', '/archive',
 ]
 
 /** Route path prefixes each role is allowed to open. '/' always included. */
 const ROLE_ACCESS: Record<Role, string[]> = {
   owner: ALL_PATHS,
   doctor: ['/', '/patients', '/appointments', '/treatments', '/prescriptions', '/radiology', '/implants', '/waiting-list', '/reports', '/settings'],
-  receptionist: ['/', '/patients', '/appointments', '/billing', '/waiting-list', '/insurance', '/settings'],
+  receptionist: ['/', '/patients', '/appointments', '/billing', '/waiting-list', '/insurance', '/archive', '/settings'],
   assistant: ['/', '/patients', '/appointments', '/treatments', '/waiting-list', '/settings'],
   lab: ['/', '/laboratory', '/implants', '/settings'],
-  accountant: ['/', '/billing', '/insurance', '/reports', '/settings'],
+  accountant: ['/', '/billing', '/insurance', '/reports', '/archive', '/settings'],
 }
 
 export function canAccess(role: string | null | undefined, path: string): boolean {

@@ -161,7 +161,7 @@ export function Modal({ open, onClose, title, children, size = 'full', footer }:
       >
         <div className={`flex items-center justify-between px-5 py-4 border-b border-slate-100 dark:border-slate-700 sticky top-0 bg-white dark:bg-slate-800 z-10 ${isFull ? '' : 'rounded-t-3xl'}`}>
           <h3 className="text-base font-bold text-slate-800 dark:text-slate-100">{title}</h3>
-          <button onClick={() => { h.cancel(); onClose() }} aria-label="بستن" className="p-1.5 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg transition-all-smooth press-scale text-slate-500 dark:text-slate-400"><X size={18} /></button>
+          <button onClick={() => { h.cancel(); onClose() }} aria-label="بستن" className="p-1.5 hover:bg-error-50 dark:hover:bg-error-900/30 rounded-lg transition-all-smooth press-scale text-slate-400 dark:text-slate-500 hover:text-error-600 dark:hover:text-error-400"><X size={18} /></button>
         </div>
         <div className={`${isFull ? 'p-4 sm:p-6 max-w-3xl mx-auto' : 'p-5'}`}>
           {children}

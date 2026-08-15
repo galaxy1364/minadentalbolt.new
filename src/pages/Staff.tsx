@@ -763,7 +763,7 @@ export default function Staff() {
             content: (
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <Input label="تاریخ استخدام" type="date" value={formData.hire_date} onChange={(v) => setFormData({ ...formData, hire_date: v })} />
-                <Input label="حقوق (تومان)" type="number" value={formData.salary} onChange={(v) => setFormData({ ...formData, salary: v })} placeholder="0" />
+                <Input label={formData.is_doctor ? 'حقوق ثابت پزشک (تومان، در صورت وجود)' : 'دستمزد ماهانه (تومان)'} type="number" value={formData.salary} onChange={(v) => setFormData({ ...formData, salary: v })} placeholder="0" />
               </div>
             ),
           },

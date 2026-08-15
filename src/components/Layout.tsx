@@ -324,6 +324,7 @@ const routeImports: Record<string, () => Promise<unknown>> = {
   '/reports':        () => import('../pages/Reports'),
   '/settings':       () => import('../pages/Settings'),
   '/waiting-list':   () => import('../pages/WaitingList'),
+  '/archive':        () => import('../pages/Archive'),
 }
 
 const prefetched = new Set<string>()
@@ -351,6 +352,7 @@ const Staff        = lazyPage('/staff')
 const Reports      = lazyPage('/reports')
 const Settings     = lazyPage('/settings')
 const WaitingList  = lazyPage('/waiting-list')
+const Archive      = lazyPage('/archive')
 
 function LL({ children, path }: { children: React.ReactNode; path: string }) {
   const { profile } = useAuth()
@@ -428,6 +430,7 @@ export function Layout() {
           <Route path="/reports"         element={<LL path="/reports"><Reports /></LL>} />
           <Route path="/settings"        element={<LL path="/settings"><Settings /></LL>} />
           <Route path="/waiting-list"    element={<LL path="/waiting-list"><WaitingList /></LL>} />
+          <Route path="/archive"         element={<LL path="/archive"><Archive /></LL>} />
           <Route path="*"                element={<NotFound />} />
         </Routes>
       </LayoutInner>
