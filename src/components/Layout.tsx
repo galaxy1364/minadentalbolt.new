@@ -1,7 +1,7 @@
-import React, { useState, useEffect, useRef } from 'react'
+import React, { useState, useEffect, useRef, useCallback } from 'react'
 import { HashRouter, Routes, Route, useNavigate, useLocation } from 'react-router-dom'
 import {
-  MoreHorizontal, X, Wifi, WifiOff, RefreshCw, Moon, Sun, LogOut, AlertTriangle,
+  MoreHorizontal, X, Wifi, WifiOff, RefreshCw, Moon, Sun, LogOut, AlertTriangle, Sparkles,
 } from 'lucide-react'
 import { Spinner, ToastContainer, Button } from './ui'
 import AICommandBar from './AICommandBar'
@@ -11,6 +11,7 @@ import { MinadentLogo } from './MinadentLogo'
 import Login from '../pages/Login'
 import { useAuth } from '../lib/auth'
 import { canAccess, REQUIRE_LOGIN } from '../lib/permissions'
+import { checkForUpdate, applyUpdate } from '../lib/updateCheck'
 import {
   primaryModules, secondaryModules, allModules,
   getModuleByPath, setModuleTheme, type ModuleIdentity,
@@ -45,6 +46,59 @@ function DarkModeToggle() {
 }
 
 // ── Sync indicator ──────────────────────────────────────
+// ── Update banner (manual + automatic) ──────────────────────────
+const AUTO_CHECK_KEY = 'minadent-auto-update-check'
+const AUTO_CHECK_INTERVAL = 15 * 60 * 1000 // 15 minutes
+
+function UpdateBanner() {
+  const [available, setAvailable] = useState(false)
+  const [remoteVersion, setRemoteVersion] = useState<string | null>(null)
+  const [dismissed, setDismissed] = useState(false)
+  const [updating, setUpdating] = useState(false)
+
+  const runCheck = useCallback(async () => {
+    const autoEnabled = localStorage.getItem(AUTO_CHECK_KEY) !== 'false'
+    if (!autoEnabled) return
+    const result = await checkForUpdate()
+    if (result.updateAvailable) {
+      setAvailable(true)
+      setRemoteVersion(result.remoteVersion)
+    }
+  }, [])
+
+  useEffect(() => {
+    runCheck()
+    const interval = setInterval(runCheck, AUTO_CHECK_INTERVAL)
+    const onVisible = () => { if (document.visibilityState === 'visible') runCheck() }
+    document.addEventListener('visibilitychange', onVisible)
+    return () => { clearInterval(interval); document.removeEventListener('visibilitychange', onVisible) }
+  }, [runCheck])
+
+  if (!available || dismissed) return null
+
+  return (
+    <div className="px-3 pt-2">
+      <div className="flex items-center gap-2.5 px-3.5 py-2.5 rounded-2xl bg-gradient-to-l from-violet-600 to-sky-500 text-white shadow-md">
+        <Sparkles size={16} className="shrink-0" />
+        <div className="flex-1 min-w-0">
+          <p className="text-xs font-bold">نسخه‌ی جدیدی موجود است{remoteVersion ? ` (${remoteVersion})` : ''}</p>
+          <p className="text-[10px] text-white/80">برای دریافت آخرین بهبودها به‌روزرسانی کنید</p>
+        </div>
+        <button
+          onClick={async () => { h.confirm(); setUpdating(true); await applyUpdate() }}
+          disabled={updating}
+          className="shrink-0 px-3 py-1.5 rounded-xl bg-white/20 hover:bg-white/30 text-xs font-bold transition-all-smooth press-scale disabled:opacity-60"
+        >
+          {updating ? 'در حال بارگذاری...' : 'به‌روزرسانی'}
+        </button>
+        <button onClick={() => { h.cancel(); setDismissed(true) }} aria-label="بعداً" className="shrink-0 p-1 rounded-lg hover:bg-white/20">
+          <X size={14} />
+        </button>
+      </div>
+    </div>
+  )
+}
+
 function SyncIndicator() {
   const navigate = useNavigate()
   const [status, setStatus] = useState<SyncStatus>('idle')
@@ -291,6 +345,8 @@ function LayoutInner({ children }: { children: React.ReactNode }) {
           </div>
         </div>
       </header>
+
+      <UpdateBanner />
 
       <main className="flex-1 min-w-0 overflow-x-hidden px-3 pt-3 pb-48">
         <div key={location.pathname} className="slide-in-right">

@@ -4,7 +4,7 @@ import {
   Settings as SettingsIcon, Building2, Hash, MessageSquare, Package, Save, Smile,
   Cloud, Download, Upload, Vibrate, Volume2, Bell, Database, RefreshCw, Check,
   Smartphone, Shield, AlertTriangle, Eye, ChevronRight, Wifi, Plus, Edit2, Trash2,
-  Stethoscope, Wrench, ListOrdered, Tag, Copy, CheckCircle2, History, CloudOff,
+  Stethoscope, Wrench, ListOrdered, Tag, Copy, CheckCircle2, History, CloudOff, Sparkles,
 } from 'lucide-react'
 import {
   fetchSmsTemplates, fetchTreatmentPackages, fetchDoctors, fetchUnits, fetchProcedures,
@@ -30,6 +30,8 @@ import { CLINIC_ID } from '../lib/supabase'
 import { getErrorLog, clearErrorLog, LoggedError } from '../lib/errorLog'
 import { fetchAuditLog, clearAuditLog } from '../lib/auditLog'
 import { listBackupSnapshots, restoreFromSnapshot } from '../lib/autoBackup'
+import { checkForUpdate, applyUpdate } from '../lib/updateCheck'
+import { APP_VERSION, BUILD_DATE } from '../lib/appVersion'
 import type { AuditLogEntry, BackupSnapshot } from '../lib/db'
 import type { SyncQueueEntry } from '../lib/db'
 
@@ -414,6 +416,7 @@ export default function Settings() {
           { key: 'errors', label: 'گزارش خطاها', icon: <AlertTriangle size={16} /> },
           { key: 'audit', label: 'گزارش فعالیت‌ها', icon: <History size={16} /> },
           { key: 'failed_sync', label: 'همگام‌سازی ناموفق', icon: <CloudOff size={16} /> },
+          { key: 'updates', label: 'به‌روزرسانی', icon: <Sparkles size={16} /> },
         ]}
         active={activeTab}
         onChange={setActiveTab}
@@ -550,6 +553,9 @@ export default function Settings() {
 
       {/* Failed Sync Tab */}
       {activeTab === 'failed_sync' && <FailedSyncTab />}
+
+      {/* Updates Tab */}
+      {activeTab === 'updates' && <UpdatesTab />}
 
       {/* Haptics Tab */}
       {activeTab === 'haptics' && (
@@ -1004,6 +1010,102 @@ function FailedSyncTab() {
             ))}
           </div>
         )}
+      </Card>
+    </div>
+  )
+}
+
+// ============================================================================
+// Updates Tab — real version number, manual + automatic update checking
+// ============================================================================
+
+const AUTO_CHECK_STORAGE_KEY = 'minadent-auto-update-check'
+
+function UpdatesTab() {
+  const [checking, setChecking] = useState(false)
+  const [lastChecked, setLastChecked] = useState<Date | null>(null)
+  const [result, setResult] = useState<{ updateAvailable: boolean; remoteVersion: string | null; remoteBuildDate: string | null } | null>(null)
+  const [autoCheck, setAutoCheck] = useState(() => localStorage.getItem(AUTO_CHECK_STORAGE_KEY) !== 'false')
+  const [applying, setApplying] = useState(false)
+
+  const handleCheck = async () => {
+    setChecking(true)
+    const r = await checkForUpdate()
+    setResult(r)
+    setLastChecked(new Date())
+    setChecking(false)
+    if (!r.updateAvailable) showToast('success', 'شما آخرین نسخه را دارید')
+  }
+
+  useEffect(() => { handleCheck() }, [])
+
+  const toggleAutoCheck = () => {
+    const next = !autoCheck
+    setAutoCheck(next)
+    localStorage.setItem(AUTO_CHECK_STORAGE_KEY, String(next))
+    showToast('success', next ? 'بررسی خودکار فعال شد' : 'بررسی خودکار غیرفعال شد')
+  }
+
+  const handleApply = async () => {
+    setApplying(true)
+    await applyUpdate()
+  }
+
+  return (
+    <div className="space-y-4">
+      <Card className="p-5">
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="text-base font-bold text-slate-800 dark:text-slate-100 flex items-center gap-2">
+            <Sparkles size={18} className="text-primary-600" /> نسخه و به‌روزرسانی
+          </h2>
+        </div>
+
+        <div className="grid grid-cols-2 gap-2.5 mb-4">
+          <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-800/60">
+            <p className="text-[11px] text-slate-400 mb-0.5">نسخه‌ی نصب‌شده</p>
+            <p className="text-base font-extrabold text-slate-800 dark:text-slate-100">{APP_VERSION}</p>
+          </div>
+          <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-800/60">
+            <p className="text-[11px] text-slate-400 mb-0.5">تاریخ ساخت</p>
+            <p className="text-sm font-bold text-slate-700 dark:text-slate-200">{toJalaliStringPretty(BUILD_DATE)}</p>
+          </div>
+        </div>
+
+        {result?.updateAvailable ? (
+          <div className="p-3.5 rounded-xl bg-gradient-to-l from-violet-50 to-sky-50 dark:from-violet-900/20 dark:to-sky-900/20 border border-violet-100 dark:border-violet-800 mb-4">
+            <p className="text-sm font-bold text-violet-700 dark:text-violet-300 mb-1">نسخه‌ی {result.remoteVersion} موجود است</p>
+            <p className="text-xs text-slate-500 dark:text-slate-400 mb-3">با به‌روزرسانی، آخرین اصلاحات و قابلیت‌ها اعمال می‌شود.</p>
+            <Button variant="primary" onClick={handleApply} disabled={applying} className="w-full justify-center">
+              {applying ? <Spinner size={16} /> : 'به‌روزرسانی الان'}
+            </Button>
+          </div>
+        ) : (
+          <div className="flex items-center gap-2 p-3.5 rounded-xl bg-success-50 dark:bg-success-900/20 border border-success-100 dark:border-success-800 mb-4">
+            <CheckCircle2 size={18} className="text-success-600 shrink-0" />
+            <p className="text-sm font-semibold text-success-700 dark:text-success-300">شما آخرین نسخه را استفاده می‌کنید</p>
+          </div>
+        )}
+
+        <Button variant="secondary" onClick={handleCheck} disabled={checking} className="w-full justify-center mb-3">
+          {checking ? <Spinner size={16} /> : <><RefreshCw size={15} className="inline ml-1.5" /> بررسی دستی به‌روزرسانی</>}
+        </Button>
+
+        {lastChecked && (
+          <p className="text-[11px] text-slate-400 text-center mb-3">آخرین بررسی: {toJalaliStringPretty(lastChecked.toISOString())}</p>
+        )}
+
+        <label className="flex items-center justify-between p-3 rounded-xl bg-slate-50 dark:bg-slate-800/60 cursor-pointer">
+          <span className="text-sm font-medium text-slate-700 dark:text-slate-200">بررسی خودکار به‌روزرسانی</span>
+          <button
+            onClick={toggleAutoCheck}
+            role="switch"
+            aria-checked={autoCheck}
+            className={`relative w-11 h-6 rounded-full transition-colors ${autoCheck ? 'bg-primary-600' : 'bg-slate-300 dark:bg-slate-600'}`}
+          >
+            <span className={`absolute top-0.5 w-5 h-5 rounded-full bg-white shadow transition-transform ${autoCheck ? 'right-0.5' : 'right-5'}`} />
+          </button>
+        </label>
+        <p className="text-[11px] text-slate-400 mt-2">در صورت فعال بودن، هر ۱۵ دقیقه و هنگام بازگشت به برنامه، به‌صورت خودکار بررسی می‌شود.</p>
       </Card>
     </div>
   )
