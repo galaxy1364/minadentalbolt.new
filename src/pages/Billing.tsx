@@ -10,7 +10,7 @@ import { useConfirmAction } from '../components/ConfirmAction'
 import { Payment, Encounter, Cheque, PaymentPlan, Patient, Expense, Treatment, ImplantCase } from '../types'
 import { calcAllPatientBalances } from '../lib/finance'
 import { Wizard, Card, Button, Input, Select, Textarea, Badge, Spinner, EmptyState, Tabs, showToast } from '../components/ui'
-import { ModuleHeader, ModuleStatCard } from '../components/ModuleHeader'
+import { ModuleHeader, ModuleStatCard, ReorderableStatGrid } from '../components/ModuleHeader'
 
 // ============================================================================
 // Constants
@@ -435,12 +435,15 @@ export default function Billing() {
   // ===========================================================================
 
   const renderStats = () => (
-    <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-      <ModuleStatCard moduleKey="billing" icon={<DollarSign size={20} />} label="کل درآمد" value={`${formatCurrency(stats.totalRevenue)} ت`} />
-      <ModuleStatCard moduleKey="billing" icon={<TrendingUp size={20} />} label="درآمد این ماه" value={`${formatCurrency(stats.monthlyRevenue)} ت`} />
-      <ModuleStatCard moduleKey="billing" icon={<Wallet size={20} />} label="مطالبات معوق" value={`${formatCurrency(stats.outstandingBalance)} ت`} />
-      <ModuleStatCard moduleKey="billing" icon={<Banknote size={20} />} label="چک‌های در انتظار" value={`${formatCurrency(stats.pendingChequeAmount)} ت`} />
-    </div>
+    <ReorderableStatGrid
+      storageKey="billing"
+      items={[
+        { key: 'revenue', node: <ModuleStatCard moduleKey="billing" icon={<DollarSign size={20} />} label="کل درآمد" value={`${formatCurrency(stats.totalRevenue)} ت`} /> },
+        { key: 'monthly', node: <ModuleStatCard moduleKey="billing" icon={<TrendingUp size={20} />} label="درآمد این ماه" value={`${formatCurrency(stats.monthlyRevenue)} ت`} /> },
+        { key: 'outstanding', node: <ModuleStatCard moduleKey="billing" icon={<Wallet size={20} />} label="مطالبات معوق" value={`${formatCurrency(stats.outstandingBalance)} ت`} /> },
+        { key: 'cheques', node: <ModuleStatCard moduleKey="billing" icon={<Banknote size={20} />} label="چک‌های در انتظار" value={`${formatCurrency(stats.pendingChequeAmount)} ت`} /> },
+      ]}
+    />
   )
 
   // ===========================================================================

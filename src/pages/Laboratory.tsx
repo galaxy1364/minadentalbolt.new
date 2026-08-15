@@ -7,7 +7,7 @@ import { h } from '../lib/haptics'
 import { useConfirmAction } from '../components/ConfirmAction'
 import type { LabOrder, Laboratory, Patient, Doctor } from '../types'
 import { Wizard, Card, Button, Input, Select, Textarea, Badge, Spinner, EmptyState, showToast } from '../components/ui'
-import { ModuleHeader, ModuleStatCard } from '../components/ModuleHeader'
+import { ModuleHeader, ModuleStatCard, ReorderableStatGrid } from '../components/ModuleHeader'
 
 // ============================================================================
 // Constants
@@ -426,12 +426,15 @@ export default function Laboratory() {
   // ===========================================================================
 
   const renderStats = () => (
-    <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-      <ModuleStatCard moduleKey="laboratory" icon={<Package size={20} />} label="کل سفارش‌ها" value={toPersianDigits(stats.total)} />
-      <ModuleStatCard moduleKey="laboratory" icon={<Clock size={20} />} label="در حال انجام" value={toPersianDigits(stats.inProgress)} />
-      <ModuleStatCard moduleKey="laboratory" icon={<AlertCircle size={20} />} label="علی‌رغم موعد" value={toPersianDigits(stats.overdue)} />
-      <ModuleStatCard moduleKey="laboratory" icon={<TrendingUp size={20} />} label="کل هزینه" value={`${formatCurrency(stats.totalCost)} ت`} />
-    </div>
+    <ReorderableStatGrid
+      storageKey="laboratory"
+      items={[
+        { key: 'total', node: <ModuleStatCard moduleKey="laboratory" icon={<Package size={20} />} label="کل سفارش‌ها" value={toPersianDigits(stats.total)} /> },
+        { key: 'inprogress', node: <ModuleStatCard moduleKey="laboratory" icon={<Clock size={20} />} label="در حال انجام" value={toPersianDigits(stats.inProgress)} /> },
+        { key: 'overdue', node: <ModuleStatCard moduleKey="laboratory" icon={<AlertCircle size={20} />} label="علی‌رغم موعد" value={toPersianDigits(stats.overdue)} /> },
+        { key: 'cost', node: <ModuleStatCard moduleKey="laboratory" icon={<TrendingUp size={20} />} label="کل هزینه" value={`${formatCurrency(stats.totalCost)} ت`} /> },
+      ]}
+    />
   )
 
   // ===========================================================================

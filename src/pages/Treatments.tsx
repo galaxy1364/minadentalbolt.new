@@ -15,7 +15,7 @@ import {
 import { toJalaliString, toJalaliStringPretty, formatCurrency, formatNumber, toPersianDigits } from '../lib/persianDate'
 import { Encounter, EncounterWithRelations, Treatment, Procedure, Patient, Doctor, Laboratory, ToothRecord } from '../types'
 import { Card, Button, Badge, Spinner, EmptyState, Tabs, Input, Select, Textarea, Modal, Wizard, showToast } from '../components/ui'
-import { ModuleHeader, ModuleStatCard } from '../components/ModuleHeader'
+import { ModuleHeader, ModuleStatCard, ReorderableStatGrid } from '../components/ModuleHeader'
 import { useConfirmAction } from '../components/ConfirmAction'
 import { h } from '../lib/haptics'
 import DentalChart from '../components/DentalChart'
@@ -526,12 +526,15 @@ export default function Treatments() {
       />
 
       {/* Stats */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-        <ModuleStatCard moduleKey="treatments" icon={<ClipboardList size={20} />} label="کل ویزیت‌ها" value={formatNumber(stats.totalEncounters)} />
-        <ModuleStatCard moduleKey="treatments" icon={<Activity size={20} />} label="در حال انجام" value={formatNumber(stats.inProgress)} />
-        <ModuleStatCard moduleKey="treatments" icon={<Stethoscope size={20} />} label="تکمیل شده" value={formatNumber(stats.completed)} />
-        <ModuleStatCard moduleKey="treatments" icon={<Smile size={20} />} label="ارزش کل درمان‌ها" value={`${formatCurrency(stats.totalRevenue)} ت`} />
-      </div>
+      <ReorderableStatGrid
+        storageKey="treatments"
+        items={[
+          { key: 'encounters', node: <ModuleStatCard moduleKey="treatments" icon={<ClipboardList size={20} />} label="کل ویزیت‌ها" value={formatNumber(stats.totalEncounters)} /> },
+          { key: 'inprogress', node: <ModuleStatCard moduleKey="treatments" icon={<Activity size={20} />} label="در حال انجام" value={formatNumber(stats.inProgress)} /> },
+          { key: 'completed', node: <ModuleStatCard moduleKey="treatments" icon={<Stethoscope size={20} />} label="تکمیل شده" value={formatNumber(stats.completed)} /> },
+          { key: 'revenue', node: <ModuleStatCard moduleKey="treatments" icon={<Smile size={20} />} label="ارزش کل درمان‌ها" value={`${formatCurrency(stats.totalRevenue)} ت`} /> },
+        ]}
+      />
 
       <Tabs
         tabs={[

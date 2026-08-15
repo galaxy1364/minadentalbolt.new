@@ -8,7 +8,7 @@ import { h } from '../lib/haptics'
 import { useConfirmAction } from '../components/ConfirmAction'
 import { ImplantCase, ImplantCaseWithRelations, ImplantComponent, Patient, Doctor } from '../types'
 import { Wizard, Card, Button, Input, Select, Textarea, Badge, Spinner, EmptyState, showToast } from '../components/ui'
-import { ModuleHeader, ModuleStatCard } from '../components/ModuleHeader'
+import { ModuleHeader, ModuleStatCard, ReorderableStatGrid } from '../components/ModuleHeader'
 
 // ============================================================================
 // Constants
@@ -464,14 +464,18 @@ export default function Implants() {
       />
 
       {/* Stats Cards */}
-      <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-3">
-        <ModuleStatCard moduleKey="implants" icon={<Smile size={20} />} label="کل موارد" value={formatNumber(stats.total)} />
-        <ModuleStatCard moduleKey="implants" icon={<Activity size={20} />} label="در جراحی" value={formatNumber(stats.inSurgery)} />
-        <ModuleStatCard moduleKey="implants" icon={<Clock size={20} />} label="در حال بهبود" value={formatNumber(stats.healing)} />
-        <ModuleStatCard moduleKey="implants" icon={<CheckCircle2 size={20} />} label="تکمیل شده" value={formatNumber(stats.completed)} />
-        <ModuleStatCard moduleKey="implants" icon={<ShieldCheck size={20} />} label="نرخ موفقیت" value={`${toPersianDigits(Math.round(stats.successRate))}٪`} />
-        <ModuleStatCard moduleKey="implants" icon={<DollarSign size={20} />} label="ارزش کل" value={`${formatCurrency(stats.totalValue)} ت`} />
-      </div>
+      <ReorderableStatGrid
+        storageKey="implants"
+        className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-3"
+        items={[
+          { key: 'total', node: <ModuleStatCard moduleKey="implants" icon={<Smile size={20} />} label="کل موارد" value={formatNumber(stats.total)} /> },
+          { key: 'surgery', node: <ModuleStatCard moduleKey="implants" icon={<Activity size={20} />} label="در جراحی" value={formatNumber(stats.inSurgery)} /> },
+          { key: 'healing', node: <ModuleStatCard moduleKey="implants" icon={<Clock size={20} />} label="در حال بهبود" value={formatNumber(stats.healing)} /> },
+          { key: 'completed', node: <ModuleStatCard moduleKey="implants" icon={<CheckCircle2 size={20} />} label="تکمیل شده" value={formatNumber(stats.completed)} /> },
+          { key: 'success', node: <ModuleStatCard moduleKey="implants" icon={<ShieldCheck size={20} />} label="نرخ موفقیت" value={`${toPersianDigits(Math.round(stats.successRate))}٪`} /> },
+          { key: 'value', node: <ModuleStatCard moduleKey="implants" icon={<DollarSign size={20} />} label="ارزش کل" value={`${formatCurrency(stats.totalValue)} ت`} /> },
+        ]}
+      />
 
       {/* Filters */}
       <Card className="p-4">
