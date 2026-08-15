@@ -374,6 +374,7 @@ export default function Billing() {
   const quickChequeStatusChange = (cheque: Cheque, newStatus: string) => {
     h.select()
     const meta = chequeStatuses.find((s) => s.value === newStatus) || chequeStatuses[0]
+    const willClear = newStatus === 'cleared' && cheque.status !== 'cleared'
     confirmAction({
       type: 'status',
       title: 'تغییر وضعیت چک',
@@ -382,10 +383,31 @@ export default function Billing() {
         { label: 'مبلغ', value: `${formatCurrency(cheque.amount)} ت` },
         { label: 'وضعیت فعلی', value: chequeStatuses.find((s) => s.value === cheque.status)?.label || cheque.status },
         { label: 'وضعیت جدید', value: meta.label, highlight: true },
+        ...(willClear ? [{ label: 'اثر روی مانده‌حساب', value: 'مانده‌حساب بیمار به همین میزان کاهش می‌یابد' }] : []),
       ],
       confirmLabel: 'تایید',
       onConfirm: async () => {
-        try { await updateCheque(cheque.id, { status: newStatus }); showToast('success', 'وضعیت تغییر کرد'); await loadData() }
+        try {
+          await updateCheque(cheque.id, { status: newStatus })
+          // Per clinic policy: a cheque only reduces the patient's balance
+          // once it actually clears/is cashed — not the moment it's
+          // handed over. So clearing it here is exactly when the matching
+          // Payment record (the thing calcPatientBalance actually counts)
+          // needs to be created; without this the balance stayed wrong
+          // even after a real cheque had legitimately cleared.
+          if (willClear) {
+            await createPayment({
+              patient_id: cheque.patient_id, encounter_id: null,
+              amount: cheque.amount, payment_method: 'cheque',
+              reference: cheque.cheque_number || null,
+              notes: `وصول چک شماره ${cheque.cheque_number || '-'}`,
+              status: 'completed', payment_date: new Date().toISOString().slice(0, 10),
+              created_by: null,
+            } as any)
+          }
+          showToast('success', willClear ? 'چک وصول شد و مانده‌حساب به‌روز شد' : 'وضعیت تغییر کرد')
+          await loadData()
+        }
         catch { showToast('error', 'خطا') }
       },
     })

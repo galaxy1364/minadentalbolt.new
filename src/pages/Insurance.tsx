@@ -1,13 +1,13 @@
 // Insurance.tsx - Persian RTL Dental Clinic Insurance Management
 import { useState, useEffect, useCallback, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Shield, FileText, Search, Building2, Percent, Eye, Plus, Edit2, Trash2, Phone, MapPin } from 'lucide-react'
+import { Shield, FileText, Search, Building2, Percent, Eye, Plus, Edit2, Trash2, Phone, MapPin, Wallet } from 'lucide-react'
 import { PieChart, Pie, Cell, XAxis, YAxis, Tooltip as RTooltip, ResponsiveContainer, Legend } from 'recharts'
 import {
   fetchInsuranceCompanies, fetchInsuranceClaims,
   createInsuranceCompany, updateInsuranceCompany, deleteInsuranceCompany,
   createInsuranceClaim, updateInsuranceClaim, deleteInsuranceClaim,
-  fetchPatients,
+  fetchPatients, createPayment,
 } from '../lib/api'
 import { toJalaliString, toJalaliStringPretty, formatCurrency, formatNumber, toPersianDigits } from '../lib/persianDate'
 import {
@@ -280,6 +280,41 @@ export default function Insurance() {
     })
   }
 
+  // Whether an approved insurance amount reduces the patient's own
+  // balance (discount-at-source model) or is settled separately with the
+  // insurer (full-charge-to-patient model) genuinely varies by clinic and
+  // even by case — so this is a deliberate one-tap choice per claim
+  // rather than a fixed rule. Recording it as a real Payment reuses the
+  // exact same ledger every other balance calculation already reads
+  // from, instead of a separate flag that would need its own logic.
+  const handleRecordClaimAsPayment = (c: InsuranceClaimWithRelations) => {
+    h.tap()
+    confirmAction({
+      type: 'create',
+      title: 'ثبت مبلغ بیمه به‌عنوان پرداخت',
+      warning: 'این مبلغ از مانده‌حساب بیمار کسر می‌شود — فقط در صورتی بزنید که تخفیف بیمه باید مانده‌حساب بیمار را کم کند.',
+      fields: [
+        { label: 'بیمار', value: claimPatientName(c), highlight: true },
+        { label: 'شرکت بیمه', value: c.company?.name || '-' },
+        { label: 'مبلغ', value: `${formatCurrency(c.approved_amount || 0)} ت`, highlight: true },
+      ],
+      confirmLabel: 'ثبت و کاهش مانده‌حساب',
+      onConfirm: async () => {
+        try {
+          await createPayment({
+            patient_id: c.patient_id, encounter_id: c.encounter_id || null,
+            amount: c.approved_amount || 0, payment_method: 'insurance',
+            reference: c.claim_number || null,
+            notes: `تسویه بیمه — ${c.company?.name || 'شرکت بیمه'}`,
+            status: 'completed', payment_date: new Date().toISOString().slice(0, 10),
+            created_by: null,
+          } as any)
+          showToast('success', 'ثبت شد و مانده‌حساب بیمار به‌روز شد')
+        } catch { showToast('error', 'خطا در ثبت پرداخت') }
+      },
+    })
+  }
+
   if (loading) {
     return <div className="flex items-center justify-center py-20"><Spinner size={32} /></div>
   }
@@ -416,6 +451,9 @@ export default function Insurance() {
                           <td className="px-4 py-3"><Badge color={meta.color}>{meta.label}</Badge></td>
                           <td className="px-4 py-3">
                             <div className="flex gap-1">
+                              {c.approved_amount != null && c.approved_amount > 0 && (
+                                <button onClick={() => handleRecordClaimAsPayment(c)} title="ثبت به‌عنوان پرداخت (کاهش مانده‌حساب بیمار)" className="text-success-500 hover:text-success-700 hover:bg-success-50 p-1 rounded-lg transition-colors"><Wallet size={15} /></button>
+                              )}
                               <button onClick={() => openEditClaim(c)} className="text-slate-400 hover:text-primary-600 hover:bg-primary-50 p-1 rounded-lg transition-colors"><Edit2 size={15} /></button>
                               <button onClick={() => handleDeleteClaim(c)} className="text-slate-400 hover:text-error-600 hover:bg-error-50 p-1 rounded-lg transition-colors"><Trash2 size={15} /></button>
                               <button onClick={() => navigate(`/patients/${c.patient_id}`)} className="text-primary-600 hover:text-primary-700 p-1 rounded-lg hover:bg-primary-50"><Eye size={15} /></button>
