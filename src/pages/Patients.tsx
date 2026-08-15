@@ -10,6 +10,7 @@ import { useConfirmAction, ConfirmActionConfig } from '../components/ConfirmActi
 import { h } from '../lib/haptics'
 import { usePullToRefresh } from '../lib/usePullToRefresh'
 import { scoreFields } from '../lib/fuzzySearch'
+import { calcPatientBalance } from '../lib/finance'
 
 const vipLevels: { value: number; label: string; color: string; icon: string }[] = [
   { value: 0, label: 'عادی', color: 'slate', icon: '' },
@@ -44,11 +45,9 @@ function getInitials(p: Patient): string {
   return (f + l).trim() || '?'
 }
 
-function calcBalance(payments: Payment[], treatments: Treatment[]): { balance: number; paid: number; totalCost: number } {
-  const totalCost = treatments.reduce((s, t) => s + (t.total_price || 0), 0)
-  const paid = payments.filter((p) => p.status === 'completed').reduce((s, p) => s + (p.amount || 0), 0)
-  return { balance: totalCost - paid, paid, totalCost }
-}
+// Shared with Dashboard/Billing (src/lib/finance.ts) so this number can
+// never silently diverge between pages again.
+const calcBalance = calcPatientBalance
 
 function calculateAge(birthDate: string | null): number | null {
   if (!birthDate) return null

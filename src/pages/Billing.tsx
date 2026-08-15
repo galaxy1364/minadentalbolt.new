@@ -3,11 +3,12 @@ import { useState, useEffect, useCallback, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { CreditCard, Plus, Search, DollarSign, TrendingUp, Wallet, Calendar, CheckCircle2, AlertCircle, Edit2, Filter, Receipt, Banknote, Clock, Trash2, Printer } from 'lucide-react'
 import { BarChart, Bar, XAxis, YAxis, Tooltip as RTooltip, ResponsiveContainer, PieChart, Pie, Cell as RCell } from 'recharts'
-import { fetchPayments, createPayment, updatePayment, deletePayment, fetchEncounters, fetchCheques, createCheque, updateCheque, fetchPaymentPlans, createPaymentPlan, updateInstallment, fetchPatients, fetchExpenses, createExpense, deleteExpense } from '../lib/api'
+import { fetchPayments, createPayment, updatePayment, deletePayment, fetchEncounters, fetchCheques, createCheque, updateCheque, fetchPaymentPlans, createPaymentPlan, updateInstallment, fetchPatients, fetchExpenses, createExpense, deleteExpense, fetchTreatments } from '../lib/api'
 import { toJalaliString, toJalaliStringPretty, formatCurrency, formatNumber, toPersianDigits } from '../lib/persianDate'
 import { h } from '../lib/haptics'
 import { useConfirmAction } from '../components/ConfirmAction'
-import { Payment, Encounter, Cheque, PaymentPlan, Patient, Expense } from '../types'
+import { Payment, Encounter, Cheque, PaymentPlan, Patient, Expense, Treatment } from '../types'
+import { calcAllPatientBalances } from '../lib/finance'
 import { Wizard, Card, Button, Input, Select, Textarea, Badge, Spinner, EmptyState, Tabs, showToast } from '../components/ui'
 import { ModuleHeader, ModuleStatCard } from '../components/ModuleHeader'
 
@@ -56,6 +57,7 @@ export default function Billing() {
 
   const [payments, setPayments] = useState<Payment[]>([])
   const [encounters, setEncounters] = useState<Encounter[]>([])
+  const [treatments, setTreatments] = useState<Treatment[]>([])
   const [cheques, setCheques] = useState<Cheque[]>([])
   const [paymentPlans, setPaymentPlans] = useState<PaymentPlan[]>([])
   const [expenses, setExpenses] = useState<Expense[]>([])
@@ -137,13 +139,14 @@ export default function Billing() {
   const loadData = useCallback(async () => {
     setLoading(true)
     try {
-      const [pays, encs, chqs, plans, pats, exps] = await Promise.all([
+      const [pays, encs, chqs, plans, pats, exps, trts] = await Promise.all([
         fetchPayments(),
         fetchEncounters(),
         fetchCheques(),
         fetchPaymentPlans(),
         fetchPatients(),
         fetchExpenses(),
+        fetchTreatments(),
       ])
       setPayments(pays)
       setEncounters(encs)
@@ -151,6 +154,7 @@ export default function Billing() {
       setPaymentPlans(plans)
       setPatients(pats)
       setExpenses(exps)
+      setTreatments(trts)
     } catch (err) {
       console.error('Error loading billing data:', err)
       showToast('error', 'خطا در بارگذاری اطلاعات مالی')
@@ -187,20 +191,15 @@ export default function Billing() {
     const pendingChequeAmount = pendingCheques.reduce((sum, c) => sum + c.amount, 0)
     const totalExpenses = expenses.reduce((sum, e) => sum + (e.amount || 0), 0)
 
-    // Calculate outstanding balances per patient
-    const patientBalances = new Map<string, number>()
-    encounters.forEach((e) => {
-      const total = e.total_amount ?? 0
-      const paid = e.paid_amount ?? 0
-      const balance = total - paid
-      if (balance > 0) {
-        patientBalances.set(e.patient_id, (patientBalances.get(e.patient_id) || 0) + balance)
-      }
-    })
-    const outstandingBalance = Array.from(patientBalances.values()).reduce((sum, b) => sum + b, 0)
+    // Calculate outstanding balances per patient — same shared basis
+    // (treatments minus payments) as Dashboard and Patients, so the
+    // number is provably identical everywhere instead of silently
+    // drifting from a cached encounters.total_amount/paid_amount field.
+    const { byPatient: patientBalancesMap, totalOutstanding: outstandingBalance } = calcAllPatientBalances(payments, treatments)
+    const patientBalances = new Map(Array.from(patientBalancesMap.entries()).map(([id, fin]) => [id, fin.balance]))
 
     return { totalRevenue, monthlyRevenue, pendingCheques: pendingCheques.length, pendingChequeAmount, outstandingBalance, patientBalances, totalExpenses }
-  }, [payments, cheques, encounters, expenses])
+  }, [payments, cheques, encounters, expenses, treatments])
 
   // Revenue chart data - last 6 months
   const revenueChartData = useMemo(() => {

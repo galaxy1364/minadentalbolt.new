@@ -29,6 +29,7 @@ import type {
 } from '../types'
 import { Card, Badge, EmptyState, showToast, Modal } from '../components/ui'
 import { findBirthdays, findDebtors, findLapsedPatients, findDueInstallments, findNoShows, findUnfinishedTreatmentFollowups, REMINDER_CATEGORY_META, SmartReminder } from '../lib/smartReminders'
+import { calcAllPatientBalances } from '../lib/finance'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../lib/auth'
 import { ErrorBoundary } from '../components/ErrorBoundary'
@@ -526,8 +527,8 @@ export default function Dashboard() {
       setEncounters(encs); setInstallments(insts)
       setTreatments(trts)
       setLabOrdersState(labOrders as LabOrder[])
-      const outstanding = encs.reduce((sum, e) => sum + Math.max(0, (e.total_amount ?? 0) - (e.paid_amount ?? 0)), 0)
-      setOutstandingBalance(outstanding)
+      const { totalOutstanding } = calcAllPatientBalances(pays, trts)
+      setOutstandingBalance(totalOutstanding)
       setLowInventoryCount(items.filter((i: any) => (i.quantity ?? 0) <= (i.min_quantity ?? 0) && i.is_active !== false).length)
       const today = new Date().toISOString().slice(0, 10)
       setOverdueLabCount(labOrders.filter((o: any) => o.status !== 'delivered' && o.status !== 'cancelled' && o.deadline && o.deadline < today).length)
@@ -607,7 +608,7 @@ export default function Dashboard() {
   const smartReminders = useMemo(() => {
     return {
       birthday: findBirthdays(patients),
-      debtor: findDebtors(patients, encounters),
+      debtor: findDebtors(patients, treatments, payments),
       lapsed: findLapsedPatients(patients, encounters),
       installment_due: findDueInstallments(installments, patients),
       no_show: findNoShows(appointments, patients),

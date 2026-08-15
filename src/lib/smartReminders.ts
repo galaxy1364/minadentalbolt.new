@@ -1,5 +1,6 @@
 import type { Patient, Encounter, Payment, Installment, AppointmentWithRelations, Treatment } from '../types'
 import { toPersianDigits } from './persianDate'
+import { calcAllPatientBalances } from './finance'
 
 export type ReminderCategory = 'birthday' | 'debtor' | 'lapsed' | 'installment_due' | 'no_show' | 'unfinished_treatment'
 
@@ -44,27 +45,24 @@ export function findBirthdays(patients: Patient[], today = new Date()): SmartRem
  */
 export function findDebtors(
   patients: Patient[],
-  encounters: Encounter[],
+  treatments: Treatment[],
+  payments: Payment[],
   minBalance = 500000,
 ): SmartReminder[] {
-  const balanceByPatient = new Map<string, number>()
-  for (const e of encounters) {
-    const owed = Math.max(0, (e.total_amount ?? 0) - (e.paid_amount ?? 0))
-    if (owed > 0) balanceByPatient.set(e.patient_id, (balanceByPatient.get(e.patient_id) ?? 0) + owed)
-  }
+  const { byPatient } = calcAllPatientBalances(payments, treatments)
   const patientMap = new Map(patients.map((p) => [p.id, p]))
   const result: SmartReminder[] = []
-  for (const [patientId, balance] of balanceByPatient) {
-    if (balance < minBalance) continue
+  for (const [patientId, fin] of byPatient) {
+    if (fin.balance < minBalance) continue
     const p = patientMap.get(patientId)
     if (!p || !p.is_active) continue
     result.push({
       category: 'debtor',
       patient: p,
       title: `${p.first_name} ${p.last_name}`,
-      detail: `${balance.toLocaleString('fa-IR')} تومان بدهی`,
-      smsMessage: `${p.first_name} عزیز، مانده حساب شما نزد کلینیک مینادنت ${balance.toLocaleString('fa-IR')} تومان است. لطفاً برای تسویه اقدام فرمایید.`,
-      priority: balance,
+      detail: `${fin.balance.toLocaleString('fa-IR')} تومان بدهی`,
+      smsMessage: `${p.first_name} عزیز، مانده حساب شما نزد کلینیک مینادنت ${fin.balance.toLocaleString('fa-IR')} تومان است. لطفاً برای تسویه اقدام فرمایید.`,
+      priority: fin.balance,
     })
   }
   return result.sort((a, b) => b.priority - a.priority)
