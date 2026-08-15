@@ -4,6 +4,7 @@ import { useParams, useNavigate } from 'react-router-dom'
 import { ArrowRight, Edit2, Phone, Mail, MapPin, Calendar, CreditCard, Activity, FileText, Image as ImageIcon, Shield, Pill, Smile, Award, AlertCircle, Clock, CheckCircle2 } from 'lucide-react'
 import { fetchPatient, updatePatient, fetchTimeline, fetchTreatments, fetchAppointments, fetchPayments, fetchToothRecords, createToothRecord, updateToothRecord, fetchPrescriptions, fetchRadiologyImages, fetchEncounters, fetchDoctors } from '../lib/api'
 import { toJalaliString, toJalaliStringPretty, formatCurrency, toPersianDigits, formatTime } from '../lib/persianDate'
+import { calcPatientBalance } from '../lib/finance'
 import { Patient, Doctor, PatientTimeline, Treatment, Appointment, Payment, ToothRecord, Prescription, RadiologyImage, Encounter } from '../types'
 import { Modal, Card, Button, Input, Select, Textarea, Badge, Spinner, EmptyState, Tabs, showToast } from '../components/ui'
 import DentalChart from '../components/DentalChart'
@@ -330,8 +331,9 @@ export default function PatientDetail() {
     return doc ? `دکتر ${doc.name || doc.specialty || 'پزشک'}` : 'نامشخص'
   }
 
-  const totalPaid = payments.filter((p) => p.status === 'completed').reduce((sum, p) => sum + p.amount, 0)
-  const totalTreatmentCost = treatments.reduce((sum, t) => sum + (t.total_price ?? 0), 0)
+  // Shared with Dashboard/Billing/Patients (src/lib/finance.ts) so this
+  // number can never silently diverge between pages again.
+  const { paid: totalPaid, totalCost: totalTreatmentCost, balance: patientBalance } = calcPatientBalance(payments, treatments)
 
   // ===========================================================================
   // Render: Patient Header
@@ -715,8 +717,8 @@ export default function PatientDetail() {
           </Card>
           <Card className="p-4 col-span-2 md:col-span-1">
             <p className="text-xs text-slate-500 mb-1">مانده</p>
-            <p className={`text-lg font-bold ${totalTreatmentCost - totalPaid > 0 ? 'text-error-700' : 'text-success-700'}`}>
-              {formatCurrency(totalTreatmentCost - totalPaid)} تومان
+            <p className={`text-lg font-bold ${patientBalance > 0 ? 'text-error-700' : 'text-success-700'}`}>
+              {formatCurrency(patientBalance)} تومان
             </p>
           </Card>
         </div>
