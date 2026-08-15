@@ -622,14 +622,14 @@ export default function Appointments() {
                   label="پزشک"
                   value={wizardData.doctor_id}
                   onChange={(v) => { h.select(); setWizardData((p) => ({ ...p, doctor_id: v })) }}
-                  options={doctors.map((d) => ({ value: d.id, label: `دکتر ${d.name || d.specialty || 'پزشک'}` }))}
+                  options={doctors.filter((d) => d.is_active || d.id === wizardData.doctor_id).map((d) => ({ value: d.id, label: `دکتر ${d.name || d.specialty || 'پزشک'}${!d.is_active ? ' (غیرفعال)' : ''}` }))}
                   placeholder="انتخاب پزشک..."
                 />
                 <Select
                   label="یونیت"
                   value={wizardData.unit_id}
                   onChange={(v) => { h.select(); setWizardData((p) => ({ ...p, unit_id: v })) }}
-                  options={units.map((u) => ({ value: u.id, label: u.name }))}
+                  options={units.filter((u) => u.is_active || u.id === wizardData.unit_id).map((u) => ({ value: u.id, label: `${u.name}${!u.is_active ? ' (غیرفعال)' : ''}` }))}
                   placeholder="انتخاب یونیت..."
                 />
               </div>

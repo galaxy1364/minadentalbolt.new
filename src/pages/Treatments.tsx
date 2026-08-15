@@ -736,7 +736,7 @@ export default function Treatments() {
                     </div>
                   )}
                 </div>
-                <Select label="پزشک (الزامی)" value={encForm.doctor_id} onChange={(v) => { h.select(); setEncForm((p) => ({ ...p, doctor_id: v })) }} options={doctors.map((d) => ({ value: d.id, label: d.name || d.specialty || `پزشک ${d.id.slice(0, 4)}` }))} placeholder="انتخاب پزشک..." />
+                <Select label="پزشک (الزامی)" value={encForm.doctor_id} onChange={(v) => { h.select(); setEncForm((p) => ({ ...p, doctor_id: v })) }} options={doctors.filter((d) => d.is_active || d.id === encForm.doctor_id).map((d) => ({ value: d.id, label: `${d.name || d.specialty || `پزشک ${d.id.slice(0, 4)}`}${!d.is_active ? ' (غیرفعال)' : ''}` }))} placeholder="انتخاب پزشک..." />
                 <Input label="تاریخ ویزیت" value={encForm.encounter_date} onChange={(v) => setEncForm((p) => ({ ...p, encounter_date: v }))} type="date" dir="ltr" />
               </>
             ),

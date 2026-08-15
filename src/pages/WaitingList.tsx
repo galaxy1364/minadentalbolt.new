@@ -146,7 +146,7 @@ export default function WaitingList() {
   }, [patients])
 
   const doctorOptions = useMemo(() => {
-    return doctors.map((d) => ({ value: d.id, label: d.name || d.specialty || 'پزشک' }))
+    return doctors.filter((d) => d.is_active).map((d) => ({ value: d.id, label: d.name || d.specialty || 'پزشک' }))
   }, [doctors])
 
   const priorityOptions = [
