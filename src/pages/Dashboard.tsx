@@ -17,7 +17,7 @@ import {
 import {
   fetchDashboardStats, fetchAppointments, fetchPatients, fetchPayments,
   fetchEncounters, fetchInventoryItems, fetchLabOrders, fetchWaitingList,
-  fetchActivityFeed, fetchDoctors, fetchAllInstallments,
+  fetchActivityFeed, fetchDoctors, fetchAllInstallments, fetchTreatments,
 } from '../lib/api'
 import {
   toJalaliStringPretty, getJalaliMonthYear, formatCurrency, formatNumber,
@@ -25,10 +25,10 @@ import {
 } from '../lib/persianDate'
 import type {
   AppointmentWithRelations, Patient, Payment, DashboardStats, Doctor, LabOrder,
-  Encounter, Installment,
+  Encounter, Installment, TreatmentWithRelations,
 } from '../types'
 import { Card, Badge, EmptyState, showToast, Modal } from '../components/ui'
-import { findBirthdays, findDebtors, findLapsedPatients, findDueInstallments, findNoShows, REMINDER_CATEGORY_META, SmartReminder } from '../lib/smartReminders'
+import { findBirthdays, findDebtors, findLapsedPatients, findDueInstallments, findNoShows, findUnfinishedTreatmentFollowups, REMINDER_CATEGORY_META, SmartReminder } from '../lib/smartReminders'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../lib/auth'
 import { ErrorBoundary } from '../components/ErrorBoundary'
@@ -474,6 +474,7 @@ export default function Dashboard() {
   const [payments, setPayments] = useState<Payment[]>([])
   const [encounters, setEncounters] = useState<Encounter[]>([])
   const [installments, setInstallments] = useState<Installment[]>([])
+  const [treatments, setTreatments] = useState<TreatmentWithRelations[]>([])
   const [doctors, setDoctors] = useState<Doctor[]>([])
   const [activity, setActivity] = useState<ActivityItem[]>([])
   const [outstandingBalance, setOutstandingBalance] = useState(0)
@@ -503,7 +504,7 @@ export default function Dashboard() {
     if (isRefresh) { setRefreshing(true); if (!silent) h.tap() } else { setLoading(true) }
     try {
       const timeout = new Promise<never>((_, reject) => setTimeout(() => reject(new Error('Dashboard load timed out')), 15000))
-      const [s, appts, pats, pays, encs, items, labOrders, waiting, docs, feed, insts] = await Promise.race([
+      const [s, appts, pats, pays, encs, items, labOrders, waiting, docs, feed, insts, trts] = await Promise.race([
         Promise.all([
           fetchDashboardStats(),
           fetchAppointments(),
@@ -516,12 +517,14 @@ export default function Dashboard() {
           fetchDoctors(),
           fetchActivityFeed(15),
           fetchAllInstallments(),
+          fetchTreatments(),
         ]),
         timeout,
-      ])
+      ]) as [DashboardStats, AppointmentWithRelations[], Patient[], Payment[], Encounter[], any[], any[], any[], Doctor[], any[], Installment[], TreatmentWithRelations[]]
       setStats(s); setAppointments(appts); setPatients(pats); setPayments(pays)
       setDoctors(docs); setActivity(feed as ActivityItem[])
       setEncounters(encs); setInstallments(insts)
+      setTreatments(trts)
       setLabOrdersState(labOrders as LabOrder[])
       const outstanding = encs.reduce((sum, e) => sum + Math.max(0, (e.total_amount ?? 0) - (e.paid_amount ?? 0)), 0)
       setOutstandingBalance(outstanding)
@@ -608,8 +611,9 @@ export default function Dashboard() {
       lapsed: findLapsedPatients(patients, encounters),
       installment_due: findDueInstallments(installments, patients),
       no_show: findNoShows(appointments, patients),
+      unfinished_treatment: findUnfinishedTreatmentFollowups(treatments, appointments, patients),
     }
-  }, [patients, encounters, installments])
+  }, [patients, encounters, installments, treatments, appointments])
 
   const [sendingReminderId, setSendingReminderId] = useState<string | null>(null)
   const handleSendReminderSms = async (reminder: SmartReminder) => {
@@ -761,7 +765,7 @@ export default function Dashboard() {
   // ── Notification center (aggregates every alert into one bell icon) ──
   const [notifCenterOpen, setNotifCenterOpen] = useState(false)
   const totalNotifCount =
-    smartReminders.birthday.length + smartReminders.debtor.length + smartReminders.lapsed.length + smartReminders.installment_due.length + smartReminders.no_show.length +
+    smartReminders.birthday.length + smartReminders.debtor.length + smartReminders.lapsed.length + smartReminders.installment_due.length + smartReminders.no_show.length + smartReminders.unfinished_treatment.length +
     lowInventoryCount + overdueLabCount + waitingListCount
 
   // ── Real Sparkline Data ────────────────────────────────────────
@@ -1714,6 +1718,13 @@ export default function Dashboard() {
                 <span className="text-lg">🚫</span>
                 <span className="flex-1 text-sm font-semibold text-red-700 dark:text-red-300">غیبت از نوبت (رزرو مجدد نشده)</span>
                 <Badge color="error">{toPersianDigits(smartReminders.no_show.length)}</Badge>
+              </button>
+            )}
+            {smartReminders.unfinished_treatment.length > 0 && (
+              <button onClick={() => { setNotifCenterOpen(false); navigate('/treatments') }} className="w-full flex items-center gap-3 p-3 rounded-xl bg-cyan-50 dark:bg-cyan-900/20 text-right hover:bg-cyan-100 dark:hover:bg-cyan-900/40 transition-all-smooth">
+                <span className="text-lg">🦷</span>
+                <span className="flex-1 text-sm font-semibold text-cyan-700 dark:text-cyan-300">درمان ناتمام بدون نوبت بعدی</span>
+                <Badge color="primary">{toPersianDigits(smartReminders.unfinished_treatment.length)}</Badge>
               </button>
             )}
             {lowInventoryCount > 0 && (

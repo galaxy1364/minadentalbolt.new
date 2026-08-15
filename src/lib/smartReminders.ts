@@ -1,6 +1,7 @@
-import type { Patient, Encounter, Payment, Installment, AppointmentWithRelations } from '../types'
+import type { Patient, Encounter, Payment, Installment, AppointmentWithRelations, Treatment } from '../types'
+import { toPersianDigits } from './persianDate'
 
-export type ReminderCategory = 'birthday' | 'debtor' | 'lapsed' | 'installment_due' | 'no_show'
+export type ReminderCategory = 'birthday' | 'debtor' | 'lapsed' | 'installment_due' | 'no_show' | 'unfinished_treatment'
 
 export interface SmartReminder {
   category: ReminderCategory
@@ -134,6 +135,53 @@ export const REMINDER_CATEGORY_META: Record<ReminderCategory, { label: string; i
   lapsed: { label: 'مراجعه‌نکرده‌ها', icon: '⏰', color: '#f59e0b' },
   installment_due: { label: 'اقساط سررسید', icon: '📅', color: '#8b5cf6' },
   no_show: { label: 'غیبت از نوبت', icon: '🚫', color: '#dc2626' },
+  unfinished_treatment: { label: 'درمان ناتمام بدون نوبت بعدی', icon: '🦷', color: '#0891b2' },
+}
+
+/**
+ * The clinical continuity gap: a patient is mid-treatment-plan (a
+ * treatment row is 'planned' or 'in_progress' — root canal not finished,
+ * crown not seated yet, etc.) but has no future appointment booked. This
+ * is exactly how patients silently fall through the cracks in a real
+ * practice — the file just goes quiet with an open clinical obligation.
+ */
+export function findUnfinishedTreatmentFollowups(
+  treatments: Treatment[],
+  appointments: AppointmentWithRelations[],
+  patients: Patient[],
+  today = new Date(),
+): SmartReminder[] {
+  const todayStr = today.toISOString().slice(0, 10)
+  const patientMap = new Map(patients.map((p) => [p.id, p]))
+
+  const hasFutureAppt = new Set<string>()
+  for (const a of appointments) {
+    if (a.date >= todayStr && a.status !== 'cancelled') hasFutureAppt.add(a.patient_id)
+  }
+
+  const openByPatient = new Map<string, { count: number; latest: string }>()
+  for (const t of treatments) {
+    if (t.status !== 'planned' && t.status !== 'in_progress') continue
+    const prev = openByPatient.get(t.patient_id)
+    const entry = { count: (prev?.count ?? 0) + 1, latest: t.updated_at > (prev?.latest ?? '') ? t.updated_at : (prev?.latest ?? t.updated_at) }
+    openByPatient.set(t.patient_id, entry)
+  }
+
+  const result: SmartReminder[] = []
+  for (const [patientId, info] of openByPatient) {
+    if (hasFutureAppt.has(patientId)) continue
+    const p = patientMap.get(patientId)
+    if (!p || !p.is_active) continue
+    result.push({
+      category: 'unfinished_treatment',
+      patient: p,
+      title: `${p.first_name} ${p.last_name}`,
+      detail: `${toPersianDigits(info.count)} مرحله‌ی درمان ناتمام — نوبت بعدی رزرو نشده`,
+      smsMessage: `${p.first_name} عزیز، طرح درمان شما در کلینیک مینادنت هنوز کامل نشده. برای هماهنگی نوبت بعدی تماس بگیرید.`,
+      priority: daysSince(info.latest),
+    })
+  }
+  return result.sort((a, b) => b.priority - a.priority)
 }
 
 /**
