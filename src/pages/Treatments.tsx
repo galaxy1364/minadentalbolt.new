@@ -9,7 +9,7 @@ import { BarChart, Bar, XAxis, YAxis, Tooltip as RTooltip, ResponsiveContainer, 
 import {
   fetchEncounters, fetchTreatments, fetchProcedures, fetchPatients, fetchDoctors,
   fetchLabs, fetchToothRecords, createEncounter, updateEncounter, createTreatment,
-  updateTreatment, deleteTreatment, deleteEncounter, createLabOrder, createPayment,
+  updateTreatment, deleteTreatment, deleteEncounter, createLabOrder,
   createToothRecord, updateToothRecord,
 } from '../lib/api'
 import { toJalaliString, toJalaliStringPretty, formatCurrency, formatNumber, toPersianDigits } from '../lib/persianDate'
@@ -419,7 +419,7 @@ export default function Treatments() {
     if (treatForm.has_lab && treatForm.lab_id) {
       const lab = labs.find((l) => l.id === treatForm.lab_id)
       fields.push({ label: 'لابراتوار', value: lab?.name || '-', highlight: true })
-      fields.push({ label: 'ارسال به مالی', value: 'بله' })
+      fields.push({ label: 'هزینه‌ی لابراتوار', value: treatForm.lab_cost ? `${formatCurrency(Number(treatForm.lab_cost))} ت` : '-' })
     }
     confirmAction({
       type: editingTreat ? 'edit' : 'create',
@@ -449,16 +449,17 @@ export default function Treatments() {
               } as any)
               showToast('success', 'درمان + سفارش لابراتوار ثبت شد')
             }
-            // Auto-create billing entry if total > 0
-            if (total > 0) {
-              await createPayment({
-                patient_id: treatPatientId, encounter_id: treatEncounterId,
-                amount: total, payment_method: 'cash',
-                reference: null, notes: `پرداخت درمان: ${treatForm.procedure_name}`,
-                status: 'pending', payment_date: new Date().toISOString().slice(0, 10),
-                created_by: null,
-              } as any)
-            }
+            // NOTE: intentionally NOT auto-creating a "payment" here. A
+            // Payment record must represent money actually received —
+            // creating one with status:'pending' for the full treatment
+            // cost every time a treatment is added conflated "charge"
+            // with "payment", cluttering the real payments list with
+            // phantom entries and risking someone later marking a
+            // never-received amount as completed (double counting /
+            // wrongly clearing a real balance). The amount owed is
+            // already correctly derived from treatments.total_price via
+            // calcPatientBalance() — no separate record needed until
+            // the patient actually pays through Billing → ثبت پرداخت.
             // Update encounter total
             const encTreatments = treatments.filter((t) => t.encounter_id === treatEncounterId)
             const newTotal = encTreatments.reduce((s, t) => s + (t.total_price || 0), 0) + total
@@ -926,7 +927,7 @@ export default function Treatments() {
                       <Input label="رنگ / شماره سایه" value={treatForm.lab_shade} onChange={(v) => setTreatForm((p) => ({ ...p, lab_shade: v }))} placeholder="مثال: A2 یا 3M2" dir="ltr" />
                       <Input label="هزینه لابراتوار (ت)" value={treatForm.lab_cost} onChange={(v) => setTreatForm((p) => ({ ...p, lab_cost: v }))} type="number" dir="ltr" />
                     </div>
-                    <p className="text-xs text-accent-600 flex items-center gap-1"><CheckCircle2 size={12} /> با تایید، همزمان سفارش لابراتوار (با جنس و رنگ) و رکورد مالی ایجاد می‌شود</p>
+                    <p className="text-xs text-accent-600 flex items-center gap-1"><CheckCircle2 size={12} /> با تایید، سفارش لابراتوار (با جنس و رنگ) خودکار ثبت می‌شود؛ هزینه به مانده‌حساب بیمار اضافه می‌شود</p>
                   </div>
                 )}
               </div>
