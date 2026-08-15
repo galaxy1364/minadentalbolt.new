@@ -47,9 +47,10 @@ export function findDebtors(
   patients: Patient[],
   treatments: Treatment[],
   payments: Payment[],
+  implantCases: { patient_id: string; total_cost: number | null; paid_amount: number | null }[] = [],
   minBalance = 500000,
 ): SmartReminder[] {
-  const { byPatient } = calcAllPatientBalances(payments, treatments)
+  const { byPatient } = calcAllPatientBalances(payments, treatments, implantCases)
   const patientMap = new Map(patients.map((p) => [p.id, p]))
   const result: SmartReminder[] = []
   for (const [patientId, fin] of byPatient) {

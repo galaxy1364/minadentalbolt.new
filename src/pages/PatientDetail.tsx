@@ -2,10 +2,10 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { ArrowRight, Edit2, Phone, Mail, MapPin, Calendar, CreditCard, Activity, FileText, Image as ImageIcon, Shield, Pill, Smile, Award, AlertCircle, Clock, CheckCircle2 } from 'lucide-react'
-import { fetchPatient, updatePatient, fetchTimeline, fetchTreatments, fetchAppointments, fetchPayments, fetchToothRecords, createToothRecord, updateToothRecord, fetchPrescriptions, fetchRadiologyImages, fetchEncounters, fetchDoctors } from '../lib/api'
+import { fetchPatient, updatePatient, fetchTimeline, fetchTreatments, fetchAppointments, fetchPayments, fetchToothRecords, createToothRecord, updateToothRecord, fetchPrescriptions, fetchRadiologyImages, fetchEncounters, fetchDoctors, fetchImplantCases } from '../lib/api'
 import { toJalaliString, toJalaliStringPretty, formatCurrency, toPersianDigits, formatTime } from '../lib/persianDate'
 import { calcPatientBalance } from '../lib/finance'
-import { Patient, Doctor, PatientTimeline, Treatment, Appointment, Payment, ToothRecord, Prescription, RadiologyImage, Encounter } from '../types'
+import { Patient, Doctor, PatientTimeline, Treatment, Appointment, Payment, ToothRecord, Prescription, RadiologyImage, Encounter, ImplantCase } from '../types'
 import { Modal, Card, Button, Input, Select, Textarea, Badge, Spinner, EmptyState, Tabs, showToast } from '../components/ui'
 import DentalChart from '../components/DentalChart'
 
@@ -128,6 +128,7 @@ export default function PatientDetail() {
   // Tab data
   const [timeline, setTimeline] = useState<PatientTimeline[]>([])
   const [treatments, setTreatments] = useState<Treatment[]>([])
+  const [implantCases, setImplantCases] = useState<ImplantCase[]>([])
   const [appointments, setAppointments] = useState<Appointment[]>([])
   const [payments, setPayments] = useState<Payment[]>([])
   const [toothRecords, setToothRecords] = useState<ToothRecord[]>([])
@@ -223,7 +224,7 @@ export default function PatientDetail() {
   const loadTabData = useCallback(async () => {
     if (!id) return
     try {
-      const [tl, tr, ap, pm, tr_records, pres, radio, enc] = await Promise.all([
+      const [tl, tr, ap, pm, tr_records, pres, radio, enc, implAll] = await Promise.all([
         fetchTimeline(id),
         fetchTreatments(undefined, id),
         fetchAppointments(),
@@ -232,6 +233,7 @@ export default function PatientDetail() {
         fetchPrescriptions(id),
         fetchRadiologyImages(id),
         fetchEncounters(id),
+        fetchImplantCases(),
       ])
       setTimeline(tl)
       setTreatments(tr)
@@ -241,6 +243,7 @@ export default function PatientDetail() {
       setPrescriptions(pres as unknown as Prescription[])
       setRadiologyImages(radio)
       setEncounters(enc)
+      setImplantCases(implAll.filter((c) => c.patient_id === id))
     } catch (err) {
       console.error('Error loading tab data:', err)
     }
@@ -333,7 +336,7 @@ export default function PatientDetail() {
 
   // Shared with Dashboard/Billing/Patients (src/lib/finance.ts) so this
   // number can never silently diverge between pages again.
-  const { paid: totalPaid, totalCost: totalTreatmentCost, balance: patientBalance } = calcPatientBalance(payments, treatments)
+  const { paid: totalPaid, totalCost: totalTreatmentCost, balance: patientBalance } = calcPatientBalance(payments, treatments, implantCases)
 
   // ===========================================================================
   // Render: Patient Header

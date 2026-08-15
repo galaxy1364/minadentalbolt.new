@@ -17,7 +17,7 @@ import {
 import {
   fetchDashboardStats, fetchAppointments, fetchPatients, fetchPayments,
   fetchEncounters, fetchInventoryItems, fetchLabOrders, fetchWaitingList,
-  fetchActivityFeed, fetchDoctors, fetchAllInstallments, fetchTreatments,
+  fetchActivityFeed, fetchDoctors, fetchAllInstallments, fetchTreatments, fetchImplantCases,
 } from '../lib/api'
 import {
   toJalaliStringPretty, getJalaliMonthYear, formatCurrency, formatNumber,
@@ -25,7 +25,7 @@ import {
 } from '../lib/persianDate'
 import type {
   AppointmentWithRelations, Patient, Payment, DashboardStats, Doctor, LabOrder,
-  Encounter, Installment, TreatmentWithRelations,
+  Encounter, Installment, TreatmentWithRelations, ImplantCase,
 } from '../types'
 import { Card, Badge, EmptyState, showToast, Modal } from '../components/ui'
 import { findBirthdays, findDebtors, findLapsedPatients, findDueInstallments, findNoShows, findUnfinishedTreatmentFollowups, REMINDER_CATEGORY_META, SmartReminder } from '../lib/smartReminders'
@@ -476,6 +476,7 @@ export default function Dashboard() {
   const [encounters, setEncounters] = useState<Encounter[]>([])
   const [installments, setInstallments] = useState<Installment[]>([])
   const [treatments, setTreatments] = useState<TreatmentWithRelations[]>([])
+  const [implantCases, setImplantCases] = useState<ImplantCase[]>([])
   const [doctors, setDoctors] = useState<Doctor[]>([])
   const [activity, setActivity] = useState<ActivityItem[]>([])
   const [outstandingBalance, setOutstandingBalance] = useState(0)
@@ -505,7 +506,7 @@ export default function Dashboard() {
     if (isRefresh) { setRefreshing(true); if (!silent) h.tap() } else { setLoading(true) }
     try {
       const timeout = new Promise<never>((_, reject) => setTimeout(() => reject(new Error('Dashboard load timed out')), 15000))
-      const [s, appts, pats, pays, encs, items, labOrders, waiting, docs, feed, insts, trts] = await Promise.race([
+      const [s, appts, pats, pays, encs, items, labOrders, waiting, docs, feed, insts, trts, implCases] = await Promise.race([
         Promise.all([
           fetchDashboardStats(),
           fetchAppointments(),
@@ -519,15 +520,17 @@ export default function Dashboard() {
           fetchActivityFeed(15),
           fetchAllInstallments(),
           fetchTreatments(),
+          fetchImplantCases(),
         ]),
         timeout,
-      ]) as [DashboardStats, AppointmentWithRelations[], Patient[], Payment[], Encounter[], any[], any[], any[], Doctor[], any[], Installment[], TreatmentWithRelations[]]
+      ]) as [DashboardStats, AppointmentWithRelations[], Patient[], Payment[], Encounter[], any[], any[], any[], Doctor[], any[], Installment[], TreatmentWithRelations[], ImplantCase[]]
       setStats(s); setAppointments(appts); setPatients(pats); setPayments(pays)
       setDoctors(docs); setActivity(feed as ActivityItem[])
       setEncounters(encs); setInstallments(insts)
       setTreatments(trts)
+      setImplantCases(implCases)
       setLabOrdersState(labOrders as LabOrder[])
-      const { totalOutstanding } = calcAllPatientBalances(pays, trts)
+      const { totalOutstanding } = calcAllPatientBalances(pays, trts, implCases)
       setOutstandingBalance(totalOutstanding)
       setLowInventoryCount(items.filter((i: any) => (i.quantity ?? 0) <= (i.min_quantity ?? 0) && i.is_active !== false).length)
       const today = new Date().toISOString().slice(0, 10)
@@ -608,13 +611,13 @@ export default function Dashboard() {
   const smartReminders = useMemo(() => {
     return {
       birthday: findBirthdays(patients),
-      debtor: findDebtors(patients, treatments, payments),
+      debtor: findDebtors(patients, treatments, payments, implantCases),
       lapsed: findLapsedPatients(patients, encounters),
       installment_due: findDueInstallments(installments, patients),
       no_show: findNoShows(appointments, patients),
       unfinished_treatment: findUnfinishedTreatmentFollowups(treatments, appointments, patients),
     }
-  }, [patients, encounters, installments, treatments, appointments])
+  }, [patients, encounters, installments, treatments, appointments, implantCases])
 
   const [sendingReminderId, setSendingReminderId] = useState<string | null>(null)
   const handleSendReminderSms = async (reminder: SmartReminder) => {

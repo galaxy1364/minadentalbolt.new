@@ -1,9 +1,9 @@
 import { useState, useEffect, useCallback, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Plus, Search, Edit2, Phone, Filter, Users, Award, AlertCircle, Smile, FileText, User, Trash2, Heart, Shield, MapPin } from 'lucide-react'
-import { fetchPatients, createPatient, updatePatient, deletePatient, fetchDoctors, fetchPayments, fetchTreatments, peekNextFileNumber } from '../lib/api'
+import { fetchPatients, createPatient, updatePatient, deletePatient, fetchDoctors, fetchPayments, fetchTreatments, fetchImplantCases, peekNextFileNumber } from '../lib/api'
 import { toJalaliStringPretty, formatCurrency, toPersianDigits } from '../lib/persianDate'
-import { Patient, Doctor, Payment, Treatment } from '../types'
+import { Patient, Doctor, Payment, Treatment, ImplantCase } from '../types'
 import { Modal, Card, Button, Input, Select, Textarea, Spinner, EmptyState, showToast, HighlightText, SkeletonList } from '../components/ui'
 import { ModuleHeader } from '../components/ModuleHeader'
 import { useConfirmAction, ConfirmActionConfig } from '../components/ConfirmAction'
@@ -74,6 +74,7 @@ export default function Patients() {
   const [doctors, setDoctors] = useState<Doctor[]>([])
   const [payments, setPayments] = useState<Payment[]>([])
   const [treatments, setTreatments] = useState<Treatment[]>([])
+  const [implantCases, setImplantCases] = useState<ImplantCase[]>([])
   const [loading, setLoading] = useState(true)
 
   const [searchQuery, setSearchQuery] = useState('')
@@ -92,8 +93,8 @@ export default function Patients() {
   const loadData = useCallback(async () => {
     setLoading(true)
     try {
-      const [pats, docs, pays, trts] = await Promise.all([fetchPatients(), fetchDoctors(), fetchPayments(), fetchTreatments()])
-      setPatients(pats); setDoctors(docs); setPayments(pays); setTreatments(trts)
+      const [pats, docs, pays, trts, implCases] = await Promise.all([fetchPatients(), fetchDoctors(), fetchPayments(), fetchTreatments(), fetchImplantCases()])
+      setPatients(pats); setDoctors(docs); setPayments(pays); setTreatments(trts); setImplantCases(implCases)
     } catch { showToast('error', 'خطا در بارگذاری بیماران') }
     finally { setLoading(false) }
   }, [])
@@ -105,10 +106,11 @@ export default function Patients() {
     for (const p of patients) {
       const pPays = payments.filter((py) => py.patient_id === p.id)
       const pTrts = treatments.filter((t) => t.patient_id === p.id)
-      map.set(p.id, calcBalance(pPays, pTrts))
+      const pImpl = implantCases.filter((c) => c.patient_id === p.id)
+      map.set(p.id, calcBalance(pPays, pTrts, pImpl))
     }
     return map
-  }, [patients, payments, treatments])
+  }, [patients, payments, treatments, implantCases])
 
   const filteredPatients = useMemo(() => {
     let result = patients.filter((p) => {

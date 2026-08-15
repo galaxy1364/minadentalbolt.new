@@ -3,11 +3,11 @@ import { useState, useEffect, useCallback, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { CreditCard, Plus, Search, DollarSign, TrendingUp, Wallet, Calendar, CheckCircle2, AlertCircle, Edit2, Filter, Receipt, Banknote, Clock, Trash2, Printer } from 'lucide-react'
 import { BarChart, Bar, XAxis, YAxis, Tooltip as RTooltip, ResponsiveContainer, PieChart, Pie, Cell as RCell } from 'recharts'
-import { fetchPayments, createPayment, updatePayment, deletePayment, fetchEncounters, fetchCheques, createCheque, updateCheque, fetchPaymentPlans, createPaymentPlan, updateInstallment, fetchPatients, fetchExpenses, createExpense, deleteExpense, fetchTreatments } from '../lib/api'
+import { fetchPayments, createPayment, updatePayment, deletePayment, fetchEncounters, fetchCheques, createCheque, updateCheque, fetchPaymentPlans, createPaymentPlan, updateInstallment, fetchPatients, fetchExpenses, createExpense, deleteExpense, fetchTreatments, fetchImplantCases } from '../lib/api'
 import { toJalaliString, toJalaliStringPretty, formatCurrency, formatNumber, toPersianDigits } from '../lib/persianDate'
 import { h } from '../lib/haptics'
 import { useConfirmAction } from '../components/ConfirmAction'
-import { Payment, Encounter, Cheque, PaymentPlan, Patient, Expense, Treatment } from '../types'
+import { Payment, Encounter, Cheque, PaymentPlan, Patient, Expense, Treatment, ImplantCase } from '../types'
 import { calcAllPatientBalances } from '../lib/finance'
 import { Wizard, Card, Button, Input, Select, Textarea, Badge, Spinner, EmptyState, Tabs, showToast } from '../components/ui'
 import { ModuleHeader, ModuleStatCard } from '../components/ModuleHeader'
@@ -58,6 +58,7 @@ export default function Billing() {
   const [payments, setPayments] = useState<Payment[]>([])
   const [encounters, setEncounters] = useState<Encounter[]>([])
   const [treatments, setTreatments] = useState<Treatment[]>([])
+  const [implantCases, setImplantCases] = useState<ImplantCase[]>([])
   const [cheques, setCheques] = useState<Cheque[]>([])
   const [paymentPlans, setPaymentPlans] = useState<PaymentPlan[]>([])
   const [expenses, setExpenses] = useState<Expense[]>([])
@@ -139,7 +140,7 @@ export default function Billing() {
   const loadData = useCallback(async () => {
     setLoading(true)
     try {
-      const [pays, encs, chqs, plans, pats, exps, trts] = await Promise.all([
+      const [pays, encs, chqs, plans, pats, exps, trts, implCases] = await Promise.all([
         fetchPayments(),
         fetchEncounters(),
         fetchCheques(),
@@ -147,6 +148,7 @@ export default function Billing() {
         fetchPatients(),
         fetchExpenses(),
         fetchTreatments(),
+        fetchImplantCases(),
       ])
       setPayments(pays)
       setEncounters(encs)
@@ -155,6 +157,7 @@ export default function Billing() {
       setPatients(pats)
       setExpenses(exps)
       setTreatments(trts)
+      setImplantCases(implCases)
     } catch (err) {
       console.error('Error loading billing data:', err)
       showToast('error', 'خطا در بارگذاری اطلاعات مالی')
@@ -195,11 +198,11 @@ export default function Billing() {
     // (treatments minus payments) as Dashboard and Patients, so the
     // number is provably identical everywhere instead of silently
     // drifting from a cached encounters.total_amount/paid_amount field.
-    const { byPatient: patientBalancesMap, totalOutstanding: outstandingBalance } = calcAllPatientBalances(payments, treatments)
+    const { byPatient: patientBalancesMap, totalOutstanding: outstandingBalance } = calcAllPatientBalances(payments, treatments, implantCases)
     const patientBalances = new Map(Array.from(patientBalancesMap.entries()).map(([id, fin]) => [id, fin.balance]))
 
     return { totalRevenue, monthlyRevenue, pendingCheques: pendingCheques.length, pendingChequeAmount, outstandingBalance, patientBalances, totalExpenses }
-  }, [payments, cheques, encounters, expenses, treatments])
+  }, [payments, cheques, encounters, expenses, treatments, implantCases])
 
   // Revenue chart data - last 6 months
   const revenueChartData = useMemo(() => {
