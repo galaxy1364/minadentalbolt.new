@@ -283,7 +283,7 @@ export default function Appointments() {
           <h1 className="text-xl font-extrabold text-slate-800">نوبت‌دهی</h1>
           <p className="text-xs text-slate-500 mt-0.5">{toJalaliStringPretty(todayStr)} — {persianWeekdaysShort[getJalaliDateInfo(todayStr).weekday]}</p>
         </div>
-        <button onClick={() => openWizard()} className="btn-teal px-4 py-2.5 text-sm flex items-center gap-1.5">
+        <button onClick={() => openWizard()} aria-label="نوبت جدید" className="btn-teal px-4 py-2.5 text-sm flex items-center gap-1.5">
           <Plus size={18} /> نوبت جدید
         </button>
       </div>
@@ -347,6 +347,7 @@ export default function Appointments() {
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             placeholder="جستجوی بیمار..."
+            aria-label="جستجوی نوبت بر اساس نام بیمار"
             className="w-full pr-10 pl-3 py-2.5 rounded-xl border border-slate-200 bg-white text-sm focus:outline-none focus:ring-2 focus:ring-primary-400"
           />
         </div>
@@ -387,7 +388,7 @@ export default function Appointments() {
                           <span className={`status-pill ${sm.bg} ${sm.color}`}>{sm.label}</span>
                         </div>
                       </div>
-                      <button onClick={(e) => { e.stopPropagation(); handleDelete(appt) }} className="p-1.5 rounded-lg bg-error-50 text-error-500 press-scale">
+                      <button onClick={(e) => { e.stopPropagation(); handleDelete(appt) }} aria-label="حذف نوبت" className="p-1.5 rounded-lg bg-error-50 text-error-500 press-scale">
                         <Trash2 size={14} />
                       </button>
                     </div>
@@ -457,16 +458,16 @@ export default function Appointments() {
                   {/* Quick action + delete */}
                   <div className="flex flex-col gap-1.5 items-center flex-shrink-0" onClick={(e) => e.stopPropagation()}>
                     {appt.status === 'scheduled' && (
-                      <button onClick={() => quickStatus(appt, 'confirmed')} className="p-1.5 rounded-lg bg-primary-50 text-primary-600 hover:bg-primary-100 transition-all-smooth press-scale" title="تایید">
+                      <button onClick={() => quickStatus(appt, 'confirmed')} aria-label="تایید نوبت" className="p-1.5 rounded-lg bg-primary-50 text-primary-600 hover:bg-primary-100 transition-all-smooth press-scale" title="تایید">
                         <CheckCircle2 size={16} />
                       </button>
                     )}
                     {appt.status === 'confirmed' && (
-                      <button onClick={() => quickStatus(appt, 'completed')} className="p-1.5 rounded-lg bg-success-50 text-success-600 hover:bg-success-100 transition-all-smooth press-scale" title="تکمیل">
+                      <button onClick={() => quickStatus(appt, 'completed')} aria-label="تکمیل نوبت" className="p-1.5 rounded-lg bg-success-50 text-success-600 hover:bg-success-100 transition-all-smooth press-scale" title="تکمیل">
                         <CheckCircle2 size={16} />
                       </button>
                     )}
-                    <button onClick={() => handleDelete(appt)} className="p-1.5 rounded-lg bg-error-50 text-error-500 hover:bg-error-100 transition-all-smooth press-scale" title="حذف">
+                    <button onClick={() => handleDelete(appt)} aria-label="حذف نوبت" className="p-1.5 rounded-lg bg-error-50 text-error-500 hover:bg-error-100 transition-all-smooth press-scale" title="حذف">
                       <Trash2 size={16} />
                     </button>
                   </div>

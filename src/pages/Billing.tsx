@@ -1,7 +1,7 @@
 // Billing.tsx - Persian RTL Dental Clinic Billing & Payments Management
 import { useState, useEffect, useCallback, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { CreditCard, Plus, Search, DollarSign, TrendingUp, Wallet, Calendar, CheckCircle2, AlertCircle, Edit2, Filter, Receipt, Banknote, Clock, Trash2 } from 'lucide-react'
+import { CreditCard, Plus, Search, DollarSign, TrendingUp, Wallet, Calendar, CheckCircle2, AlertCircle, Edit2, Filter, Receipt, Banknote, Clock, Trash2, Printer } from 'lucide-react'
 import { BarChart, Bar, XAxis, YAxis, Tooltip as RTooltip, ResponsiveContainer, PieChart, Pie, Cell as RCell } from 'recharts'
 import { fetchPayments, createPayment, updatePayment, deletePayment, fetchEncounters, fetchCheques, createCheque, updateCheque, fetchPaymentPlans, createPaymentPlan, updateInstallment, fetchPatients, fetchExpenses, createExpense, deleteExpense } from '../lib/api'
 import { toJalaliString, toJalaliStringPretty, formatCurrency, formatNumber, toPersianDigits } from '../lib/persianDate'
@@ -475,12 +475,45 @@ export default function Billing() {
   // Render: Payments Tab
   // ===========================================================================
 
+  const handlePrintReceipt = (p: Payment) => {
+    const methodMeta = paymentMethods.find((m) => m.value === p.payment_method) || paymentMethods[0]
+    const win = window.open('', '_blank', 'width=550,height=700')
+    if (!win) { showToast('error', 'اجازه‌ی باز کردن پنجره‌ی چاپ داده نشد'); return }
+    win.document.write(`<!DOCTYPE html><html dir="rtl" lang="fa"><head><meta charset="utf-8"><title>رسید پرداخت</title>
+      <style>
+        body { font-family: Tahoma, Arial, sans-serif; padding: 32px; color: #1e293b; }
+        .header { text-align: center; border-bottom: 2px solid #0d9488; padding-bottom: 16px; margin-bottom: 24px; }
+        .header h1 { color: #0d9488; margin: 0 0 4px; font-size: 22px; }
+        .header p { margin: 0; color: #64748b; font-size: 13px; }
+        .amount { text-align: center; font-size: 32px; font-weight: 800; color: #0d9488; margin: 24px 0; }
+        table { width: 100%; border-collapse: collapse; margin-bottom: 20px; }
+        td { padding: 10px; font-size: 14px; border-bottom: 1px solid #f1f5f9; }
+        td:first-child { color: #64748b; font-weight: bold; width: 40%; }
+        .footer { margin-top: 40px; display: flex; justify-content: space-between; font-size: 12px; color: #94a3b8; }
+        @media print { body { padding: 12px; } }
+      </style>
+      </head><body>
+        <div class="header"><h1>کلینیک دندانپزشکی مینا</h1><p>رسید پرداخت</p></div>
+        <div class="amount">${formatCurrency(p.amount)} تومان</div>
+        <table>
+          <tr><td>بیمار</td><td>${getPatientName(p.patient_id)}</td></tr>
+          <tr><td>روش پرداخت</td><td>${methodMeta.label}</td></tr>
+          <tr><td>تاریخ</td><td>${toJalaliStringPretty(p.payment_date)}</td></tr>
+          ${p.reference ? `<tr><td>شماره مرجع</td><td dir="ltr">${p.reference}</td></tr>` : ''}
+        </table>
+        <div class="footer"><span>مینادنت — سیستم مدیریت کلینیک</span><span>مهر و امضا</span></div>
+      </body></html>`)
+    win.document.close()
+    win.focus()
+    setTimeout(() => win.print(), 300)
+  }
+
   const renderPaymentsTab = () => (
     <div className="space-y-3">
       <div className="flex items-center gap-2 flex-wrap">
         <div className="relative flex-1 min-w-[200px]">
           <Search size={16} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400" />
-          <input value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} placeholder="جستجوی بیمار..." className="w-full pr-10 pl-3 py-2 rounded-xl border border-slate-200 bg-slate-50 text-sm focus:outline-none focus:ring-2 focus:ring-primary-400" />
+          <input value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} placeholder="جستجوی بیمار..." aria-label="جستجوی بیمار" className="w-full pr-10 pl-3 py-2 rounded-xl border border-slate-200 bg-slate-50 text-sm focus:outline-none focus:ring-2 focus:ring-primary-400" />
         </div>
         <Button variant="secondary" size="md" onClick={() => setShowFilters(!showFilters)}><Filter size={16} /> فیلتر</Button>
         <Button onClick={() => { setPaymentWizardStep(0); setPaymentModalOpen(true) }}><Plus size={16} /> ثبت پرداخت</Button>
@@ -521,6 +554,7 @@ export default function Billing() {
                 </div>
                 {p.notes && <p className="text-xs text-slate-400 mt-2">{p.notes}</p>}
                 <div className="flex gap-1 mt-2 pt-2 border-t border-slate-100">
+                  <button onClick={() => handlePrintReceipt(p)} className="flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs text-primary-600 hover:bg-primary-50 transition-colors"><Printer size={12} /> چاپ رسید</button>
                   <button onClick={() => {
                     h.warning()
                     confirmAction({
@@ -548,7 +582,7 @@ export default function Billing() {
       <div className="flex items-center gap-2 flex-wrap">
         <div className="relative flex-1 min-w-[200px]">
           <Search size={16} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400" />
-          <input value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} placeholder="جستجوی بیمار..." className="w-full pr-10 pl-3 py-2 rounded-xl border border-slate-200 bg-slate-50 text-sm focus:outline-none focus:ring-2 focus:ring-primary-400" />
+          <input value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} placeholder="جستجوی بیمار..." aria-label="جستجوی بیمار" className="w-full pr-10 pl-3 py-2 rounded-xl border border-slate-200 bg-slate-50 text-sm focus:outline-none focus:ring-2 focus:ring-primary-400" />
         </div>
         <Button variant="secondary" size="md" onClick={() => setShowFilters(!showFilters)}><Filter size={16} /> فیلتر</Button>
         <Button onClick={() => { setChequeWizardStep(0); setChequeModalOpen(true) }}><Plus size={16} /> ثبت چک</Button>
@@ -763,7 +797,7 @@ export default function Billing() {
                       <td className="px-4 py-3 text-slate-600">{e.date ? toJalaliString(e.date) : '-'}</td>
                       <td className="px-4 py-3 text-slate-500 max-w-[200px] truncate">{e.description || '-'}</td>
                       <td className="px-4 py-3">
-                        <button onClick={() => handleDeleteExpense(e)} className="text-slate-400 hover:text-error-600 hover:bg-error-50 p-1.5 rounded-lg transition-colors"><Trash2 size={15} /></button>
+                        <button onClick={() => handleDeleteExpense(e)} aria-label="حذف هزینه" className="text-slate-400 hover:text-error-600 hover:bg-error-50 p-1.5 rounded-lg transition-colors"><Trash2 size={15} /></button>
                       </td>
                     </tr>
                   ))}

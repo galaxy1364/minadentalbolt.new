@@ -1,5 +1,6 @@
 import React from 'react'
 import { Activity } from 'lucide-react'
+import { logError } from '../lib/errorLog'
 
 interface State {
   hasError: boolean
@@ -15,6 +16,7 @@ export class ErrorBoundary extends React.Component<{ children: React.ReactNode }
 
   componentDidCatch(error: Error, info: React.ErrorInfo) {
     console.error('Dashboard ErrorBoundary caught:', error, info)
+    logError(error, 'react', info.componentStack ?? undefined)
   }
 
   render() {

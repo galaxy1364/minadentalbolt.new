@@ -283,7 +283,7 @@ export default function Patients() {
           <h1 className="text-xl font-extrabold text-slate-800">بیماران</h1>
           <p className="text-xs text-slate-500 mt-0.5">{toPersianDigits(filteredPatients.length)} بیمار</p>
         </div>
-        <button onClick={openCreateModal} className="btn-teal px-4 py-2.5 text-sm flex items-center gap-1.5">
+        <button onClick={openCreateModal} aria-label="افزودن بیمار جدید" className="btn-teal px-4 py-2.5 text-sm flex items-center gap-1.5">
           <Plus size={18} /> بیمار جدید
         </button>
       </div>
@@ -316,10 +316,11 @@ export default function Patients() {
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             placeholder="جستجو بر اساس نام، تلفن، پرونده..."
+            aria-label="جستجوی بیمار"
             className="w-full pr-10 pl-3 py-2.5 rounded-xl border border-slate-200 bg-white text-sm focus:outline-none focus:ring-2 focus:ring-primary-400"
           />
         </div>
-        <button onClick={() => { h.tap(); setShowFilters(!showFilters) }} className="p-2.5 rounded-xl bg-white border border-slate-200 text-slate-500 hover:text-primary-600 transition-all-smooth press-scale flex-shrink-0">
+        <button onClick={() => { h.tap(); setShowFilters(!showFilters) }} aria-label={showFilters ? 'بستن فیلترها' : 'باز کردن فیلترها'} aria-pressed={showFilters} className="p-2.5 rounded-xl bg-white border border-slate-200 text-slate-500 hover:text-primary-600 transition-all-smooth press-scale flex-shrink-0">
           <Filter size={16} />
         </button>
       </div>
@@ -398,12 +399,14 @@ export default function Patients() {
                   <div className="flex items-center gap-1.5 flex-shrink-0" onClick={(e) => e.stopPropagation()}>
                     <button
                       onClick={() => openEditModal(patient)}
+                      aria-label={`ویرایش ${patient.first_name} ${patient.last_name}`}
                       className="p-1.5 rounded-lg text-slate-400 hover:bg-slate-100 hover:text-slate-600 transition-all-smooth press-scale"
                     >
                       <Edit2 size={14} />
                     </button>
                     <button
                       onClick={() => handleDelete(patient)}
+                      aria-label={`حذف ${patient.first_name} ${patient.last_name}`}
                       className="p-1.5 rounded-lg text-error-400 hover:bg-error-50 hover:text-error-600 transition-all-smooth press-scale"
                     >
                       <Trash2 size={14} />

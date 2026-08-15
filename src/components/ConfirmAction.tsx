@@ -57,6 +57,17 @@ export function ConfirmAction({ config, onClose }: { config: ConfirmActionConfig
     }
   }, [config])
 
+  // Escape closes the confirmation (unless mid-execution, to avoid
+  // interrupting a save that's already running).
+  useEffect(() => {
+    if (!config) return
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && step !== 'executing') { h.cancel(); onClose() }
+    }
+    window.addEventListener('keydown', onKeyDown)
+    return () => window.removeEventListener('keydown', onKeyDown)
+  }, [config, step, onClose])
+
   // ── Progress bar animation during execution ──
   useEffect(() => {
     if (step === 'executing') {

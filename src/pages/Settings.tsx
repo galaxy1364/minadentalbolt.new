@@ -4,7 +4,7 @@ import {
   Settings as SettingsIcon, Building2, Hash, MessageSquare, Package, Save, Smile,
   Cloud, Download, Upload, Vibrate, Volume2, Bell, Database, RefreshCw, Check,
   Smartphone, Shield, AlertTriangle, Eye, ChevronRight, Wifi, Plus, Edit2, Trash2,
-  Stethoscope, Wrench, ListOrdered, Tag,
+  Stethoscope, Wrench, ListOrdered, Tag, Copy, CheckCircle2,
 } from 'lucide-react'
 import {
   fetchSmsTemplates, fetchTreatmentPackages, fetchDoctors, fetchUnits, fetchProcedures,
@@ -27,6 +27,7 @@ import { Card, Button, Input, Select, Textarea, Badge, Spinner, EmptyState, Stat
 import { useConfirmAction } from '../components/ConfirmAction'
 import { h, setHapticsEnabled, setSoundEnabled, getHapticsEnabled, getSoundEnabled } from '../lib/haptics'
 import { CLINIC_ID } from '../lib/supabase'
+import { getErrorLog, clearErrorLog, LoggedError } from '../lib/errorLog'
 
 const smsTemplateTypes: { value: string; label: string }[] = [
   { value: 'appointment_reminder', label: 'یادآوری نوبت' },
@@ -406,6 +407,7 @@ export default function Settings() {
           { key: 'sms', label: 'قالب پیامک', icon: <MessageSquare size={16} /> },
           { key: 'packages', label: 'پکیج درمان', icon: <Package size={16} /> },
           { key: 'categories', label: 'دسته‌بندی انبار', icon: <Tag size={16} /> },
+          { key: 'errors', label: 'گزارش خطاها', icon: <AlertTriangle size={16} /> },
         ]}
         active={activeTab}
         onChange={setActiveTab}
@@ -532,6 +534,9 @@ export default function Settings() {
           </Card>
         </div>
       )}
+
+      {/* Error Log Tab */}
+      {activeTab === 'errors' && <ErrorLogTab />}
 
       {/* Haptics Tab */}
       {activeTab === 'haptics' && (
@@ -713,6 +718,73 @@ export default function Settings() {
       </Modal>
 
       {ConfirmActionModal}
+    </div>
+  )
+}
+
+// ============================================================================
+// Error Log Tab — self-hosted error monitoring (no external service needed)
+// ============================================================================
+
+function ErrorLogTab() {
+  const [errors, setErrors] = useState<LoggedError[]>(() => getErrorLog())
+  const [expandedId, setExpandedId] = useState<string | null>(null)
+
+  const handleClear = () => {
+    if (!window.confirm('همه‌ی گزارش‌های خطا پاک شوند؟')) return
+    clearErrorLog()
+    setErrors([])
+    showToast('success', 'گزارش خطاها پاک شد')
+  }
+
+  const handleCopyAll = () => {
+    const text = errors.map((e) => `[${e.timestamp}] (${e.source}) ${e.message}${e.stack ? `\n${e.stack}` : ''}`).join('\n\n---\n\n')
+    navigator.clipboard.writeText(text || 'بدون خطا').then(() => showToast('success', 'کپی شد'))
+  }
+
+  return (
+    <div className="space-y-4">
+      <Card className="p-5">
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="text-base font-bold text-slate-800 dark:text-slate-100 flex items-center gap-2">
+            <AlertTriangle size={18} className="text-primary-600" /> گزارش خطاهای برنامه
+          </h2>
+          <Badge color={errors.length > 0 ? 'error' : 'success'}>{toPersianDigits(errors.length)}</Badge>
+        </div>
+        <p className="text-xs text-slate-500 dark:text-slate-400 mb-4">
+          چون سرویس گزارش خطای بیرونی (مثل Sentry) به این پروژه وصل نشده، خطاهایی که برای کاربران رخ می‌دهد اینجا به‌صورت محلی روی همان دستگاه ذخیره می‌شود (حداکثر ۵۰ مورد آخر). اگر می‌خواهید یک سرویس حرفه‌ای‌تر وصل شود، به من بگو.
+        </p>
+
+        {errors.length === 0 ? (
+          <div className="flex flex-col items-center justify-center py-10 text-center">
+            <div className="w-14 h-14 rounded-2xl bg-success-50 dark:bg-success-900/20 flex items-center justify-center mb-3">
+              <CheckCircle2 size={24} className="text-success-500" />
+            </div>
+            <p className="text-sm font-medium text-slate-600 dark:text-slate-300">تا الان هیچ خطایی ثبت نشده 🎉</p>
+          </div>
+        ) : (
+          <>
+            <div className="flex gap-2 mb-3">
+              <Button size="sm" variant="secondary" onClick={handleCopyAll}><Copy size={14} className="inline ml-1" /> کپی همه</Button>
+              <Button size="sm" variant="danger" onClick={handleClear}><Trash2 size={14} className="inline ml-1" /> پاک کردن</Button>
+            </div>
+            <div className="space-y-2 max-h-[420px] overflow-y-auto pr-1 -mr-1">
+              {errors.map((err) => (
+                <div key={err.id} className="p-3 rounded-xl bg-error-50 dark:bg-error-900/10 border border-error-100 dark:border-error-800 cursor-pointer" onClick={() => setExpandedId(expandedId === err.id ? null : err.id)}>
+                  <div className="flex items-start justify-between gap-2">
+                    <p className="text-xs font-bold text-error-700 dark:text-error-300 break-words flex-1">{err.message}</p>
+                    <Badge color="slate">{err.source}</Badge>
+                  </div>
+                  <p className="text-[10px] text-slate-400 mt-1">{toJalaliStringPretty(err.timestamp)}</p>
+                  {expandedId === err.id && err.stack && (
+                    <pre className="text-[10px] text-slate-500 dark:text-slate-400 mt-2 whitespace-pre-wrap break-all bg-white dark:bg-slate-900 rounded-lg p-2 max-h-[200px] overflow-y-auto">{err.stack}</pre>
+                  )}
+                </div>
+              ))}
+            </div>
+          </>
+        )}
+      </Card>
     </div>
   )
 }

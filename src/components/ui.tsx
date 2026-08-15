@@ -134,6 +134,17 @@ export function EmptyState({ icon, title, description, action }: { icon: React.R
 }
 
 export function Modal({ open, onClose, title, children, size = 'full', footer }: { open: boolean; onClose: () => void; title: string; children: React.ReactNode; size?: 'sm' | 'md' | 'lg' | 'xl' | 'full'; footer?: React.ReactNode }) {
+  // Escape closes the modal — standard keyboard behavior expected in every
+  // modal/dialog worldwide; previously only mouse/touch could close these.
+  useEffect(() => {
+    if (!open) return
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') { h.cancel(); onClose() }
+    }
+    window.addEventListener('keydown', onKeyDown)
+    return () => window.removeEventListener('keydown', onKeyDown)
+  }, [open, onClose])
+
   if (!open) return null
   const sizes: Record<string, string> = { sm: 'max-w-md', md: 'max-w-lg', lg: 'max-w-2xl', xl: 'max-w-4xl', full: 'max-w-none' }
   const isFull = size === 'full'

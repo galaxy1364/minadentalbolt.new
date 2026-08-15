@@ -2,6 +2,9 @@ import React from 'react'
 import ReactDOM from 'react-dom/client'
 import App from './App'
 import './index.css'
+import { initGlobalErrorLogging } from './lib/errorLog'
+
+initGlobalErrorLogging()
 
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {

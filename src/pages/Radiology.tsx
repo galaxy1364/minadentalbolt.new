@@ -50,6 +50,13 @@ export default function Radiology() {
   // Detail modal
   const [selectedImage, setSelectedImage] = useState<RadiologyImage | null>(null)
 
+  useEffect(() => {
+    if (!selectedImage) return
+    const onKeyDown = (e: KeyboardEvent) => { if (e.key === 'Escape') setSelectedImage(null) }
+    window.addEventListener('keydown', onKeyDown)
+    return () => window.removeEventListener('keydown', onKeyDown)
+  }, [selectedImage])
+
   // Upload modal
   const [uploadModalOpen, setUploadModalOpen] = useState(false)
   const [uploadWizardStep, setUploadWizardStep] = useState(0)

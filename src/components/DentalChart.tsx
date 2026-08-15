@@ -1,6 +1,6 @@
 // DentalChart.tsx — Professional interactive dental chart with SVG tooth shapes
 // Supports: FDI numbering, surfaces, conditions, treatment history, primary teeth
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect } from 'react'
 import { createPortal } from 'react-dom'
 import { Smile, Plus, Activity, AlertCircle, Clock, Grid3x3 } from 'lucide-react'
 import { h } from '../lib/haptics'
@@ -321,6 +321,12 @@ function ToothDetailPanel({
   const [surfaceConditions, setSurfaceConditions] = useState<ToothSurfaceCondition[]>(tooth.surfaces)
   const [notes, setNotes] = useState(tooth.notes || '')
   const [activeSurface, setActiveSurface] = useState<ToothSurface | null>(null)
+
+  useEffect(() => {
+    const onKeyDown = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose() }
+    window.addEventListener('keydown', onKeyDown)
+    return () => window.removeEventListener('keydown', onKeyDown)
+  }, [onClose])
 
   const toggleSurfaceCondition = (surface: ToothSurface, cond: ToothCondition) => {
     setSurfaceConditions((prev) => {

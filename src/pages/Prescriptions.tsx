@@ -1,7 +1,7 @@
 // Prescriptions.tsx - Persian RTL Dental Clinic Prescriptions Management
 import { useState, useEffect, useCallback, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Pill, FileText, Search, Plus, Eye, Trash2, Edit2, TrendingUp, Smile } from 'lucide-react'
+import { Pill, FileText, Search, Plus, Eye, Trash2, Edit2, TrendingUp, Smile, Printer } from 'lucide-react'
 import { AreaChart, Area, XAxis, YAxis, Tooltip as RTooltip, ResponsiveContainer } from 'recharts'
 import { fetchPrescriptions, createPrescription, updatePrescription, deletePrescription, fetchPatients, fetchDoctors } from '../lib/api'
 import { toJalaliString, toJalaliStringPretty, getJalaliMonthYear, formatCurrency, formatNumber, toPersianDigits, persianMonths } from '../lib/persianDate'
@@ -163,18 +163,58 @@ export default function Prescriptions() {
   }
 
   const medicationsCount = (p: PrescriptionWithRelations) => {
-    if (!p.medications) return 0
-    if (Array.isArray(p.medications)) return p.medications.length
-    if (typeof p.medications === 'object') return Object.keys(p.medications).length
-    return 0
+    const items = (p.medications as any)?.items
+    return Array.isArray(items) ? items.length : 0
+  }
+
+  const medicationsList = (p: PrescriptionWithRelations): { name: string; dose: string; frequency: string }[] => {
+    const items = (p.medications as any)?.items
+    return Array.isArray(items) ? items : []
   }
 
   const medicationsSummary = (p: PrescriptionWithRelations) => {
-    if (!p.medications) return '-'
-    if (Array.isArray(p.medications)) {
-      return p.medications.slice(0, 2).map((m: any) => m.name || m.medication || String(m)).join('، ')
-    }
-    return JSON.stringify(p.medications).slice(0, 50)
+    const items = medicationsList(p)
+    if (items.length === 0) return '-'
+    return items.slice(0, 2).map((m) => m.name).join('، ')
+  }
+
+  const handlePrint = (p: PrescriptionWithRelations) => {
+    const items = medicationsList(p)
+    const win = window.open('', '_blank', 'width=650,height=800')
+    if (!win) { showToast('error', 'اجازه‌ی باز کردن پنجره‌ی چاپ داده نشد'); return }
+    win.document.write(`<!DOCTYPE html><html dir="rtl" lang="fa"><head><meta charset="utf-8"><title>نسخه — ${patientName(p)}</title>
+      <style>
+        body { font-family: Tahoma, Arial, sans-serif; padding: 32px; color: #1e293b; }
+        .header { text-align: center; border-bottom: 2px solid #0d9488; padding-bottom: 16px; margin-bottom: 24px; }
+        .header h1 { color: #0d9488; margin: 0 0 4px; font-size: 22px; }
+        .header p { margin: 0; color: #64748b; font-size: 13px; }
+        .meta { display: flex; justify-content: space-between; margin-bottom: 20px; font-size: 14px; }
+        table { width: 100%; border-collapse: collapse; margin-bottom: 20px; }
+        th, td { border: 1px solid #e2e8f0; padding: 10px; text-align: right; font-size: 13px; }
+        th { background: #f0fdfa; color: #0d9488; }
+        .notes { border-top: 1px solid #e2e8f0; padding-top: 12px; font-size: 13px; color: #475569; }
+        .footer { margin-top: 40px; display: flex; justify-content: space-between; font-size: 12px; color: #94a3b8; }
+        @media print { body { padding: 12px; } }
+      </style>
+      </head><body>
+        <div class="header"><h1>کلینیک دندانپزشکی مینا</h1><p>نسخه‌ی دارویی</p></div>
+        <div class="meta">
+          <span><b>بیمار:</b> ${patientName(p)}</span>
+          <span><b>پزشک:</b> ${doctorName(p)}</span>
+          <span><b>تاریخ:</b> ${toJalaliStringPretty(p.created_at)}</span>
+        </div>
+        <table>
+          <thead><tr><th>#</th><th>نام دارو</th><th>دوز</th><th>بسامد مصرف</th></tr></thead>
+          <tbody>
+            ${items.map((m, i) => `<tr><td>${toPersianDigits(i + 1)}</td><td>${m.name || '-'}</td><td>${m.dose || '-'}</td><td>${m.frequency || '-'}</td></tr>`).join('')}
+          </tbody>
+        </table>
+        ${p.notes ? `<div class="notes"><b>یادداشت:</b> ${p.notes}</div>` : ''}
+        <div class="footer"><span>مینادنت — سیستم مدیریت کلینیک</span><span>امضا و مهر پزشک</span></div>
+      </body></html>`)
+    win.document.close()
+    win.focus()
+    setTimeout(() => win.print(), 300)
   }
 
   // ===========================================================================
@@ -363,6 +403,7 @@ export default function Prescriptions() {
                   <span className="text-xs text-slate-500">{toJalaliStringPretty(p.created_at)}</span>
                   <div className="flex items-center gap-2">
                     <button onClick={() => openEditModal(p)} className="text-slate-500 hover:text-slate-700 text-xs flex items-center gap-1"><Edit2 size={14} /> ویرایش</button>
+                    <button onClick={() => handlePrint(p)} className="text-primary-600 hover:text-primary-700 text-xs flex items-center gap-1"><Printer size={14} /> چاپ</button>
                     <button onClick={() => handleDelete(p)} className="text-error-500 hover:text-error-700 text-xs flex items-center gap-1"><Trash2 size={14} /> حذف</button>
                     <button onClick={() => navigate(`/patients/${p.patient_id}`)} className="text-primary-600 hover:text-primary-700 text-xs flex items-center gap-1"><Eye size={14} /> پرونده</button>
                   </div>
