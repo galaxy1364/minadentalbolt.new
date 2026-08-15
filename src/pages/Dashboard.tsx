@@ -167,18 +167,19 @@ function Sparkline({ data, color, width = 64, height = 24 }: { data: number[]; c
 // Premium Stat Tile
 // ============================================================================
 
+// Soft "white-to-color" tiles (Gemini-style wash) — light-tinted base +
+// saturated color blob in the corner + colored icon. Shared by StatTile
+// and QuickAction so the whole dashboard reads as one coherent palette:
+// violet, lime ("کله‌غازی"), sky blue, pink, amber, rose.
 type TileColor = 'violet' | 'lime' | 'sky' | 'pink' | 'amber' | 'rose'
 
-// Soft "white-to-color" tiles (Gemini-style wash) — light base, saturated
-// color blob in the corner, dark text. Replaces the old fully-saturated
-// dark gradient tiles for a lighter, more modern look.
-const tileThemes: Record<TileColor, { blob: string; iconBg: string; text: string; sparkColor: string; ring: string }> = {
-  violet: { blob: 'from-violet-300/70 dark:from-violet-500/30', iconBg: 'bg-gradient-to-br from-violet-500 to-purple-600', text: 'text-violet-700 dark:text-violet-300', sparkColor: '#8b5cf6', ring: 'focus:ring-violet-300' },
-  lime:   { blob: 'from-lime-300/70 dark:from-lime-500/25',     iconBg: 'bg-gradient-to-br from-lime-500 to-green-600',   text: 'text-lime-700 dark:text-lime-300',   sparkColor: '#84cc16', ring: 'focus:ring-lime-300' },
-  sky:    { blob: 'from-sky-300/70 dark:from-sky-500/30',       iconBg: 'bg-gradient-to-br from-sky-500 to-blue-600',     text: 'text-sky-700 dark:text-sky-300',     sparkColor: '#0ea5e9', ring: 'focus:ring-sky-300' },
-  pink:   { blob: 'from-pink-300/70 dark:from-pink-500/30',     iconBg: 'bg-gradient-to-br from-pink-500 to-fuchsia-600', text: 'text-pink-700 dark:text-pink-300',   sparkColor: '#ec4899', ring: 'focus:ring-pink-300' },
-  amber:  { blob: 'from-amber-300/70 dark:from-amber-500/30',   iconBg: 'bg-gradient-to-br from-amber-500 to-orange-600', text: 'text-amber-700 dark:text-amber-300', sparkColor: '#f59e0b', ring: 'focus:ring-amber-300' },
-  rose:   { blob: 'from-rose-300/70 dark:from-rose-500/30',     iconBg: 'bg-gradient-to-br from-rose-500 to-red-600',     text: 'text-rose-700 dark:text-rose-300',   sparkColor: '#f43f5e', ring: 'focus:ring-rose-300' },
+const tileThemes: Record<TileColor, { bg: string; blob: string; iconBg: string; text: string; sparkColor: string; ring: string }> = {
+  violet: { bg: 'from-white to-violet-100 dark:from-slate-800 dark:to-violet-950/50', blob: 'from-violet-400/60 dark:from-violet-500/40', iconBg: 'bg-gradient-to-br from-violet-500 to-purple-600', text: 'text-violet-700 dark:text-violet-300', sparkColor: '#8b5cf6', ring: 'focus:ring-violet-300' },
+  lime:   { bg: 'from-white to-lime-100 dark:from-slate-800 dark:to-lime-950/40',     blob: 'from-lime-400/60 dark:from-lime-500/35',     iconBg: 'bg-gradient-to-br from-lime-500 to-green-600',   text: 'text-lime-700 dark:text-lime-300',   sparkColor: '#84cc16', ring: 'focus:ring-lime-300' },
+  sky:    { bg: 'from-white to-sky-100 dark:from-slate-800 dark:to-sky-950/50',       blob: 'from-sky-400/60 dark:from-sky-500/40',       iconBg: 'bg-gradient-to-br from-sky-500 to-blue-600',     text: 'text-sky-700 dark:text-sky-300',     sparkColor: '#0ea5e9', ring: 'focus:ring-sky-300' },
+  pink:   { bg: 'from-white to-pink-100 dark:from-slate-800 dark:to-pink-950/50',     blob: 'from-pink-400/60 dark:from-pink-500/40',     iconBg: 'bg-gradient-to-br from-pink-500 to-fuchsia-600', text: 'text-pink-700 dark:text-pink-300',   sparkColor: '#ec4899', ring: 'focus:ring-pink-300' },
+  amber:  { bg: 'from-white to-amber-100 dark:from-slate-800 dark:to-amber-950/50',   blob: 'from-amber-400/60 dark:from-amber-500/40',   iconBg: 'bg-gradient-to-br from-amber-500 to-orange-600', text: 'text-amber-700 dark:text-amber-300', sparkColor: '#f59e0b', ring: 'focus:ring-amber-300' },
+  rose:   { bg: 'from-white to-rose-100 dark:from-slate-800 dark:to-rose-950/50',     blob: 'from-rose-400/60 dark:from-rose-500/40',     iconBg: 'bg-gradient-to-br from-rose-500 to-red-600',     text: 'text-rose-700 dark:text-rose-300',   sparkColor: '#f43f5e', ring: 'focus:ring-rose-300' },
 }
 
 function StatTile({
@@ -202,9 +203,9 @@ function StatTile({
       onClick={() => { h.tap(); onClick?.() }}
       aria-label={ariaLabel || label}
       style={{ animationDelay: `${delay}ms` }}
-      className={`tile-in card-lift relative overflow-hidden rounded-2xl bg-white dark:bg-slate-800 border border-slate-100 dark:border-slate-700 shadow-sm p-3 text-right group focus:outline-none focus:ring-4 ${theme.ring}`}
+      className={`tile-in card-lift relative overflow-hidden rounded-2xl bg-gradient-to-br ${theme.bg} border border-slate-100 dark:border-slate-700 shadow-sm p-3 text-right group focus:outline-none focus:ring-4 ${theme.ring}`}
     >
-      <div className={`absolute -top-6 -left-6 w-20 h-20 rounded-full bg-gradient-to-br ${theme.blob} to-transparent blur-xl pointer-events-none`} />
+      <div className={`absolute -top-6 -left-6 w-24 h-24 rounded-full bg-gradient-to-br ${theme.blob} to-transparent blur-xl pointer-events-none breathe-slow`} />
       <div className="relative flex items-center gap-2 mb-1.5">
         <div className={`w-7 h-7 rounded-lg ${theme.iconBg} flex items-center justify-center text-white shrink-0`}>
           {isValidElement(icon) ? cloneElement(icon as React.ReactElement<any>, { size: 14 }) : icon}
@@ -231,18 +232,20 @@ function StatTile({
 // Quick Action Button
 // ============================================================================
 
-function QuickAction({ icon, label, gradient, onClick, delay }: { icon: React.ReactNode; label: string; gradient: string; onClick: () => void; delay: number }) {
+function QuickAction({ icon, label, color, onClick, delay }: { icon: React.ReactNode; label: string; color: TileColor; onClick: () => void; delay: number }) {
+  const theme = tileThemes[color]
   return (
     <button
       onClick={() => { h.select(); onClick() }}
       aria-label={label}
       style={{ animationDelay: `${delay}ms` }}
-      className={`tile-in card-lift flex flex-col items-center gap-1.5 p-2.5 rounded-2xl bg-gradient-to-br ${gradient} shadow-sm text-white relative overflow-hidden min-w-[76px] flex-1 focus:outline-none focus:ring-4 focus:ring-white/30`}
+      className={`tile-in card-lift relative overflow-hidden flex flex-col items-center gap-1.5 p-3 rounded-2xl bg-gradient-to-br ${theme.bg} border border-slate-100 dark:border-slate-700 shadow-sm min-w-[76px] flex-1 focus:outline-none focus:ring-4 ${theme.ring}`}
     >
-      <div className="w-8 h-8 rounded-lg bg-white/20 backdrop-blur-sm flex items-center justify-center">
-        {icon}
+      <div className={`absolute -bottom-6 -left-6 w-20 h-20 rounded-full bg-gradient-to-br ${theme.blob} to-transparent blur-xl pointer-events-none breathe-slow`} />
+      <div className={`relative w-9 h-9 rounded-xl ${theme.iconBg} flex items-center justify-center text-white float-bounce`}>
+        {isValidElement(icon) ? cloneElement(icon as React.ReactElement<any>, { size: 17 }) : icon}
       </div>
-      <span className="text-[11px] font-bold">{label}</span>
+      <span className={`relative text-[11px] font-bold ${theme.text}`}>{label}</span>
     </button>
   )
 }
@@ -787,13 +790,13 @@ export default function Dashboard() {
 
   // ── Quick Actions ──────────────────────────────────────────────
 
-  const quickActions = [
-    { label: 'نوبت جدید',   icon: <Calendar size={20} />,      gradient: 'from-amber-400 to-orange-600',  path: '/appointments' },
-    { label: 'بیمار جدید',  icon: <Users size={20} />,         gradient: 'from-sky-400 to-blue-600',      path: '/patients' },
-    { label: 'ایمپلنت',      icon: <Smile size={20} />,         gradient: 'from-blue-400 to-blue-700',     path: '/implants' },
-    { label: 'لیست انتظار', icon: <Clock size={20} />,         gradient: 'from-yellow-400 to-yellow-600', path: '/waiting-list' },
-    { label: 'صندوق',        icon: <Wallet size={20} />,        gradient: 'from-emerald-400 to-green-600', path: '/billing' },
-    { label: 'موجودی',       icon: <Package size={20} />,       gradient: 'from-orange-400 to-red-600',    path: '/inventory' },
+  const quickActions: { label: string; icon: React.ReactNode; color: TileColor; path: string }[] = [
+    { label: 'نوبت جدید',   icon: <Calendar size={20} />, color: 'amber', path: '/appointments' },
+    { label: 'بیمار جدید',  icon: <Users size={20} />,    color: 'violet', path: '/patients' },
+    { label: 'ایمپلنت',      icon: <Smile size={20} />,    color: 'sky',   path: '/implants' },
+    { label: 'لیست انتظار', icon: <Clock size={20} />,    color: 'lime',  path: '/waiting-list' },
+    { label: 'صندوق',        icon: <Wallet size={20} />,   color: 'pink',  path: '/billing' },
+    { label: 'موجودی',       icon: <Package size={20} />,  color: 'rose',  path: '/inventory' },
   ]
 
   // ── Loading ────────────────────────────────────────────────────
@@ -857,14 +860,14 @@ export default function Dashboard() {
           ))}
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-1.5 shrink-0">
           {/* Doctor Filter */}
           {doctors.length > 0 && (
             <select
               value={doctorFilter}
               onChange={(e) => { h.tap(); setDoctorFilter(e.target.value) }}
               aria-label="فیلتر بر اساس پزشک"
-              className="px-3 py-2 rounded-xl text-xs font-bold bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-slate-700 focus:outline-none focus:ring-2 focus:ring-primary-400 cursor-pointer"
+              className="px-2 py-1.5 rounded-xl text-[11px] font-bold bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-slate-700 focus:outline-none focus:ring-2 focus:ring-primary-400 cursor-pointer max-w-[92px]"
             >
               <option value="all">همه پزشکان</option>
               {doctors.map((d) => (
@@ -873,29 +876,30 @@ export default function Dashboard() {
             </select>
           )}
 
-          {/* Auto-refresh toggle */}
+          {/* Auto-refresh toggle — icon only so it fits next to the time tabs on mobile */}
           <button
             onClick={() => { h.tap(); setAutoRefresh(!autoRefresh) }}
-            aria-label="به‌روزرسانی خودکار"
+            aria-label={autoRefresh ? 'به‌روزرسانی خودکار فعال' : 'به‌روزرسانی خودکار غیرفعال'}
             aria-pressed={autoRefresh}
-            className={`flex items-center gap-1 px-3 py-2 rounded-xl text-xs font-bold border transition-all-smooth ${
+            title="به‌روزرسانی خودکار"
+            className={`flex items-center justify-center w-9 h-9 rounded-xl border transition-all-smooth ${
               autoRefresh
                 ? 'bg-success-50 dark:bg-success-900/20 text-success-600 dark:text-success-400 border-success-200 dark:border-success-700'
-                : 'bg-white dark:bg-slate-800 text-slate-500 dark:text-slate-400 border-slate-200 dark:border-slate-700'
+                : 'bg-white dark:bg-slate-800 text-slate-400 dark:text-slate-500 border-slate-200 dark:border-slate-700'
             }`}
           >
-            <Zap size={14} className={autoRefresh ? 'animate-pulse' : ''} />
-            خودکار
+            <Zap size={15} className={autoRefresh ? 'animate-pulse' : ''} />
           </button>
 
           {/* Manual Refresh */}
           <button
             onClick={handleRefresh}
             aria-label="به‌روزرسانی دستی"
+            title="به‌روزرسانی دستی"
             disabled={refreshing}
-            className="flex items-center gap-1 px-3 py-2 rounded-xl text-xs font-bold bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700 transition-all-smooth disabled:opacity-50"
+            className="flex items-center justify-center w-9 h-9 rounded-xl bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700 transition-all-smooth disabled:opacity-50"
           >
-            <RefreshCw size={14} className={refreshing ? 'animate-spin' : ''} />
+            <RefreshCw size={15} className={refreshing ? 'animate-spin' : ''} />
           </button>
         </div>
       </div>
@@ -994,7 +998,7 @@ export default function Dashboard() {
             key={action.path}
             icon={action.icon}
             label={action.label}
-            gradient={action.gradient}
+            color={action.color}
             onClick={() => navigate(action.path)}
             delay={280 + i * 40}
           />

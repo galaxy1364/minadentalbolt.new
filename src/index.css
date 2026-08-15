@@ -842,3 +842,13 @@ input, textarea, select { font-size: 16px !important; }
 @media (prefers-reduced-motion: reduce) {
   .list-stagger-item { animation: none; }
 }
+
+/* ── Bento tile: slow "breathing" color blob (subtle life, not distracting) ─ */
+@keyframes breathe-slow {
+  0%, 100% { transform: scale(1) translate(0, 0); opacity: 0.9; }
+  50% { transform: scale(1.15) translate(4px, -4px); opacity: 1; }
+}
+.breathe-slow { animation: breathe-slow 6s ease-in-out infinite; }
+@media (prefers-reduced-motion: reduce) {
+  .breathe-slow { animation: none; }
+}
