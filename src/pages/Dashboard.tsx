@@ -6,7 +6,7 @@ import { useNavigate } from 'react-router-dom'
 import {
   Users, Calendar, DollarSign, FlaskConical, Plus, ArrowLeft, Activity,
   Clock, TrendingUp, TrendingDown, Smile, AlertTriangle, Package,
-  ClipboardList, Wallet, Zap, ChevronLeft, Timer, Moon, Sun,
+  ClipboardList, Wallet, Zap, ChevronLeft, Timer, Moon, Sun, Target,
   CheckCircle2, ArrowUpRight, ArrowDownRight, Sparkles, Building2,
   RefreshCw, Download, FileText, Bell,
 } from 'lucide-react'
@@ -30,6 +30,7 @@ import type {
 import { Card, Badge, EmptyState, showToast } from '../components/ui'
 import { findBirthdays, findDebtors, findLapsedPatients, findDueInstallments, REMINDER_CATEGORY_META, SmartReminder } from '../lib/smartReminders'
 import { supabase } from '../lib/supabase'
+import { useAuth } from '../lib/auth'
 import { ErrorBoundary } from '../components/ErrorBoundary'
 import { h } from '../lib/haptics'
 import { usePullToRefresh } from '../lib/usePullToRefresh'
@@ -183,7 +184,7 @@ const tileThemes: Record<TileColor, { bg: string; blob: string; iconBg: string; 
 }
 
 function StatTile({
-  icon, label, value, suffix, color, sparkData, trend, delay, onClick, ariaLabel,
+  icon, label, value, suffix, color, sparkData, trend, delay, onClick, ariaLabel, goal, narrative,
 }: {
   icon: React.ReactNode
   label: string
@@ -195,9 +196,14 @@ function StatTile({
   delay: number
   onClick?: () => void
   ariaLabel?: string
+  /** Optional daily/period target — renders a thin progress bar under the number. */
+  goal?: number
+  /** Optional short auto-generated explanation of the trend (why it moved). */
+  narrative?: string
 }) {
   const animatedValue = useCountUp(value)
   const theme = tileThemes[color]
+  const goalPct = goal && goal > 0 ? Math.min(100, Math.round((value / goal) * 100)) : null
   return (
     <button
       onClick={() => { h.tap(); onClick?.() }}
@@ -224,6 +230,17 @@ function StatTile({
           </span>
         )}
       </div>
+      {goalPct !== null && (
+        <div className="relative mt-1.5">
+          <div className="h-1 rounded-full bg-black/5 dark:bg-white/10 overflow-hidden">
+            <div className={`h-full rounded-full ${theme.iconBg} transition-all duration-700`} style={{ width: `${goalPct}%` }} />
+          </div>
+          <p className="text-[9px] text-slate-400 mt-0.5">{toPersianDigits(goalPct)}٪ از هدف {toPersianDigits(goal!)}</p>
+        </div>
+      )}
+      {narrative && (
+        <p className="relative text-[9px] text-slate-400 dark:text-slate-500 mt-1 truncate">{narrative}</p>
+      )}
     </button>
   )
 }
@@ -436,6 +453,18 @@ function exportCSV(filename: string, headers: string[], rows: (string | number)[
 
 export default function Dashboard() {
   const navigate = useNavigate()
+  const { profile } = useAuth()
+  // 'owner' is the default while login is disabled / no role is set yet,
+  // so the dashboard behaves exactly as before until roles are assigned.
+  const role = profile?.role || 'owner'
+  const roleGreeting: Record<string, string> = {
+    owner: 'داشبورد مدیریت',
+    doctor: 'داشبورد پزشک',
+    receptionist: 'داشبورد پذیرش',
+    assistant: 'داشبورد دستیار',
+    lab: 'داشبورد لابراتوار',
+    accountant: 'داشبورد مالی',
+  }
 
   // ── State ──────────────────────────────────────────────────────
 
@@ -671,6 +700,46 @@ export default function Dashboard() {
   }, [appointments, inPrevRange, doctorFilter])
   const apptChange = prevApptCount > 0 ? Math.round(((currentApptCount - prevApptCount) / prevApptCount) * 100) : 0
 
+  // ── KPI goal (daily appointment target) — simple localStorage-backed
+  // target, editable inline. Only meaningful for the 'today' range.
+  const [apptGoal, setApptGoal] = useState<number>(() => {
+    const stored = localStorage.getItem('minadent-appt-goal')
+    return stored ? Number(stored) : 15
+  })
+  const [editingGoal, setEditingGoal] = useState(false)
+  const [goalDraft, setGoalDraft] = useState(String(apptGoal))
+  const saveGoal = () => {
+    const n = Math.max(1, Number(goalDraft) || apptGoal)
+    setApptGoal(n)
+    localStorage.setItem('minadent-appt-goal', String(n))
+    setEditingGoal(false)
+  }
+
+  // ── Auto-generated narrative context (rule-based "why did this move") ──
+  const todayCancelledCount = useMemo(
+    () => appointments.filter((a) => a.date === todayStr && a.status === 'cancelled').length,
+    [appointments, todayStr],
+  )
+  const apptNarrative = timeRange === 'today' && todayCancelledCount > 0
+    ? `${toPersianDigits(todayCancelledCount)} نوبت لغو شده`
+    : undefined
+
+  const revenueNarrative = useMemo(() => {
+    if (filteredPayments.length === 0) return undefined
+    const topMethod = Object.entries(
+      filteredPayments.reduce<Record<string, number>>((acc, p) => {
+        const m = p.payment_method || 'نامشخص'
+        acc[m] = (acc[m] || 0) + (p.amount || 0)
+        return acc
+      }, {}),
+    ).sort((a, b) => b[1] - a[1])[0]
+    if (!topMethod) return undefined
+    const pct = Math.round((topMethod[1] / currentRevenue) * 100)
+    if (pct < 40) return undefined
+    const methodLabel = { cash: 'نقدی', card: 'کارت', transfer: 'انتقال', cheque: 'چک', insurance: 'بیمه' }[topMethod[0]] || topMethod[0]
+    return `عمدتاً از ${methodLabel} (${toPersianDigits(pct)}٪)`
+  }, [filteredPayments, currentRevenue])
+
   // ── Real Sparkline Data ────────────────────────────────────────
 
   const patientSparkData = useMemo(() => {
@@ -790,14 +859,27 @@ export default function Dashboard() {
 
   // ── Quick Actions ──────────────────────────────────────────────
 
-  const quickActions: { label: string; icon: React.ReactNode; color: TileColor; path: string }[] = [
-    { label: 'نوبت جدید',   icon: <Calendar size={20} />, color: 'amber', path: '/appointments' },
-    { label: 'بیمار جدید',  icon: <Users size={20} />,    color: 'violet', path: '/patients' },
-    { label: 'ایمپلنت',      icon: <Smile size={20} />,    color: 'sky',   path: '/implants' },
-    { label: 'لیست انتظار', icon: <Clock size={20} />,    color: 'lime',  path: '/waiting-list' },
-    { label: 'صندوق',        icon: <Wallet size={20} />,   color: 'pink',  path: '/billing' },
-    { label: 'موجودی',       icon: <Package size={20} />,  color: 'rose',  path: '/inventory' },
+  const allQuickActions: { key: string; label: string; icon: React.ReactNode; color: TileColor; path: string }[] = [
+    { key: 'appt',   label: 'نوبت جدید',   icon: <Calendar size={20} />, color: 'amber', path: '/appointments' },
+    { key: 'patient',label: 'بیمار جدید',  icon: <Users size={20} />,    color: 'violet', path: '/patients' },
+    { key: 'implant',label: 'ایمپلنت',      icon: <Smile size={20} />,    color: 'sky',   path: '/implants' },
+    { key: 'wait',   label: 'لیست انتظار', icon: <Clock size={20} />,    color: 'lime',  path: '/waiting-list' },
+    { key: 'cash',   label: 'صندوق',        icon: <Wallet size={20} />,   color: 'pink',  path: '/billing' },
+    { key: 'inv',    label: 'موجودی',       icon: <Package size={20} />,  color: 'rose',  path: '/inventory' },
   ]
+
+  // Role-aware ordering: each role's most-used actions float to the front
+  // (all six stay available — this only changes priority, never hides).
+  const roleActionPriority: Record<string, string[]> = {
+    doctor: ['appt', 'patient', 'wait', 'implant', 'cash', 'inv'],
+    receptionist: ['patient', 'appt', 'wait', 'cash', 'implant', 'inv'],
+    assistant: ['appt', 'wait', 'patient', 'implant', 'cash', 'inv'],
+    lab: ['implant', 'appt', 'patient', 'wait', 'cash', 'inv'],
+    accountant: ['cash', 'inv', 'appt', 'patient', 'wait', 'implant'],
+    owner: ['appt', 'patient', 'implant', 'wait', 'cash', 'inv'],
+  }
+  const priority = roleActionPriority[role] || roleActionPriority.owner
+  const quickActions = [...allQuickActions].sort((a, b) => priority.indexOf(a.key) - priority.indexOf(b.key))
 
   // ── Loading ────────────────────────────────────────────────────
 
@@ -917,6 +999,7 @@ export default function Dashboard() {
             <div className="flex items-center gap-1.5 mb-0.5">
               <Building2 size={13} className="text-primary-500 shrink-0" />
               <span className="text-[11px] font-bold text-primary-600 dark:text-primary-400 truncate">کلینیک دندانپزشکی مینا</span>
+              <span className="text-[10px] font-bold text-slate-400 dark:text-slate-500 bg-slate-100 dark:bg-slate-700 rounded-full px-2 py-0.5 shrink-0">{roleGreeting[role] || roleGreeting.owner}</span>
             </div>
             <h1 className="text-lg font-extrabold text-slate-800 dark:text-slate-100 truncate">
               {toJalaliStringPretty(todayStr)}
@@ -964,6 +1047,8 @@ export default function Dashboard() {
             delay={140}
             onClick={() => navigate('/appointments')}
             ariaLabel={`نوبت‌ها: ${currentApptCount}`}
+            goal={timeRange === 'today' ? apptGoal : undefined}
+            narrative={apptNarrative}
           />
           <StatTile
             icon={<DollarSign />}
@@ -976,6 +1061,7 @@ export default function Dashboard() {
             delay={180}
             onClick={() => navigate('/billing')}
             ariaLabel={`درآمد: ${formatCurrency(currentRevenue)} تومان`}
+            narrative={revenueNarrative}
           />
           <StatTile
             icon={<FlaskConical />}
@@ -989,6 +1075,32 @@ export default function Dashboard() {
             ariaLabel={`سفارش‌های فعال: ${stats?.activeLabOrders ?? 0}`}
           />
         </div>
+
+        {timeRange === 'today' && (
+          <div className="relative flex items-center justify-end mt-2.5">
+            {editingGoal ? (
+              <div className="flex items-center gap-1.5">
+                <input
+                  autoFocus
+                  type="number"
+                  value={goalDraft}
+                  onChange={(e) => setGoalDraft(e.target.value)}
+                  onKeyDown={(e) => e.key === 'Enter' && saveGoal()}
+                  className="w-16 px-2 py-1 rounded-lg border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-700 text-xs text-center focus:outline-none focus:ring-2 focus:ring-primary-400"
+                />
+                <button onClick={saveGoal} className="text-[11px] font-bold text-primary-600 dark:text-primary-400">ذخیره</button>
+              </div>
+            ) : (
+              <button
+                onClick={() => { setGoalDraft(String(apptGoal)); setEditingGoal(true) }}
+                className="flex items-center gap-1 text-[11px] text-slate-400 dark:text-slate-500 hover:text-primary-500 transition-colors"
+              >
+                <Target size={11} />
+                هدف روزانه نوبت: {toPersianDigits(apptGoal)} (ویرایش)
+              </button>
+            )}
+          </div>
+        )}
       </div>
 
       {/* ═══ Quick Actions ══════════════════════════════════════════ */}
