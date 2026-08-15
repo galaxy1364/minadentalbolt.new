@@ -28,7 +28,7 @@ import type {
   Encounter, Installment, TreatmentWithRelations, ImplantCase,
 } from '../types'
 import { Card, Badge, EmptyState, showToast, Modal } from '../components/ui'
-import { findBirthdays, findDebtors, findLapsedPatients, findDueInstallments, findNoShows, findUnfinishedTreatmentFollowups, REMINDER_CATEGORY_META, SmartReminder } from '../lib/smartReminders'
+import { findBirthdays, findDebtors, findLapsedPatients, findDueInstallments, findNoShows, findUnfinishedTreatmentFollowups, findUnresolvedPastAppointments, REMINDER_CATEGORY_META, SmartReminder } from '../lib/smartReminders'
 import { calcAllPatientBalances } from '../lib/finance'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../lib/auth'
@@ -615,6 +615,7 @@ export default function Dashboard() {
       lapsed: findLapsedPatients(patients, encounters),
       installment_due: findDueInstallments(installments, patients),
       no_show: findNoShows(appointments, patients),
+      unresolved_appointment: findUnresolvedPastAppointments(appointments, patients),
       unfinished_treatment: findUnfinishedTreatmentFollowups(treatments, appointments, patients),
     }
   }, [patients, encounters, installments, treatments, appointments, implantCases])
@@ -769,7 +770,7 @@ export default function Dashboard() {
   // ── Notification center (aggregates every alert into one bell icon) ──
   const [notifCenterOpen, setNotifCenterOpen] = useState(false)
   const totalNotifCount =
-    smartReminders.birthday.length + smartReminders.debtor.length + smartReminders.lapsed.length + smartReminders.installment_due.length + smartReminders.no_show.length + smartReminders.unfinished_treatment.length +
+    smartReminders.birthday.length + smartReminders.debtor.length + smartReminders.lapsed.length + smartReminders.installment_due.length + smartReminders.no_show.length + smartReminders.unfinished_treatment.length + smartReminders.unresolved_appointment.length +
     lowInventoryCount + overdueLabCount + waitingListCount
 
   // ── Real Sparkline Data ────────────────────────────────────────
@@ -1488,7 +1489,7 @@ export default function Dashboard() {
                         <div
                           key={key}
                           className="flex items-center gap-2.5 p-2.5 rounded-xl bg-slate-50 dark:bg-slate-800/60 hover:bg-slate-100 dark:hover:bg-slate-800 transition-all-smooth cursor-pointer"
-                          onClick={() => navigate(`/patients/${r.patient.id}`)}
+                          onClick={() => cat === 'unresolved_appointment' ? navigate('/appointments') : navigate(`/patients/${r.patient.id}`)}
                         >
                           <div className="w-8 h-8 rounded-full flex items-center justify-center text-white text-xs font-bold shrink-0" style={{ background: meta.color }}>
                             {r.patient.first_name[0]}
@@ -1497,13 +1498,19 @@ export default function Dashboard() {
                             <p className="text-sm font-semibold text-slate-800 dark:text-slate-100 truncate">{r.title}</p>
                             <p className="text-[11px] text-slate-500 dark:text-slate-400 truncate">{r.detail}</p>
                           </div>
-                          <button
-                            onClick={(e) => { e.stopPropagation(); handleSendReminderSms(r) }}
-                            disabled={sendingReminderId === key}
-                            className="shrink-0 px-2.5 py-1.5 rounded-lg bg-primary-50 dark:bg-primary-900/30 text-primary-700 dark:text-primary-400 text-[11px] font-semibold hover:bg-primary-100 dark:hover:bg-primary-900/50 transition-all-smooth press-scale disabled:opacity-50"
-                          >
-                            {sendingReminderId === key ? '...' : 'ارسال پیامک'}
-                          </button>
+                          {r.smsMessage ? (
+                            <button
+                              onClick={(e) => { e.stopPropagation(); handleSendReminderSms(r) }}
+                              disabled={sendingReminderId === key}
+                              className="shrink-0 px-2.5 py-1.5 rounded-lg bg-primary-50 dark:bg-primary-900/30 text-primary-700 dark:text-primary-400 text-[11px] font-semibold hover:bg-primary-100 dark:hover:bg-primary-900/50 transition-all-smooth press-scale disabled:opacity-50"
+                            >
+                              {sendingReminderId === key ? '...' : 'ارسال پیامک'}
+                            </button>
+                          ) : (
+                            <span className="shrink-0 px-2.5 py-1.5 rounded-lg bg-slate-100 dark:bg-slate-700 text-slate-500 dark:text-slate-400 text-[11px] font-semibold">
+                              بستن وضعیت
+                            </span>
+                          )}
                         </div>
                       )
                     })}
@@ -1722,6 +1729,13 @@ export default function Dashboard() {
                 <span className="text-lg">🚫</span>
                 <span className="flex-1 text-sm font-semibold text-red-700 dark:text-red-300">غیبت از نوبت (رزرو مجدد نشده)</span>
                 <Badge color="error">{toPersianDigits(smartReminders.no_show.length)}</Badge>
+              </button>
+            )}
+            {smartReminders.unresolved_appointment.length > 0 && (
+              <button onClick={() => { setNotifCenterOpen(false); navigate('/appointments') }} className="w-full flex items-center gap-3 p-3 rounded-xl bg-slate-100 dark:bg-slate-700/40 text-right hover:bg-slate-200 dark:hover:bg-slate-700 transition-all-smooth">
+                <span className="text-lg">❓</span>
+                <span className="flex-1 text-sm font-semibold text-slate-700 dark:text-slate-300">نوبت‌های بدون وضعیت نهایی</span>
+                <Badge color="slate">{toPersianDigits(smartReminders.unresolved_appointment.length)}</Badge>
               </button>
             )}
             {smartReminders.unfinished_treatment.length > 0 && (

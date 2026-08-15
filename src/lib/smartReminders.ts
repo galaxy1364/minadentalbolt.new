@@ -2,7 +2,7 @@ import type { Patient, Encounter, Payment, Installment, AppointmentWithRelations
 import { toPersianDigits } from './persianDate'
 import { calcAllPatientBalances } from './finance'
 
-export type ReminderCategory = 'birthday' | 'debtor' | 'lapsed' | 'installment_due' | 'no_show' | 'unfinished_treatment'
+export type ReminderCategory = 'birthday' | 'debtor' | 'lapsed' | 'installment_due' | 'no_show' | 'unfinished_treatment' | 'unresolved_appointment'
 
 export interface SmartReminder {
   category: ReminderCategory
@@ -135,6 +135,43 @@ export const REMINDER_CATEGORY_META: Record<ReminderCategory, { label: string; i
   installment_due: { label: 'اقساط سررسید', icon: '📅', color: '#8b5cf6' },
   no_show: { label: 'غیبت از نوبت', icon: '🚫', color: '#dc2626' },
   unfinished_treatment: { label: 'درمان ناتمام بدون نوبت بعدی', icon: '🦷', color: '#0891b2' },
+  unresolved_appointment: { label: 'نوبت بدون وضعیت نهایی', icon: '❓', color: '#64748b' },
+}
+
+/**
+ * Appointments whose time has already passed but are still sitting on
+ * 'scheduled'/'confirmed' — nobody closed them out (تکمیل/غیبت/لغو).
+ * This matters beyond tidiness: findNoShows() only works if a missed
+ * visit actually gets marked 'no_show', and an unclosed slot also
+ * silently blocks that time from ever being correctly reported as
+ * free or attended in any statistics.
+ */
+export function findUnresolvedPastAppointments(
+  appointments: AppointmentWithRelations[],
+  patients: Patient[],
+  today = new Date(),
+): SmartReminder[] {
+  const todayStr = today.toISOString().slice(0, 10)
+  const nowTime = today.toTimeString().slice(0, 5)
+  const patientMap = new Map(patients.map((p) => [p.id, p]))
+
+  const result: SmartReminder[] = []
+  for (const a of appointments) {
+    const isPast = a.date < todayStr || (a.date === todayStr && a.end_time < nowTime)
+    if (!isPast) continue
+    if (a.status !== 'scheduled' && a.status !== 'confirmed') continue
+    const p = patientMap.get(a.patient_id) || a.patient
+    if (!p || !p.is_active) continue
+    result.push({
+      category: 'unresolved_appointment',
+      patient: p,
+      title: `${p.first_name} ${p.last_name}`,
+      detail: a.date === todayStr ? `نوبت امروز ساعت ${a.start_time} هنوز بسته نشده` : `نوبت گذشته (${a.date}) هنوز بسته نشده`,
+      smsMessage: '',
+      priority: daysSince(a.date),
+    })
+  }
+  return result.sort((a, b) => b.priority - a.priority)
 }
 
 /**
