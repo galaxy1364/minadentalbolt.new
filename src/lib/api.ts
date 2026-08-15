@@ -800,6 +800,16 @@ export async function deleteCheque(id: string): Promise<void> {
   await db.cheques.delete(id)
   await queueOperation('cheques', 'delete', id)
 }
+export async function updatePaymentPlan(id: string, updates: Partial<PaymentPlanInput>): Promise<PaymentPlan> {
+  const existing = await db.payment_plans.get(id)
+  if (!existing) throw new Error('طرح قسطی یافت نشد')
+  const { clinic_id, ...rest } = updates
+  const updated: PaymentPlan = { ...existing, ...rest, updated_at: nowISO() }
+  await db.payment_plans.put(updated)
+  await queueOperation('payment_plans', 'update', id, rest)
+  return updated
+}
+
 export async function deletePaymentPlan(id: string): Promise<void> {
   await db.payment_plans.delete(id)
   await queueOperation('payment_plans', 'delete', id)

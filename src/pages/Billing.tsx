@@ -3,11 +3,11 @@ import { useState, useEffect, useCallback, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { CreditCard, Plus, Search, DollarSign, TrendingUp, Wallet, Calendar, CheckCircle2, AlertCircle, Edit2, Filter, Receipt, Banknote, Clock, Trash2, Printer } from 'lucide-react'
 import { BarChart, Bar, XAxis, YAxis, Tooltip as RTooltip, ResponsiveContainer, PieChart, Pie, Cell as RCell } from 'recharts'
-import { fetchPayments, createPayment, updatePayment, deletePayment, fetchEncounters, fetchCheques, createCheque, updateCheque, fetchPaymentPlans, createPaymentPlan, updateInstallment, fetchPatients, fetchExpenses, createExpense, deleteExpense, fetchTreatments, fetchImplantCases } from '../lib/api'
+import { fetchPayments, createPayment, updatePayment, deletePayment, fetchEncounters, fetchCheques, createCheque, updateCheque, fetchPaymentPlans, createPaymentPlan, updatePaymentPlan, updateInstallment, fetchPatients, fetchExpenses, createExpense, deleteExpense, fetchTreatments, fetchImplantCases } from '../lib/api'
 import { toJalaliString, toJalaliStringPretty, formatCurrency, formatNumber, toPersianDigits } from '../lib/persianDate'
 import { h } from '../lib/haptics'
 import { useConfirmAction } from '../components/ConfirmAction'
-import { Payment, Encounter, Cheque, PaymentPlan, Patient, Expense, Treatment, ImplantCase } from '../types'
+import { Payment, Encounter, Cheque, PaymentPlan, PaymentPlanWithRelations, Patient, Expense, Treatment, ImplantCase, Installment } from '../types'
 import { calcAllPatientBalances } from '../lib/finance'
 import { Wizard, Card, Button, Input, Select, Textarea, Badge, Spinner, EmptyState, Tabs, showToast } from '../components/ui'
 import { ModuleHeader, ModuleStatCard, ReorderableStatGrid } from '../components/ModuleHeader'
@@ -60,7 +60,7 @@ export default function Billing() {
   const [treatments, setTreatments] = useState<Treatment[]>([])
   const [implantCases, setImplantCases] = useState<ImplantCase[]>([])
   const [cheques, setCheques] = useState<Cheque[]>([])
-  const [paymentPlans, setPaymentPlans] = useState<PaymentPlan[]>([])
+  const [paymentPlans, setPaymentPlans] = useState<PaymentPlanWithRelations[]>([])
   const [expenses, setExpenses] = useState<Expense[]>([])
   const [patients, setPatients] = useState<Patient[]>([])
   const [loading, setLoading] = useState(true)
@@ -413,18 +413,40 @@ export default function Billing() {
     })
   }
 
-  const markInstallmentPaid = (installmentId: string) => {
+  const markInstallmentPaid = (installment: Installment, plan: PaymentPlanWithRelations) => {
     h.confirm()
     confirmAction({
       type: 'status',
       title: 'پرداخت قسط',
       fields: [
-        { label: 'قسط', value: 'پرداخت کامل', highlight: true },
+        { label: 'قسط', value: `قسط ${toPersianDigits(installment.installment_number)} — ${formatCurrency(installment.amount)} ت`, highlight: true },
         { label: 'تاریخ', value: toJalaliString(new Date().toISOString().slice(0, 10)) },
       ],
       confirmLabel: 'تایید پرداخت',
       onConfirm: async () => {
-        try { await updateInstallment(installmentId, { status: 'paid', payment_date: new Date().toISOString().slice(0, 10) }); showToast('success', 'قسط پرداخت شد'); await loadData() }
+        try {
+          await updateInstallment(installment.id, { status: 'paid', payment_date: new Date().toISOString().slice(0, 10) })
+          // Same fix as cheques/insurance: an installment's own status
+          // field isn't what calcPatientBalance reads — without a real
+          // Payment record, the patient's balance stayed unchanged even
+          // after every installment was fully paid off.
+          await createPayment({
+            patient_id: plan.patient_id, encounter_id: null,
+            amount: installment.amount, payment_method: 'cash',
+            reference: null,
+            notes: `پرداخت قسط ${installment.installment_number} از طرح قسطی`,
+            status: 'completed', payment_date: new Date().toISOString().slice(0, 10),
+            created_by: null,
+          } as any)
+          // If every installment in this plan is now paid, the plan
+          // itself should stop showing as 'active' forever.
+          const allPaid = plan.installments.every((i) => i.id === installment.id || i.status === 'paid')
+          if (allPaid && plan.status !== 'completed') {
+            await updatePaymentPlan(plan.id, { status: 'completed' })
+          }
+          showToast('success', allPaid ? 'قسط پرداخت شد و طرح قسطی تکمیل شد' : 'قسط پرداخت شد')
+          await loadData()
+        }
         catch { showToast('error', 'خطا') }
       },
     })
@@ -729,7 +751,7 @@ export default function Billing() {
                           ) : (
                             <>
                               <Badge color="warning">در انتظار</Badge>
-                              <Button size="sm" variant="success" onClick={() => markInstallmentPaid(inst.id)}>پرداخت</Button>
+                              <Button size="sm" variant="success" onClick={() => markInstallmentPaid(inst, plan)}>پرداخت</Button>
                             </>
                           )}
                         </div>
