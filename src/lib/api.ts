@@ -236,12 +236,32 @@ export async function deleteAppointment(id: string): Promise<void> {
   await queueOperation('appointments', 'delete', id)
 }
 
-export async function checkConflict(doctorId: string, date: string, startTime: string, endTime: string, excludeId?: string): Promise<boolean> {
+/**
+ * Checks BOTH kinds of real scheduling conflict a clinic can hit:
+ *  - Same doctor double-booked (they can't see two patients at once)
+ *  - Same physical unit/chair double-booked (even with two different
+ *    doctors — a clinic with more doctors than chairs is common, and
+ *    the previous version only checked doctor_id, silently allowing two
+ *    different doctors to be booked into the same chair at once).
+ */
+export async function checkConflict(
+  doctorId: string,
+  date: string,
+  startTime: string,
+  endTime: string,
+  excludeId?: string,
+  unitId?: string | null,
+): Promise<'doctor' | 'unit' | null> {
   const items = await db.appointments
     .where('clinic_id').equals(CLINIC_ID)
-    .and((a) => a.doctor_id === doctorId && a.date === date && a.status !== 'cancelled' && a.id !== excludeId)
+    .and((a) => a.date === date && a.status !== 'cancelled' && a.id !== excludeId)
     .toArray()
-  return items.some((a) => a.start_time < endTime && a.end_time > startTime)
+
+  const overlaps = (a: Appointment) => a.start_time < endTime && a.end_time > startTime
+
+  if (items.some((a) => a.doctor_id === doctorId && overlaps(a))) return 'doctor'
+  if (unitId && items.some((a) => a.unit_id === unitId && overlaps(a))) return 'unit'
+  return null
 }
 
 // ── Encounters ───────────────────────────────────────────────

@@ -173,8 +173,9 @@ export default function Appointments() {
 
   // ── Preview + Confirm for create/edit ──
   const wizardSave = async () => {
-    const conflict = await checkConflict(wizardData.doctor_id, wizardData.date, wizardData.start_time, wizardData.end_time, editingAppt?.id)
-    if (conflict) { h.error(); showToast('error', 'تداخل زمانی با نوبت دیگر این پزشک'); return }
+    const conflict = await checkConflict(wizardData.doctor_id, wizardData.date, wizardData.start_time, wizardData.end_time, editingAppt?.id, wizardData.unit_id || null)
+    if (conflict === 'doctor') { h.error(); showToast('error', 'تداخل زمانی با نوبت دیگر این پزشک'); return }
+    if (conflict === 'unit') { h.error(); showToast('error', 'این یونیت/صندلی در این بازه‌ی زمانی رزرو شده است'); return }
 
     const patient = patients.find((p) => p.id === wizardData.patient_id)
     const doctor = doctors.find((d) => d.id === wizardData.doctor_id)

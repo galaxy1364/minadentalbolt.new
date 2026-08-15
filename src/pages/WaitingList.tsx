@@ -3,7 +3,7 @@ import { useState, useEffect, useCallback, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Clock, Search, Plus, Phone, Bell, CheckCircle2, XCircle, Calendar, Smile, AlertCircle, Edit2, Trash2 } from 'lucide-react'
 import { BarChart, Bar, XAxis, YAxis, Tooltip as RTooltip, ResponsiveContainer, Cell } from 'recharts'
-import { fetchWaitingList, createWaitingEntry, updateWaitingEntry, deleteWaitingEntry, fetchPatients, fetchDoctors, createAppointment, fetchUnits } from '../lib/api'
+import { fetchWaitingList, createWaitingEntry, updateWaitingEntry, deleteWaitingEntry, fetchPatients, fetchDoctors, createAppointment, fetchUnits, checkConflict } from '../lib/api'
 import { toJalaliString, toJalaliStringPretty, formatTime, formatNumber, toPersianDigits } from '../lib/persianDate'
 import { h } from '../lib/haptics'
 import { useConfirmAction } from '../components/ConfirmAction'
@@ -237,10 +237,18 @@ export default function WaitingList() {
           const startTime = e.preferred_time || '09:00'
           const [sh, sm] = startTime.split(':').map(Number)
           const endTime = `${String(sh + 1).padStart(2, '0')}:${String(sm).padStart(2, '0')}`
+          const unitId = units[0]?.id || null
+
+          if (e.doctor_id) {
+            const conflict = await checkConflict(e.doctor_id, startDate, startTime, endTime, undefined, unitId)
+            if (conflict === 'doctor') { h.error(); showToast('error', 'این پزشک در این بازه‌ی زمانی نوبت دیگری دارد — تاریخ/ساعت را تغییر دهید'); return }
+            if (conflict === 'unit') { h.error(); showToast('error', 'یونیت/صندلی در این بازه‌ی زمانی رزرو شده است'); return }
+          }
+
           await createAppointment({
             patient_id: e.patient_id,
             doctor_id: e.doctor_id || null,
-            unit_id: units[0]?.id || null,
+            unit_id: unitId,
             date: startDate,
             start_time: startTime,
             end_time: endTime,
