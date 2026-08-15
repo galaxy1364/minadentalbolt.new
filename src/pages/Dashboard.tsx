@@ -28,7 +28,7 @@ import type {
   Encounter, Installment,
 } from '../types'
 import { Card, Badge, EmptyState, showToast, Modal } from '../components/ui'
-import { findBirthdays, findDebtors, findLapsedPatients, findDueInstallments, REMINDER_CATEGORY_META, SmartReminder } from '../lib/smartReminders'
+import { findBirthdays, findDebtors, findLapsedPatients, findDueInstallments, findNoShows, REMINDER_CATEGORY_META, SmartReminder } from '../lib/smartReminders'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../lib/auth'
 import { ErrorBoundary } from '../components/ErrorBoundary'
@@ -607,6 +607,7 @@ export default function Dashboard() {
       debtor: findDebtors(patients, encounters),
       lapsed: findLapsedPatients(patients, encounters),
       installment_due: findDueInstallments(installments, patients),
+      no_show: findNoShows(appointments, patients),
     }
   }, [patients, encounters, installments])
 
@@ -760,7 +761,7 @@ export default function Dashboard() {
   // ── Notification center (aggregates every alert into one bell icon) ──
   const [notifCenterOpen, setNotifCenterOpen] = useState(false)
   const totalNotifCount =
-    smartReminders.birthday.length + smartReminders.debtor.length + smartReminders.lapsed.length + smartReminders.installment_due.length +
+    smartReminders.birthday.length + smartReminders.debtor.length + smartReminders.lapsed.length + smartReminders.installment_due.length + smartReminders.no_show.length +
     lowInventoryCount + overdueLabCount + waitingListCount
 
   // ── Real Sparkline Data ────────────────────────────────────────
@@ -1706,6 +1707,13 @@ export default function Dashboard() {
                 <span className="text-lg">📅</span>
                 <span className="flex-1 text-sm font-semibold text-violet-700 dark:text-violet-300">اقساط سررسید</span>
                 <Badge color="secondary">{toPersianDigits(smartReminders.installment_due.length)}</Badge>
+              </button>
+            )}
+            {smartReminders.no_show.length > 0 && (
+              <button onClick={() => { setNotifCenterOpen(false); navigate('/appointments') }} className="w-full flex items-center gap-3 p-3 rounded-xl bg-red-50 dark:bg-red-900/20 text-right hover:bg-red-100 dark:hover:bg-red-900/40 transition-all-smooth">
+                <span className="text-lg">🚫</span>
+                <span className="flex-1 text-sm font-semibold text-red-700 dark:text-red-300">غیبت از نوبت (رزرو مجدد نشده)</span>
+                <Badge color="error">{toPersianDigits(smartReminders.no_show.length)}</Badge>
               </button>
             )}
             {lowInventoryCount > 0 && (

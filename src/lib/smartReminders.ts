@@ -1,6 +1,6 @@
-import type { Patient, Encounter, Payment, Installment } from '../types'
+import type { Patient, Encounter, Payment, Installment, AppointmentWithRelations } from '../types'
 
-export type ReminderCategory = 'birthday' | 'debtor' | 'lapsed' | 'installment_due'
+export type ReminderCategory = 'birthday' | 'debtor' | 'lapsed' | 'installment_due' | 'no_show'
 
 export interface SmartReminder {
   category: ReminderCategory
@@ -133,4 +133,52 @@ export const REMINDER_CATEGORY_META: Record<ReminderCategory, { label: string; i
   debtor: { label: 'بدهکاران', icon: '💰', color: '#ef4444' },
   lapsed: { label: 'مراجعه‌نکرده‌ها', icon: '⏰', color: '#f59e0b' },
   installment_due: { label: 'اقساط سررسید', icon: '📅', color: '#8b5cf6' },
+  no_show: { label: 'غیبت از نوبت', icon: '🚫', color: '#dc2626' },
+}
+
+/**
+ * Patients who missed a recent appointment (status = 'no_show') without a
+ * follow-up booking after it — a Labkhand-style "غیبت‌کننده‌ها" list, so
+ * staff can proactively call and rebook instead of silently losing the
+ * patient.
+ */
+export function findNoShows(
+  appointments: AppointmentWithRelations[],
+  patients: Patient[],
+  lookbackDays = 30,
+): SmartReminder[] {
+  const cutoff = new Date()
+  cutoff.setDate(cutoff.getDate() - lookbackDays)
+  const cutoffStr = cutoff.toISOString().slice(0, 10)
+  const patientMap = new Map(patients.map((p) => [p.id, p]))
+
+  // Only the most recent no_show per patient, and only if they have no
+  // appointment booked after it (i.e. genuinely un-rebooked).
+  const latestNoShowByPatient = new Map<string, AppointmentWithRelations>()
+  const latestApptByPatient = new Map<string, string>()
+  for (const a of appointments) {
+    const prevLatest = latestApptByPatient.get(a.patient_id)
+    if (!prevLatest || a.date > prevLatest) latestApptByPatient.set(a.patient_id, a.date)
+    if (a.status === 'no_show' && a.date >= cutoffStr) {
+      const prev = latestNoShowByPatient.get(a.patient_id)
+      if (!prev || a.date > prev.date) latestNoShowByPatient.set(a.patient_id, a)
+    }
+  }
+
+  const result: SmartReminder[] = []
+  for (const [patientId, noShowAppt] of latestNoShowByPatient) {
+    const latestApptDate = latestApptByPatient.get(patientId)
+    if (latestApptDate && latestApptDate > noShowAppt.date) continue // already rebooked after the miss
+    const p = patientMap.get(patientId)
+    if (!p || !p.is_active) continue
+    result.push({
+      category: 'no_show',
+      patient: p,
+      title: `${p.first_name} ${p.last_name}`,
+      detail: `غیبت در ${noShowAppt.date} — رزرو مجدد نشده`,
+      smsMessage: `${p.first_name} عزیز، در نوبت اخیرتان در کلینیک مینادنت حضور نداشتید. لطفاً برای رزرو مجدد تماس بگیرید.`,
+      priority: daysSince(noShowAppt.date),
+    })
+  }
+  return result.sort((a, b) => b.priority - a.priority)
 }
