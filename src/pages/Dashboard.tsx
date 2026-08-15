@@ -6,7 +6,7 @@ import { useNavigate } from 'react-router-dom'
 import {
   Users, Calendar, DollarSign, FlaskConical, Plus, ArrowLeft, Activity,
   Clock, TrendingUp, TrendingDown, Smile, AlertTriangle, Package,
-  ClipboardList, Wallet, Zap, ChevronLeft, Timer, Moon, Sun, Target,
+  ClipboardList, Wallet, Zap, ChevronLeft, Timer, Moon, Sun, Target, Settings2,
   CheckCircle2, ArrowUpRight, ArrowDownRight, Sparkles, Building2,
   RefreshCw, Download, FileText, Bell,
 } from 'lucide-react'
@@ -27,7 +27,7 @@ import type {
   AppointmentWithRelations, Patient, Payment, DashboardStats, Doctor, LabOrder,
   Encounter, Installment,
 } from '../types'
-import { Card, Badge, EmptyState, showToast } from '../components/ui'
+import { Card, Badge, EmptyState, showToast, Modal } from '../components/ui'
 import { findBirthdays, findDebtors, findLapsedPatients, findDueInstallments, REMINDER_CATEGORY_META, SmartReminder } from '../lib/smartReminders'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../lib/auth'
@@ -486,8 +486,11 @@ export default function Dashboard() {
   const [lastRefresh, setLastRefresh] = useState<Date>(new Date())
 
   // Filters
-  const [timeRange, setTimeRange] = useState<TimeRange>('today')
-  const [doctorFilter, setDoctorFilter] = useState<string>('all')
+  const [timeRange, setTimeRange] = useState<TimeRange>(() => (localStorage.getItem('minadent-dash-range') as TimeRange) || 'today')
+  const [doctorFilter, setDoctorFilter] = useState<string>(() => localStorage.getItem('minadent-dash-doctor') || 'all')
+
+  useEffect(() => { localStorage.setItem('minadent-dash-range', timeRange) }, [timeRange])
+  useEffect(() => { localStorage.setItem('minadent-dash-doctor', doctorFilter) }, [doctorFilter])
 
   // Auto-refresh
   const [autoRefresh, setAutoRefresh] = useState(true)
@@ -740,6 +743,22 @@ export default function Dashboard() {
     return `عمدتاً از ${methodLabel} (${toPersianDigits(pct)}٪)`
   }, [filteredPayments, currentRevenue])
 
+  // ── Drill-down panel (tap a stat tile → quick detail list instead of
+  // a full navigation away from the dashboard) ──────────────────────
+  const [drillDown, setDrillDown] = useState<'patients' | 'appointments' | 'revenue' | 'lab' | null>(null)
+  const recentPaymentsForDrill = useMemo(
+    () => [...filteredPayments].sort((a, b) => (b.payment_date || '').localeCompare(a.payment_date || '')).slice(0, 6),
+    [filteredPayments],
+  )
+  const recentPatientsForDrill = useMemo(() => [...filteredPatients].slice(0, 6), [filteredPatients])
+  const upcomingApptsForDrill = useMemo(() => [...filteredAppointments].sort((a, b) => a.start_time.localeCompare(b.start_time)).slice(0, 6), [filteredAppointments])
+
+  // ── Notification center (aggregates every alert into one bell icon) ──
+  const [notifCenterOpen, setNotifCenterOpen] = useState(false)
+  const totalNotifCount =
+    smartReminders.birthday.length + smartReminders.debtor.length + smartReminders.lapsed.length + smartReminders.installment_due.length +
+    lowInventoryCount + overdueLabCount + waitingListCount
+
   // ── Real Sparkline Data ────────────────────────────────────────
 
   const patientSparkData = useMemo(() => {
@@ -879,7 +898,23 @@ export default function Dashboard() {
     owner: ['appt', 'patient', 'implant', 'wait', 'cash', 'inv'],
   }
   const priority = roleActionPriority[role] || roleActionPriority.owner
-  const quickActions = [...allQuickActions].sort((a, b) => priority.indexOf(a.key) - priority.indexOf(b.key))
+  const [customOrder, setCustomOrder] = useState<string[] | null>(() => {
+    const stored = localStorage.getItem('minadent-quickaction-order')
+    return stored ? JSON.parse(stored) : null
+  })
+  const [editingLayout, setEditingLayout] = useState(false)
+  const effectiveOrder = customOrder || priority
+  const quickActions = [...allQuickActions].sort((a, b) => effectiveOrder.indexOf(a.key) - effectiveOrder.indexOf(b.key))
+  const moveQuickAction = (key: string, dir: -1 | 1) => {
+    const order = [...effectiveOrder]
+    const idx = order.indexOf(key)
+    const swapWith = idx + dir
+    if (swapWith < 0 || swapWith >= order.length) return
+    ;[order[idx], order[swapWith]] = [order[swapWith], order[idx]]
+    setCustomOrder(order)
+    localStorage.setItem('minadent-quickaction-order', JSON.stringify(order))
+    h.tap()
+  }
 
   // ── Loading ────────────────────────────────────────────────────
 
@@ -1013,6 +1048,18 @@ export default function Dashboard() {
               {toPersianDigits(currentTime.toLocaleTimeString('fa-IR', { hour: '2-digit', minute: '2-digit' }))}
             </span>
             <button
+              onClick={() => { h.tap(); setNotifCenterOpen(true) }}
+              aria-label={`مرکز اعلان‌ها${totalNotifCount > 0 ? `، ${totalNotifCount} مورد` : ''}`}
+              className="relative flex items-center justify-center w-9 h-9 rounded-xl bg-white dark:bg-slate-700 border border-slate-200 dark:border-slate-600 text-slate-500 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-600 transition-all-smooth"
+            >
+              <Bell size={16} />
+              {totalNotifCount > 0 && (
+                <span className="absolute -top-1.5 -left-1.5 min-w-[18px] h-[18px] px-1 rounded-full bg-error-500 text-white text-[10px] font-bold flex items-center justify-center">
+                  {toPersianDigits(Math.min(totalNotifCount, 99))}
+                </span>
+              )}
+            </button>
+            <button
               onClick={() => { h.confirm(); navigate('/appointments') }}
               aria-label="نوبت جدید"
               className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-gradient-to-l from-violet-600 to-sky-500 hover:opacity-90 text-white text-sm font-bold shadow-md transition-all-smooth press-scale focus:outline-none focus:ring-4 focus:ring-violet-300/40"
@@ -1033,7 +1080,7 @@ export default function Dashboard() {
             sparkData={patientSparkData}
             trend={patientChange !== 0 ? { value: `${toPersianDigits(Math.abs(patientChange))}٪`, up: patientChange >= 0 } : undefined}
             delay={100}
-            onClick={() => navigate('/patients')}
+            onClick={() => setDrillDown('patients')}
             ariaLabel={`بیماران: ${currentPatientCount}، تغییر ${patientChange} درصد`}
           />
           <StatTile
@@ -1045,7 +1092,7 @@ export default function Dashboard() {
             sparkData={appointmentSparkData}
             trend={apptChange !== 0 ? { value: `${toPersianDigits(Math.abs(apptChange))}٪`, up: apptChange >= 0 } : undefined}
             delay={140}
-            onClick={() => navigate('/appointments')}
+            onClick={() => setDrillDown('appointments')}
             ariaLabel={`نوبت‌ها: ${currentApptCount}`}
             goal={timeRange === 'today' ? apptGoal : undefined}
             narrative={apptNarrative}
@@ -1059,7 +1106,7 @@ export default function Dashboard() {
             sparkData={revenueSparkData.map((v) => Math.round(v / 1000000))}
             trend={revenueChange !== 0 ? { value: `${toPersianDigits(Math.abs(revenueChange))}٪`, up: revenueChange >= 0 } : undefined}
             delay={180}
-            onClick={() => navigate('/billing')}
+            onClick={() => setDrillDown('revenue')}
             ariaLabel={`درآمد: ${formatCurrency(currentRevenue)} تومان`}
             narrative={revenueNarrative}
           />
@@ -1071,7 +1118,7 @@ export default function Dashboard() {
             sparkData={labSparkData}
             trend={{ value: `${toPersianDigits(overdueLabCount)} تأخیر`, up: overdueLabCount > 0 }}
             delay={220}
-            onClick={() => navigate('/laboratory')}
+            onClick={() => setDrillDown('lab')}
             ariaLabel={`سفارش‌های فعال: ${stats?.activeLabOrders ?? 0}`}
           />
         </div>
@@ -1104,16 +1151,47 @@ export default function Dashboard() {
       </div>
 
       {/* ═══ Quick Actions ══════════════════════════════════════════ */}
+      <div className="flex items-center justify-between mb-1">
+        <span className="text-[11px] font-bold text-slate-400 dark:text-slate-500">دسترسی سریع</span>
+        <button
+          onClick={() => { h.tap(); setEditingLayout(!editingLayout) }}
+          className={`flex items-center gap-1 text-[11px] font-bold px-2 py-1 rounded-lg transition-all-smooth ${editingLayout ? 'bg-primary-100 dark:bg-primary-900/40 text-primary-700 dark:text-primary-300' : 'text-slate-400 dark:text-slate-500 hover:text-primary-500'}`}
+        >
+          <Settings2 size={12} />
+          {editingLayout ? 'پایان چیدمان' : 'تنظیم چیدمان'}
+        </button>
+      </div>
       <div className="flex flex-wrap gap-2">
         {quickActions.map((action, i) => (
-          <QuickAction
-            key={action.path}
-            icon={action.icon}
-            label={action.label}
-            color={action.color}
-            onClick={() => navigate(action.path)}
-            delay={280 + i * 40}
-          />
+          <div key={action.key} className="relative flex-1 min-w-[76px]">
+            <QuickAction
+              icon={action.icon}
+              label={action.label}
+              color={action.color}
+              onClick={() => { if (!editingLayout) navigate(action.path) }}
+              delay={280 + i * 40}
+            />
+            {editingLayout && (
+              <div className="absolute inset-0 flex items-center justify-between px-1 pointer-events-none">
+                <button
+                  onClick={(e) => { e.stopPropagation(); moveQuickAction(action.key, 1) }}
+                  disabled={i === quickActions.length - 1}
+                  aria-label="جابجایی به چپ"
+                  className="pointer-events-auto w-6 h-6 rounded-full bg-white dark:bg-slate-900 shadow-md flex items-center justify-center text-slate-500 disabled:opacity-30"
+                >
+                  <ChevronLeft size={13} />
+                </button>
+                <button
+                  onClick={(e) => { e.stopPropagation(); moveQuickAction(action.key, -1) }}
+                  disabled={i === 0}
+                  aria-label="جابجایی به راست"
+                  className="pointer-events-auto w-6 h-6 rounded-full bg-white dark:bg-slate-900 shadow-md flex items-center justify-center text-slate-500 disabled:opacity-30"
+                >
+                  <ChevronLeft size={13} className="rotate-180" />
+                </button>
+              </div>
+            )}
+          </div>
         ))}
       </div>
 
@@ -1515,6 +1593,141 @@ export default function Dashboard() {
           </>
         )}
       </div>
+
+      {/* ═══ Drill-down panel — tap a stat tile for a quick preview
+           instead of leaving the dashboard ═══════════════════════════ */}
+      <Modal
+        open={drillDown !== null}
+        onClose={() => setDrillDown(null)}
+        size="md"
+        title={
+          drillDown === 'patients' ? 'بیماران این دوره' :
+          drillDown === 'appointments' ? 'نوبت‌های این دوره' :
+          drillDown === 'revenue' ? 'پرداخت‌های اخیر' :
+          'سفارش‌های لابراتوار فعال'
+        }
+      >
+        {drillDown === 'patients' && (
+          recentPatientsForDrill.length === 0 ? <p className="text-sm text-slate-400 text-center py-6">بیماری در این بازه ثبت نشده</p> : (
+            <div className="space-y-1.5">
+              {recentPatientsForDrill.map((p) => (
+                <div key={p.id} className="flex items-center gap-2.5 p-2.5 rounded-xl bg-slate-50 dark:bg-slate-800/60 cursor-pointer hover:bg-slate-100 dark:hover:bg-slate-800" onClick={() => { setDrillDown(null); navigate(`/patients/${p.id}`) }}>
+                  <div className="w-8 h-8 rounded-full bg-gradient-to-br from-violet-500 to-purple-600 flex items-center justify-center text-white text-xs font-bold shrink-0">{p.first_name[0]}</div>
+                  <p className="text-sm font-semibold text-slate-800 dark:text-slate-100 truncate">{p.first_name} {p.last_name}</p>
+                </div>
+              ))}
+            </div>
+          )
+        )}
+        {drillDown === 'appointments' && (
+          upcomingApptsForDrill.length === 0 ? <p className="text-sm text-slate-400 text-center py-6">نوبتی در این بازه نیست</p> : (
+            <div className="space-y-1.5">
+              {upcomingApptsForDrill.map((a) => (
+                <div key={a.id} className="flex items-center gap-2.5 p-2.5 rounded-xl bg-slate-50 dark:bg-slate-800/60 cursor-pointer hover:bg-slate-100 dark:hover:bg-slate-800" onClick={() => { setDrillDown(null); navigate('/appointments') }}>
+                  <div className="w-8 h-8 rounded-full bg-gradient-to-br from-lime-500 to-green-600 flex items-center justify-center text-white text-[11px] font-bold shrink-0 tabular-nums">{toPersianDigits(a.start_time.slice(0, 5))}</div>
+                  <p className="text-sm font-semibold text-slate-800 dark:text-slate-100 truncate">{a.patient?.first_name} {a.patient?.last_name}</p>
+                </div>
+              ))}
+            </div>
+          )
+        )}
+        {drillDown === 'revenue' && (
+          recentPaymentsForDrill.length === 0 ? <p className="text-sm text-slate-400 text-center py-6">پرداختی در این بازه نیست</p> : (
+            <div className="space-y-1.5">
+              {recentPaymentsForDrill.map((p) => (
+                <div key={p.id} className="flex items-center justify-between gap-2.5 p-2.5 rounded-xl bg-slate-50 dark:bg-slate-800/60">
+                  <span className="text-sm font-bold text-sky-700 dark:text-sky-400">{formatCurrency(p.amount)} ت</span>
+                  <span className="text-xs text-slate-400">{p.payment_date ? toJalaliStringPretty(p.payment_date) : '-'}</span>
+                </div>
+              ))}
+            </div>
+          )
+        )}
+        {drillDown === 'lab' && (
+          labOrdersState.filter((o) => o.status !== 'delivered' && o.status !== 'cancelled').length === 0 ? <p className="text-sm text-slate-400 text-center py-6">سفارش فعالی نیست</p> : (
+            <div className="space-y-1.5">
+              {labOrdersState.filter((o) => o.status !== 'delivered' && o.status !== 'cancelled').slice(0, 6).map((o) => (
+                <div key={o.id} className="flex items-center gap-2.5 p-2.5 rounded-xl bg-slate-50 dark:bg-slate-800/60 cursor-pointer hover:bg-slate-100 dark:hover:bg-slate-800" onClick={() => { setDrillDown(null); navigate('/laboratory') }}>
+                  <div className="w-8 h-8 rounded-full bg-gradient-to-br from-pink-500 to-fuchsia-600 flex items-center justify-center text-white shrink-0"><FlaskConical size={14} /></div>
+                  <div className="min-w-0 flex-1">
+                    <p className="text-sm font-semibold text-slate-800 dark:text-slate-100 truncate">{o.work_type || 'کار لابراتوار'}</p>
+                    <p className="text-[11px] text-slate-400">{o.deadline ? toJalaliStringPretty(o.deadline) : 'بدون موعد'}</p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )
+        )}
+        <button
+          onClick={() => {
+            const path = drillDown === 'patients' ? '/patients' : drillDown === 'appointments' ? '/appointments' : drillDown === 'revenue' ? '/billing' : '/laboratory'
+            setDrillDown(null)
+            navigate(path)
+          }}
+          className="w-full mt-3 py-2.5 rounded-xl bg-primary-50 dark:bg-primary-900/20 text-primary-700 dark:text-primary-400 text-sm font-bold hover:bg-primary-100 dark:hover:bg-primary-900/40 transition-all-smooth"
+        >
+          مشاهده همه
+        </button>
+      </Modal>
+
+      {/* ═══ Notification Center ═══════════════════════════════════════ */}
+      <Modal open={notifCenterOpen} onClose={() => setNotifCenterOpen(false)} size="md" title="مرکز اعلان‌ها">
+        {totalNotifCount === 0 ? (
+          <p className="text-sm text-slate-400 text-center py-6">فعلاً هیچ هشداری نداری 🎉</p>
+        ) : (
+          <div className="space-y-2">
+            {smartReminders.birthday.length > 0 && (
+              <button onClick={() => { setNotifCenterOpen(false); navigate('/patients') }} className="w-full flex items-center gap-3 p-3 rounded-xl bg-pink-50 dark:bg-pink-900/20 text-right hover:bg-pink-100 dark:hover:bg-pink-900/40 transition-all-smooth">
+                <span className="text-lg">🎂</span>
+                <span className="flex-1 text-sm font-semibold text-pink-700 dark:text-pink-300">تولد امروز</span>
+                <Badge color="error">{toPersianDigits(smartReminders.birthday.length)}</Badge>
+              </button>
+            )}
+            {smartReminders.debtor.length > 0 && (
+              <button onClick={() => { setNotifCenterOpen(false); navigate('/billing') }} className="w-full flex items-center gap-3 p-3 rounded-xl bg-error-50 dark:bg-error-900/20 text-right hover:bg-error-100 dark:hover:bg-error-900/40 transition-all-smooth">
+                <span className="text-lg">💰</span>
+                <span className="flex-1 text-sm font-semibold text-error-700 dark:text-error-300">بدهکاران</span>
+                <Badge color="error">{toPersianDigits(smartReminders.debtor.length)}</Badge>
+              </button>
+            )}
+            {smartReminders.lapsed.length > 0 && (
+              <button onClick={() => { setNotifCenterOpen(false); navigate('/patients') }} className="w-full flex items-center gap-3 p-3 rounded-xl bg-amber-50 dark:bg-amber-900/20 text-right hover:bg-amber-100 dark:hover:bg-amber-900/40 transition-all-smooth">
+                <span className="text-lg">⏰</span>
+                <span className="flex-1 text-sm font-semibold text-amber-700 dark:text-amber-300">مراجعه‌نکرده‌ها</span>
+                <Badge color="warning">{toPersianDigits(smartReminders.lapsed.length)}</Badge>
+              </button>
+            )}
+            {smartReminders.installment_due.length > 0 && (
+              <button onClick={() => { setNotifCenterOpen(false); navigate('/billing') }} className="w-full flex items-center gap-3 p-3 rounded-xl bg-violet-50 dark:bg-violet-900/20 text-right hover:bg-violet-100 dark:hover:bg-violet-900/40 transition-all-smooth">
+                <span className="text-lg">📅</span>
+                <span className="flex-1 text-sm font-semibold text-violet-700 dark:text-violet-300">اقساط سررسید</span>
+                <Badge color="secondary">{toPersianDigits(smartReminders.installment_due.length)}</Badge>
+              </button>
+            )}
+            {lowInventoryCount > 0 && (
+              <button onClick={() => { setNotifCenterOpen(false); navigate('/inventory') }} className="w-full flex items-center gap-3 p-3 rounded-xl bg-orange-50 dark:bg-orange-900/20 text-right hover:bg-orange-100 dark:hover:bg-orange-900/40 transition-all-smooth">
+                <Package size={18} className="text-orange-600 dark:text-orange-400" />
+                <span className="flex-1 text-sm font-semibold text-orange-700 dark:text-orange-300">موجودی رو به اتمام</span>
+                <Badge color="warning">{toPersianDigits(lowInventoryCount)}</Badge>
+              </button>
+            )}
+            {overdueLabCount > 0 && (
+              <button onClick={() => { setNotifCenterOpen(false); navigate('/laboratory') }} className="w-full flex items-center gap-3 p-3 rounded-xl bg-fuchsia-50 dark:bg-fuchsia-900/20 text-right hover:bg-fuchsia-100 dark:hover:bg-fuchsia-900/40 transition-all-smooth">
+                <FlaskConical size={18} className="text-fuchsia-600 dark:text-fuchsia-400" />
+                <span className="flex-1 text-sm font-semibold text-fuchsia-700 dark:text-fuchsia-300">سفارش‌های عقب‌افتاده لابراتوار</span>
+                <Badge color="error">{toPersianDigits(overdueLabCount)}</Badge>
+              </button>
+            )}
+            {waitingListCount > 0 && (
+              <button onClick={() => { setNotifCenterOpen(false); navigate('/waiting-list') }} className="w-full flex items-center gap-3 p-3 rounded-xl bg-sky-50 dark:bg-sky-900/20 text-right hover:bg-sky-100 dark:hover:bg-sky-900/40 transition-all-smooth">
+                <Clock size={18} className="text-sky-600 dark:text-sky-400" />
+                <span className="flex-1 text-sm font-semibold text-sky-700 dark:text-sky-300">لیست انتظار</span>
+                <Badge color="primary">{toPersianDigits(waitingListCount)}</Badge>
+              </button>
+            )}
+          </div>
+        )}
+      </Modal>
     </div>
     </ErrorBoundary>
   )
