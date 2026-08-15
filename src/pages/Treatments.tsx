@@ -9,11 +9,11 @@ import { BarChart, Bar, XAxis, YAxis, Tooltip as RTooltip, ResponsiveContainer, 
 import {
   fetchEncounters, fetchTreatments, fetchProcedures, fetchPatients, fetchDoctors,
   fetchLabs, fetchToothRecords, createEncounter, updateEncounter, createTreatment,
-  updateTreatment, deleteTreatment, deleteEncounter, createLabOrder,
+  updateTreatment, deleteTreatment, deleteEncounter, createLabOrder, fetchLabOrders, updateLabOrder,
   createToothRecord, updateToothRecord,
 } from '../lib/api'
 import { toJalaliString, toJalaliStringPretty, formatCurrency, formatNumber, toPersianDigits } from '../lib/persianDate'
-import { Encounter, EncounterWithRelations, Treatment, Procedure, Patient, Doctor, Laboratory, ToothRecord } from '../types'
+import { Encounter, EncounterWithRelations, Treatment, Procedure, Patient, Doctor, Laboratory, ToothRecord, LabOrder } from '../types'
 import { Card, Button, Badge, Spinner, EmptyState, Tabs, Input, Select, Textarea, Modal, Wizard, showToast } from '../components/ui'
 import { ModuleHeader, ModuleStatCard, ReorderableStatGrid } from '../components/ModuleHeader'
 import { useConfirmAction } from '../components/ConfirmAction'
@@ -103,6 +103,7 @@ export default function Treatments() {
   const [patients, setPatients] = useState<Patient[]>([])
   const [doctors, setDoctors] = useState<Doctor[]>([])
   const [labs, setLabs] = useState<Laboratory[]>([])
+  const [labOrders, setLabOrders] = useState<LabOrder[]>([])
   const [toothRecords, setToothRecords] = useState<ToothRecord[]>([])
   const [loading, setLoading] = useState(true)
 
@@ -151,9 +152,9 @@ export default function Treatments() {
   const loadData = useCallback(async () => {
     setLoading(true)
     try {
-      const [encs, trets, procs, pats, docs, labsList] = await Promise.all([
+      const [encs, trets, procs, pats, docs, labsList, labOrdersList] = await Promise.all([
         fetchEncounters(), fetchTreatments(), fetchProcedures(),
-        fetchPatients(), fetchDoctors(), fetchLabs(),
+        fetchPatients(), fetchDoctors(), fetchLabs(), fetchLabOrders(),
       ])
       setEncounters(encs)
       setTreatments(trets as Treatment[])
@@ -161,6 +162,7 @@ export default function Treatments() {
       setPatients(pats)
       setDoctors(docs)
       setLabs(labsList)
+      setLabOrders(labOrdersList as unknown as LabOrder[])
     } catch (err) {
       console.error('Error loading treatments:', err)
       showToast('error', 'خطا در بارگذاری درمان‌ها')
@@ -479,15 +481,30 @@ export default function Treatments() {
 
   const handleDeleteTreatment = (t: Treatment) => {
     h.warning()
+    // A treatment with has_lab created a real lab order — deleting the
+    // treatment without touching that order leaves it orphaned: the lab
+    // could keep working on (and billing for) physical work for a
+    // treatment that no longer exists in the clinical record. Offer to
+    // cancel it in the same step rather than leaving a ghost order.
+    const linkedOrder = t.lab_id
+      ? labOrders.find((o) => o.encounter_id === t.encounter_id && o.lab_id === t.lab_id && o.status !== 'cancelled' && o.status !== 'delivered')
+      : null
+
     confirmAction({
       type: 'delete', title: 'حذف درمان', warning: 'این عملیات قابل بازگشت نیست',
       fields: [
         { label: 'رویه', value: t.procedure_name || '-', highlight: true },
         { label: 'دندان', value: t.tooth_number ? toPersianDigits(t.tooth_number) : '-' },
+        ...(linkedOrder ? [{ label: 'سفارش لابراتوار مرتبط', value: 'همزمان لغو می‌شود تا کار روی آن ادامه پیدا نکند' }] : []),
       ],
       confirmLabel: 'حذف قطعی',
       onConfirm: async () => {
-        try { await deleteTreatment(t.id); showToast('success', 'درمان حذف شد'); await loadData() }
+        try {
+          await deleteTreatment(t.id)
+          if (linkedOrder) await updateLabOrder(linkedOrder.id, { status: 'cancelled' })
+          showToast('success', linkedOrder ? 'درمان حذف و سفارش لابراتوار مرتبط لغو شد' : 'درمان حذف شد')
+          await loadData()
+        }
         catch { showToast('error', 'خطا در حذف') }
       },
     })
