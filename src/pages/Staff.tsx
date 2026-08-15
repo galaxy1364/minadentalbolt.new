@@ -2,10 +2,10 @@
 import { useState, useEffect, useCallback, useMemo } from 'react'
 import { Users, Search, Plus, Phone, Mail, Calendar, DollarSign, Smile, Briefcase, Edit2, Trash2, Stethoscope, Calculator, Award, TrendingUp, Percent, UserCheck, ChevronDown, ChevronUp, Shield } from 'lucide-react'
 import { PieChart, Pie, Cell, Tooltip as RTooltip, ResponsiveContainer } from 'recharts'
-import { fetchStaff, createStaff, updateStaff, deleteStaff, fetchEncounters, fetchLabOrders } from '../lib/api'
+import { fetchStaff, createStaff, updateStaff, deleteStaff, fetchEncounters, fetchLabOrders, fetchTreatments } from '../lib/api'
 import { CLINIC_ID, supabase } from '../lib/supabase'
 import { toJalaliString, formatCurrency, formatNumber, toPersianDigits } from '../lib/persianDate'
-import type { Staff as StaffType, StaffInput, EncounterWithRelations, LabOrderWithRelations } from '../types'
+import type { Staff as StaffType, StaffInput, EncounterWithRelations, LabOrderWithRelations, Treatment } from '../types'
 import { Modal, Wizard, Card, Button, Input, Select, Badge, Spinner, EmptyState, showToast } from '../components/ui'
 import { ModuleHeader, ModuleStatCard } from '../components/ModuleHeader'
 import { ROLES } from '../lib/permissions'
@@ -58,6 +58,7 @@ export default function Staff() {
   const [staff, setStaff] = useState<StaffType[]>([])
   const [encounters, setEncounters] = useState<EncounterWithRelations[]>([])
   const [labOrders, setLabOrders] = useState<LabOrderWithRelations[]>([])
+  const [treatments, setTreatments] = useState<Treatment[]>([])
   const [loading, setLoading] = useState(true)
   const [searchQuery, setSearchQuery] = useState('')
   const [filterRole, setFilterRole] = useState('')
@@ -91,14 +92,16 @@ export default function Staff() {
   const loadData = useCallback(async () => {
     setLoading(true)
     try {
-      const [s, enc, labs] = await Promise.all([
+      const [s, enc, labs, trts] = await Promise.all([
         fetchStaff(),
         fetchEncounters().catch(() => []),
         fetchLabOrders().catch(() => []),
+        fetchTreatments().catch(() => []),
       ])
       setStaff(s)
       setEncounters(enc)
       setLabOrders(labs)
+      setTreatments(trts)
     } catch (err) {
       console.error('Error loading staff:', err)
       showToast('error', 'خطا در بارگذاری پرسنل')
@@ -160,8 +163,14 @@ export default function Staff() {
       const results: ShareResult[] = []
 
       for (const doc of doctors) {
-        const docEncounters = encounters.filter((e) => e.doctor_id === doc.id || e.doctor?.id === doc.id)
-        const totalProduction = docEncounters.reduce((sum, e) => sum + (e.total_amount || 0), 0)
+        // Production is the sum of actual billable treatment line-items
+        // performed by this doctor — not encounters.total_amount, which
+        // is a cached rollup that can drift out of sync with the real
+        // itemized work (same class of bug fixed for patient balances
+        // in src/lib/finance.ts). Real money paid to a doctor must be
+        // based on the real ledger, not a stale summary field.
+        const docTreatments = treatments.filter((t) => t.doctor_id === doc.id)
+        const totalProduction = docTreatments.reduce((sum, t) => sum + (t.total_price || 0), 0)
 
         const docLabOrders = labOrders.filter((l) => l.doctor_id === doc.id || l.doctor?.id === doc.id)
         const totalLabCost = docLabOrders.reduce((sum, l) => sum + (l.cost || 0), 0)
@@ -201,7 +210,7 @@ export default function Staff() {
     } finally {
       setCalculating(false)
     }
-  }, [doctors, encounters, labOrders])
+  }, [doctors, treatments, labOrders])
 
   // ── Modal Handlers ─────────────────────────────────────────────
   const openCreateModal = () => {
