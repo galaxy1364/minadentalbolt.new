@@ -2,9 +2,9 @@
 import { useState, useEffect, useCallback, useMemo } from 'react'
 import { Users, Search, Plus, Phone, Mail, Calendar, DollarSign, Smile, Briefcase, Edit2, Trash2, Stethoscope, Calculator, Award, TrendingUp, Percent, UserCheck, ChevronDown, ChevronUp, Shield } from 'lucide-react'
 import { PieChart, Pie, Cell, Tooltip as RTooltip, ResponsiveContainer } from 'recharts'
-import { fetchStaff, createStaff, updateStaff, deleteStaff, fetchEncounters, fetchLabOrders, fetchTreatments } from '../lib/api'
+import { fetchStaff, createStaff, updateStaff, deleteStaff, fetchEncounters, fetchLabOrders, fetchTreatments, createExpense } from '../lib/api'
 import { CLINIC_ID, supabase } from '../lib/supabase'
-import { toJalaliString, formatCurrency, formatNumber, toPersianDigits } from '../lib/persianDate'
+import { toJalaliString, toJalaliStringPretty, formatCurrency, formatNumber, toPersianDigits } from '../lib/persianDate'
 import type { Staff as StaffType, StaffInput, EncounterWithRelations, LabOrderWithRelations, Treatment } from '../types'
 import { Modal, Wizard, Card, Button, Input, Select, Badge, Spinner, EmptyState, showToast } from '../components/ui'
 import { ModuleHeader, ModuleStatCard, ReorderableStatGrid } from '../components/ModuleHeader'
@@ -69,6 +69,10 @@ export default function Staff() {
   const [showSharePanel, setShowSharePanel] = useState(false)
   const [shareResults, setShareResults] = useState<ShareResult[]>([])
   const [calculating, setCalculating] = useState(false)
+  const monthStart = () => { const d = new Date(); return new Date(d.getFullYear(), d.getMonth(), 1).toISOString().slice(0, 10) }
+  const todayStr = () => new Date().toISOString().slice(0, 10)
+  const [sharePeriodStart, setSharePeriodStart] = useState(monthStart())
+  const [sharePeriodEnd, setSharePeriodEnd] = useState(todayStr())
 
   const [formData, setFormData] = useState({
     full_name: '',
@@ -169,10 +173,16 @@ export default function Staff() {
         // itemized work (same class of bug fixed for patient balances
         // in src/lib/finance.ts). Real money paid to a doctor must be
         // based on the real ledger, not a stale summary field.
-        const docTreatments = treatments.filter((t) => t.doctor_id === doc.id)
+        //
+        // Filtered to the selected settlement period — without this, the
+        // calculator summed a doctor's ENTIRE history every time, which
+        // is useless for actually running monthly payroll (you can't
+        // tell how much is owed for this month specifically).
+        const inPeriod = (dateStr: string) => dateStr >= sharePeriodStart && dateStr <= `${sharePeriodEnd}T23:59:59`
+        const docTreatments = treatments.filter((t) => t.doctor_id === doc.id && inPeriod(t.created_at))
         const totalProduction = docTreatments.reduce((sum, t) => sum + (t.total_price || 0), 0)
 
-        const docLabOrders = labOrders.filter((l) => l.doctor_id === doc.id || l.doctor?.id === doc.id)
+        const docLabOrders = labOrders.filter((l) => (l.doctor_id === doc.id || l.doctor?.id === doc.id) && inPeriod(l.created_at))
         const totalLabCost = docLabOrders.reduce((sum, l) => sum + (l.cost || 0), 0)
 
         const netProduction = totalProduction - totalLabCost
@@ -210,7 +220,39 @@ export default function Staff() {
     } finally {
       setCalculating(false)
     }
-  }, [doctors, treatments, labOrders])
+  }, [doctors, treatments, labOrders, sharePeriodStart, sharePeriodEnd])
+
+  // Records that a doctor's calculated share for this period was
+  // actually paid out — creates a real Expense record (clinic paying
+  // the doctor IS a clinic expense) so it flows into the same
+  // Expenses/reports the rest of the app already reads from, instead of
+  // this panel being a number with no paper trail behind it.
+  const handleSettleShare = (r: ShareResult) => {
+    h.tap()
+    confirmAction({
+      type: 'create',
+      title: 'ثبت تسویه سهم پزشک',
+      fields: [
+        { label: 'پزشک', value: r.doctorName, highlight: true },
+        { label: 'بازه', value: `${toJalaliStringPretty(sharePeriodStart)} تا ${toJalaliStringPretty(sharePeriodEnd)}` },
+        { label: 'مبلغ سهم', value: `${formatCurrency(r.shareAmount)} ت`, highlight: true },
+      ],
+      confirmLabel: 'ثبت پرداخت',
+      onConfirm: async () => {
+        try {
+          await createExpense({
+            clinic_id: CLINIC_ID,
+            category: 'سهم پزشک',
+            amount: r.shareAmount,
+            date: new Date().toISOString().slice(0, 10),
+            payment_method: 'cash',
+            description: `تسویه سهم ${r.doctorName} — بازه ${toJalaliStringPretty(sharePeriodStart)} تا ${toJalaliStringPretty(sharePeriodEnd)}`,
+          } as any)
+          showToast('success', 'تسویه ثبت شد و در هزینه‌های کلینیک لحاظ شد')
+        } catch { showToast('error', 'خطا در ثبت تسویه') }
+      },
+    })
+  }
 
   // ── Modal Handlers ─────────────────────────────────────────────
   const openCreateModal = () => {
@@ -457,6 +499,15 @@ export default function Staff() {
           </div>
         </div>
 
+        {showSharePanel && (
+          <div className="flex items-center gap-2 mb-3">
+            <label className="text-[11px] font-medium text-slate-500 shrink-0">بازه:</label>
+            <input type="date" value={sharePeriodStart} onChange={(e) => setSharePeriodStart(e.target.value)} className="flex-1 px-2 py-1.5 rounded-lg border border-slate-200 text-xs" />
+            <span className="text-slate-400 text-xs">تا</span>
+            <input type="date" value={sharePeriodEnd} onChange={(e) => setSharePeriodEnd(e.target.value)} className="flex-1 px-2 py-1.5 rounded-lg border border-slate-200 text-xs" />
+          </div>
+        )}
+
         <div className="bg-primary-50/50 rounded-xl p-3 mb-3 text-xs text-slate-600 leading-relaxed">
           <strong className="text-primary-700">فرمول محاسبه:</strong> سود خالص = کل کارکرد پزشک - کل هزینه لابراتوار آن پزشک
           <br />
@@ -498,6 +549,7 @@ export default function Staff() {
                     <th className="text-right py-2 px-2">سود خالص</th>
                     <th className="text-right py-2 px-2">فرمول</th>
                     <th className="text-right py-2 px-2">سهم پزشک</th>
+                    <th className="text-right py-2 px-2"></th>
                   </tr>
                 </thead>
                 <tbody>
@@ -513,6 +565,11 @@ export default function Staff() {
                          'مبلغ ثابت'}
                       </td>
                       <td className="py-2 px-2 font-bold text-primary-700">{formatCurrency(r.shareAmount)} ت</td>
+                      <td className="py-2 px-2">
+                        <Button size="sm" variant="secondary" onClick={() => handleSettleShare(r)} disabled={r.shareAmount <= 0}>
+                          ثبت تسویه
+                        </Button>
+                      </td>
                     </tr>
                   ))}
                 </tbody>
