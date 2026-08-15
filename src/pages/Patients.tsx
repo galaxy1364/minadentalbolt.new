@@ -236,10 +236,35 @@ export default function Patients() {
   // ── Preview + Confirm for delete ──
   const handleDelete = (patient: Patient) => {
     const fin = patientFinances.get(patient.id) || { balance: 0, paid: 0, totalCost: 0 }
+    const hasHistory = fin.totalCost > 0 || fin.paid > 0
+
+    if (hasHistory) {
+      // A patient with any financial/treatment history must never be
+      // permanently deleted — that would destroy accounting/legal
+      // records with no way back. Deactivating (hiding from active
+      // lists, keeping all history intact) is the only safe option here.
+      confirmAction({
+        type: 'status',
+        title: 'این بیمار قابل حذف نیست',
+        warning: `این بیمار ${formatCurrency(fin.totalCost)} هزینه‌ی درمان و ${formatCurrency(fin.paid)} پرداخت ثبت‌شده دارد. برای حفظ سوابق مالی/قانونی، حذف کامل امکان‌پذیر نیست.`,
+        fields: [
+          { label: 'نام', value: `${patient.first_name} ${patient.last_name}`, icon: <User size={16} />, highlight: true },
+          { label: 'پیشنهاد', value: 'غیرفعال کردن به‌جای حذف', icon: <Shield size={16} /> },
+        ],
+        confirmLabel: 'غیرفعال کردن بیمار',
+        onConfirm: async () => {
+          await updatePatient(patient.id, { is_active: false })
+          showToast('success', 'بیمار غیرفعال شد — سوابق حفظ شد')
+          await loadData()
+        },
+      })
+      return
+    }
+
     confirmAction({
       type: 'delete',
       title: 'حذف بیمار',
-      warning: fin.totalCost > 0 ? `این بیمار ${formatCurrency(fin.totalCost)} هزینه درمان و ${formatCurrency(fin.paid)} پرداخت ثبت شده دارد` : 'این عملیات قابل بازگشت نیست',
+      warning: 'این بیمار هیچ سابقه‌ی مالی/درمانی ندارد — این عملیات قابل بازگشت نیست',
       fields: [
         { label: 'نام', value: `${patient.first_name} ${patient.last_name}`, icon: <User size={16} />, highlight: true },
         { label: 'شماره پرونده', value: patient.file_number || '—', icon: <FileText size={16} /> },

@@ -1,6 +1,6 @@
 // Staff.tsx - Persian RTL Dental Clinic Staff Management with Doctor Revenue Sharing
 import { useState, useEffect, useCallback, useMemo } from 'react'
-import { Users, Search, Plus, Phone, Mail, Calendar, DollarSign, Smile, Briefcase, Edit2, Trash2, Stethoscope, Calculator, Award, TrendingUp, Percent, UserCheck, ChevronDown, ChevronUp } from 'lucide-react'
+import { Users, Search, Plus, Phone, Mail, Calendar, DollarSign, Smile, Briefcase, Edit2, Trash2, Stethoscope, Calculator, Award, TrendingUp, Percent, UserCheck, ChevronDown, ChevronUp, Shield } from 'lucide-react'
 import { PieChart, Pie, Cell, Tooltip as RTooltip, ResponsiveContainer } from 'recharts'
 import { fetchStaff, createStaff, updateStaff, deleteStaff, fetchEncounters, fetchLabOrders } from '../lib/api'
 import { CLINIC_ID, supabase } from '../lib/supabase'
@@ -340,6 +340,32 @@ export default function Staff() {
 
   const handleDelete = (s: StaffType) => {
     h.tap()
+    const hasHistory = encounters.some((e) => e.doctor_id === s.id) || labOrders.some((l) => l.doctor_id === s.id)
+
+    if (hasHistory) {
+      // Anyone (doctor or otherwise) with treatment/encounter/lab history
+      // must never be hard-deleted — that would either corrupt every
+      // record referencing them or get permanently stuck in the failed
+      // sync queue against a database foreign-key constraint. Deactivate
+      // instead, which keeps every historical record intact and correct.
+      confirmAction({
+        type: 'status',
+        title: 'این پرسنل قابل حذف نیست',
+        warning: 'این شخص سابقه‌ی ویزیت یا سفارش لابراتوار دارد — برای حفظ صحت سوابق درمانی، حذف کامل امکان‌پذیر نیست.',
+        fields: [
+          { label: 'نام', value: s.full_name, highlight: true },
+          { label: 'پیشنهاد', value: 'غیرفعال کردن به‌جای حذف', icon: <Shield size={16} /> },
+        ],
+        confirmLabel: 'غیرفعال کردن پرسنل',
+        onConfirm: async () => {
+          await updateStaff(s.id, { is_active: false })
+          showToast('success', 'پرسنل غیرفعال شد — سوابق حفظ شد')
+          loadData()
+        },
+      })
+      return
+    }
+
     confirmAction({
       type: 'delete',
       title: 'حذف پرسنل',
