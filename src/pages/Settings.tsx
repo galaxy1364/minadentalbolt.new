@@ -4,7 +4,7 @@ import {
   Settings as SettingsIcon, Building2, Hash, MessageSquare, Package, Save, Smile,
   Cloud, Download, Upload, Vibrate, Volume2, Bell, Database, RefreshCw, Check,
   Smartphone, Shield, AlertTriangle, Eye, ChevronRight, Wifi, Plus, Edit2, Trash2,
-  Stethoscope, Wrench, ListOrdered, Tag, Copy, CheckCircle2,
+  Stethoscope, Wrench, ListOrdered, Tag, Copy, CheckCircle2, History,
 } from 'lucide-react'
 import {
   fetchSmsTemplates, fetchTreatmentPackages, fetchDoctors, fetchUnits, fetchProcedures,
@@ -28,6 +28,9 @@ import { useConfirmAction } from '../components/ConfirmAction'
 import { h, setHapticsEnabled, setSoundEnabled, getHapticsEnabled, getSoundEnabled } from '../lib/haptics'
 import { CLINIC_ID } from '../lib/supabase'
 import { getErrorLog, clearErrorLog, LoggedError } from '../lib/errorLog'
+import { fetchAuditLog, clearAuditLog } from '../lib/auditLog'
+import { listBackupSnapshots, restoreFromSnapshot } from '../lib/autoBackup'
+import type { AuditLogEntry, BackupSnapshot } from '../lib/db'
 
 const smsTemplateTypes: { value: string; label: string }[] = [
   { value: 'appointment_reminder', label: 'یادآوری نوبت' },
@@ -408,6 +411,7 @@ export default function Settings() {
           { key: 'packages', label: 'پکیج درمان', icon: <Package size={16} /> },
           { key: 'categories', label: 'دسته‌بندی انبار', icon: <Tag size={16} /> },
           { key: 'errors', label: 'گزارش خطاها', icon: <AlertTriangle size={16} /> },
+          { key: 'audit', label: 'گزارش فعالیت‌ها', icon: <History size={16} /> },
         ]}
         active={activeTab}
         onChange={setActiveTab}
@@ -532,11 +536,15 @@ export default function Settings() {
               </label>
             </div>
           </Card>
+          <AutoBackupCard />
         </div>
       )}
 
       {/* Error Log Tab */}
       {activeTab === 'errors' && <ErrorLogTab />}
+
+      {/* Audit Log Tab */}
+      {activeTab === 'audit' && <AuditLogTab />}
 
       {/* Haptics Tab */}
       {activeTab === 'haptics' && (
@@ -783,6 +791,107 @@ function ErrorLogTab() {
               ))}
             </div>
           </>
+        )}
+      </Card>
+    </div>
+  )
+}
+
+// ============================================================================
+// Auto Backup Card — shows the automatic daily on-device snapshots
+// ============================================================================
+
+function AutoBackupCard() {
+  const [snapshots, setSnapshots] = useState<BackupSnapshot[]>([])
+  const [loading, setLoading] = useState(true)
+  const [restoring, setRestoring] = useState<number | null>(null)
+
+  const load = () => { listBackupSnapshots().then((s) => { setSnapshots(s); setLoading(false) }) }
+  useEffect(() => { load() }, [])
+
+  const handleRestoreSnapshot = (snap: BackupSnapshot) => {
+    if (!window.confirm(`بازگردانی به نسخه‌ی ${toJalaliStringPretty(snap.created_at)}؟ داده‌های فعلی جایگزین می‌شوند.`)) return
+    setRestoring(snap.id ?? -1)
+    restoreFromSnapshot(snap)
+      .then(() => { showToast('success', 'بازیابی انجام شد — صفحه در حال بارگذاری مجدد است'); setTimeout(() => window.location.reload(), 1200) })
+      .catch(() => showToast('error', 'خطا در بازیابی'))
+      .finally(() => setRestoring(null))
+  }
+
+  return (
+    <Card className="p-5">
+      <h2 className="text-base font-bold text-slate-800 dark:text-slate-100 mb-1 flex items-center gap-2">
+        <RefreshCw size={18} className="text-primary-600" /> پشتیبان خودکار روزانه
+      </h2>
+      <p className="text-xs text-slate-500 dark:text-slate-400 mb-4">
+        هر روز که برنامه باز می‌شود، یک نسخه‌ی کامل از داده‌ها به‌صورت خودکار داخل همین دستگاه ذخیره می‌شود (۷ روز آخر نگه داشته می‌شود).
+      </p>
+      {loading ? (
+        <Spinner size={20} />
+      ) : snapshots.length === 0 ? (
+        <p className="text-xs text-slate-400 text-center py-4">هنوز نسخه‌ی خودکاری ساخته نشده — فردا که برنامه باز شود، اولین نسخه ساخته می‌شود.</p>
+      ) : (
+        <div className="space-y-2">
+          {snapshots.map((snap) => (
+            <div key={snap.id} className="flex items-center justify-between gap-2 p-3 rounded-xl bg-slate-50 dark:bg-slate-800/60">
+              <div className="min-w-0">
+                <p className="text-sm font-semibold text-slate-700 dark:text-slate-200">{toJalaliStringPretty(snap.created_at)}</p>
+                <p className="text-[11px] text-slate-400">{toPersianDigits(snap.record_count)} رکورد</p>
+              </div>
+              <Button size="sm" variant="secondary" onClick={() => handleRestoreSnapshot(snap)} disabled={restoring !== null}>
+                {restoring === snap.id ? <Spinner size={14} /> : 'بازیابی'}
+              </Button>
+            </div>
+          ))}
+        </div>
+      )}
+    </Card>
+  )
+}
+
+// ============================================================================
+// Audit Log Tab — who changed what, when
+// ============================================================================
+
+function AuditLogTab() {
+  const [entries, setEntries] = useState<AuditLogEntry[]>([])
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => { fetchAuditLog(150).then((e) => { setEntries(e); setLoading(false) }) }, [])
+
+  const handleClear = () => {
+    if (!window.confirm('گزارش فعالیت‌ها پاک شود؟')) return
+    clearAuditLog().then(() => { setEntries([]); showToast('success', 'گزارش فعالیت‌ها پاک شد') })
+  }
+
+  const opColor: Record<string, string> = { insert: 'success', update: 'primary', delete: 'error' }
+
+  return (
+    <div className="space-y-4">
+      <Card className="p-5">
+        <div className="flex items-center justify-between mb-1">
+          <h2 className="text-base font-bold text-slate-800 dark:text-slate-100 flex items-center gap-2">
+            <History size={18} className="text-primary-600" /> گزارش فعالیت‌ها
+          </h2>
+          {entries.length > 0 && <Button size="sm" variant="danger" onClick={handleClear}><Trash2 size={14} className="inline ml-1" /> پاک کردن</Button>}
+        </div>
+        <p className="text-xs text-slate-500 dark:text-slate-400 mb-4">
+          هر ثبت، ویرایش یا حذف در برنامه اینجا با زمان و کاربر انجام‌دهنده ثبت می‌شود. تا وقتی سیستم ورود فعال نشده، همه‌چیز به نام «کاربر سیستم» ثبت می‌شود.
+        </p>
+        {loading ? (
+          <Spinner size={20} />
+        ) : entries.length === 0 ? (
+          <p className="text-xs text-slate-400 text-center py-6">هنوز فعالیتی ثبت نشده</p>
+        ) : (
+          <div className="space-y-1.5 max-h-[500px] overflow-y-auto pr-1 -mr-1">
+            {entries.map((e) => (
+              <div key={e.id} className="flex items-center gap-3 p-2.5 rounded-xl bg-slate-50 dark:bg-slate-800/60">
+                <Badge color={opColor[e.operation] || 'slate'}>{e.summary}</Badge>
+                <span className="text-xs text-slate-500 dark:text-slate-400 flex-1 truncate">{e.actor_name}</span>
+                <span className="text-[10px] text-slate-400">{toJalaliStringPretty(e.created_at)}</span>
+              </div>
+            ))}
+          </div>
         )}
       </Card>
     </div>

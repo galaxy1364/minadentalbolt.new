@@ -1,6 +1,7 @@
 import { createContext, useContext, useEffect, useState, createElement, type ReactNode } from 'react'
 import type { Session, User } from '@supabase/supabase-js'
 import { supabase } from './supabase'
+import { currentActor } from './auditLog'
 
 export interface StaffProfile {
   id: string
@@ -27,8 +28,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   async function loadProfile(userId: string) {
     const { data, error } = await supabase.from('users').select('id, clinic_id, full_name, role').eq('id', userId).maybeSingle()
-    if (!error && data) setProfile(data as StaffProfile)
-    else setProfile(null)
+    if (!error && data) {
+      setProfile(data as StaffProfile)
+      currentActor.name = (data as StaffProfile).full_name
+      currentActor.role = (data as StaffProfile).role
+    } else {
+      setProfile(null)
+      currentActor.name = null
+      currentActor.role = null
+    }
   }
 
   useEffect(() => {
@@ -57,6 +65,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   async function signOut() {
     await supabase.auth.signOut()
+    currentActor.name = null
+    currentActor.role = null
   }
 
   return createElement(AuthContext.Provider, {

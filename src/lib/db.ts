@@ -23,6 +23,25 @@ export interface SyncMeta {
   last_sync_at: string
 }
 
+export interface AuditLogEntry {
+  id?: number
+  table_name: string
+  operation: 'insert' | 'update' | 'delete'
+  record_id: string
+  summary: string
+  actor_name: string
+  actor_role: string | null
+  created_at: string
+}
+
+export interface BackupSnapshot {
+  id?: number
+  date: string // YYYY-MM-DD, one per day
+  created_at: string
+  record_count: number
+  data: string // JSON-stringified { [table]: rows[] }
+}
+
 class MinadentDB extends Dexie {
   patients!: Table<Patient, string>
   doctors!: Table<Doctor, string>
@@ -57,6 +76,8 @@ class MinadentDB extends Dexie {
   sms_templates!: Table<SmsTemplate, string>
   sync_queue!: Table<SyncQueueEntry, number>
   sync_meta!: Table<SyncMeta, string>
+  audit_log!: Table<AuditLogEntry, number>
+  backup_snapshots!: Table<BackupSnapshot, number>
 
   constructor() {
     super('minadent')
@@ -94,6 +115,13 @@ class MinadentDB extends Dexie {
       sms_templates: 'id, clinic_id, type, is_active',
       sync_queue: '++id, table_name, operation, record_id, created_at, retry_count',
       sync_meta: 'table_name, last_sync_at',
+    })
+    // v2: local-only audit trail + automatic daily backup snapshots.
+    // Neither table is in TABLE_NAMES, so neither is pushed to Supabase —
+    // both stay purely on-device for now.
+    this.version(2).stores({
+      audit_log: '++id, table_name, operation, record_id, created_at',
+      backup_snapshots: '++id, date, created_at',
     })
   }
 }

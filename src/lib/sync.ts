@@ -1,5 +1,6 @@
 import { supabase, CLINIC_ID } from './supabase'
 import { db, TABLE_NAMES, TableName, SyncQueueEntry } from './db'
+import { logAudit } from './auditLog'
 
 export type SyncStatus = 'idle' | 'syncing' | 'online' | 'offline' | 'error'
 
@@ -147,6 +148,7 @@ export async function queueOperation(
   }
   await db.sync_queue.add(entry)
   await refreshPendingCount()
+  logAudit(tableName, operation, recordId)
   if (typeof navigator !== 'undefined' && navigator.onLine) {
     enqueueSync(2000)
   }
