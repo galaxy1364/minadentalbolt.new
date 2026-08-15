@@ -285,7 +285,7 @@ export default function Appointments() {
         title="نوبت‌دهی"
         subtitle={`${toJalaliStringPretty(todayStr)} — ${persianWeekdaysShort[getJalaliDateInfo(todayStr).weekday]}`}
         action={
-          <button onClick={() => openWizard()} aria-label="نوبت جدید" className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-white/20 backdrop-blur-sm text-white text-sm font-bold hover:bg-white/30 transition-all-smooth press-scale">
+          <button onClick={() => openWizard()} aria-label="نوبت جدید" style={{ background: 'linear-gradient(135deg, #fbbf24, #d97706)' }} className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-white text-sm font-bold hover:opacity-90 shadow-md transition-all-smooth press-scale">
             <Plus size={16} /> نوبت جدید
           </button>
         }

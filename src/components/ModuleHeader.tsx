@@ -12,20 +12,26 @@ export function ModuleHeader({ moduleKey, title, subtitle, action }: {
   const Icon = mod.icon
 
   return (
-    <div className="module-banner p-4 flex items-center justify-between gap-3">
-      <div className="flex items-center gap-3">
+    <div
+      className="relative overflow-hidden rounded-2xl p-4 flex items-center justify-between gap-3 border border-slate-100 dark:border-slate-700 bg-white dark:bg-slate-800 shadow-sm"
+    >
+      <div
+        className="absolute -top-10 -left-10 w-40 h-40 rounded-full blur-2xl pointer-events-none breathe-slow"
+        style={{ background: `radial-gradient(circle, ${mod.color}66, transparent 70%)` }}
+      />
+      <div className="relative flex items-center gap-3">
         <div
-          className="w-12 h-12 rounded-2xl flex items-center justify-center shrink-0"
-          style={{ background: 'rgba(255,255,255,0.2)', backdropFilter: 'blur(8px)' }}
+          className="w-12 h-12 rounded-2xl flex items-center justify-center shrink-0 text-white"
+          style={{ background: `linear-gradient(135deg, ${mod.gradient[0]}, ${mod.gradient[1]})` }}
         >
-          <Icon size={26} className="text-white" strokeWidth={2} />
+          <Icon size={26} strokeWidth={2} />
         </div>
         <div>
-          <h1 className="text-lg font-extrabold text-white leading-tight">{title}</h1>
-          {subtitle && <p className="text-xs text-white/80 mt-0.5">{subtitle}</p>}
+          <h1 className="text-lg font-extrabold text-slate-800 dark:text-slate-100 leading-tight">{title}</h1>
+          {subtitle && <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">{subtitle}</p>}
         </div>
       </div>
-      {action && <div className="shrink-0">{action}</div>}
+      {action && <div className="relative shrink-0">{action}</div>}
     </div>
   )
 }
@@ -41,13 +47,13 @@ export function ModuleStatCard({ moduleKey, icon, label, value }: {
 
   return (
     <div
-      className="rounded-2xl p-3.5 transition-all-smooth press-scale"
-      style={{
-        background: `linear-gradient(135deg, ${mod.colorLight}, #fff)`,
-        border: `1px solid ${mod.color}20`,
-      }}
+      className="relative overflow-hidden rounded-2xl p-3.5 border border-slate-100 dark:border-slate-700 bg-white dark:bg-slate-800 shadow-sm transition-all-smooth press-scale"
     >
-      <div className="flex items-center gap-2.5">
+      <div
+        className="absolute -top-6 -left-6 w-24 h-24 rounded-full blur-xl pointer-events-none breathe-slow"
+        style={{ background: `radial-gradient(circle, ${mod.color}55, transparent 70%)` }}
+      />
+      <div className="relative flex items-center gap-2.5">
         <div
           className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0"
           style={{ background: `linear-gradient(135deg, ${mod.gradient[0]}, ${mod.gradient[1]})`, color: '#fff' }}

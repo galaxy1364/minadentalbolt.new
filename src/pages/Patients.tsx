@@ -310,7 +310,7 @@ export default function Patients() {
         title="بیماران"
         subtitle={`${toPersianDigits(filteredPatients.length)} بیمار`}
         action={
-          <button onClick={openCreateModal} aria-label="افزودن بیمار جدید" className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-white/20 backdrop-blur-sm text-white text-sm font-bold hover:bg-white/30 transition-all-smooth press-scale">
+          <button onClick={openCreateModal} aria-label="افزودن بیمار جدید" style={{ background: 'linear-gradient(135deg, #a78bfa, #7c3aed)' }} className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-white text-sm font-bold hover:opacity-90 shadow-md transition-all-smooth press-scale">
             <Plus size={16} /> بیمار جدید
           </button>
         }
