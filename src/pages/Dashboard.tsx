@@ -1,7 +1,7 @@
 // Dashboard.tsx — World-class Enterprise Persian RTL Dental Clinic Dashboard
 // iOS 27 design • Dark mode • Time-range & doctor filters • Period comparison
 // Auto-refresh • CSV export • Activity feed • Full accessibility • Responsive
-import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
+import { useState, useEffect, useCallback, useMemo, useRef, cloneElement, isValidElement } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
   Users, Calendar, DollarSign, FlaskConical, Plus, ArrowLeft, Activity,
@@ -167,15 +167,18 @@ function Sparkline({ data, color, width = 64, height = 24 }: { data: number[]; c
 // Premium Stat Tile
 // ============================================================================
 
-type TileColor = 'teal' | 'amber' | 'emerald' | 'rose' | 'sky' | 'violet'
+type TileColor = 'violet' | 'lime' | 'sky' | 'pink' | 'amber' | 'rose'
 
-const tileThemes: Record<TileColor, { gradient: string; glow: string; text: string; sparkColor: string; iconBg: string }> = {
-  teal:    { gradient: 'from-teal-500 via-teal-600 to-cyan-700',        glow: 'shadow-teal-500/30',    text: 'text-teal-50',    sparkColor: '#5eead4', iconBg: 'bg-white/20' },
-  amber:   { gradient: 'from-amber-400 via-orange-500 to-amber-600',    glow: 'shadow-amber-500/30',   text: 'text-amber-50',   sparkColor: '#fcd34d', iconBg: 'bg-white/20' },
-  emerald: { gradient: 'from-emerald-400 via-green-500 to-emerald-700', glow: 'shadow-emerald-500/30', text: 'text-emerald-50', sparkColor: '#6ee7b7', iconBg: 'bg-white/20' },
-  rose:    { gradient: 'from-rose-400 via-red-500 to-rose-600',         glow: 'shadow-rose-500/30',    text: 'text-rose-50',    sparkColor: '#fda4af', iconBg: 'bg-white/20' },
-  sky:     { gradient: 'from-sky-400 via-blue-500 to-indigo-600',       glow: 'shadow-sky-500/30',     text: 'text-sky-50',     sparkColor: '#7dd3fc', iconBg: 'bg-white/20' },
-  violet:  { gradient: 'from-violet-400 via-purple-500 to-violet-600',  glow: 'shadow-violet-500/30',  text: 'text-violet-50',  sparkColor: '#c4b5fd', iconBg: 'bg-white/20' },
+// Soft "white-to-color" tiles (Gemini-style wash) — light base, saturated
+// color blob in the corner, dark text. Replaces the old fully-saturated
+// dark gradient tiles for a lighter, more modern look.
+const tileThemes: Record<TileColor, { blob: string; iconBg: string; text: string; sparkColor: string; ring: string }> = {
+  violet: { blob: 'from-violet-300/70 dark:from-violet-500/30', iconBg: 'bg-gradient-to-br from-violet-500 to-purple-600', text: 'text-violet-700 dark:text-violet-300', sparkColor: '#8b5cf6', ring: 'focus:ring-violet-300' },
+  lime:   { blob: 'from-lime-300/70 dark:from-lime-500/25',     iconBg: 'bg-gradient-to-br from-lime-500 to-green-600',   text: 'text-lime-700 dark:text-lime-300',   sparkColor: '#84cc16', ring: 'focus:ring-lime-300' },
+  sky:    { blob: 'from-sky-300/70 dark:from-sky-500/30',       iconBg: 'bg-gradient-to-br from-sky-500 to-blue-600',     text: 'text-sky-700 dark:text-sky-300',     sparkColor: '#0ea5e9', ring: 'focus:ring-sky-300' },
+  pink:   { blob: 'from-pink-300/70 dark:from-pink-500/30',     iconBg: 'bg-gradient-to-br from-pink-500 to-fuchsia-600', text: 'text-pink-700 dark:text-pink-300',   sparkColor: '#ec4899', ring: 'focus:ring-pink-300' },
+  amber:  { blob: 'from-amber-300/70 dark:from-amber-500/30',   iconBg: 'bg-gradient-to-br from-amber-500 to-orange-600', text: 'text-amber-700 dark:text-amber-300', sparkColor: '#f59e0b', ring: 'focus:ring-amber-300' },
+  rose:   { blob: 'from-rose-300/70 dark:from-rose-500/30',     iconBg: 'bg-gradient-to-br from-rose-500 to-red-600',     text: 'text-rose-700 dark:text-rose-300',   sparkColor: '#f43f5e', ring: 'focus:ring-rose-300' },
 }
 
 function StatTile({
@@ -199,29 +202,26 @@ function StatTile({
       onClick={() => { h.tap(); onClick?.() }}
       aria-label={ariaLabel || label}
       style={{ animationDelay: `${delay}ms` }}
-      className={`tile-in card-lift relative overflow-hidden rounded-3xl bg-gradient-to-br ${theme.gradient} ${theme.glow} shadow-lg p-5 text-right shimmer-sweep group focus:outline-none focus:ring-4 focus:ring-white/30`}
+      className={`tile-in card-lift relative overflow-hidden rounded-2xl bg-white dark:bg-slate-800 border border-slate-100 dark:border-slate-700 shadow-sm p-3 text-right group focus:outline-none focus:ring-4 ${theme.ring}`}
     >
-      <div className="absolute -top-8 -left-8 w-32 h-32 rounded-full bg-white/10 blur-2xl pointer-events-none" />
-      <div className={`relative w-12 h-12 rounded-2xl ${theme.iconBg} backdrop-blur-sm flex items-center justify-center text-white mb-3 float-bounce`}>
-        {icon}
+      <div className={`absolute -top-6 -left-6 w-20 h-20 rounded-full bg-gradient-to-br ${theme.blob} to-transparent blur-xl pointer-events-none`} />
+      <div className="relative flex items-center gap-2 mb-1.5">
+        <div className={`w-7 h-7 rounded-lg ${theme.iconBg} flex items-center justify-center text-white shrink-0`}>
+          {isValidElement(icon) ? cloneElement(icon as React.ReactElement<any>, { size: 14 }) : icon}
+        </div>
+        <p className="text-[11px] font-semibold text-slate-500 dark:text-slate-400 truncate">{label}</p>
       </div>
-      <p className={`relative text-xs font-medium ${theme.text} opacity-80 mb-1`}>{label}</p>
       <div className="relative flex items-baseline gap-1">
-        <span className={`text-2xl font-extrabold ${theme.text} count-glow`}>
+        <span className={`text-lg font-extrabold ${theme.text}`}>
           {toPersianDigits(formatNumber(animatedValue))}
         </span>
-        {suffix && <span className={`text-xs font-medium ${theme.text} opacity-70`}>{suffix}</span>}
-      </div>
-      <div className="relative flex items-center justify-between mt-3">
+        {suffix && <span className="text-[10px] font-medium text-slate-400">{suffix}</span>}
         {trend && (
-          <span className={`flex items-center gap-0.5 text-xs font-bold ${theme.text} bg-white/15 rounded-full px-2 py-0.5`}>
-            {trend.up ? <ArrowUpRight size={12} /> : <ArrowDownRight size={12} />}
+          <span className={`flex items-center gap-0.5 text-[10px] font-bold mr-auto ${trend.up ? 'text-success-600 dark:text-success-400' : 'text-error-500 dark:text-error-400'}`}>
+            {trend.up ? <ArrowUpRight size={10} /> : <ArrowDownRight size={10} />}
             {trend.value}
           </span>
         )}
-        <div className="mr-auto">
-          <Sparkline data={sparkData} color={theme.sparkColor} />
-        </div>
       </div>
     </button>
   )
@@ -237,12 +237,12 @@ function QuickAction({ icon, label, gradient, onClick, delay }: { icon: React.Re
       onClick={() => { h.select(); onClick() }}
       aria-label={label}
       style={{ animationDelay: `${delay}ms` }}
-      className={`tile-in card-lift flex flex-col items-center gap-2 p-4 rounded-2xl bg-gradient-to-br ${gradient} shadow-md text-white relative overflow-hidden min-w-[88px] flex-1 focus:outline-none focus:ring-4 focus:ring-white/30`}
+      className={`tile-in card-lift flex flex-col items-center gap-1.5 p-2.5 rounded-2xl bg-gradient-to-br ${gradient} shadow-sm text-white relative overflow-hidden min-w-[76px] flex-1 focus:outline-none focus:ring-4 focus:ring-white/30`}
     >
-      <div className="w-10 h-10 rounded-xl bg-white/20 backdrop-blur-sm flex items-center justify-center float-bounce">
+      <div className="w-8 h-8 rounded-lg bg-white/20 backdrop-blur-sm flex items-center justify-center">
         {icon}
       </div>
-      <span className="text-xs font-bold">{label}</span>
+      <span className="text-[11px] font-bold">{label}</span>
     </button>
   )
 }
@@ -257,16 +257,15 @@ function AlertWidget({ icon, label, value, color, onClick, delay }: { icon: Reac
       onClick={() => { h.warning(); onClick() }}
       aria-label={label}
       style={{ animationDelay: `${delay}ms` }}
-      className={`tile-in card-lift flex items-center gap-3 p-4 rounded-2xl border-2 ${color} text-right alert-ring focus:outline-none focus:ring-4 focus:ring-error/20`}
+      className={`tile-in card-lift flex items-center gap-2 p-2.5 rounded-xl border ${color} text-right focus:outline-none focus:ring-4 focus:ring-error/20`}
     >
-      <div className="w-11 h-11 rounded-xl flex items-center justify-center flex-shrink-0">
+      <div className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0">
         {icon}
       </div>
       <div className="min-w-0 flex-1">
-        <p className="text-xs font-bold opacity-80">{label}</p>
-        <p className="text-base font-extrabold truncate">{value}</p>
+        <p className="text-[10px] font-bold opacity-80 truncate">{label}</p>
+        <p className="text-sm font-extrabold truncate">{value}</p>
       </div>
-      <ChevronLeft size={16} className="opacity-50 flex-shrink-0" />
     </button>
   )
 }
@@ -812,7 +811,7 @@ export default function Dashboard() {
           <div className="skeleton h-80 rounded-2xl lg:col-span-2" />
           <div className="skeleton h-80 rounded-2xl" />
         </div>
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-3.5">
           <div className="skeleton h-64 rounded-2xl" />
           <div className="skeleton h-64 rounded-2xl" />
         </div>
@@ -824,7 +823,7 @@ export default function Dashboard() {
 
   return (
     <ErrorBoundary>
-    <div ref={ptr.containerRef} className="space-y-6" aria-live="polite" {...ptr.handlers}>
+    <div ref={ptr.containerRef} className="space-y-3.5" aria-live="polite" {...ptr.handlers}>
       {/* ═══ Pull-to-refresh indicator ═══ */}
       {ptr.pullDistance > 0 && (
         <div className="pull-indicator" style={{ opacity: ptr.isRefreshing ? 1 : ptr.pullProgress, top: -4 }}>
@@ -901,103 +900,95 @@ export default function Dashboard() {
         </div>
       </div>
 
-      {/* ═══ Hero Header ═══════════════════════════════════════════ */}
+      {/* ═══ Compact Hero + Stats — single Bento block ═══════════════ */}
       <div
-        className="tile-in relative overflow-hidden rounded-3xl bg-gradient-to-br from-slate-800 via-slate-900 to-teal-900 dark:from-slate-900 dark:via-slate-950 dark:to-teal-950 p-6 md:p-7 shadow-xl gradient-animate"
+        className="tile-in relative overflow-hidden rounded-3xl bg-white dark:bg-slate-800 border border-slate-100 dark:border-slate-700 shadow-sm p-4"
         style={{ animationDelay: '50ms' }}
       >
-        <div className="absolute top-0 right-0 w-48 h-48 bg-teal-500/20 rounded-full blur-3xl pointer-events-none" />
-        <div className="absolute bottom-0 left-0 w-40 h-40 bg-cyan-500/15 rounded-full blur-3xl pointer-events-none" />
-        <div className="absolute inset-0 opacity-[0.03]" style={{ backgroundImage: 'radial-gradient(circle, white 1px, transparent 1px)', backgroundSize: '20px 20px' }} />
+        <div className="absolute -top-16 -left-10 w-56 h-56 rounded-full bg-gradient-to-br from-violet-200/60 dark:from-violet-500/15 to-transparent blur-3xl pointer-events-none" />
+        <div className="absolute -bottom-16 -right-10 w-48 h-48 rounded-full bg-gradient-to-br from-sky-200/50 dark:from-sky-500/15 to-transparent blur-3xl pointer-events-none" />
 
-        <div className="relative flex items-center justify-between flex-wrap gap-4">
-          <div>
-            <div className="flex items-center gap-2 mb-2">
-              <div className="w-8 h-8 rounded-lg bg-teal-500/30 backdrop-blur-sm flex items-center justify-center">
-                <Building2 size={16} className="text-teal-300" />
-              </div>
-              <span className="text-teal-300 text-xs font-bold tracking-wide">کلینیک دندانپزشکی مینا</span>
+        <div className="relative flex items-center justify-between gap-3 mb-4">
+          <div className="min-w-0">
+            <div className="flex items-center gap-1.5 mb-0.5">
+              <Building2 size={13} className="text-primary-500 shrink-0" />
+              <span className="text-[11px] font-bold text-primary-600 dark:text-primary-400 truncate">کلینیک دندانپزشکی مینا</span>
             </div>
-            <h1 className="text-2xl md:text-3xl font-extrabold text-white mb-1">داشبورد مدیریت</h1>
-            <p className="text-sm text-slate-300">
+            <h1 className="text-lg font-extrabold text-slate-800 dark:text-slate-100 truncate">
               {toJalaliStringPretty(todayStr)}
               {doctorFilter !== 'all' && (
-                <span className="mr-2 text-teal-300">— {doctors.find((d) => d.id === doctorFilter)?.name || 'پزشک'}</span>
+                <span className="text-primary-500 text-sm font-medium mr-1.5">— {doctors.find((d) => d.id === doctorFilter)?.name || 'پزشک'}</span>
               )}
-            </p>
+            </h1>
           </div>
-
-          <div className="flex items-center gap-3">
-            <div className="flex flex-col items-end px-4 py-2 rounded-2xl bg-white/10 backdrop-blur-md border border-white/10">
-              <span className="text-lg font-bold text-white tabular-nums">
-                {toPersianDigits(currentTime.toLocaleTimeString('fa-IR', { hour: '2-digit', minute: '2-digit' }))}
-              </span>
-              <span className="text-xs text-teal-300">ساعت کلینیک</span>
-            </div>
+          <div className="flex items-center gap-2 shrink-0">
+            <span className="text-sm font-bold text-slate-500 dark:text-slate-400 tabular-nums hidden sm:inline">
+              {toPersianDigits(currentTime.toLocaleTimeString('fa-IR', { hour: '2-digit', minute: '2-digit' }))}
+            </span>
             <button
               onClick={() => { h.confirm(); navigate('/appointments') }}
               aria-label="نوبت جدید"
-              className="flex items-center gap-2 px-5 py-3 rounded-2xl bg-gradient-to-br from-teal-400 to-cyan-500 hover:from-teal-300 hover:to-cyan-400 text-white font-bold shadow-lg shadow-teal-500/30 card-lift transition-all-smooth focus:outline-none focus:ring-4 focus:ring-teal-300/50"
+              className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-gradient-to-l from-violet-600 to-sky-500 hover:opacity-90 text-white text-sm font-bold shadow-md transition-all-smooth press-scale focus:outline-none focus:ring-4 focus:ring-violet-300/40"
             >
-              <Plus size={20} />
+              <Plus size={16} />
               نوبت جدید
             </button>
           </div>
         </div>
-      </div>
 
-      {/* ═══ Stat Tiles ════════════════════════════════════════════ */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4">
-        <StatTile
-          icon={<Users size={24} />}
-          label="بیماران"
-          value={currentPatientCount}
-          color="teal"
-          sparkData={patientSparkData}
-          trend={patientChange !== 0 ? { value: `${toPersianDigits(Math.abs(patientChange))}٪`, up: patientChange >= 0 } : undefined}
-          delay={100}
-          onClick={() => navigate('/patients')}
-          ariaLabel={`بیماران: ${currentPatientCount}، تغییر ${patientChange} درصد`}
-        />
-        <StatTile
-          icon={<Calendar size={24} />}
-          label="نوبت‌ها"
-          value={currentApptCount}
-          suffix={timeRange === 'today' ? `امروز` : ''}
-          color="amber"
-          sparkData={appointmentSparkData}
-          trend={apptChange !== 0 ? { value: `${toPersianDigits(Math.abs(apptChange))}٪`, up: apptChange >= 0 } : undefined}
-          delay={180}
-          onClick={() => navigate('/appointments')}
-          ariaLabel={`نوبت‌ها: ${currentApptCount}`}
-        />
-        <StatTile
-          icon={<DollarSign size={24} />}
-          label="درآمد دوره"
-          value={Math.round(currentRevenue / 1000000)}
-          suffix="م ت"
-          color="emerald"
-          sparkData={revenueSparkData.map((v) => Math.round(v / 1000000))}
-          trend={revenueChange !== 0 ? { value: `${toPersianDigits(Math.abs(revenueChange))}٪`, up: revenueChange >= 0 } : undefined}
-          delay={260}
-          onClick={() => navigate('/billing')}
-          ariaLabel={`درآمد: ${formatCurrency(currentRevenue)} تومان`}
-        />
-        <StatTile
-          icon={<FlaskConical size={24} />}
-          label="سفارش‌های لابراتوار"
-          value={stats?.activeLabOrders ?? 0}
-          color="rose"
-          sparkData={labSparkData}
-          trend={{ value: `${toPersianDigits(overdueLabCount)} تأخیر`, up: overdueLabCount > 0 }}
-          delay={340}
-          onClick={() => navigate('/laboratory')}
-          ariaLabel={`سفارش‌های فعال: ${stats?.activeLabOrders ?? 0}`}
-        />
+        {/* Stat tiles — compact 2x2/4x1 bento grid, part of the same block */}
+        <div className="relative grid grid-cols-2 lg:grid-cols-4 gap-2.5">
+          <StatTile
+            icon={<Users />}
+            label="بیماران"
+            value={currentPatientCount}
+            color="violet"
+            sparkData={patientSparkData}
+            trend={patientChange !== 0 ? { value: `${toPersianDigits(Math.abs(patientChange))}٪`, up: patientChange >= 0 } : undefined}
+            delay={100}
+            onClick={() => navigate('/patients')}
+            ariaLabel={`بیماران: ${currentPatientCount}، تغییر ${patientChange} درصد`}
+          />
+          <StatTile
+            icon={<Calendar />}
+            label="نوبت‌ها"
+            value={currentApptCount}
+            suffix={timeRange === 'today' ? `امروز` : ''}
+            color="lime"
+            sparkData={appointmentSparkData}
+            trend={apptChange !== 0 ? { value: `${toPersianDigits(Math.abs(apptChange))}٪`, up: apptChange >= 0 } : undefined}
+            delay={140}
+            onClick={() => navigate('/appointments')}
+            ariaLabel={`نوبت‌ها: ${currentApptCount}`}
+          />
+          <StatTile
+            icon={<DollarSign />}
+            label="درآمد دوره"
+            value={Math.round(currentRevenue / 1000000)}
+            suffix="م ت"
+            color="sky"
+            sparkData={revenueSparkData.map((v) => Math.round(v / 1000000))}
+            trend={revenueChange !== 0 ? { value: `${toPersianDigits(Math.abs(revenueChange))}٪`, up: revenueChange >= 0 } : undefined}
+            delay={180}
+            onClick={() => navigate('/billing')}
+            ariaLabel={`درآمد: ${formatCurrency(currentRevenue)} تومان`}
+          />
+          <StatTile
+            icon={<FlaskConical />}
+            label="لابراتوار"
+            value={stats?.activeLabOrders ?? 0}
+            color="pink"
+            sparkData={labSparkData}
+            trend={{ value: `${toPersianDigits(overdueLabCount)} تأخیر`, up: overdueLabCount > 0 }}
+            delay={220}
+            onClick={() => navigate('/laboratory')}
+            ariaLabel={`سفارش‌های فعال: ${stats?.activeLabOrders ?? 0}`}
+          />
+        </div>
       </div>
 
       {/* ═══ Quick Actions ══════════════════════════════════════════ */}
-      <div className="flex flex-wrap gap-3">
+      <div className="flex flex-wrap gap-2">
         {quickActions.map((action, i) => (
           <QuickAction
             key={action.path}
@@ -1005,14 +996,14 @@ export default function Dashboard() {
             label={action.label}
             gradient={action.gradient}
             onClick={() => navigate(action.path)}
-            delay={400 + i * 60}
+            delay={280 + i * 40}
           />
         ))}
       </div>
 
       {/* ═══ Alert Widgets ══════════════════════════════════════════ */}
       {(outstandingBalance > 0 || lowInventoryCount > 0 || overdueLabCount > 0 || waitingListCount > 0) && (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-2.5">
           {outstandingBalance > 0 && (
             <AlertWidget
               icon={<div className="w-full h-full rounded-xl bg-warning-100 dark:bg-warning-900/40 flex items-center justify-center text-warning-600 dark:text-warning-400"><Wallet size={20} /></div>}
@@ -1115,7 +1106,7 @@ export default function Dashboard() {
 
         {/* Side Panel: Occupancy + Revenue Snapshot */}
         <div className="space-y-6">
-          <Card className="p-5 tile-in">
+          <Card className="p-4 tile-in">
             <h3 className="text-sm font-bold text-slate-800 dark:text-slate-100 flex items-center gap-2 mb-4">
               <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-amber-400 to-orange-500 flex items-center justify-center text-white">
                 <Zap size={14} />
@@ -1136,7 +1127,7 @@ export default function Dashboard() {
           </Card>
 
           {/* Revenue Snapshot with Comparison */}
-          <Card className="p-5 tile-in">
+          <Card className="p-4 tile-in">
             <h3 className="text-sm font-bold text-slate-800 dark:text-slate-100 flex items-center gap-2 mb-3">
               <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-emerald-400 to-green-600 flex items-center justify-center text-white">
                 <DollarSign size={14} />
@@ -1188,7 +1179,7 @@ export default function Dashboard() {
               description="پس از ثبت پرداخت‌ها، نمودار نمایش داده می‌شود"
             />
           ) : (
-            <ResponsiveContainer width="100%" height={280}>
+            <ResponsiveContainer width="100%" height={190}>
               <AreaChart data={revenueChartData} margin={{ top: 10, right: 10, left: 10, bottom: 0 }}>
                 <defs>
                   <linearGradient id="revGradient" x1="0" y1="0" x2="0" y2="1">
@@ -1227,7 +1218,7 @@ export default function Dashboard() {
         </Card>
 
         {/* Status Distribution Bar Chart */}
-        <Card className="p-5 tile-in">
+        <Card className="p-4 tile-in">
           <h3 className="text-sm font-bold text-slate-800 dark:text-slate-100 flex items-center gap-2 mb-4">
             <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-sky-400 to-blue-600 flex items-center justify-center text-white">
               <Activity size={14} />
@@ -1241,7 +1232,7 @@ export default function Dashboard() {
               description="نوبتی در این بازه ثبت نشده است"
             />
           ) : (
-            <ResponsiveContainer width="100%" height={250}>
+            <ResponsiveContainer width="100%" height={190}>
               <BarChart data={statusChartData} layout="vertical" margin={{ top: 5, right: 15, left: 5, bottom: 5 }}>
                 <XAxis type="number" tick={{ fontSize: 10, fill: '#94a3b8' }} tickLine={false} axisLine={false} />
                 <YAxis type="category" dataKey="name" tick={{ fontSize: 10, fill: '#94a3b8' }} tickLine={false} axisLine={false} width={70} />
@@ -1262,7 +1253,7 @@ export default function Dashboard() {
 
       {/* ═══ Smart Reminders ════════════════════════════════════════ */}
       {(smartReminders.birthday.length + smartReminders.debtor.length + smartReminders.lapsed.length + smartReminders.installment_due.length) > 0 && (
-        <Card className="p-5 tile-in">
+        <Card className="p-4 tile-in">
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-base font-bold text-slate-800 dark:text-slate-100 flex items-center gap-2">
               <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-amber-400 to-orange-500 flex items-center justify-center text-white">
@@ -1318,9 +1309,9 @@ export default function Dashboard() {
       )}
 
       {/* ═══ Recent Patients + Activity Feed ════════════════════════ */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-3.5">
         {/* Recent Patients */}
-        <Card className="p-5 tile-in">
+        <Card className="p-4 tile-in">
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-base font-bold text-slate-800 dark:text-slate-100 flex items-center gap-2">
               <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-sky-400 to-blue-600 flex items-center justify-center text-white">
@@ -1358,7 +1349,7 @@ export default function Dashboard() {
         </Card>
 
         {/* Activity Feed */}
-        <Card className="p-5 tile-in">
+        <Card className="p-4 tile-in">
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-base font-bold text-slate-800 dark:text-slate-100 flex items-center gap-2">
               <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-violet-400 to-purple-600 flex items-center justify-center text-white">
