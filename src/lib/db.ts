@@ -128,6 +128,25 @@ class MinadentDB extends Dexie {
 
 export const db = new MinadentDB()
 
+// ── Multi-tab schema-upgrade safety ─────────────────────────────────────
+// IndexedDB upgrades (like the audit_log/backup_snapshots tables added in
+// v2) can hang forever — silently, with no error — if another browser tab
+// (or a leftover service-worker-cached page) still holds an open
+// connection to the OLD database version. That blocks the upgrade
+// transaction indefinitely, which is exactly the "app never finishes
+// loading, stuck on skeletons" failure mode. These two handlers make
+// every future version bump safe automatically:
+db.on('versionchange', () => {
+  // Another tab wants to upgrade — release our own connection so it can
+  // proceed instead of blocking it.
+  db.close()
+  window.location.reload()
+})
+db.on('blocked', () => {
+  // Our own upgrade is being blocked by another open tab/connection.
+  console.warn('Database upgrade blocked by another open tab — please close other tabs of this app and reload.')
+})
+
 export const TABLE_NAMES = [
   'patients', 'doctors', 'units', 'appointments', 'encounters', 'treatments',
   'payments', 'procedures', 'laboratories', 'lab_orders', 'insurance_companies',

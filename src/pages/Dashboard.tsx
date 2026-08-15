@@ -502,18 +502,22 @@ export default function Dashboard() {
   const loadData = useCallback(async (isRefresh = false, silent = false) => {
     if (isRefresh) { setRefreshing(true); if (!silent) h.tap() } else { setLoading(true) }
     try {
-      const [s, appts, pats, pays, encs, items, labOrders, waiting, docs, feed, insts] = await Promise.all([
-        fetchDashboardStats(),
-        fetchAppointments(),
-        fetchPatients(),
-        fetchPayments(),
-        fetchEncounters(),
-        fetchInventoryItems(),
-        fetchLabOrders(),
-        fetchWaitingList(),
-        fetchDoctors(),
-        fetchActivityFeed(15),
-        fetchAllInstallments(),
+      const timeout = new Promise<never>((_, reject) => setTimeout(() => reject(new Error('Dashboard load timed out')), 15000))
+      const [s, appts, pats, pays, encs, items, labOrders, waiting, docs, feed, insts] = await Promise.race([
+        Promise.all([
+          fetchDashboardStats(),
+          fetchAppointments(),
+          fetchPatients(),
+          fetchPayments(),
+          fetchEncounters(),
+          fetchInventoryItems(),
+          fetchLabOrders(),
+          fetchWaitingList(),
+          fetchDoctors(),
+          fetchActivityFeed(15),
+          fetchAllInstallments(),
+        ]),
+        timeout,
       ])
       setStats(s); setAppointments(appts); setPatients(pats); setPayments(pays)
       setDoctors(docs); setActivity(feed as ActivityItem[])
