@@ -5,6 +5,7 @@ import { fetchPatients, createPatient, updatePatient, deletePatient, fetchDoctor
 import { toJalaliStringPretty, formatCurrency, toPersianDigits } from '../lib/persianDate'
 import { Patient, Doctor, Payment, Treatment } from '../types'
 import { Modal, Card, Button, Input, Select, Textarea, Spinner, EmptyState, showToast, HighlightText, SkeletonList } from '../components/ui'
+import { ModuleHeader } from '../components/ModuleHeader'
 import { useConfirmAction, ConfirmActionConfig } from '../components/ConfirmAction'
 import { h } from '../lib/haptics'
 import { usePullToRefresh } from '../lib/usePullToRefresh'
@@ -303,15 +304,16 @@ export default function Patients() {
         </div>
       )}
       {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-xl font-extrabold text-slate-800">بیماران</h1>
-          <p className="text-xs text-slate-500 mt-0.5">{toPersianDigits(filteredPatients.length)} بیمار</p>
-        </div>
-        <button onClick={openCreateModal} aria-label="افزودن بیمار جدید" className="btn-teal px-4 py-2.5 text-sm flex items-center gap-1.5">
-          <Plus size={18} /> بیمار جدید
-        </button>
-      </div>
+      <ModuleHeader
+        moduleKey="patients"
+        title="بیماران"
+        subtitle={`${toPersianDigits(filteredPatients.length)} بیمار`}
+        action={
+          <button onClick={openCreateModal} aria-label="افزودن بیمار جدید" className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-white/20 backdrop-blur-sm text-white text-sm font-bold hover:bg-white/30 transition-all-smooth press-scale">
+            <Plus size={16} /> بیمار جدید
+          </button>
+        }
+      />
 
       {/* Stats */}
       <div className="grid grid-cols-4 gap-2">

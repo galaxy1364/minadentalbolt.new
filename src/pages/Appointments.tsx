@@ -5,6 +5,7 @@ import { fetchAppointments, createAppointment, updateAppointment, deleteAppointm
 import { toJalaliString, toJalaliStringPretty, getJalaliDateInfo, formatTime, formatCurrency, toPersianDigits, persianWeekdaysShort, getHoliday } from '../lib/persianDate'
 import { Appointment, AppointmentWithRelations, Patient, Doctor, Unit } from '../types'
 import { Modal, Card, Button, Input, Select, Textarea, EmptyState, showToast } from '../components/ui'
+import { ModuleHeader } from '../components/ModuleHeader'
 import { useConfirmAction, ConfirmActionConfig } from '../components/ConfirmAction'
 import { h } from '../lib/haptics'
 import { usePullToRefresh } from '../lib/usePullToRefresh'
@@ -278,15 +279,16 @@ export default function Appointments() {
         </div>
       )}
       {/* ── Date header ── */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-xl font-extrabold text-slate-800">نوبت‌دهی</h1>
-          <p className="text-xs text-slate-500 mt-0.5">{toJalaliStringPretty(todayStr)} — {persianWeekdaysShort[getJalaliDateInfo(todayStr).weekday]}</p>
-        </div>
-        <button onClick={() => openWizard()} aria-label="نوبت جدید" className="btn-teal px-4 py-2.5 text-sm flex items-center gap-1.5">
-          <Plus size={18} /> نوبت جدید
-        </button>
-      </div>
+      <ModuleHeader
+        moduleKey="appointments"
+        title="نوبت‌دهی"
+        subtitle={`${toJalaliStringPretty(todayStr)} — ${persianWeekdaysShort[getJalaliDateInfo(todayStr).weekday]}`}
+        action={
+          <button onClick={() => openWizard()} aria-label="نوبت جدید" className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-white/20 backdrop-blur-sm text-white text-sm font-bold hover:bg-white/30 transition-all-smooth press-scale">
+            <Plus size={16} /> نوبت جدید
+          </button>
+        }
+      />
 
       {/* ── Stats cards ── */}
       <div className="grid grid-cols-3 gap-2.5">
