@@ -274,7 +274,7 @@ function LayoutInner({ children }: { children: React.ReactNode }) {
         </div>
       </header>
 
-      <main className="flex-1 min-w-0 overflow-x-hidden px-3 pt-3 pb-40">
+      <main className="flex-1 min-w-0 overflow-x-hidden px-3 pt-3 pb-48">
         <div key={location.pathname} className="slide-in-right">
           {children}
         </div>
