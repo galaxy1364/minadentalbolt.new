@@ -9,7 +9,7 @@ import { h } from '../lib/haptics'
 import { useConfirmAction } from '../components/ConfirmAction'
 import { WaitingListEntry, WaitingListEntryWithRelations, Patient, Doctor, Unit } from '../types'
 import { Wizard, Card, Button, Input, Select, Textarea, Badge, Spinner, EmptyState, showToast } from '../components/ui'
-import { ModuleHeader, ModuleStatCard } from '../components/ModuleHeader'
+import { ModuleHeader, ModuleStatCard, ReorderableStatGrid } from '../components/ModuleHeader'
 
 // ============================================================================
 // Constants
@@ -344,10 +344,15 @@ export default function WaitingList() {
 
       {/* Stats Cards */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-        <ModuleStatCard moduleKey="waitingList" icon={<Clock size={20} />} label="کل لیست" value={formatNumber(stats.total)} />
-        <ModuleStatCard moduleKey="waitingList" icon={<AlertCircle size={20} />} label="در انتظار" value={formatNumber(stats.waiting)} />
-        <ModuleStatCard moduleKey="waitingList" icon={<Bell size={20} />} label="اطلاع داده شد" value={formatNumber(stats.notified)} />
-        <ModuleStatCard moduleKey="waitingList" icon={<CheckCircle2 size={20} />} label="زمان‌بندی شد" value={formatNumber(stats.scheduled)} />
+<ReorderableStatGrid
+        storageKey="waitingList"
+        items={[
+          { key: 'total', node: <ModuleStatCard moduleKey="waitingList" icon={<Clock size={20} />} label="کل لیست" value={formatNumber(stats.total)} /> },
+          { key: 'waiting', node: <ModuleStatCard moduleKey="waitingList" icon={<AlertCircle size={20} />} label="در انتظار" value={formatNumber(stats.waiting)} /> },
+          { key: 'notified', node: <ModuleStatCard moduleKey="waitingList" icon={<Bell size={20} />} label="اطلاع داده شد" value={formatNumber(stats.notified)} /> },
+          { key: 'scheduled', node: <ModuleStatCard moduleKey="waitingList" icon={<CheckCircle2 size={20} />} label="زمان‌بندی شد" value={formatNumber(stats.scheduled)} /> },
+        ]}
+      />
       </div>
 
       {/* Filters */}

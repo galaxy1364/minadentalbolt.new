@@ -9,7 +9,7 @@ import { h } from '../lib/haptics'
 import { useConfirmAction } from '../components/ConfirmAction'
 import { Prescription, PrescriptionWithRelations, Patient, Doctor } from '../types'
 import { Wizard, Card, Button, Input, Select, Textarea, Badge, Spinner, EmptyState, showToast } from '../components/ui'
-import { ModuleHeader, ModuleStatCard } from '../components/ModuleHeader'
+import { ModuleHeader, ModuleStatCard, ReorderableStatGrid } from '../components/ModuleHeader'
 
 // ============================================================================
 // Constants
@@ -318,10 +318,15 @@ export default function Prescriptions() {
 
       {/* Stats Cards */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-        <ModuleStatCard moduleKey="prescriptions" icon={<FileText size={20} />} label="کل نسخه‌ها" value={formatNumber(stats.total)} />
-        <ModuleStatCard moduleKey="prescriptions" icon={<Pill size={20} />} label="نسخه‌های فعال" value={formatNumber(stats.active)} />
-        <ModuleStatCard moduleKey="prescriptions" icon={<Smile size={20} />} label="تکمیل شده" value={formatNumber(stats.completed)} />
-        <ModuleStatCard moduleKey="prescriptions" icon={<TrendingUp size={20} />} label="نسخه‌های این ماه" value={formatNumber(stats.thisMonth)} />
+<ReorderableStatGrid
+        storageKey="prescriptions"
+        items={[
+          { key: 'total', node: <ModuleStatCard moduleKey="prescriptions" icon={<FileText size={20} />} label="کل نسخه‌ها" value={formatNumber(stats.total)} /> },
+          { key: 'active', node: <ModuleStatCard moduleKey="prescriptions" icon={<Pill size={20} />} label="نسخه‌های فعال" value={formatNumber(stats.active)} /> },
+          { key: 'completed', node: <ModuleStatCard moduleKey="prescriptions" icon={<Smile size={20} />} label="تکمیل شده" value={formatNumber(stats.completed)} /> },
+          { key: 'month', node: <ModuleStatCard moduleKey="prescriptions" icon={<TrendingUp size={20} />} label="نسخه‌های این ماه" value={formatNumber(stats.thisMonth)} /> },
+        ]}
+      />
       </div>
 
       {/* Trend Chart */}

@@ -8,7 +8,7 @@ import { fetchRadiologyImages, fetchPatients, createRadiologyImage, deleteRadiol
 import { toJalaliString, toJalaliStringPretty, formatNumber, toPersianDigits } from '../lib/persianDate'
 import { RadiologyImage, Patient } from '../types'
 import { Card, Button, Badge, Spinner, EmptyState, Modal, Wizard, Input, Select, Textarea, showToast } from '../components/ui'
-import { ModuleHeader, ModuleStatCard } from '../components/ModuleHeader'
+import { ModuleHeader, ModuleStatCard, ReorderableStatGrid } from '../components/ModuleHeader'
 import { useConfirmAction } from '../components/ConfirmAction'
 
 // ============================================================================
@@ -235,10 +235,15 @@ export default function Radiology() {
 
       {/* Stats Cards */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-        <ModuleStatCard moduleKey="radiology" icon={<Image size={20} />} label="کل تصاویر" value={formatNumber(stats.total)} />
-        <ModuleStatCard moduleKey="radiology" icon={<Camera size={20} />} label="پانورامیک" value={formatNumber(stats.panoramic)} />
-        <ModuleStatCard moduleKey="radiology" icon={<Smile size={20} />} label="پری‌اپیکال" value={formatNumber(stats.periapical)} />
-        <ModuleStatCard moduleKey="radiology" icon={<Image size={20} />} label="تصاویر این ماه" value={formatNumber(stats.thisMonth)} />
+<ReorderableStatGrid
+        storageKey="radiology"
+        items={[
+          { key: 'total', node: <ModuleStatCard moduleKey="radiology" icon={<Image size={20} />} label="کل تصاویر" value={formatNumber(stats.total)} /> },
+          { key: 'pano', node: <ModuleStatCard moduleKey="radiology" icon={<Camera size={20} />} label="پانورامیک" value={formatNumber(stats.panoramic)} /> },
+          { key: 'peri', node: <ModuleStatCard moduleKey="radiology" icon={<Smile size={20} />} label="پری‌اپیکال" value={formatNumber(stats.periapical)} /> },
+          { key: 'month', node: <ModuleStatCard moduleKey="radiology" icon={<Image size={20} />} label="تصاویر این ماه" value={formatNumber(stats.thisMonth)} /> },
+        ]}
+      />
       </div>
 
       {/* Filters */}

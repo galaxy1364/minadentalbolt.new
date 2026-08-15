@@ -7,7 +7,7 @@ import { CLINIC_ID, supabase } from '../lib/supabase'
 import { toJalaliString, formatCurrency, formatNumber, toPersianDigits } from '../lib/persianDate'
 import type { Staff as StaffType, StaffInput, EncounterWithRelations, LabOrderWithRelations, Treatment } from '../types'
 import { Modal, Wizard, Card, Button, Input, Select, Badge, Spinner, EmptyState, showToast } from '../components/ui'
-import { ModuleHeader, ModuleStatCard } from '../components/ModuleHeader'
+import { ModuleHeader, ModuleStatCard, ReorderableStatGrid } from '../components/ModuleHeader'
 import { ROLES } from '../lib/permissions'
 import { scoreFields } from '../lib/fuzzySearch'
 import { useConfirmAction } from '../components/ConfirmAction'
@@ -427,10 +427,15 @@ export default function Staff() {
 
       {/* Stats Cards */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-        <ModuleStatCard moduleKey="staff" icon={<Users size={20} />} label="کل پرسنل" value={formatNumber(stats.total)} />
-        <ModuleStatCard moduleKey="staff" icon={<Stethoscope size={20} />} label="پزشکان" value={formatNumber(stats.doctorCount)} />
-        <ModuleStatCard moduleKey="staff" icon={<Briefcase size={20} />} label="نقش‌ها" value={formatNumber(stats.roles)} />
-        <ModuleStatCard moduleKey="staff" icon={<DollarSign size={20} />} label="کل حقوق" value={`${formatCurrency(stats.totalSalary)} ت`} />
+<ReorderableStatGrid
+        storageKey="staff"
+        items={[
+          { key: 'total', node: <ModuleStatCard moduleKey="staff" icon={<Users size={20} />} label="کل پرسنل" value={formatNumber(stats.total)} /> },
+          { key: 'doctors', node: <ModuleStatCard moduleKey="staff" icon={<Stethoscope size={20} />} label="پزشکان" value={formatNumber(stats.doctorCount)} /> },
+          { key: 'roles', node: <ModuleStatCard moduleKey="staff" icon={<Briefcase size={20} />} label="نقش‌ها" value={formatNumber(stats.roles)} /> },
+          { key: 'salary', node: <ModuleStatCard moduleKey="staff" icon={<DollarSign size={20} />} label="کل حقوق" value={`${formatCurrency(stats.totalSalary)} ت`} /> },
+        ]}
+      />
       </div>
 
       {/* Revenue Share Panel */}

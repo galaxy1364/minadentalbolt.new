@@ -10,7 +10,7 @@ import { useConfirmAction } from '../components/ConfirmAction'
 import { InventoryItem, InventoryItemWithRelations, InventoryCategory } from '../types'
 import { Wizard, Card, Button, Input, Select, Textarea, Badge, Spinner, EmptyState, Tabs, showToast } from '../components/ui'
 import { scoreFields } from '../lib/fuzzySearch'
-import { ModuleHeader, ModuleStatCard } from '../components/ModuleHeader'
+import { ModuleHeader, ModuleStatCard, ReorderableStatGrid } from '../components/ModuleHeader'
 
 // ============================================================================
 // Constants
@@ -268,10 +268,15 @@ export default function Inventory() {
 
       {/* Stats Cards */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-        <ModuleStatCard moduleKey="inventory" icon={<Package size={20} />} label="کل اقلام" value={formatNumber(stats.totalItems)} />
-        <ModuleStatCard moduleKey="inventory" icon={<TrendingDown size={20} />} label="رو به اتمام" value={formatNumber(stats.lowStock)} />
-        <ModuleStatCard moduleKey="inventory" icon={<AlertTriangle size={20} />} label="ناموجود" value={formatNumber(stats.outOfStock)} />
-        <ModuleStatCard moduleKey="inventory" icon={<PackageCheck size={20} />} label="ارزش انبار" value={`${formatCurrency(stats.totalValue)} ت`} />
+<ReorderableStatGrid
+        storageKey="inventory"
+        items={[
+          { key: 'total', node: <ModuleStatCard moduleKey="inventory" icon={<Package size={20} />} label="کل اقلام" value={formatNumber(stats.totalItems)} /> },
+          { key: 'low', node: <ModuleStatCard moduleKey="inventory" icon={<TrendingDown size={20} />} label="رو به اتمام" value={formatNumber(stats.lowStock)} /> },
+          { key: 'out', node: <ModuleStatCard moduleKey="inventory" icon={<AlertTriangle size={20} />} label="ناموجود" value={formatNumber(stats.outOfStock)} /> },
+          { key: 'value', node: <ModuleStatCard moduleKey="inventory" icon={<PackageCheck size={20} />} label="ارزش انبار" value={`${formatCurrency(stats.totalValue)} ت`} /> },
+        ]}
+      />
       </div>
 
       {/* Tabs */}

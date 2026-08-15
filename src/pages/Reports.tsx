@@ -8,7 +8,7 @@ import { toJalaliString, toJalaliStringPretty, getJalaliMonthYear, formatCurrenc
 import { h } from '../lib/haptics'
 import { Payment, Patient, Encounter, Treatment, Procedure, Appointment, Expense } from '../types'
 import { Card, Button, Badge, Spinner, EmptyState, Tabs, showToast } from '../components/ui'
-import { ModuleHeader, ModuleStatCard } from '../components/ModuleHeader'
+import { ModuleHeader, ModuleStatCard, ReorderableStatGrid } from '../components/ModuleHeader'
 
 // ============================================================================
 // Constants
@@ -389,12 +389,15 @@ export default function Reports() {
       {/* Revenue Tab */}
       {activeTab === 'revenue' && (
         <div className="space-y-6">
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-            <ModuleStatCard moduleKey="reports" icon={<TrendingUp size={20} />} label="درآمد کل" value={`${formatCurrency(revenueStats.totalRevenue)} ت`} />
-            <ModuleStatCard moduleKey="reports" icon={<ArrowDown size={20} />} label="هزینه‌های کل" value={`${formatCurrency(revenueStats.totalExpenses)} ت`} />
-            <ModuleStatCard moduleKey="reports" icon={<DollarSign size={20} />} label="سود خالص" value={`${formatCurrency(revenueStats.profit)} ت`} />
-            <ModuleStatCard moduleKey="reports" icon={<BarChart3 size={20} />} label="میانگین ماهانه" value={`${formatCurrency(Math.round(revenueStats.avgMonthlyRevenue))} ت`} />
-          </div>
+          <ReorderableStatGrid
+            storageKey="reports-revenue"
+            items={[
+              { key: 'total', node: <ModuleStatCard moduleKey="reports" icon={<TrendingUp size={20} />} label="درآمد کل" value={`${formatCurrency(revenueStats.totalRevenue)} ت`} /> },
+              { key: 'expenses', node: <ModuleStatCard moduleKey="reports" icon={<ArrowDown size={20} />} label="هزینه‌های کل" value={`${formatCurrency(revenueStats.totalExpenses)} ت`} /> },
+              { key: 'profit', node: <ModuleStatCard moduleKey="reports" icon={<DollarSign size={20} />} label="سود خالص" value={`${formatCurrency(revenueStats.profit)} ت`} /> },
+              { key: 'avg', node: <ModuleStatCard moduleKey="reports" icon={<BarChart3 size={20} />} label="میانگین ماهانه" value={`${formatCurrency(Math.round(revenueStats.avgMonthlyRevenue))} ت`} /> },
+            ]}
+          />
 
           <Card className="p-5">
             <h2 className="text-base font-bold text-slate-800 mb-4 flex items-center gap-2">
@@ -455,12 +458,15 @@ export default function Reports() {
       {/* Patients Tab */}
       {activeTab === 'patients' && (
         <div className="space-y-6">
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-            <ModuleStatCard moduleKey="reports" icon={<Users size={20} />} label="کل بیماران" value={formatNumber(patientStats.total)} />
-            <ModuleStatCard moduleKey="reports" icon={<ArrowUp size={20} />} label="بیماران این ماه" value={formatNumber(patientStats.thisMonth)} />
-            <ModuleStatCard moduleKey="reports" icon={<ArrowDown size={20} />} label="بیماران ماه قبل" value={formatNumber(patientStats.lastMonth)} />
-            <ModuleStatCard moduleKey="reports" icon={<TrendingUp size={20} />} label="نرخ رشد" value={`${toPersianDigits(Math.round(patientStats.growth))}٪`} />
-          </div>
+          <ReorderableStatGrid
+            storageKey="reports-patients"
+            items={[
+              { key: 'total', node: <ModuleStatCard moduleKey="reports" icon={<Users size={20} />} label="کل بیماران" value={formatNumber(patientStats.total)} /> },
+              { key: 'month', node: <ModuleStatCard moduleKey="reports" icon={<ArrowUp size={20} />} label="بیماران این ماه" value={formatNumber(patientStats.thisMonth)} /> },
+              { key: 'lastmonth', node: <ModuleStatCard moduleKey="reports" icon={<ArrowDown size={20} />} label="بیماران ماه قبل" value={formatNumber(patientStats.lastMonth)} /> },
+              { key: 'growth', node: <ModuleStatCard moduleKey="reports" icon={<TrendingUp size={20} />} label="نرخ رشد" value={`${toPersianDigits(Math.round(patientStats.growth))}٪`} /> },
+            ]}
+          />
 
           <Card className="p-5">
             <h2 className="text-base font-bold text-slate-800 mb-4 flex items-center gap-2">

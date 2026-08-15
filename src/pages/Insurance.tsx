@@ -15,7 +15,7 @@ import {
   Patient,
 } from '../types'
 import { Card, Button, Badge, Spinner, EmptyState, Tabs, Wizard, Input, Select, Textarea, showToast } from '../components/ui'
-import { ModuleHeader, ModuleStatCard } from '../components/ModuleHeader'
+import { ModuleHeader, ModuleStatCard, ReorderableStatGrid } from '../components/ModuleHeader'
 import { CLINIC_ID } from '../lib/supabase'
 import { useConfirmAction } from '../components/ConfirmAction'
 import { h } from '../lib/haptics'
@@ -330,10 +330,15 @@ export default function Insurance() {
 
       {/* Stats Cards */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-        <ModuleStatCard moduleKey="insurance" icon={<Building2 size={20} />} label="شرکت‌های بیمه" value={formatNumber(companies.length)} />
-        <ModuleStatCard moduleKey="insurance" icon={<FileText size={20} />} label="کل ادعاها" value={formatNumber(stats.totalClaims)} />
-        <ModuleStatCard moduleKey="insurance" icon={<Shield size={20} />} label="در انتظار بررسی" value={formatNumber(stats.pendingCount)} />
-        <ModuleStatCard moduleKey="insurance" icon={<Percent size={20} />} label="مبلغ تایید شده" value={`${formatCurrency(stats.approvedAmount)} ت`} />
+<ReorderableStatGrid
+        storageKey="insurance"
+        items={[
+          { key: 'companies', node: <ModuleStatCard moduleKey="insurance" icon={<Building2 size={20} />} label="شرکت‌های بیمه" value={formatNumber(companies.length)} /> },
+          { key: 'claims', node: <ModuleStatCard moduleKey="insurance" icon={<FileText size={20} />} label="کل ادعاها" value={formatNumber(stats.totalClaims)} /> },
+          { key: 'pending', node: <ModuleStatCard moduleKey="insurance" icon={<Shield size={20} />} label="در انتظار بررسی" value={formatNumber(stats.pendingCount)} /> },
+          { key: 'approved', node: <ModuleStatCard moduleKey="insurance" icon={<Percent size={20} />} label="مبلغ تایید شده" value={`${formatCurrency(stats.approvedAmount)} ت`} /> },
+        ]}
+      />
       </div>
 
       {/* Tabs */}
