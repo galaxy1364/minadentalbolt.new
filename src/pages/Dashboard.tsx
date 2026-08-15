@@ -1161,9 +1161,9 @@ export default function Dashboard() {
           {editingLayout ? 'پایان چیدمان' : 'تنظیم چیدمان'}
         </button>
       </div>
-      <div className="flex flex-wrap gap-2">
+      <div className="grid grid-cols-3 gap-2">
         {quickActions.map((action, i) => (
-          <div key={action.key} className="relative flex-1 min-w-[76px]">
+          <div key={action.key} className="relative">
             <QuickAction
               icon={action.icon}
               label={action.label}
