@@ -235,7 +235,7 @@ export default function AICommandBar() {
     return (
       <button
         onClick={() => { h.tap(); setOpen(true) }}
-        className="fixed bottom-20 left-1/2 -translate-x-1/2 z-40 flex items-center gap-2 px-4 py-2.5 rounded-full bg-gradient-to-r from-sky-500 to-teal-600 text-white text-sm font-medium shadow-lg hover:shadow-xl transition-all-smooth press-scale"
+        className="fixed bottom-24 left-4 z-40 flex items-center gap-2 px-4 py-2.5 rounded-full bg-gradient-to-r from-sky-500 to-teal-600 text-white text-sm font-medium shadow-lg hover:shadow-xl transition-all-smooth press-scale"
         aria-label="دستیار هوشمند"
       >
         <Sparkles size={16} className="animate-pulse" />
