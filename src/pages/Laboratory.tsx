@@ -1,11 +1,11 @@
 // Laboratory.tsx - Persian RTL Dental Clinic Laboratory Management
 import { useState, useEffect, useCallback, useMemo } from 'react'
 import { FlaskConical, Plus, Search, Clock, CheckCircle2, AlertCircle, Edit2, Trash2, Phone, Filter, TrendingUp, Package } from 'lucide-react'
-import { fetchLabOrders, createLabOrder, updateLabOrder, fetchLabs, createLab, updateLab, deleteLab, fetchPatients, fetchDoctors } from '../lib/api'
+import { fetchLabOrders, createLabOrder, updateLabOrder, fetchLabs, createLab, updateLab, deleteLab, fetchPatients, fetchDoctors, fetchTreatments, updateTreatment } from '../lib/api'
 import { toJalaliString, toJalaliStringPretty, formatCurrency, toPersianDigits } from '../lib/persianDate'
 import { h } from '../lib/haptics'
 import { useConfirmAction } from '../components/ConfirmAction'
-import type { LabOrder, Laboratory, Patient, Doctor } from '../types'
+import type { LabOrder, Laboratory, Patient, Doctor, Treatment } from '../types'
 import { Wizard, Card, Button, Input, Select, Textarea, Badge, Spinner, EmptyState, showToast } from '../components/ui'
 import { ModuleHeader, ModuleStatCard, ReorderableStatGrid } from '../components/ModuleHeader'
 
@@ -63,6 +63,7 @@ export default function Laboratory() {
   const [labOrders, setLabOrders] = useState<LabOrder[]>([])
   const [labs, setLabs] = useState<Laboratory[]>([])
   const [patients, setPatients] = useState<Patient[]>([])
+  const [treatments, setTreatments] = useState<Treatment[]>([])
   const [doctors, setDoctors] = useState<Doctor[]>([])
   const [loading, setLoading] = useState(true)
 
@@ -119,16 +120,18 @@ export default function Laboratory() {
   const loadData = useCallback(async () => {
     setLoading(true)
     try {
-      const [orders, l, pats, docs] = await Promise.all([
+      const [orders, l, pats, docs, trts] = await Promise.all([
         fetchLabOrders(),
         fetchLabs(),
         fetchPatients(),
         fetchDoctors(),
+        fetchTreatments(),
       ])
       setLabOrders(orders as unknown as LabOrder[])
       setLabs(l)
       setPatients(pats)
       setDoctors(docs)
+      setTreatments(trts)
     } catch (err) {
       console.error('Error loading lab data:', err)
       showToast('error', 'خطا در بارگذاری اطلاعات لابراتوار')
@@ -338,6 +341,18 @@ export default function Laboratory() {
   const quickStatusChange = (order: LabOrder, newStatus: string) => {
     h.select()
     const meta = labOrderStatuses.find((s) => s.value === newStatus) || labOrderStatuses[0]
+    // When a lab order is delivered, find any treatment in the same
+    // encounter referencing this same lab that's still open — a
+    // delivered crown/bridge with the parent treatment still stuck on
+    // 'planned' is exactly how a case looks unfinished forever, and
+    // would even wrongly trigger the 'unfinished treatment' reminder.
+    // Matching is scoped to (encounter_id + lab_id) — a real link, not a
+    // guess — and stays a one-tap confirm rather than silently
+    // auto-completing something that might not actually be done yet.
+    const linkedTreatment = newStatus === 'delivered' && order.encounter_id
+      ? treatments.find((t) => t.encounter_id === order.encounter_id && t.lab_id === order.lab_id && t.status !== 'completed')
+      : null
+
     confirmAction({
       type: 'status',
       title: 'تغییر وضعیت سفارش',
@@ -345,12 +360,18 @@ export default function Laboratory() {
         { label: 'بیمار', value: getPatientName(order.patient_id), highlight: true },
         { label: 'وضعیت فعلی', value: labOrderStatuses.find((s) => s.value === order.status)?.label || order.status },
         { label: 'وضعیت جدید', value: meta.label, highlight: true },
+        ...(linkedTreatment ? [{ label: 'درمان مرتبط', value: `${linkedTreatment.procedure_name || 'درمان'} — همزمان تکمیل می‌شود` }] : []),
       ],
       confirmLabel: 'تایید',
       onConfirm: async () => {
         const updates: any = { status: newStatus }
         if (newStatus === 'delivered') updates.received_at = new Date().toISOString()
-        try { await updateLabOrder(order.id, updates); showToast('success', 'وضعیت تغییر کرد'); await loadData() }
+        try {
+          await updateLabOrder(order.id, updates)
+          if (linkedTreatment) await updateTreatment(linkedTreatment.id, { status: 'completed' })
+          showToast('success', linkedTreatment ? 'وضعیت تغییر کرد و درمان مرتبط تکمیل شد' : 'وضعیت تغییر کرد')
+          await loadData()
+        }
         catch { showToast('error', 'خطا') }
       },
     })
