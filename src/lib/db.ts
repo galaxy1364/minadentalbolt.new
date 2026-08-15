@@ -16,6 +16,10 @@ export interface SyncQueueEntry {
   data: any
   created_at: number
   retry_count: number
+  /** Set once retries are exhausted — the record is NEVER deleted, only
+   * parked here for manual review, so nothing is silently lost. */
+  failed?: boolean
+  last_error?: string
 }
 
 export interface SyncMeta {

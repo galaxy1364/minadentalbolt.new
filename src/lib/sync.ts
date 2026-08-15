@@ -4,26 +4,29 @@ import { logAudit } from './auditLog'
 
 export type SyncStatus = 'idle' | 'syncing' | 'online' | 'offline' | 'error'
 
-type SyncListener = (status: SyncStatus, pending: number, lastSync: string | null) => void
+type SyncListener = (status: SyncStatus, pending: number, lastSync: string | null, failedCount: number) => void
 
 const listeners: Set<SyncListener> = new Set()
 let currentStatus: SyncStatus = typeof navigator !== 'undefined' && navigator.onLine ? 'online' : 'offline'
 let pendingCount = 0
+let failedCount = 0
 let lastSyncAt: string | null = null
 let syncTimer: ReturnType<typeof setTimeout> | null = null
 
 export function subscribeSync(listener: SyncListener): () => void {
   listeners.add(listener)
-  listener(currentStatus, pendingCount, lastSyncAt)
+  listener(currentStatus, pendingCount, lastSyncAt, failedCount)
   return () => listeners.delete(listener)
 }
 
 function notify() {
-  listeners.forEach((l) => l(currentStatus, pendingCount, lastSyncAt))
+  listeners.forEach((l) => l(currentStatus, pendingCount, lastSyncAt, failedCount))
 }
 
 async function refreshPendingCount() {
-  pendingCount = await db.sync_queue.count()
+  const all = await db.sync_queue.toArray()
+  pendingCount = all.filter((e) => !e.failed).length
+  failedCount = all.filter((e) => e.failed).length
   notify()
 }
 
@@ -51,7 +54,8 @@ async function pullTable(tableName: TableName): Promise<number> {
 }
 
 async function pushQueue(): Promise<void> {
-  const entries = await db.sync_queue.orderBy('created_at').limit(50).toArray()
+  const allEntries = await db.sync_queue.orderBy('created_at').toArray()
+  const entries = allEntries.filter((e) => !e.failed).slice(0, 50)
   if (entries.length === 0) return
 
   for (const entry of entries) {
@@ -70,14 +74,15 @@ async function pushQueue(): Promise<void> {
     } catch (err: any) {
       if (entry.id) {
         const newRetry = entry.retry_count + 1
-        await db.sync_queue.update(entry.id, { retry_count: newRetry })
         if (newRetry >= 10) {
-          await db.sync_queue.delete(entry.id)
-          // Notify user of data loss
-          listeners.forEach((l) => l('error', pendingCount, lastSyncAt))
-          if (typeof window !== 'undefined') {
-            console.error(`Sync op dropped after 10 retries: ${entry.operation} on ${entry.table_name}`)
-          }
+          // NEVER delete the data on repeated failure — park it for manual
+          // review instead (see Settings → همگام‌سازی‌های ناموفق). Losing a
+          // patient/payment/appointment record silently is unacceptable for
+          // a clinic's real operational data.
+          await db.sync_queue.update(entry.id, { retry_count: newRetry, failed: true, last_error: err?.message || String(err) })
+          currentStatus = 'error'
+        } else {
+          await db.sync_queue.update(entry.id, { retry_count: newRetry, last_error: err?.message || String(err) })
         }
       }
     }
@@ -180,4 +185,38 @@ export function initSyncEngine(): () => void {
     clearInterval(interval)
     if (syncTimer) clearTimeout(syncTimer)
   }
+}
+
+// ── Failed sync entries — manual review & recovery ──────────────────────
+// These are operations that failed 10 times in a row (e.g. a real
+// validation error, not a transient network blip) and were parked
+// instead of being silently discarded. They stay in sync_queue forever
+// until someone deliberately retries or discards them from Settings.
+
+export async function getFailedSyncEntries(): Promise<SyncQueueEntry[]> {
+  const all = await db.sync_queue.toArray()
+  return all.filter((e) => e.failed).sort((a, b) => b.created_at - a.created_at)
+}
+
+/** Resets the entry so the normal push loop picks it up again on the next sync. */
+export async function retryFailedEntry(id: number): Promise<void> {
+  await db.sync_queue.update(id, { failed: false, retry_count: 0, last_error: undefined })
+  await refreshPendingCount()
+  if (typeof navigator !== 'undefined' && navigator.onLine) enqueueSync(500)
+}
+
+export async function retryAllFailedEntries(): Promise<void> {
+  const failed = await getFailedSyncEntries()
+  for (const e of failed) {
+    if (e.id) await db.sync_queue.update(e.id, { failed: false, retry_count: 0, last_error: undefined })
+  }
+  await refreshPendingCount()
+  if (typeof navigator !== 'undefined' && navigator.onLine) enqueueSync(500)
+}
+
+/** Explicit, deliberate discard — only ever called by a human clicking a
+ * confirm button in Settings, never automatically. */
+export async function discardFailedEntry(id: number): Promise<void> {
+  await db.sync_queue.delete(id)
+  await refreshPendingCount()
 }

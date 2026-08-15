@@ -4,7 +4,7 @@ import {
   Settings as SettingsIcon, Building2, Hash, MessageSquare, Package, Save, Smile,
   Cloud, Download, Upload, Vibrate, Volume2, Bell, Database, RefreshCw, Check,
   Smartphone, Shield, AlertTriangle, Eye, ChevronRight, Wifi, Plus, Edit2, Trash2,
-  Stethoscope, Wrench, ListOrdered, Tag, Copy, CheckCircle2, History,
+  Stethoscope, Wrench, ListOrdered, Tag, Copy, CheckCircle2, History, CloudOff,
 } from 'lucide-react'
 import {
   fetchSmsTemplates, fetchTreatmentPackages, fetchDoctors, fetchUnits, fetchProcedures,
@@ -17,7 +17,7 @@ import {
   createInventoryCategory, updateInventoryCategory, deleteInventoryCategory,
 } from '../lib/api'
 import { db, TABLE_NAMES } from '../lib/db'
-import { syncNow, subscribeSync, SyncStatus } from '../lib/sync'
+import { syncNow, subscribeSync, SyncStatus, getFailedSyncEntries, retryFailedEntry, retryAllFailedEntries, discardFailedEntry } from '../lib/sync'
 import { toJalaliString, toJalaliStringPretty, formatCurrency, formatNumber, toPersianDigits } from '../lib/persianDate'
 import {
   SmsTemplate, TreatmentPackage, Doctor, Unit, Procedure, InventoryCategory,
@@ -31,6 +31,7 @@ import { getErrorLog, clearErrorLog, LoggedError } from '../lib/errorLog'
 import { fetchAuditLog, clearAuditLog } from '../lib/auditLog'
 import { listBackupSnapshots, restoreFromSnapshot } from '../lib/autoBackup'
 import type { AuditLogEntry, BackupSnapshot } from '../lib/db'
+import type { SyncQueueEntry } from '../lib/db'
 
 const smsTemplateTypes: { value: string; label: string }[] = [
   { value: 'appointment_reminder', label: 'یادآوری نوبت' },
@@ -412,6 +413,7 @@ export default function Settings() {
           { key: 'categories', label: 'دسته‌بندی انبار', icon: <Tag size={16} /> },
           { key: 'errors', label: 'گزارش خطاها', icon: <AlertTriangle size={16} /> },
           { key: 'audit', label: 'گزارش فعالیت‌ها', icon: <History size={16} /> },
+          { key: 'failed_sync', label: 'همگام‌سازی ناموفق', icon: <CloudOff size={16} /> },
         ]}
         active={activeTab}
         onChange={setActiveTab}
@@ -545,6 +547,9 @@ export default function Settings() {
 
       {/* Audit Log Tab */}
       {activeTab === 'audit' && <AuditLogTab />}
+
+      {/* Failed Sync Tab */}
+      {activeTab === 'failed_sync' && <FailedSyncTab />}
 
       {/* Haptics Tab */}
       {activeTab === 'haptics' && (
@@ -889,6 +894,112 @@ function AuditLogTab() {
                 <Badge color={opColor[e.operation] || 'slate'}>{e.summary}</Badge>
                 <span className="text-xs text-slate-500 dark:text-slate-400 flex-1 truncate">{e.actor_name}</span>
                 <span className="text-[10px] text-slate-400">{toJalaliStringPretty(e.created_at)}</span>
+              </div>
+            ))}
+          </div>
+        )}
+      </Card>
+    </div>
+  )
+}
+
+// ============================================================================
+// Failed Sync Tab — data that could NOT reach the server after repeated
+// retries. Never auto-deleted; the admin sees and resolves it here.
+// ============================================================================
+
+const TABLE_LABELS_FA: Record<string, string> = {
+  patients: 'بیمار', doctors: 'پزشک', units: 'یونیت', appointments: 'نوبت',
+  encounters: 'ویزیت', treatments: 'درمان', payments: 'پرداخت', procedures: 'رویه درمانی',
+  laboratories: 'لابراتوار', lab_orders: 'سفارش لابراتوار', insurance_companies: 'شرکت بیمه',
+  insurance_claims: 'ادعای بیمه', prescriptions: 'نسخه', radiology_images: 'تصویر رادیولوژی',
+  treatment_phases: 'فاز درمان', waiting_list: 'لیست انتظار', staff: 'پرسنل', expenses: 'هزینه',
+  treatment_packages: 'پکیج درمان', consent_forms: 'فرم رضایت', tooth_records: 'رکورد دندان',
+  inventory_items: 'قلم انبار', inventory_categories: 'دسته‌بندی انبار', payment_plans: 'طرح قسطی',
+  installments: 'قسط', cheques: 'چک', doctor_schedules: 'برنامه پزشک', implant_cases: 'مورد ایمپلنت',
+  implant_components: 'کامپوننت ایمپلنت', sms_templates: 'قالب پیامک',
+}
+const OP_LABELS_FA: Record<string, string> = { insert: 'ثبت', update: 'ویرایش', delete: 'حذف' }
+
+function FailedSyncTab() {
+  const [entries, setEntries] = useState<SyncQueueEntry[]>([])
+  const [loading, setLoading] = useState(true)
+  const [busyId, setBusyId] = useState<number | null>(null)
+  const [expandedId, setExpandedId] = useState<number | null>(null)
+
+  const load = () => { getFailedSyncEntries().then((e) => { setEntries(e); setLoading(false) }) }
+  useEffect(() => { load() }, [])
+
+  const handleRetry = async (id: number) => {
+    setBusyId(id)
+    await retryFailedEntry(id)
+    showToast('success', 'دوباره در صف همگام‌سازی قرار گرفت')
+    setBusyId(null)
+    load()
+  }
+
+  const handleRetryAll = async () => {
+    setBusyId(-1)
+    await retryAllFailedEntries()
+    showToast('success', 'همه موارد دوباره در صف قرار گرفتند')
+    setBusyId(null)
+    load()
+  }
+
+  const handleDiscard = async (entry: SyncQueueEntry) => {
+    if (!window.confirm(`این مورد («${OP_LABELS_FA[entry.operation]} ${TABLE_LABELS_FA[entry.table_name] || entry.table_name}») برای همیشه نادیده گرفته شود؟ این کار قابل بازگشت نیست.`)) return
+    if (!entry.id) return
+    await discardFailedEntry(entry.id)
+    showToast('success', 'نادیده گرفته شد')
+    load()
+  }
+
+  const handleCopy = (entry: SyncQueueEntry) => {
+    navigator.clipboard.writeText(JSON.stringify(entry.data, null, 2)).then(() => showToast('success', 'کپی شد'))
+  }
+
+  return (
+    <div className="space-y-4">
+      <Card className="p-5">
+        <div className="flex items-center justify-between mb-1">
+          <h2 className="text-base font-bold text-slate-800 dark:text-slate-100 flex items-center gap-2">
+            <CloudOff size={18} className="text-error-600" /> همگام‌سازی‌های ناموفق
+          </h2>
+          {entries.length > 0 && <Button size="sm" variant="primary" onClick={handleRetryAll} disabled={busyId !== null}>تلاش مجدد همه</Button>}
+        </div>
+        <p className="text-xs text-slate-500 dark:text-slate-400 mb-4">
+          این‌ها تغییراتی هستند که بعد از ۱۰ بار تلاش به سرور ابری نرسیدند — روی همین دستگاه محفوظ مانده‌اند و <b>هرگز خودکار پاک نمی‌شوند</b>. معمولاً با اتصال اینترنت بهتر و «تلاش مجدد» حل می‌شود.
+        </p>
+        {loading ? (
+          <Spinner size={20} />
+        ) : entries.length === 0 ? (
+          <div className="flex flex-col items-center justify-center py-10 text-center">
+            <div className="w-14 h-14 rounded-2xl bg-success-50 dark:bg-success-900/20 flex items-center justify-center mb-3">
+              <CheckCircle2 size={24} className="text-success-500" />
+            </div>
+            <p className="text-sm font-medium text-slate-600 dark:text-slate-300">همه‌چیز با موفقیت همگام‌سازی شده — چیزی گم نشده 🎉</p>
+          </div>
+        ) : (
+          <div className="space-y-2">
+            {entries.map((entry) => (
+              <div key={entry.id} className="p-3 rounded-xl bg-error-50 dark:bg-error-900/10 border border-error-100 dark:border-error-800">
+                <div className="flex items-center justify-between gap-2 cursor-pointer" onClick={() => setExpandedId(expandedId === entry.id ? null : (entry.id ?? null))}>
+                  <div className="min-w-0">
+                    <p className="text-sm font-bold text-error-700 dark:text-error-300">{OP_LABELS_FA[entry.operation]} {TABLE_LABELS_FA[entry.table_name] || entry.table_name}</p>
+                    <p className="text-[11px] text-slate-400 truncate">{entry.last_error || 'خطای نامشخص'}</p>
+                  </div>
+                  <Badge color="error">{toPersianDigits(entry.retry_count)} بار تلاش</Badge>
+                </div>
+                {expandedId === entry.id && (
+                  <pre className="text-[10px] text-slate-500 dark:text-slate-400 mt-2 whitespace-pre-wrap break-all bg-white dark:bg-slate-900 rounded-lg p-2 max-h-[160px] overflow-y-auto">{JSON.stringify(entry.data, null, 2)}</pre>
+                )}
+                <div className="flex gap-2 mt-2">
+                  <Button size="sm" variant="primary" onClick={() => entry.id && handleRetry(entry.id)} disabled={busyId !== null}>
+                    {busyId === entry.id ? <Spinner size={14} /> : 'تلاش مجدد'}
+                  </Button>
+                  <Button size="sm" variant="secondary" onClick={() => handleCopy(entry)}><Copy size={13} className="inline ml-1" /> کپی داده</Button>
+                  <Button size="sm" variant="danger" onClick={() => handleDiscard(entry)}>نادیده بگیر</Button>
+                </div>
               </div>
             ))}
           </div>

@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react'
 import { HashRouter, Routes, Route, useNavigate, useLocation } from 'react-router-dom'
 import {
-  MoreHorizontal, X, Wifi, WifiOff, RefreshCw, Moon, Sun, LogOut,
+  MoreHorizontal, X, Wifi, WifiOff, RefreshCw, Moon, Sun, LogOut, AlertTriangle,
 } from 'lucide-react'
 import { Spinner, ToastContainer, Button } from './ui'
 import AICommandBar from './AICommandBar'
@@ -46,14 +46,17 @@ function DarkModeToggle() {
 
 // ── Sync indicator ──────────────────────────────────────
 function SyncIndicator() {
+  const navigate = useNavigate()
   const [status, setStatus] = useState<SyncStatus>('idle')
   const [pending, setPending] = useState(0)
+  const [failed, setFailed] = useState(0)
   const [spinning, setSpinning] = useState(false)
   const prevStatus = useRef<SyncStatus>('idle')
+  const prevFailed = useRef(0)
 
   useEffect(() => {
-    const unsub = subscribeSync((s, p) => {
-      setStatus(s); setPending(p); setSpinning(s === 'syncing')
+    const unsub = subscribeSync((s, p, _lastSync, f) => {
+      setStatus(s); setPending(p); setSpinning(s === 'syncing'); setFailed(f)
       // Only notify on an actual transition (e.g. offline -> online, or a
       // sync that just finished pushing real changes) — not on every
       // background poll tick, which would otherwise pop up a toast every
@@ -61,32 +64,47 @@ function SyncIndicator() {
       const changed = prevStatus.current !== s
       if (s === 'online' && p === 0 && changed) {
         pushIslandNotification({ id: 'sync-done', title: 'همگام‌سازی کامل', message: 'داده‌ها به‌روزرسانی شد', icon: <CheckCircle2 size={16} />, color: '#0d9488', duration: 3000 })
-      } else if ((s === 'offline' || s === 'error') && changed) {
+      } else if ((s === 'offline') && changed) {
         pushIslandNotification({ id: 'sync-off', title: 'حالت آفلاین', message: 'تغییرات بعداً همگام می‌شوند', icon: <CloudOff size={16} />, color: '#f59e0b', duration: 3000 })
       }
+      // Failed items need a persistent, hard-to-miss alert — this is real
+      // data that couldn't reach the server after repeated attempts.
+      if (f > prevFailed.current) {
+        pushIslandNotification({ id: 'sync-failed', title: 'نیاز به بررسی', message: `${f} مورد همگام‌سازی نشد — تنظیمات را ببینید`, icon: <AlertTriangle size={16} />, color: '#dc2626', duration: 6000 })
+      }
       prevStatus.current = s
+      prevFailed.current = f
     })
     return unsub
   }, [])
 
   const isOnline = status === 'online' || status === 'syncing' || status === 'idle'
-  const label = spinning ? 'در حال همگام‌سازی' : isOnline ? 'آنلاین' : 'حالت آفلاین — تغییرات با اتصال اینترنت سینک می‌شود'
+  const hasFailed = failed > 0
+  const label = hasFailed
+    ? `${failed} مورد همگام‌سازی نشد — برای بررسی بزنید`
+    : spinning ? 'در حال همگام‌سازی' : isOnline ? 'آنلاین' : 'حالت آفلاین — تغییرات با اتصال اینترنت سینک می‌شود'
 
   return (
     <button
-      onClick={() => { if (isOnline) { h.tap(); syncNow() } }}
+      onClick={() => { h.tap(); if (hasFailed) navigate('/settings'); else if (isOnline) syncNow() }}
       aria-label={label}
       title={label}
-      className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl glass border transition-all-smooth active:scale-95 ${isOnline ? 'border-white/60 dark:border-white/10' : 'border-warning-300 dark:border-warning-700 bg-warning-50/80 dark:bg-warning-900/20'}`}
+      className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl glass border transition-all-smooth active:scale-95 ${
+        hasFailed ? 'border-error-300 dark:border-error-700 bg-error-50/90 dark:bg-error-900/30' :
+        isOnline ? 'border-white/60 dark:border-white/10' :
+        'border-warning-300 dark:border-warning-700 bg-warning-50/80 dark:bg-warning-900/20'
+      }`}
     >
-      {spinning
-        ? <RefreshCw size={13} className="animate-spin text-primary-600" />
-        : isOnline
-          ? <Wifi size={13} className="text-primary-600" />
-          : <WifiOff size={13} className="text-warning-600" />
+      {hasFailed
+        ? <AlertTriangle size={13} className="text-error-600" />
+        : spinning
+          ? <RefreshCw size={13} className="animate-spin text-primary-600" />
+          : isOnline
+            ? <Wifi size={13} className="text-primary-600" />
+            : <WifiOff size={13} className="text-warning-600" />
       }
-      <div className={`w-1.5 h-1.5 rounded-full ${isOnline ? 'bg-primary-500' : 'bg-warning-500'} ${isOnline && !spinning ? 'animate-pulse' : ''}`} />
-      {pending > 0 && <span className="text-[10px] text-slate-500 font-medium">{pending}</span>}
+      <div className={`w-1.5 h-1.5 rounded-full ${hasFailed ? 'bg-error-500 animate-pulse' : isOnline ? 'bg-primary-500' : 'bg-warning-500'} ${isOnline && !spinning && !hasFailed ? 'animate-pulse' : ''}`} />
+      {hasFailed ? <span className="text-[10px] text-error-600 font-bold">{failed}</span> : pending > 0 && <span className="text-[10px] text-slate-500 font-medium">{pending}</span>}
     </button>
   )
 }
