@@ -1,9 +1,9 @@
 import { useState, useEffect, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Archive as ArchiveIcon, Search, Users, IdCard, RotateCcw, User } from 'lucide-react'
-import { fetchPatients, fetchStaff, updatePatient, updateStaff } from '../lib/api'
+import { Archive as ArchiveIcon, Search, Users, IdCard, RotateCcw, User, Building2 } from 'lucide-react'
+import { fetchPatients, fetchStaff, updatePatient, updateStaff, fetchInsuranceCompanies, updateInsuranceCompany } from '../lib/api'
 import { toJalaliStringPretty, toPersianDigits } from '../lib/persianDate'
-import type { Patient, Staff as StaffType } from '../types'
+import type { Patient, Staff as StaffType, InsuranceCompany } from '../types'
 import { Card, Button, Spinner, EmptyState, Tabs, showToast, HighlightText } from '../components/ui'
 import { ModuleHeader } from '../components/ModuleHeader'
 import { useConfirmAction } from '../components/ConfirmAction'
@@ -13,18 +13,20 @@ import { h } from '../lib/haptics'
 export default function Archive() {
   const navigate = useNavigate()
   const { confirmAction, ConfirmActionModal } = useConfirmAction()
-  const [tab, setTab] = useState<'patients' | 'staff'>('patients')
+  const [tab, setTab] = useState<'patients' | 'staff' | 'insurance'>('patients')
   const [patients, setPatients] = useState<Patient[]>([])
   const [staff, setStaff] = useState<StaffType[]>([])
+  const [companies, setCompanies] = useState<InsuranceCompany[]>([])
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
 
   const loadData = async () => {
     setLoading(true)
     try {
-      const [pats, st] = await Promise.all([fetchPatients(), fetchStaff()])
+      const [pats, st, comps] = await Promise.all([fetchPatients(), fetchStaff(), fetchInsuranceCompanies()])
       setPatients(pats.filter((p) => !p.is_active))
       setStaff(st.filter((s) => !s.is_active))
+      setCompanies(comps.filter((c) => !c.is_active))
     } finally {
       setLoading(false)
     }
@@ -49,6 +51,15 @@ export default function Archive() {
       .sort((a, b) => (b.score as number) - (a.score as number))
       .map((r) => r.s)
   }, [staff, search])
+
+  const filteredCompanies = useMemo(() => {
+    if (!search.trim()) return companies
+    return companies
+      .map((c) => ({ c, score: scoreFields(search, [{ value: c.name, weight: 1.2 }]) }))
+      .filter((r) => r.score !== null)
+      .sort((a, b) => (b.score as number) - (a.score as number))
+      .map((r) => r.c)
+  }, [companies, search])
 
   const handleRestorePatient = (p: Patient) => {
     h.tap()
@@ -80,6 +91,21 @@ export default function Archive() {
     })
   }
 
+  const handleRestoreCompany = (c: InsuranceCompany) => {
+    h.tap()
+    confirmAction({
+      type: 'status',
+      title: 'بازگردانی شرکت بیمه',
+      fields: [{ label: 'نام', value: c.name, icon: <Building2 size={16} />, highlight: true }],
+      confirmLabel: 'بازگردانی به لیست فعال',
+      onConfirm: async () => {
+        await updateInsuranceCompany(c.id, { is_active: true })
+        showToast('success', 'شرکت بیمه بازگردانی شد')
+        loadData()
+      },
+    })
+  }
+
   if (loading) {
     return (
       <div className="space-y-4" aria-busy="true">
@@ -97,7 +123,7 @@ export default function Archive() {
       <ModuleHeader
         moduleKey="archive"
         title="بایگانی"
-        subtitle={`${toPersianDigits(patients.length + staff.length)} مورد غیرفعال‌شده`}
+        subtitle={`${toPersianDigits(patients.length + staff.length + companies.length)} مورد غیرفعال‌شده`}
       />
 
       <div className="relative">
@@ -115,9 +141,10 @@ export default function Archive() {
         tabs={[
           { key: 'patients', label: 'بیماران', icon: <Users size={16} /> },
           { key: 'staff', label: 'پرسنل', icon: <IdCard size={16} /> },
+          { key: 'insurance', label: 'بیمه', icon: <Building2 size={16} /> },
         ]}
         active={tab}
-        onChange={(k) => setTab(k as 'patients' | 'staff')}
+        onChange={(k) => setTab(k as 'patients' | 'staff' | 'insurance')}
       />
 
       {tab === 'patients' && (
@@ -162,6 +189,31 @@ export default function Archive() {
                   <p className="text-[11px] text-slate-400">غیرفعال از {toJalaliStringPretty(s.updated_at)}</p>
                 </div>
                 <Button size="sm" variant="secondary" onClick={() => handleRestoreStaff(s)}>
+                  <RotateCcw size={14} className="inline ml-1" /> بازگردانی
+                </Button>
+              </Card>
+            ))}
+          </div>
+        )
+      )}
+
+      {tab === 'insurance' && (
+        filteredCompanies.length === 0 ? (
+          <EmptyState icon={<ArchiveIcon size={40} />} title="بایگانی بیمه خالی است" description="شرکت‌های بیمه‌ی غیرفعال‌شده اینجا نمایش داده می‌شوند" />
+        ) : (
+          <div className="space-y-2">
+            {filteredCompanies.map((c) => (
+              <Card key={c.id} className="p-3.5 flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-slate-100 dark:bg-slate-700 flex items-center justify-center text-slate-500 dark:text-slate-400 shrink-0">
+                  <Building2 size={18} />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-bold text-slate-800 dark:text-slate-100 truncate">
+                    <HighlightText text={c.name} query={search} />
+                  </p>
+                  <p className="text-[11px] text-slate-400">غیرفعال از {toJalaliStringPretty(c.updated_at)}</p>
+                </div>
+                <Button size="sm" variant="secondary" onClick={() => handleRestoreCompany(c)}>
                   <RotateCcw size={14} className="inline ml-1" /> بازگردانی
                 </Button>
               </Card>

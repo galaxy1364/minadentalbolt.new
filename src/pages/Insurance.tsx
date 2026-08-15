@@ -193,9 +193,35 @@ export default function Insurance() {
 
   const handleDeleteCompany = (c: InsuranceCompany) => {
     h.tap()
+    const hasHistory = claims.some((cl) => cl.company_id === c.id)
+
+    if (hasHistory) {
+      // A company with existing claims must not be hard-deleted — those
+      // claims would lose their company reference (showing as
+      // 'نامشخص' everywhere) and the record of what was submitted/
+      // approved with that insurer would effectively be orphaned.
+      confirmAction({
+        type: 'status',
+        title: 'این شرکت بیمه قابل حذف نیست',
+        warning: 'این شرکت بیمه دارای ادعای ثبت‌شده است — حذف کامل باعث گم شدن ارجاع آن ادعاها می‌شود.',
+        fields: [
+          { label: 'نام', value: c.name, highlight: true },
+          { label: 'پیشنهاد', value: 'غیرفعال کردن به‌جای حذف' },
+        ],
+        confirmLabel: 'غیرفعال کردن شرکت',
+        onConfirm: async () => {
+          await updateInsuranceCompany(c.id, { is_active: false })
+          showToast('success', 'شرکت بیمه غیرفعال شد')
+          loadData()
+        },
+      })
+      return
+    }
+
     confirmAction({
       type: 'delete',
       title: 'حذف شرکت بیمه',
+      warning: 'این عملیات قابل بازگشت نیست',
       fields: [{ label: 'نام', value: c.name, highlight: true }],
       confirmLabel: 'تایید حذف',
       onConfirm: async () => { await deleteInsuranceCompany(c.id); showToast('success', 'حذف شد'); loadData() },
