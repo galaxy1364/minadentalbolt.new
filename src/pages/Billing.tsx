@@ -3,7 +3,7 @@ import { useState, useEffect, useCallback, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { CreditCard, Plus, Search, DollarSign, TrendingUp, Wallet, Calendar, CheckCircle2, AlertCircle, Edit2, Filter, Receipt, Banknote, Clock, Trash2, Printer } from 'lucide-react'
 import { BarChart, Bar, XAxis, YAxis, Tooltip as RTooltip, ResponsiveContainer, PieChart, Pie, Cell as RCell } from 'recharts'
-import { fetchPayments, createPayment, updatePayment, deletePayment, fetchEncounters, fetchCheques, createCheque, updateCheque, fetchPaymentPlans, createPaymentPlan, updatePaymentPlan, updateInstallment, fetchPatients, fetchExpenses, createExpense, deleteExpense, fetchTreatments, fetchImplantCases } from '../lib/api'
+import { fetchPayments, createPayment, updatePayment, deletePayment, fetchEncounters, fetchCheques, createCheque, updateCheque, deleteCheque, fetchPaymentPlans, createPaymentPlan, updatePaymentPlan, deletePaymentPlan, updateInstallment, fetchPatients, fetchExpenses, createExpense, updateExpense, deleteExpense, fetchTreatments, fetchImplantCases } from '../lib/api'
 import { toJalaliString, toJalaliStringPretty, formatCurrency, formatNumber, toPersianDigits } from '../lib/persianDate'
 import { h } from '../lib/haptics'
 import { useConfirmAction } from '../components/ConfirmAction'
@@ -371,6 +371,42 @@ export default function Billing() {
     })
   }
 
+  const handleDeleteCheque = (cheque: Cheque) => {
+    h.tap()
+    confirmAction({
+      type: 'delete',
+      title: 'حذف چک',
+      warning: 'این عملیات قابل بازگشت نیست',
+      fields: [
+        { label: 'بیمار', value: getPatientName(cheque.patient_id), highlight: true },
+        { label: 'مبلغ', value: `${formatCurrency(cheque.amount)} ت` },
+      ],
+      confirmLabel: 'تایید حذف',
+      onConfirm: async () => {
+        try { await deleteCheque(cheque.id); showToast('success', 'چک حذف شد'); await loadData() }
+        catch { showToast('error', 'خطا در حذف') }
+      },
+    })
+  }
+
+  const handleDeletePlan = (plan: PaymentPlanWithRelations) => {
+    h.tap()
+    confirmAction({
+      type: 'delete',
+      title: 'حذف طرح قسطی',
+      warning: 'این طرح هیچ قسط پرداخت‌شده‌ای ندارد — حذفش امن است',
+      fields: [
+        { label: 'بیمار', value: getPatientName(plan.patient_id), highlight: true },
+        { label: 'مبلغ کل', value: `${formatCurrency(plan.total_amount)} ت` },
+      ],
+      confirmLabel: 'تایید حذف',
+      onConfirm: async () => {
+        try { await deletePaymentPlan(plan.id); showToast('success', 'طرح قسطی حذف شد'); await loadData() }
+        catch { showToast('error', 'خطا در حذف') }
+      },
+    })
+  }
+
   const quickChequeStatusChange = (cheque: Cheque, newStatus: string) => {
     h.select()
     const meta = chequeStatuses.find((s) => s.value === newStatus) || chequeStatuses[0]
@@ -680,6 +716,9 @@ export default function Billing() {
                     >
                       {chequeStatuses.map((s) => <option key={s.value} value={s.value}>{s.label}</option>)}
                     </select>
+                    {c.status !== 'cleared' && (
+                      <button onClick={() => handleDeleteCheque(c)} aria-label="حذف چک" className="p-1.5 rounded-lg text-slate-400 hover:text-error-600 hover:bg-error-50 transition-colors"><Trash2 size={14} /></button>
+                    )}
                   </div>
                 </div>
                 {c.notes && <p className="text-xs text-slate-400 mt-2">{c.notes}</p>}
@@ -719,7 +758,12 @@ export default function Billing() {
                     <p className="text-sm font-bold text-slate-800">{getPatientName(plan.patient_id)}</p>
                     <p className="text-xs text-slate-500">مبلغ کل: {formatCurrency(plan.total_amount)} تومان - {toPersianDigits(plan.installment_count)} قسط</p>
                   </div>
-                  <Badge color={statusMeta.color}>{statusMeta.label}</Badge>
+                  <div className="flex items-center gap-2">
+                    <Badge color={statusMeta.color}>{statusMeta.label}</Badge>
+                    {paidCount === 0 && (
+                      <button onClick={() => handleDeletePlan(plan)} aria-label="حذف طرح قسطی" className="p-1.5 rounded-lg text-slate-400 hover:text-error-600 hover:bg-error-50 transition-colors"><Trash2 size={14} /></button>
+                    )}
+                  </div>
                 </div>
 
                 {/* Progress bar */}
@@ -773,8 +817,17 @@ export default function Billing() {
   // ===========================================================================
 
   // ── Expenses Tab ──────────────────────────────────────────
+  const [editingExpense, setEditingExpense] = useState<Expense | null>(null)
   const openCreateExpense = () => {
+    setEditingExpense(null)
     setExpenseForm({ category: '', amount: '', description: '', date: new Date().toISOString().slice(0, 10), payment_method: 'cash' })
+    setExpenseWizardStep(0)
+    setExpenseModalOpen(true)
+  }
+
+  const openEditExpense = (e: Expense) => {
+    setEditingExpense(e)
+    setExpenseForm({ category: e.category, amount: String(e.amount), description: e.description || '', date: e.date, payment_method: e.payment_method || 'cash' })
     setExpenseWizardStep(0)
     setExpenseModalOpen(true)
   }
@@ -783,16 +836,21 @@ export default function Billing() {
     if (!expenseForm.category.trim() || !expenseForm.amount) { showToast('error', 'دسته‌بندی و مبلغ الزامی است'); return }
     setSavingExpense(true)
     try {
-      await createExpense({
-        clinic_id: undefined as any,
+      const payload = {
         category: expenseForm.category.trim(),
         amount: Number(expenseForm.amount),
         description: expenseForm.description || null,
         date: expenseForm.date,
         payment_method: expenseForm.payment_method,
         reference: null,
-      })
-      showToast('success', 'هزینه ثبت شد')
+      }
+      if (editingExpense) {
+        await updateExpense(editingExpense.id, payload)
+        showToast('success', 'هزینه ویرایش شد')
+      } else {
+        await createExpense({ clinic_id: undefined as any, ...payload })
+        showToast('success', 'هزینه ثبت شد')
+      }
       setExpenseModalOpen(false)
       loadData()
     } catch { showToast('error', 'خطا در ثبت هزینه') } finally { setSavingExpense(false) }
@@ -846,6 +904,7 @@ export default function Billing() {
                       <td className="px-4 py-3 text-slate-600">{e.date ? toJalaliString(e.date) : '-'}</td>
                       <td className="px-4 py-3 text-slate-500 max-w-[200px] truncate">{e.description || '-'}</td>
                       <td className="px-4 py-3">
+                        <button onClick={() => openEditExpense(e)} aria-label="ویرایش هزینه" className="text-slate-400 hover:text-primary-600 hover:bg-primary-50 p-1.5 rounded-lg transition-colors"><Edit2 size={15} /></button>
                         <button onClick={() => handleDeleteExpense(e)} aria-label="حذف هزینه" className="text-slate-400 hover:text-error-600 hover:bg-error-50 p-1.5 rounded-lg transition-colors"><Trash2 size={15} /></button>
                       </td>
                     </tr>
@@ -863,11 +922,11 @@ export default function Billing() {
     <Wizard
       open={expenseModalOpen}
       onClose={() => setExpenseModalOpen(false)}
-      title="ثبت هزینه"
+      title={editingExpense ? 'ویرایش هزینه' : 'ثبت هزینه'}
       step={expenseWizardStep}
       onStepChange={setExpenseWizardStep}
       onFinish={handleSaveExpense}
-      finishLabel="ثبت هزینه"
+      finishLabel={editingExpense ? 'ذخیره' : 'ثبت هزینه'}
       saving={savingExpense}
       steps={[
         {
