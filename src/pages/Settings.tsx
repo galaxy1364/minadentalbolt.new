@@ -15,12 +15,13 @@ import {
   createSmsTemplate, updateSmsTemplate, deleteSmsTemplate,
   createTreatmentPackage, updateTreatmentPackage, deleteTreatmentPackage,
   createInventoryCategory, updateInventoryCategory, deleteInventoryCategory,
+  fetchDoctorSchedules, createDoctorSchedule, deleteDoctorSchedule,
 } from '../lib/api'
 import { db, TABLE_NAMES } from '../lib/db'
 import { syncNow, subscribeSync, SyncStatus, getFailedSyncEntries, retryFailedEntry, retryAllFailedEntries, discardFailedEntry } from '../lib/sync'
 import { toJalaliString, toJalaliStringPretty, formatCurrency, formatNumber, toPersianDigits } from '../lib/persianDate'
 import {
-  SmsTemplate, TreatmentPackage, Doctor, Unit, Procedure, InventoryCategory,
+  SmsTemplate, TreatmentPackage, Doctor, Unit, Procedure, InventoryCategory, DoctorSchedule,
   DoctorInput, UnitInput, ProcedureInput, SmsTemplateInput, TreatmentPackageInput, InventoryCategoryInput,
 } from '../types'
 import { Card, Button, Input, Select, Textarea, Badge, Spinner, EmptyState, StatCard, Tabs, Modal, showToast } from '../components/ui'
@@ -95,6 +96,9 @@ export default function Settings() {
   // ── Modals ──
   const [doctorModal, setDoctorModal] = useState(false)
   const [editingDoctor, setEditingDoctor] = useState<Doctor | null>(null)
+  const [doctorSchedule, setDoctorSchedule] = useState<DoctorSchedule[]>([])
+  const [savingSchedule, setSavingSchedule] = useState(false)
+  const weekdays = ['یکشنبه', 'دوشنبه', 'سه‌شنبه', 'چهارشنبه', 'پنجشنبه', 'جمعه', 'شنبه']
   const [doctorForm, setDoctorForm] = useState({ name: '', specialty: '', license_number: '', is_active: 'true' })
   const [savingDoctor, setSavingDoctor] = useState(false)
 
@@ -238,8 +242,57 @@ export default function Settings() {
   }
 
   // ── Doctor handlers ──
-  const openCreateDoctor = () => { setEditingDoctor(null); setDoctorForm({ name: '', specialty: '', license_number: '', is_active: 'true' }); setDoctorModal(true) }
-  const openEditDoctor = (d: Doctor) => { setEditingDoctor(d); setDoctorForm({ name: d.name || '', specialty: d.specialty || '', license_number: d.license_number || '', is_active: d.is_active ? 'true' : 'false' }); setDoctorModal(true) }
+  const openCreateDoctor = () => { setEditingDoctor(null); setDoctorForm({ name: '', specialty: '', license_number: '', is_active: 'true' }); setDoctorSchedule([]); setDoctorModal(true) }
+
+  // Working-hours editor for a doctor — each weekday is either absent
+  // from doctorSchedule (day off) or present with start/end times.
+  const getDaySchedule = (day: number) => doctorSchedule.find((s) => s.day_of_week === day)
+  const toggleDay = (day: number) => {
+    const existing = getDaySchedule(day)
+    if (existing) {
+      setDoctorSchedule(doctorSchedule.filter((s) => s.day_of_week !== day))
+    } else {
+      setDoctorSchedule([...doctorSchedule, {
+        id: `new-${day}`, clinic_id: '', doctor_id: editingDoctor?.id || '', day_of_week: day,
+        start_time: '09:00', end_time: '17:00', slot_duration: 30, break_duration: null,
+        break_start: null, break_end: null, max_appointments: null, is_active: true, notes: null,
+        created_at: '', updated_at: '',
+      } as DoctorSchedule])
+    }
+  }
+  const updateDayTime = (day: number, field: 'start_time' | 'end_time', value: string) => {
+    setDoctorSchedule(doctorSchedule.map((s) => s.day_of_week === day ? { ...s, [field]: value } : s))
+  }
+
+  const handleSaveSchedule = async () => {
+    if (!editingDoctor) return
+    setSavingSchedule(true)
+    try {
+      // Simplest reliable approach given schedules are few rows per
+      // doctor: replace the doctor's whole week — delete whatever
+      // existed, then re-create the current in-memory state.
+      const existing = (await fetchDoctorSchedules()).filter((sc) => sc.doctor_id === editingDoctor.id)
+      for (const s of existing) await deleteDoctorSchedule(s.id)
+      for (const s of doctorSchedule) {
+        await createDoctorSchedule({
+          clinic_id: '', doctor_id: editingDoctor.id, day_of_week: s.day_of_week,
+          start_time: s.start_time, end_time: s.end_time, slot_duration: s.slot_duration || 30,
+          break_duration: null, break_start: null, break_end: null, max_appointments: null,
+          is_active: true, notes: null,
+        } as any)
+      }
+      showToast('success', 'برنامه‌ی کاری ذخیره شد')
+      const refreshed = (await fetchDoctorSchedules()).filter((sc) => sc.doctor_id === editingDoctor.id)
+      setDoctorSchedule(refreshed)
+    } catch { showToast('error', 'خطا در ذخیره‌ی برنامه') }
+    finally { setSavingSchedule(false) }
+  }
+  const openEditDoctor = (d: Doctor) => {
+    setEditingDoctor(d)
+    setDoctorForm({ name: d.name || '', specialty: d.specialty || '', license_number: d.license_number || '', is_active: d.is_active ? 'true' : 'false' })
+    setDoctorModal(true)
+    fetchDoctorSchedules().then((all) => setDoctorSchedule(all.filter((sc) => sc.doctor_id === d.id)))
+  }
   const handleSaveDoctor = async () => {
     if (!doctorForm.name.trim()) { showToast('error', 'نام پزشک الزامی است'); return }
     setSavingDoctor(true)
@@ -678,6 +731,42 @@ export default function Settings() {
           <Input label="تخصص" value={doctorForm.specialty} onChange={(v) => setDoctorForm({ ...doctorForm, specialty: v })} placeholder="مثلا: دندانپزشک عمومی" />
           <Input label="شماره پروانه" value={doctorForm.license_number} onChange={(v) => setDoctorForm({ ...doctorForm, license_number: v })} placeholder="شماره پروانه" dir="ltr" />
           <Select label="وضعیت" value={doctorForm.is_active} onChange={(v) => setDoctorForm({ ...doctorForm, is_active: v })} options={[{ value: 'true', label: 'فعال' }, { value: 'false', label: 'غیرفعال' }]} />
+
+          {editingDoctor && (
+            <div className="pt-3 border-t border-slate-100 dark:border-slate-700">
+              <p className="text-sm font-bold text-slate-700 dark:text-slate-200 mb-2">برنامه‌ی کاری هفتگی</p>
+              <p className="text-xs text-slate-400 mb-3">روزهایی که پزشک کار نمی‌کند را خاموش بگذارید. این برنامه در نوبت‌دهی برای هشدار تداخل با ساعت کاری استفاده می‌شود.</p>
+              <div className="space-y-2">
+                {weekdays.map((label, day) => {
+                  const sched = getDaySchedule(day)
+                  return (
+                    <div key={day} className="flex items-center gap-2 p-2 rounded-xl bg-slate-50 dark:bg-slate-800/60">
+                      <button
+                        onClick={() => toggleDay(day)}
+                        role="switch" aria-checked={!!sched}
+                        className={`relative w-10 h-5.5 rounded-full transition-colors shrink-0 ${sched ? 'bg-primary-600' : 'bg-slate-300 dark:bg-slate-600'}`}
+                      >
+                        <span className={`absolute top-0.5 w-4.5 h-4.5 rounded-full bg-white shadow transition-transform ${sched ? 'right-0.5' : 'right-4.5'}`} />
+                      </button>
+                      <span className="text-xs font-semibold text-slate-600 dark:text-slate-300 w-16 shrink-0">{label}</span>
+                      {sched ? (
+                        <div className="flex items-center gap-1.5 flex-1">
+                          <input type="time" value={sched.start_time} onChange={(e) => updateDayTime(day, 'start_time', e.target.value)} className="flex-1 px-2 py-1 rounded-lg border border-slate-200 dark:border-slate-600 text-xs bg-white dark:bg-slate-700" />
+                          <span className="text-slate-400 text-xs">تا</span>
+                          <input type="time" value={sched.end_time} onChange={(e) => updateDayTime(day, 'end_time', e.target.value)} className="flex-1 px-2 py-1 rounded-lg border border-slate-200 dark:border-slate-600 text-xs bg-white dark:bg-slate-700" />
+                        </div>
+                      ) : (
+                        <span className="text-xs text-slate-400">تعطیل</span>
+                      )}
+                    </div>
+                  )
+                })}
+              </div>
+              <Button variant="secondary" size="sm" onClick={handleSaveSchedule} disabled={savingSchedule} className="w-full justify-center mt-3">
+                {savingSchedule ? <Spinner size={14} /> : 'ذخیره‌ی برنامه‌ی کاری'}
+              </Button>
+            </div>
+          )}
           <div className="flex justify-end gap-2 pt-2 border-t border-slate-100"><Button variant="secondary" onClick={() => setDoctorModal(false)}>انصراف</Button><Button variant="primary" onClick={handleSaveDoctor} disabled={savingDoctor}>{savingDoctor ? <Spinner size={16} /> : editingDoctor ? 'ذخیره' : 'افزودن'}</Button></div>
         </div>
       </Modal>

@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Calendar, Clock, CheckCircle2, User, ChevronRight, ChevronLeft, Plus, Search, Trash2, AlertCircle, Edit2, Stethoscope, DollarSign, FileText, Activity, List, Grid, X, UserPlus } from 'lucide-react'
-import { fetchAppointments, createAppointment, updateAppointment, deleteAppointment, checkConflict, fetchPatients, fetchDoctors, fetchUnits, peekNextFileNumber, createPatient, createEncounter } from '../lib/api'
+import { fetchAppointments, createAppointment, updateAppointment, deleteAppointment, checkConflict, fetchPatients, fetchDoctors, fetchUnits, peekNextFileNumber, createPatient, createEncounter, fetchDoctorSchedules } from '../lib/api'
 import { toJalaliString, toJalaliStringPretty, getJalaliDateInfo, formatTime, formatCurrency, toPersianDigits, persianWeekdaysShort, getHoliday } from '../lib/persianDate'
 import { Appointment, AppointmentWithRelations, Patient, Doctor, Unit } from '../types'
 import { Modal, Card, Button, Input, Select, Textarea, EmptyState, showToast } from '../components/ui'
@@ -194,6 +194,26 @@ export default function Appointments() {
     if (unit) fields.push({ label: 'یونیت', value: unit.name, icon: <FileText size={16} /> })
     if (wizardData.estimated_fee) fields.push({ label: 'هزینه برآوردی', value: `${formatCurrency(Number(wizardData.estimated_fee))} تومان`, icon: <DollarSign size={16} /> })
     if (wizardData.notes) fields.push({ label: 'یادداشت', value: wizardData.notes })
+
+    // Soft warning (never a hard block — real clinics do make
+    // exceptions) if the selected time falls outside this doctor's
+    // declared working hours for that weekday, or the day is marked off
+    // entirely. Schedules are managed in Settings → پزشکان و یونیت‌ها.
+    let scheduleWarning: string | null = null
+    if (wizardData.doctor_id) {
+      const allSchedules = await fetchDoctorSchedules()
+      const docSchedules = allSchedules.filter((s) => s.doctor_id === wizardData.doctor_id)
+      if (docSchedules.length > 0) {
+        const weekday = new Date(wizardData.date).getDay()
+        const daySched = docSchedules.find((s) => s.day_of_week === weekday)
+        if (!daySched) {
+          scheduleWarning = 'طبق برنامه‌ی کاری ثبت‌شده، این پزشک در این روز از هفته حضور ندارد'
+        } else if (wizardData.start_time < daySched.start_time || wizardData.end_time > daySched.end_time) {
+          scheduleWarning = `خارج از ساعت کاری این پزشک (${toPersianDigits(daySched.start_time)} تا ${toPersianDigits(daySched.end_time)})`
+        }
+      }
+    }
+    if (scheduleWarning) fields.push({ label: '⚠ هشدار برنامه‌ی کاری', value: scheduleWarning })
 
     confirmAction({
       type: editingAppt ? 'edit' : 'create',
