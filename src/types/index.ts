@@ -513,7 +513,6 @@ export interface ImplantCase {
   extraction_needed: boolean | null
   sinus_lift: boolean | null
   immediate_loading: boolean | null
-  prosthesis_doctor_id: string | null
   total_cost: number | null
   paid_amount: number | null
   warranty_years: number | null
@@ -526,6 +525,9 @@ export interface ImplantCase {
   surgery_fee_mode: 'formula' | 'negotiated' | null
   surgery_fee_amount: number | null
   surgery_settled: boolean | null
+  prosthesis_doctor_id: string | null
+  prosthesis_fee_amount: number | null
+  prosthesis_settled: boolean | null
   notes: string | null
   success_status: string | null
   failure_reason: string | null

@@ -153,6 +153,7 @@ export default function Implants() {
     surgery_fee_mode: 'formula' as 'formula' | 'negotiated',
     surgery_fee_amount: '',
     prosthesis_doctor_id: '',
+    prosthesis_fee_amount: '',
   })
 
   // Component form state
@@ -258,7 +259,7 @@ export default function Implants() {
       surgery_date: '', bone_graft: false, gbr: false, membrane_used: false, extraction_needed: false,
       sinus_lift: false, immediate_loading: false,
       total_cost: '', paid_amount: '', warranty_years: '', notes: '',
-      surgery_fee_mode: 'formula', surgery_fee_amount: '', prosthesis_doctor_id: '',
+      surgery_fee_mode: 'formula', surgery_fee_amount: '', prosthesis_doctor_id: '', prosthesis_fee_amount: '',
     })
     setCaseModalOpen(true)
   }
@@ -288,6 +289,7 @@ export default function Implants() {
       surgery_fee_mode: (c.surgery_fee_mode as 'formula' | 'negotiated') || 'formula',
       surgery_fee_amount: c.surgery_fee_amount != null ? String(c.surgery_fee_amount) : '',
       prosthesis_doctor_id: c.prosthesis_doctor_id || '',
+      prosthesis_fee_amount: c.prosthesis_fee_amount != null ? String(c.prosthesis_fee_amount) : '',
     })
     setCaseWizardStep(0)
     setCaseModalOpen(true)
@@ -329,6 +331,37 @@ export default function Implants() {
     })
   }
 
+  const handleSettleProsthesis = (c: ImplantCaseWithRelations) => {
+    h.tap()
+    const amount = c.prosthesis_fee_amount || 0
+    const doctorName = doctors.find((d) => d.id === c.prosthesis_doctor_id)?.name || 'پزشک پروتز'
+    confirmAction({
+      type: 'create',
+      title: 'ثبت تسویه دستمزد پروتز',
+      fields: [
+        { label: 'بیمار', value: patientName(c), highlight: true },
+        { label: 'پروتزکار', value: `دکتر ${doctorName}` },
+        { label: 'مبلغ توافقی', value: `${formatCurrency(amount)} ت`, highlight: true },
+      ],
+      confirmLabel: 'ثبت پرداخت',
+      onConfirm: async () => {
+        try {
+          await createExpense({
+            clinic_id: CLINIC_ID,
+            category: 'دستمزد پروتز ایمپلنت',
+            amount,
+            date: new Date().toISOString().slice(0, 10),
+            payment_method: 'cash',
+            description: `دستمزد پروتز ایمپلنت — ${patientName(c)} — دکتر ${doctorName}`,
+          } as any)
+          await updateImplantCase(c.id, { prosthesis_settled: true })
+          showToast('success', 'تسویه ثبت شد و در هزینه‌های کلینیک لحاظ شد')
+          await loadData()
+        } catch { showToast('error', 'خطا در ثبت تسویه') }
+      },
+    })
+  }
+
   const handleSaveCase = () => {
     if (!caseForm.patient_id) { showToast('error', 'انتخاب بیمار الزامی است'); return }
     if (!caseForm.tooth_number.trim()) { showToast('error', 'شماره دندان الزامی است'); return }
@@ -346,6 +379,7 @@ export default function Implants() {
       surgery_fee_mode: caseForm.surgery_fee_mode,
       surgery_fee_amount: caseForm.surgery_fee_mode === 'negotiated' && caseForm.surgery_fee_amount ? Number(caseForm.surgery_fee_amount) : null,
       prosthesis_doctor_id: caseForm.prosthesis_doctor_id || null,
+      prosthesis_fee_amount: caseForm.prosthesis_fee_amount ? Number(caseForm.prosthesis_fee_amount) : null,
       stage: editingCase?.stage || 'planned', success_status: editingCase?.success_status || 'pending',
       healing_abutment_date: editingCase?.healing_abutment_date || null,
       impression_date: editingCase?.impression_date || null,
@@ -669,9 +703,15 @@ export default function Implants() {
                       جراحی: {toJalaliString(c.surgery_date)}
                     </span>
                   )}
+                  {c.extraction_needed && <Badge color="slate">کشیدن دندان</Badge>}
                   {c.bone_graft && <Badge color="warning">پونده استخوانی</Badge>}
+                  {c.gbr && <Badge color="warning">GBR</Badge>}
+                  {c.membrane_used && <Badge color="warning">ممبران</Badge>}
                   {c.sinus_lift && <Badge color="accent">سینوس لیفت</Badge>}
                   {c.immediate_loading && <Badge color="success">بارگذاری فوری</Badge>}
+                  {c.prosthesis_doctor_id && c.prosthesis_doctor_id !== c.doctor_id && (
+                    <Badge color="secondary">پروتز: دکتر {doctors.find((d) => d.id === c.prosthesis_doctor_id)?.name || '؟'}</Badge>
+                  )}
                 </div>
 
                 {/* Osseointegration Timeline */}
@@ -754,8 +794,18 @@ export default function Implants() {
                     className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-success-50 text-success-700 text-xs hover:bg-success-100 transition-all-smooth disabled:opacity-50"
                   >
                     <DollarSign size={12} />
-                    {c.surgery_settled ? 'تسویه شده' : 'ثبت تسویه جراحی'}
+                    {c.surgery_settled ? 'جراحی تسویه شده' : 'ثبت تسویه جراحی'}
                   </button>
+                  {c.prosthesis_doctor_id && (
+                    <button
+                      onClick={() => handleSettleProsthesis(c)}
+                      disabled={!!c.prosthesis_settled}
+                      className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-secondary-50 text-secondary-700 text-xs hover:bg-secondary-100 transition-all-smooth disabled:opacity-50"
+                    >
+                      <DollarSign size={12} />
+                      {c.prosthesis_settled ? 'پروتز تسویه شده' : 'ثبت تسویه پروتز'}
+                    </button>
+                  )}
                   <button
                     onClick={() => openEditCaseModal(c)}
                     className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-primary-50 text-primary-700 text-xs hover:bg-primary-100 transition-all-smooth"
@@ -925,6 +975,9 @@ export default function Implants() {
                     placeholder="همان پزشک جراح"
                   />
                   <p className="text-xs text-slate-400 mt-2">اگر روکش/پروتز را پزشک دیگری کار می‌کند، اینجا انتخاب کنید تا سهم‌بندی هرکدام جدا محاسبه شود.</p>
+                  {caseForm.prosthesis_doctor_id && (
+                    <Input label="دستمزد توافقی پروتزکار (تومان)" type="number" value={caseForm.prosthesis_fee_amount} onChange={(v) => setCaseForm({ ...caseForm, prosthesis_fee_amount: v })} placeholder="0" />
+                  )}
                 </div>
               </>
             ),

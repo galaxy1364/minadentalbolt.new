@@ -30,7 +30,9 @@ ALTER TABLE implant_cases
   ADD COLUMN IF NOT EXISTS gbr boolean DEFAULT false,
   ADD COLUMN IF NOT EXISTS membrane_used boolean DEFAULT false,
   ADD COLUMN IF NOT EXISTS extraction_needed boolean DEFAULT false,
-  ADD COLUMN IF NOT EXISTS prosthesis_doctor_id uuid REFERENCES doctors(id);
+  ADD COLUMN IF NOT EXISTS prosthesis_doctor_id uuid REFERENCES doctors(id),
+  ADD COLUMN IF NOT EXISTS prosthesis_fee_amount numeric,
+  ADD COLUMN IF NOT EXISTS prosthesis_settled boolean DEFAULT false;
 
 ALTER TABLE implant_components
   ADD COLUMN IF NOT EXISTS include_in_doctor_share boolean DEFAULT true;
