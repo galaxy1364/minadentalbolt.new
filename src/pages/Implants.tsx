@@ -2,7 +2,7 @@
 import { useState, useEffect, useCallback, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Smile, Plus, Search, Edit2, Eye, Filter, Package, Calendar, DollarSign, ShieldCheck, AlertTriangle, CheckCircle2, Clock, Activity, Layers, Trash2 } from 'lucide-react'
-import { fetchImplantCases, createImplantCase, updateImplantCase, deleteImplantCase, createImplantComponent, fetchPatients, fetchDoctors, createExpense } from '../lib/api'
+import { fetchImplantCases, createImplantCase, updateImplantCase, deleteImplantCase, createImplantComponent, deleteImplantComponent, fetchPatients, fetchDoctors, createExpense } from '../lib/api'
 import { CLINIC_ID } from '../lib/supabase'
 import { toJalaliString, toJalaliStringPretty, formatCurrency, formatNumber, toPersianDigits } from '../lib/persianDate'
 import { h } from '../lib/haptics'
@@ -299,6 +299,27 @@ export default function Implants() {
   // expense (same pattern as the doctor commission settlement in
   // Staff.tsx) and marks the case as settled so the button doesn't
   // stay actionable forever.
+  // A mistyped component cost directly skews the surgery-share formula
+  // (deducted before the /2 split), so being able to fix/remove a
+  // wrong entry matters here more than in most lists.
+  const handleDeleteComponent = (comp: ImplantComponent) => {
+    h.tap()
+    confirmAction({
+      type: 'delete',
+      title: 'حذف کامپوننت',
+      warning: 'اگر این هزینه در محاسبه‌ی سهم جراح لحاظ می‌شد، بعد از حذف دوباره محاسبه می‌شود',
+      fields: [
+        { label: 'نوع', value: getComponentTypeLabel(comp.component_type), highlight: true },
+        { label: 'هزینه', value: comp.cost != null ? `${formatCurrency(comp.cost)} ت` : '-' },
+      ],
+      confirmLabel: 'تایید حذف',
+      onConfirm: async () => {
+        try { await deleteImplantComponent(comp.id); showToast('success', 'کامپوننت حذف شد'); await loadData() }
+        catch { showToast('error', 'خطا در حذف') }
+      },
+    })
+  }
+
   const handleSettleSurgery = (c: ImplantCaseWithRelations) => {
     h.tap()
     const amount = calcSurgeryShare(c)
@@ -751,11 +772,16 @@ export default function Implants() {
                       <Layers size={12} />
                       کامپوننت‌ها ({toPersianDigits(componentCount)}):
                     </p>
-                    <div className="flex flex-wrap gap-1.5">
+                    <div className="flex flex-col gap-1.5">
                       {c.components?.map((comp) => (
-                        <Badge key={comp.id} color="secondary">
-                          {getComponentTypeLabel(comp.component_type)}
-                        </Badge>
+                        <div key={comp.id} className="flex items-center justify-between gap-2 p-1.5 rounded-lg bg-slate-50 dark:bg-slate-700/50">
+                          <div className="flex items-center gap-2 min-w-0">
+                            <Badge color="secondary">{getComponentTypeLabel(comp.component_type)}</Badge>
+                            {comp.cost != null && <span className="text-[11px] text-slate-500 dark:text-slate-400 shrink-0">{formatCurrency(comp.cost)} ت</span>}
+                            {comp.brand && <span className="text-[11px] text-slate-400 truncate">{comp.brand}</span>}
+                          </div>
+                          <button onClick={() => handleDeleteComponent(comp)} aria-label="حذف کامپوننت" className="shrink-0 p-1 rounded-lg text-slate-400 hover:text-error-600 hover:bg-error-50 transition-colors"><Trash2 size={12} /></button>
+                        </div>
                       ))}
                     </div>
                   </div>
