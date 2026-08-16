@@ -20,6 +20,7 @@ import {
   ImplantCase, ImplantCaseInput, ImplantCaseWithRelations, ImplantComponent,
   ImplantComponentInput, SmsTemplate, SmsTemplateInput, DoctorSchedule,
   DoctorScheduleInput, TreatmentPackage, TreatmentPackageInput, ConsentForm,
+  PersonalFinanceItem, PersonalFinanceItemInput,
   ConsentFormInput, DashboardStats, DoctorInput, UnitInput,
 } from '../types'
 
@@ -1237,4 +1238,34 @@ export async function updateDoctorSchedule(id: string, updates: Partial<DoctorSc
 export async function deleteDoctorSchedule(id: string): Promise<void> {
   await db.doctor_schedules.delete(id)
   await queueOperation('doctor_schedules', 'delete', id)
+}
+
+// ── Personal Finance (loans, rent, personal cheques, debts) ─────────
+export async function fetchPersonalFinanceItems(): Promise<PersonalFinanceItem[]> {
+  const items = await db.personal_finance_items.where('clinic_id').equals(CLINIC_ID).toArray()
+  return items.sort((a, b) => (a.due_date || '9999').localeCompare(b.due_date || '9999'))
+}
+
+export async function createPersonalFinanceItem(item: PersonalFinanceItemInput): Promise<PersonalFinanceItem> {
+  const { clinic_id, ...rest } = item
+  const id = uid()
+  const record: PersonalFinanceItem = { ...rest, id, clinic_id: CLINIC_ID, created_at: nowISO(), updated_at: nowISO() }
+  await db.personal_finance_items.put(record)
+  await queueOperation('personal_finance_items', 'insert', id, record)
+  return record
+}
+
+export async function updatePersonalFinanceItem(id: string, updates: Partial<PersonalFinanceItemInput>): Promise<PersonalFinanceItem> {
+  const existing = await db.personal_finance_items.get(id)
+  if (!existing) throw new Error('مورد مالی یافت نشد')
+  const { clinic_id, ...rest } = updates
+  const updated: PersonalFinanceItem = { ...existing, ...rest, updated_at: nowISO() }
+  await db.personal_finance_items.put(updated)
+  await queueOperation('personal_finance_items', 'update', id, rest)
+  return updated
+}
+
+export async function deletePersonalFinanceItem(id: string): Promise<void> {
+  await db.personal_finance_items.delete(id)
+  await queueOperation('personal_finance_items', 'delete', id)
 }

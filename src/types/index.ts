@@ -844,3 +844,28 @@ export type DoctorScheduleInput = Omit<
 > & {
   clinic_id?: string
 }
+
+export interface PersonalFinanceItem {
+  id: string
+  clinic_id: string
+  /** loan/وام, rent/اجاره, cheque/چک, debt/بدهی, or a generic 'other' —
+   * a single flexible table for the whole personal-finance module
+   * rather than four separate tables, since they share the same shape
+   * (a party you owe or are owed, an amount, a due date, a status). */
+  item_type: 'loan' | 'rent' | 'cheque' | 'debt' | 'other'
+  title: string
+  counterparty: string | null
+  total_amount: number
+  paid_amount: number
+  due_date: string | null
+  monthly_amount: number | null
+  interest_rate: number | null
+  cheque_number: string | null
+  bank_name: string | null
+  status: 'active' | 'completed' | 'overdue' | 'cancelled'
+  notes: string | null
+  created_at: string
+  updated_at: string
+}
+
+export type PersonalFinanceItemInput = Omit<PersonalFinanceItem, 'id' | 'created_at' | 'updated_at'> & { clinic_id?: string }

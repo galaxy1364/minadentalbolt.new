@@ -5,7 +5,7 @@ import type {
   Prescription, RadiologyImage, TreatmentPhase, PatientTimeline,
   WaitingListEntry, Staff, Expense, TreatmentPackage, ConsentForm,
   ToothRecord, InventoryItem, InventoryCategory, PaymentPlan, Installment,
-  Cheque, DoctorSchedule, ImplantCase, ImplantComponent, SmsTemplate,
+  Cheque, DoctorSchedule, ImplantCase, ImplantComponent, SmsTemplate, PersonalFinanceItem,
 } from '../types'
 
 export interface SyncQueueEntry {
@@ -82,6 +82,7 @@ class MinadentDB extends Dexie {
   sync_meta!: Table<SyncMeta, string>
   audit_log!: Table<AuditLogEntry, number>
   backup_snapshots!: Table<BackupSnapshot, number>
+  personal_finance_items!: Table<PersonalFinanceItem, string>
 
   constructor() {
     super('minadent')
@@ -127,6 +128,12 @@ class MinadentDB extends Dexie {
       audit_log: '++id, table_name, operation, record_id, created_at',
       backup_snapshots: '++id, date, created_at',
     })
+    // v3: personal finance module (loans, rent, personal cheques, debts)
+    // — this DOES sync via TABLE_NAMES/queueOperation like the rest of
+    // the app's data, unlike v2's local-only tables.
+    this.version(3).stores({
+      personal_finance_items: 'id, clinic_id, item_type, status, due_date',
+    })
   }
 }
 
@@ -158,7 +165,7 @@ export const TABLE_NAMES = [
   'patient_timeline', 'waiting_list', 'staff', 'expenses', 'treatment_packages',
   'consent_forms', 'tooth_records', 'inventory_items', 'inventory_categories',
   'payment_plans', 'installments', 'cheques', 'doctor_schedules',
-  'implant_cases', 'implant_components', 'sms_templates',
+  'implant_cases', 'implant_components', 'sms_templates', 'personal_finance_items',
 ] as const
 
 export type TableName = typeof TABLE_NAMES[number]
