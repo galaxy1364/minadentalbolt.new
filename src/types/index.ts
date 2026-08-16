@@ -508,11 +508,24 @@ export interface ImplantCase {
   crown_delivery_date: string | null
   stage: string | null
   bone_graft: boolean | null
+  gbr: boolean | null
+  membrane_used: boolean | null
+  extraction_needed: boolean | null
   sinus_lift: boolean | null
   immediate_loading: boolean | null
+  prosthesis_doctor_id: string | null
   total_cost: number | null
   paid_amount: number | null
   warranty_years: number | null
+  /** How the surgeon's share for THIS case is determined — an automatic
+   * formula ((revenue minus deductible material costs) / 2, mirroring
+   * the same net-split logic used for regular doctor commissions) or a
+   * manually negotiated fixed amount. Cases vary enough (who did the
+   * surgery vs. who seated the crown, special arrangements, etc.) that
+   * this needs to be a real per-case choice, not a single global rule. */
+  surgery_fee_mode: 'formula' | 'negotiated' | null
+  surgery_fee_amount: number | null
+  surgery_settled: boolean | null
   notes: string | null
   success_status: string | null
   failure_reason: string | null
@@ -531,6 +544,12 @@ export interface ImplantComponent {
   cost: number | null
   placed_date: string | null
   notes: string | null
+  /** Whether this component's cost counts toward the deduction before
+   * computing the surgeon's share. Fixture is always excluded
+   * regardless of this flag (its cost is billed separately) — other
+   * consumables (abutment, membrane, etc.) are opt-in per case since
+   * not every case uses every material. */
+  include_in_doctor_share: boolean | null
   created_at: string
   updated_at: string
 }

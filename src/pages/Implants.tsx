@@ -2,7 +2,8 @@
 import { useState, useEffect, useCallback, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Smile, Plus, Search, Edit2, Eye, Filter, Package, Calendar, DollarSign, ShieldCheck, AlertTriangle, CheckCircle2, Clock, Activity, Layers, Trash2 } from 'lucide-react'
-import { fetchImplantCases, createImplantCase, updateImplantCase, deleteImplantCase, createImplantComponent, fetchPatients, fetchDoctors } from '../lib/api'
+import { fetchImplantCases, createImplantCase, updateImplantCase, deleteImplantCase, createImplantComponent, fetchPatients, fetchDoctors, createExpense } from '../lib/api'
+import { CLINIC_ID } from '../lib/supabase'
 import { toJalaliString, toJalaliStringPretty, formatCurrency, formatNumber, toPersianDigits } from '../lib/persianDate'
 import { h } from '../lib/haptics'
 import { useConfirmAction } from '../components/ConfirmAction'
@@ -81,6 +82,19 @@ function getBrandModels(brand: string | null): string[] {
   return implantBrands.find((b) => b.value === brand)?.models || []
 }
 
+// Computes the surgeon's share for a case: negotiated flat amount, or
+// the formula (total_cost minus deductible component costs) / 2.
+// Fixture cost is always excluded regardless of include_in_doctor_share
+// (billed separately, never part of the surgeon's deduction base).
+function calcSurgeryShare(c: ImplantCaseWithRelations): number {
+  if (c.surgery_fee_mode === 'negotiated') return c.surgery_fee_amount || 0
+  const deductible = (c.components || [])
+    .filter((comp) => comp.component_type !== 'fixture' && comp.include_in_doctor_share !== false)
+    .reduce((s, comp) => s + (comp.cost || 0), 0)
+  const net = (c.total_cost || 0) - deductible
+  return Math.max(0, net / 2)
+}
+
 function getComponentTypeLabel(type: string | null) {
   return componentTypes.find((c) => c.value === type)?.label || type || '-'
 }
@@ -127,12 +141,18 @@ export default function Implants() {
     length: '',
     surgery_date: '',
     bone_graft: false,
+    gbr: false,
+    membrane_used: false,
+    extraction_needed: false,
     sinus_lift: false,
     immediate_loading: false,
     total_cost: '',
     paid_amount: '',
     warranty_years: '',
     notes: '',
+    surgery_fee_mode: 'formula' as 'formula' | 'negotiated',
+    surgery_fee_amount: '',
+    prosthesis_doctor_id: '',
   })
 
   // Component form state
@@ -144,6 +164,7 @@ export default function Implants() {
     cost: '',
     placed_date: '',
     notes: '',
+    include_in_doctor_share: true,
   })
 
   // ===========================================================================
@@ -234,8 +255,10 @@ export default function Implants() {
     setCaseWizardStep(0)
     setCaseForm({
       patient_id: '', doctor_id: '', tooth_number: '', brand: '', model: '', diameter: '', length: '',
-      surgery_date: '', bone_graft: false, sinus_lift: false, immediate_loading: false,
+      surgery_date: '', bone_graft: false, gbr: false, membrane_used: false, extraction_needed: false,
+      sinus_lift: false, immediate_loading: false,
       total_cost: '', paid_amount: '', warranty_years: '', notes: '',
+      surgery_fee_mode: 'formula', surgery_fee_amount: '', prosthesis_doctor_id: '',
     })
     setCaseModalOpen(true)
   }
@@ -253,15 +276,57 @@ export default function Implants() {
       length: c.length || '',
       surgery_date: c.surgery_date || '',
       bone_graft: c.bone_graft || false,
+      gbr: c.gbr || false,
+      membrane_used: c.membrane_used || false,
+      extraction_needed: c.extraction_needed || false,
       sinus_lift: c.sinus_lift || false,
       immediate_loading: c.immediate_loading || false,
       total_cost: c.total_cost != null ? String(c.total_cost) : '',
       paid_amount: c.paid_amount != null ? String(c.paid_amount) : '',
       warranty_years: c.warranty_years != null ? String(c.warranty_years) : '',
       notes: c.notes || '',
+      surgery_fee_mode: (c.surgery_fee_mode as 'formula' | 'negotiated') || 'formula',
+      surgery_fee_amount: c.surgery_fee_amount != null ? String(c.surgery_fee_amount) : '',
+      prosthesis_doctor_id: c.prosthesis_doctor_id || '',
     })
     setCaseWizardStep(0)
     setCaseModalOpen(true)
+  }
+
+  // Records the surgeon's calculated/negotiated share as a real clinic
+  // expense (same pattern as the doctor commission settlement in
+  // Staff.tsx) and marks the case as settled so the button doesn't
+  // stay actionable forever.
+  const handleSettleSurgery = (c: ImplantCaseWithRelations) => {
+    h.tap()
+    const amount = calcSurgeryShare(c)
+    const doctorName = c.doctor?.name || 'پزشک جراح'
+    confirmAction({
+      type: 'create',
+      title: 'ثبت تسویه دستمزد جراحی',
+      fields: [
+        { label: 'بیمار', value: patientName(c), highlight: true },
+        { label: 'جراح', value: `دکتر ${doctorName}` },
+        { label: 'روش محاسبه', value: c.surgery_fee_mode === 'negotiated' ? 'توافقی' : 'فرمول خودکار' },
+        { label: 'مبلغ', value: `${formatCurrency(amount)} ت`, highlight: true },
+      ],
+      confirmLabel: 'ثبت پرداخت',
+      onConfirm: async () => {
+        try {
+          await createExpense({
+            clinic_id: CLINIC_ID,
+            category: 'دستمزد جراحی ایمپلنت',
+            amount,
+            date: new Date().toISOString().slice(0, 10),
+            payment_method: 'cash',
+            description: `دستمزد جراحی ایمپلنت — ${patientName(c)} — دکتر ${doctorName}`,
+          } as any)
+          await updateImplantCase(c.id, { surgery_settled: true })
+          showToast('success', 'تسویه ثبت شد و در هزینه‌های کلینیک لحاظ شد')
+          await loadData()
+        } catch { showToast('error', 'خطا در ثبت تسویه') }
+      },
+    })
   }
 
   const handleSaveCase = () => {
@@ -272,11 +337,15 @@ export default function Implants() {
       tooth_number: caseForm.tooth_number, brand: caseForm.brand || null,
       model: caseForm.model || null, diameter: caseForm.diameter || null, length: caseForm.length || null,
       surgery_date: caseForm.surgery_date || null, bone_graft: caseForm.bone_graft,
+      gbr: caseForm.gbr, membrane_used: caseForm.membrane_used, extraction_needed: caseForm.extraction_needed,
       sinus_lift: caseForm.sinus_lift, immediate_loading: caseForm.immediate_loading,
       total_cost: caseForm.total_cost ? Number(caseForm.total_cost) : null,
       paid_amount: caseForm.paid_amount ? Number(caseForm.paid_amount) : null,
       warranty_years: caseForm.warranty_years ? Number(caseForm.warranty_years) : null,
       notes: caseForm.notes || null,
+      surgery_fee_mode: caseForm.surgery_fee_mode,
+      surgery_fee_amount: caseForm.surgery_fee_mode === 'negotiated' && caseForm.surgery_fee_amount ? Number(caseForm.surgery_fee_amount) : null,
+      prosthesis_doctor_id: caseForm.prosthesis_doctor_id || null,
       stage: editingCase?.stage || 'planned', success_status: editingCase?.success_status || 'pending',
       healing_abutment_date: editingCase?.healing_abutment_date || null,
       impression_date: editingCase?.impression_date || null,
@@ -292,6 +361,7 @@ export default function Implants() {
         { label: 'دندان', value: toPersianDigits(caseForm.tooth_number) },
         { label: 'برند', value: getBrandLabel(caseForm.brand) },
         { label: 'کل هزینه', value: caseForm.total_cost ? `${formatCurrency(Number(caseForm.total_cost))} ت` : '-' },
+        { label: 'دستمزد جراح', value: caseForm.surgery_fee_mode === 'negotiated' ? `توافقی — ${caseForm.surgery_fee_amount ? formatCurrency(Number(caseForm.surgery_fee_amount)) : '0'} ت` : 'فرمول خودکار' },
       ],
       confirmLabel: editingCase ? 'ذخیره' : 'ایجاد',
       onConfirm: async () => {
@@ -341,7 +411,7 @@ export default function Implants() {
     setComponentCaseId(caseId)
     setComponentWizardStep(0)
     setComponentForm({
-      component_type: 'fixture', brand: '', model: '', serial_number: '', cost: '', placed_date: '', notes: '',
+      component_type: 'fixture', brand: '', model: '', serial_number: '', cost: '', placed_date: '', notes: '', include_in_doctor_share: true,
     })
     setComponentModalOpen(true)
   }
@@ -366,6 +436,7 @@ export default function Implants() {
             brand: componentForm.brand || null, model: componentForm.model || null,
             serial_number: componentForm.serial_number || null, cost: componentForm.cost ? Number(componentForm.cost) : null,
             placed_date: componentForm.placed_date || null, notes: componentForm.notes || null,
+            include_in_doctor_share: componentForm.component_type === 'fixture' ? false : componentForm.include_in_doctor_share,
           } as any)
           showToast('success', 'کامپوننت اضافه شد'); setComponentModalOpen(false); await loadData()
         } catch { showToast('error', 'خطا') }
@@ -678,6 +749,14 @@ export default function Implants() {
                     افزودن کامپوننت
                   </button>
                   <button
+                    onClick={() => handleSettleSurgery(c)}
+                    disabled={!!c.surgery_settled}
+                    className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-success-50 text-success-700 text-xs hover:bg-success-100 transition-all-smooth disabled:opacity-50"
+                  >
+                    <DollarSign size={12} />
+                    {c.surgery_settled ? 'تسویه شده' : 'ثبت تسویه جراحی'}
+                  </button>
+                  <button
                     onClick={() => openEditCaseModal(c)}
                     className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-primary-50 text-primary-700 text-xs hover:bg-primary-100 transition-all-smooth"
                   >
@@ -780,8 +859,20 @@ export default function Implants() {
                 </div>
                 <div className="flex flex-col gap-3 p-3 bg-slate-50 dark:bg-slate-700/50 rounded-xl">
                   <label className="flex items-center gap-2 cursor-pointer">
+                    <input type="checkbox" checked={caseForm.extraction_needed} onChange={(e) => setCaseForm({ ...caseForm, extraction_needed: e.target.checked })} className="rounded text-primary-600 focus:ring-primary-400" />
+                    <span className="text-sm text-slate-700 dark:text-slate-200">کشیدن دندان همزمان (Extraction)</span>
+                  </label>
+                  <label className="flex items-center gap-2 cursor-pointer">
                     <input type="checkbox" checked={caseForm.bone_graft} onChange={(e) => setCaseForm({ ...caseForm, bone_graft: e.target.checked })} className="rounded text-primary-600 focus:ring-primary-400" />
                     <span className="text-sm text-slate-700 dark:text-slate-200">پوند استخوانی (Bone Graft)</span>
+                  </label>
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input type="checkbox" checked={caseForm.gbr} onChange={(e) => setCaseForm({ ...caseForm, gbr: e.target.checked })} className="rounded text-primary-600 focus:ring-primary-400" />
+                    <span className="text-sm text-slate-700 dark:text-slate-200">بازسازی استخوان هدایت‌شده (GBR)</span>
+                  </label>
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input type="checkbox" checked={caseForm.membrane_used} onChange={(e) => setCaseForm({ ...caseForm, membrane_used: e.target.checked })} className="rounded text-primary-600 focus:ring-primary-400" />
+                    <span className="text-sm text-slate-700 dark:text-slate-200">استفاده از ممبران (Membrane)</span>
                   </label>
                   <label className="flex items-center gap-2 cursor-pointer">
                     <input type="checkbox" checked={caseForm.sinus_lift} onChange={(e) => setCaseForm({ ...caseForm, sinus_lift: e.target.checked })} className="rounded text-primary-600 focus:ring-primary-400" />
@@ -791,6 +882,49 @@ export default function Implants() {
                     <input type="checkbox" checked={caseForm.immediate_loading} onChange={(e) => setCaseForm({ ...caseForm, immediate_loading: e.target.checked })} className="rounded text-primary-600 focus:ring-primary-400" />
                     <span className="text-sm text-slate-700 dark:text-slate-200">بارگذاری فوری (Immediate Loading)</span>
                   </label>
+                </div>
+              </>
+            ),
+          },
+          {
+            label: 'دستمزد جراحی و پروتز',
+            content: (
+              <>
+                <div className="p-3 bg-slate-50 dark:bg-slate-700/50 rounded-xl space-y-3">
+                  <p className="text-xs font-bold text-slate-500 dark:text-slate-400">روش تعیین دستمزد جراح</p>
+                  <div className="grid grid-cols-2 gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setCaseForm({ ...caseForm, surgery_fee_mode: 'formula' })}
+                      className={`p-2.5 rounded-xl border-2 text-sm font-bold transition-all-smooth ${caseForm.surgery_fee_mode === 'formula' ? 'border-primary-500 bg-primary-50 text-primary-700 dark:bg-primary-900/30 dark:text-primary-300' : 'border-slate-200 dark:border-slate-600 text-slate-500'}`}
+                    >
+                      فرمول خودکار
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setCaseForm({ ...caseForm, surgery_fee_mode: 'negotiated' })}
+                      className={`p-2.5 rounded-xl border-2 text-sm font-bold transition-all-smooth ${caseForm.surgery_fee_mode === 'negotiated' ? 'border-primary-500 bg-primary-50 text-primary-700 dark:bg-primary-900/30 dark:text-primary-300' : 'border-slate-200 dark:border-slate-600 text-slate-500'}`}
+                    >
+                      مبلغ توافقی
+                    </button>
+                  </div>
+                  {caseForm.surgery_fee_mode === 'formula' ? (
+                    <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed">
+                      سهم جراح = (هزینه‌ی کل − هزینه‌ی اقلامی که تیک «کسر در سهم جراح» خورده‌اند) ÷ ۲. هزینه‌ی فیکسچر همیشه مستقل حساب می‌شود.
+                    </p>
+                  ) : (
+                    <Input label="مبلغ توافقی جراح (تومان)" type="number" value={caseForm.surgery_fee_amount} onChange={(v) => setCaseForm({ ...caseForm, surgery_fee_amount: v })} placeholder="0" />
+                  )}
+                </div>
+                <div className="p-3 bg-slate-50 dark:bg-slate-700/50 rounded-xl">
+                  <Select
+                    label="پزشک انجام‌دهنده‌ی پروتز (در صورت متفاوت بودن با جراح)"
+                    value={caseForm.prosthesis_doctor_id}
+                    onChange={(v) => setCaseForm({ ...caseForm, prosthesis_doctor_id: v })}
+                    options={doctors.filter((d) => d.is_active).map((d) => ({ value: d.id, label: `دکتر ${d.name || d.specialty || 'پزشک'}` }))}
+                    placeholder="همان پزشک جراح"
+                  />
+                  <p className="text-xs text-slate-400 mt-2">اگر روکش/پروتز را پزشک دیگری کار می‌کند، اینجا انتخاب کنید تا سهم‌بندی هرکدام جدا محاسبه شود.</p>
                 </div>
               </>
             ),
@@ -849,6 +983,14 @@ export default function Implants() {
                   <Input label="هزینه (تومان)" type="number" value={componentForm.cost} onChange={(v) => setComponentForm({ ...componentForm, cost: v })} placeholder="0" />
                 </div>
                 <Input label="تاریخ نصب" type="date" value={componentForm.placed_date} onChange={(v) => setComponentForm({ ...componentForm, placed_date: v })} />
+                {componentForm.component_type === 'fixture' ? (
+                  <p className="text-xs text-slate-400 mt-2">هزینه‌ی فیکسچر همیشه از محاسبه‌ی سهم جراح کنار گذاشته می‌شود (جداگانه محاسبه می‌شود).</p>
+                ) : (
+                  <label className="flex items-center gap-2 mt-3 cursor-pointer">
+                    <input type="checkbox" checked={componentForm.include_in_doctor_share} onChange={(e) => setComponentForm({ ...componentForm, include_in_doctor_share: e.target.checked })} className="w-4 h-4 rounded accent-primary-600" />
+                    <span className="text-sm text-slate-600 dark:text-slate-300">هزینه‌ی این قلم در محاسبه‌ی سهم جراح کسر شود</span>
+                  </label>
+                )}
               </>
             ),
           },
