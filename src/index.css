@@ -852,3 +852,40 @@ input, textarea, select { font-size: 16px !important; }
 @media (prefers-reduced-motion: reduce) {
   .breathe-slow { animation: none; }
 }
+
+/* ── Module-aware Gemini-style animated page background ──────────────
+   Two soft, blurred color blobs tinted with the CURRENT module's color
+   (via --module-color CSS vars, already set per-route by
+   setModuleTheme() in Layout.tsx) — fixed behind all page content,
+   giving every module page the same soft animated wash used on
+   Dashboard/login instead of a flat gray background. */
+.module-page-bg {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  overflow: hidden;
+  pointer-events: none;
+}
+.module-page-blob {
+  position: absolute;
+  border-radius: 50%;
+  filter: blur(80px);
+  opacity: 0.22;
+  will-change: transform;
+}
+.dark .module-page-blob { opacity: 0.14; }
+.module-page-blob-1 {
+  width: 60vmax; height: 60vmax;
+  top: -25%; right: -20%;
+  background: radial-gradient(circle, var(--module-gradient-from, #0d9488), transparent 70%);
+  animation: login-float-1 26s ease-in-out infinite;
+}
+.module-page-blob-2 {
+  width: 45vmax; height: 45vmax;
+  bottom: -20%; left: -15%;
+  background: radial-gradient(circle, var(--module-gradient-to, #0f766e), transparent 70%);
+  animation: login-float-2 30s ease-in-out infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+  .module-page-blob { animation: none !important; }
+}

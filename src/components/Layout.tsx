@@ -323,6 +323,10 @@ function LayoutInner({ children }: { children: React.ReactNode }) {
 
   return (
     <div className="min-h-screen bg-slate-50 dark:bg-slate-950 flex flex-col" dir="rtl">
+      <div className="module-page-bg" aria-hidden="true">
+        <div className="module-page-blob module-page-blob-1" />
+        <div className="module-page-blob module-page-blob-2" />
+      </div>
       <header className="sticky top-0 z-40 glass dark:glass border-b border-white/60 dark:border-white/10">
         <div className="flex items-center justify-between px-4 h-[56px]">
           <button
@@ -349,7 +353,7 @@ function LayoutInner({ children }: { children: React.ReactNode }) {
 
       <UpdateBanner />
 
-      <main className="flex-1 min-w-0 overflow-x-hidden px-3 pt-3 pb-48">
+      <main className="relative z-[1] flex-1 min-w-0 overflow-x-hidden px-3 pt-3 pb-48">
         <div key={location.pathname} className="slide-in-right">
           {children}
         </div>
