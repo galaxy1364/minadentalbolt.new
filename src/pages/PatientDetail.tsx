@@ -1,12 +1,14 @@
 // PatientDetail.tsx - Persian RTL Dental Clinic Patient Detail Page
 import { useState, useEffect, useCallback } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { ArrowRight, Edit2, Phone, Mail, MapPin, Calendar, CreditCard, Activity, FileText, Image as ImageIcon, Shield, Pill, Smile, Award, AlertCircle, Clock, CheckCircle2 } from 'lucide-react'
-import { fetchPatient, updatePatient, fetchTimeline, fetchTreatments, fetchAppointments, fetchPayments, fetchToothRecords, createToothRecord, updateToothRecord, fetchPrescriptions, fetchRadiologyImages, fetchEncounters, fetchDoctors, fetchImplantCases } from '../lib/api'
+import { ArrowRight, Edit2, Phone, Mail, MapPin, Calendar, CreditCard, Activity, FileText, Image as ImageIcon, Shield, Pill, Smile, Award, AlertCircle, Clock, CheckCircle2, Layers, Plus, Trash2 } from 'lucide-react'
+import { fetchPatient, updatePatient, fetchTimeline, fetchTreatments, fetchAppointments, fetchPayments, fetchToothRecords, createToothRecord, updateToothRecord, fetchPrescriptions, fetchRadiologyImages, fetchEncounters, fetchDoctors, fetchImplantCases, fetchTreatmentPhases, createTreatmentPhase, updateTreatmentPhase, deleteTreatmentPhase } from '../lib/api'
 import { toJalaliString, toJalaliStringPretty, formatCurrency, toPersianDigits, formatTime } from '../lib/persianDate'
 import { calcPatientBalance } from '../lib/finance'
-import { Patient, Doctor, PatientTimeline, Treatment, Appointment, Payment, ToothRecord, Prescription, RadiologyImage, Encounter, ImplantCase } from '../types'
-import { Modal, Card, Button, Input, Select, Textarea, Badge, Spinner, EmptyState, Tabs, showToast } from '../components/ui'
+import { Patient, Doctor, PatientTimeline, Treatment, Appointment, Payment, ToothRecord, Prescription, RadiologyImage, Encounter, ImplantCase, TreatmentPhase } from '../types'
+import { Modal, Card, Button, Input, Select, Textarea, Badge, Spinner, EmptyState, Tabs, showToast, Wizard } from '../components/ui'
+import { useConfirmAction } from '../components/ConfirmAction'
+import { h } from '../lib/haptics'
 import DentalChart from '../components/DentalChart'
 
 // ============================================================================
@@ -117,6 +119,7 @@ function getVipLabel(level: number | null): { label: string; color: string } {
 export default function PatientDetail() {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
+  const { confirmAction, ConfirmActionModal } = useConfirmAction()
 
   const [patient, setPatient] = useState<Patient | null>(null)
   const [doctors, setDoctors] = useState<Doctor[]>([])
@@ -129,6 +132,7 @@ export default function PatientDetail() {
   const [timeline, setTimeline] = useState<PatientTimeline[]>([])
   const [treatments, setTreatments] = useState<Treatment[]>([])
   const [implantCases, setImplantCases] = useState<ImplantCase[]>([])
+  const [phases, setPhases] = useState<TreatmentPhase[]>([])
   const [appointments, setAppointments] = useState<Appointment[]>([])
   const [payments, setPayments] = useState<Payment[]>([])
   const [toothRecords, setToothRecords] = useState<ToothRecord[]>([])
@@ -224,7 +228,7 @@ export default function PatientDetail() {
   const loadTabData = useCallback(async () => {
     if (!id) return
     try {
-      const [tl, tr, ap, pm, tr_records, pres, radio, enc, implAll] = await Promise.all([
+      const [tl, tr, ap, pm, tr_records, pres, radio, enc, implAll, ph] = await Promise.all([
         fetchTimeline(id),
         fetchTreatments(undefined, id),
         fetchAppointments(),
@@ -234,6 +238,7 @@ export default function PatientDetail() {
         fetchRadiologyImages(id),
         fetchEncounters(id),
         fetchImplantCases(),
+        fetchTreatmentPhases(id),
       ])
       setTimeline(tl)
       setTreatments(tr)
@@ -244,6 +249,7 @@ export default function PatientDetail() {
       setRadiologyImages(radio)
       setEncounters(enc)
       setImplantCases(implAll.filter((c) => c.patient_id === id))
+      setPhases(ph.sort((a, b) => a.phase_number - b.phase_number))
     } catch (err) {
       console.error('Error loading tab data:', err)
     }
@@ -337,6 +343,96 @@ export default function PatientDetail() {
   // Shared with Dashboard/Billing/Patients (src/lib/finance.ts) so this
   // number can never silently diverge between pages again.
   const { paid: totalPaid, totalCost: totalTreatmentCost, balance: patientBalance } = calcPatientBalance(payments, treatments, implantCases)
+
+  // ── Staged treatment plan (phases) ──────────────────────────────
+  const [phaseModalOpen, setPhaseModalOpen] = useState(false)
+  const [phaseWizardStep, setPhaseWizardStep] = useState(0)
+  const [editingPhase, setEditingPhase] = useState<TreatmentPhase | null>(null)
+  const [savingPhase, setSavingPhase] = useState(false)
+  const phaseStatuses = [
+    { value: 'planned', label: 'برنامه‌ریزی شده', color: 'slate' },
+    { value: 'in_progress', label: 'در حال انجام', color: 'warning' },
+    { value: 'completed', label: 'تکمیل شده', color: 'success' },
+    { value: 'on_hold', label: 'متوقف شده', color: 'error' },
+  ]
+  const [phaseForm, setPhaseForm] = useState({
+    doctor_id: '', title: '', description: '', procedures: '',
+    estimated_cost: '', actual_cost: '', estimated_duration_days: '',
+    status: 'planned', start_date: '', end_date: '',
+  })
+
+  const openCreatePhase = () => {
+    h.tap()
+    setEditingPhase(null)
+    setPhaseWizardStep(0)
+    setPhaseForm({ doctor_id: '', title: '', description: '', procedures: '', estimated_cost: '', actual_cost: '', estimated_duration_days: '', status: 'planned', start_date: '', end_date: '' })
+    setPhaseModalOpen(true)
+  }
+
+  const openEditPhase = (p: TreatmentPhase) => {
+    setEditingPhase(p)
+    setPhaseWizardStep(0)
+    setPhaseForm({
+      doctor_id: p.doctor_id || '', title: p.title || '', description: p.description || '',
+      procedures: p.procedures || '', estimated_cost: p.estimated_cost != null ? String(p.estimated_cost) : '',
+      actual_cost: p.actual_cost != null ? String(p.actual_cost) : '',
+      estimated_duration_days: p.estimated_duration_days != null ? String(p.estimated_duration_days) : '',
+      status: p.status, start_date: p.start_date || '', end_date: p.end_date || '',
+    })
+    setPhaseModalOpen(true)
+  }
+
+  const handleSavePhase = () => {
+    if (!phaseForm.title.trim()) { showToast('error', 'عنوان فاز الزامی است'); return }
+    if (!id) return
+    const nextNumber = editingPhase ? editingPhase.phase_number : (phases.length > 0 ? Math.max(...phases.map((p) => p.phase_number)) + 1 : 1)
+    const payload = {
+      patient_id: id, doctor_id: phaseForm.doctor_id || null,
+      phase_number: nextNumber, title: phaseForm.title, description: phaseForm.description || null,
+      procedures: phaseForm.procedures || null,
+      estimated_cost: phaseForm.estimated_cost ? Number(phaseForm.estimated_cost) : null,
+      actual_cost: phaseForm.actual_cost ? Number(phaseForm.actual_cost) : null,
+      estimated_duration_days: phaseForm.estimated_duration_days ? Number(phaseForm.estimated_duration_days) : null,
+      status: phaseForm.status, start_date: phaseForm.start_date || null, end_date: phaseForm.end_date || null,
+    } as any
+    confirmAction({
+      type: editingPhase ? 'edit' : 'create',
+      title: editingPhase ? 'ویرایش فاز درمان' : 'افزودن فاز درمان',
+      fields: [
+        { label: 'فاز', value: `${toPersianDigits(nextNumber)} — ${phaseForm.title}`, highlight: true },
+        { label: 'هزینه‌ی تخمینی', value: phaseForm.estimated_cost ? `${formatCurrency(Number(phaseForm.estimated_cost))} ت` : '-' },
+        { label: 'وضعیت', value: phaseStatuses.find((s) => s.value === phaseForm.status)?.label || phaseForm.status },
+      ],
+      confirmLabel: editingPhase ? 'ذخیره' : 'افزودن',
+      onConfirm: async () => {
+        setSavingPhase(true)
+        try {
+          if (editingPhase) await updateTreatmentPhase(editingPhase.id, payload)
+          else await createTreatmentPhase(payload)
+          showToast('success', editingPhase ? 'ویرایش شد' : 'فاز اضافه شد')
+          setPhaseModalOpen(false)
+          const updated = await fetchTreatmentPhases(id)
+          setPhases(updated.sort((a, b) => a.phase_number - b.phase_number))
+        } catch { showToast('error', 'خطا در ذخیره') }
+        finally { setSavingPhase(false) }
+      },
+    })
+  }
+
+  const handleDeletePhase = (p: TreatmentPhase) => {
+    h.tap()
+    confirmAction({
+      type: 'delete',
+      title: 'حذف فاز درمان',
+      fields: [{ label: 'فاز', value: `${toPersianDigits(p.phase_number)} — ${p.title}`, highlight: true }],
+      confirmLabel: 'تایید حذف',
+      onConfirm: async () => {
+        await deleteTreatmentPhase(p.id)
+        showToast('success', 'حذف شد')
+        if (id) { const updated = await fetchTreatmentPhases(id); setPhases(updated.sort((a, b) => a.phase_number - b.phase_number)) }
+      },
+    })
+  }
 
   // ===========================================================================
   // Render: Patient Header
@@ -434,6 +530,7 @@ export default function PatientDetail() {
     { key: 'overview', label: 'نمای کلی', icon: <FileText size={16} /> },
     { key: 'timeline', label: 'تایم‌لاین', icon: <Clock size={16} /> },
     { key: 'treatments', label: 'درمان‌ها', icon: <Activity size={16} /> },
+    { key: 'phases', label: 'طرح درمان مرحله‌ای', icon: <Layers size={16} /> },
     { key: 'appointments', label: 'نوبت‌ها', icon: <Calendar size={16} /> },
     { key: 'payments', label: 'پرداخت‌ها', icon: <CreditCard size={16} /> },
     { key: 'teeth', label: 'نمودار دندان‌ها', icon: <Smile size={16} /> },
@@ -617,6 +714,82 @@ export default function PatientDetail() {
             </Card>
           )
         })}
+      </div>
+    )
+  }
+
+  // ===========================================================================
+  // Render: Staged Treatment Plan (Phases) Tab
+  // ===========================================================================
+
+  const renderPhases = () => {
+    const totalEstimated = phases.reduce((s, p) => s + (p.estimated_cost || 0), 0)
+    const totalActual = phases.reduce((s, p) => s + (p.actual_cost || 0), 0)
+    const completedCount = phases.filter((p) => p.status === 'completed').length
+
+    return (
+      <div className="space-y-4">
+        <div className="flex items-center justify-between">
+          <div>
+            <p className="text-sm font-bold text-slate-800 dark:text-slate-100">طرح درمان مرحله‌ای</p>
+            <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+              {phases.length > 0 ? `${toPersianDigits(completedCount)} از ${toPersianDigits(phases.length)} فاز تکمیل شده` : 'هنوز فازی تعریف نشده'}
+            </p>
+          </div>
+          <Button variant="primary" size="sm" onClick={openCreatePhase}><Plus size={14} className="inline ml-1" /> افزودن فاز</Button>
+        </div>
+
+        {phases.length > 0 && (
+          <div className="grid grid-cols-2 gap-2.5">
+            <Card className="p-3">
+              <p className="text-[11px] text-slate-400">هزینه‌ی تخمینی کل</p>
+              <p className="text-base font-extrabold text-primary-700">{formatCurrency(totalEstimated)} ت</p>
+            </Card>
+            <Card className="p-3">
+              <p className="text-[11px] text-slate-400">هزینه‌ی واقعی تا الان</p>
+              <p className="text-base font-extrabold text-slate-700 dark:text-slate-200">{formatCurrency(totalActual)} ت</p>
+            </Card>
+          </div>
+        )}
+
+        {phases.length === 0 ? (
+          <EmptyState icon={<Layers size={40} />} title="فاز درمانی ثبت نشده" description="برای طرح‌های درمانی چندمرحله‌ای (مثلاً فاز۱: کشیدن، فاز۲: ایمپلنت، فاز۳: روکش) فازها را اینجا تعریف کنید" />
+        ) : (
+          <div className="relative space-y-3">
+            {phases.map((p, i) => {
+              const meta = phaseStatuses.find((s) => s.value === p.status) || phaseStatuses[0]
+              const doc = doctors.find((d) => d.id === p.doctor_id)
+              return (
+                <div key={p.id} className="relative flex gap-3">
+                  <div className="flex flex-col items-center">
+                    <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-extrabold shrink-0 ${p.status === 'completed' ? 'bg-success-500 text-white' : p.status === 'in_progress' ? 'bg-warning-400 text-white' : 'bg-slate-200 text-slate-500'}`}>
+                      {p.status === 'completed' ? <CheckCircle2 size={16} /> : toPersianDigits(p.phase_number)}
+                    </div>
+                    {i < phases.length - 1 && <div className="w-0.5 flex-1 bg-slate-200 dark:bg-slate-700 my-1" />}
+                  </div>
+                  <Card className="flex-1 p-3.5 mb-1">
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="min-w-0">
+                        <p className="text-sm font-bold text-slate-800 dark:text-slate-100 truncate">فاز {toPersianDigits(p.phase_number)}: {p.title}</p>
+                        {p.description && <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">{p.description}</p>}
+                        {doc && <p className="text-[11px] text-slate-400 mt-1">دکتر {doc.name}</p>}
+                      </div>
+                      <Badge color={meta.color}>{meta.label}</Badge>
+                    </div>
+                    <div className="flex items-center gap-3 mt-2 flex-wrap text-[11px] text-slate-500 dark:text-slate-400">
+                      {p.estimated_cost != null && <span>هزینه تخمینی: {formatCurrency(p.estimated_cost)} ت</span>}
+                      {p.estimated_duration_days != null && <span>مدت: {toPersianDigits(p.estimated_duration_days)} روز</span>}
+                    </div>
+                    <div className="flex gap-2 mt-2.5 pt-2.5 border-t border-slate-100 dark:border-slate-700">
+                      <button onClick={() => openEditPhase(p)} className="text-xs text-primary-600 hover:underline">ویرایش</button>
+                      <button onClick={() => handleDeletePhase(p)} className="text-xs text-error-500 hover:underline">حذف</button>
+                    </div>
+                  </Card>
+                </div>
+              )
+            })}
+          </div>
+        )}
       </div>
     )
   }
@@ -1063,6 +1236,7 @@ export default function PatientDetail() {
       {activeTab === 'overview' && renderOverview()}
       {activeTab === 'timeline' && renderTimeline()}
       {activeTab === 'treatments' && renderTreatments()}
+      {activeTab === 'phases' && renderPhases()}
       {activeTab === 'appointments' && renderAppointments()}
       {activeTab === 'payments' && renderPayments()}
       {activeTab === 'teeth' && renderTeethChart()}
@@ -1073,6 +1247,56 @@ export default function PatientDetail() {
 
       {/* Modals */}
       {renderEditModal()}
+
+      {/* Phase Wizard */}
+      <Wizard
+        open={phaseModalOpen}
+        onClose={() => setPhaseModalOpen(false)}
+        title={editingPhase ? 'ویرایش فاز درمان' : 'افزودن فاز درمان'}
+        step={phaseWizardStep}
+        onStepChange={setPhaseWizardStep}
+        onFinish={handleSavePhase}
+        saving={savingPhase}
+        steps={[
+          {
+            label: 'عنوان و پزشک',
+            content: (
+              <>
+                <Input label="عنوان فاز" value={phaseForm.title} onChange={(v) => setPhaseForm({ ...phaseForm, title: v })} placeholder="مثلاً: کشیدن دندان‌های آسیب‌دیده" />
+                <Select label="پزشک مسئول" value={phaseForm.doctor_id} onChange={(v) => setPhaseForm({ ...phaseForm, doctor_id: v })} options={doctors.filter((d) => d.is_active).map((d) => ({ value: d.id, label: `دکتر ${d.name || d.specialty || 'پزشک'}` }))} placeholder="انتخاب پزشک..." />
+                <Textarea label="توضیحات" value={phaseForm.description} onChange={(v) => setPhaseForm({ ...phaseForm, description: v })} placeholder="جزئیات این فاز" rows={2} />
+              </>
+            ),
+          },
+          {
+            label: 'رویه‌ها و هزینه',
+            content: (
+              <>
+                <Textarea label="رویه‌های این فاز" value={phaseForm.procedures} onChange={(v) => setPhaseForm({ ...phaseForm, procedures: v })} placeholder="مثلاً: کشیدن دندان ۱۶، ۱۷" rows={2} />
+                <div className="grid grid-cols-2 gap-3">
+                  <Input label="هزینه‌ی تخمینی (ت)" type="number" value={phaseForm.estimated_cost} onChange={(v) => setPhaseForm({ ...phaseForm, estimated_cost: v })} placeholder="0" />
+                  <Input label="هزینه‌ی واقعی (ت)" type="number" value={phaseForm.actual_cost} onChange={(v) => setPhaseForm({ ...phaseForm, actual_cost: v })} placeholder="0" />
+                </div>
+                <Input label="مدت تخمینی (روز)" type="number" value={phaseForm.estimated_duration_days} onChange={(v) => setPhaseForm({ ...phaseForm, estimated_duration_days: v })} placeholder="30" />
+              </>
+            ),
+          },
+          {
+            label: 'زمان‌بندی و وضعیت',
+            content: (
+              <>
+                <div className="grid grid-cols-2 gap-3">
+                  <Input label="تاریخ شروع" type="date" value={phaseForm.start_date} onChange={(v) => setPhaseForm({ ...phaseForm, start_date: v })} />
+                  <Input label="تاریخ پایان" type="date" value={phaseForm.end_date} onChange={(v) => setPhaseForm({ ...phaseForm, end_date: v })} />
+                </div>
+                <Select label="وضعیت" value={phaseForm.status} onChange={(v) => setPhaseForm({ ...phaseForm, status: v })} options={phaseStatuses.map((s) => ({ value: s.value, label: s.label }))} />
+              </>
+            ),
+          },
+        ]}
+      />
+
+      {ConfirmActionModal}
     </div>
   )
 }
