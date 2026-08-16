@@ -1,6 +1,6 @@
 // Treatments.tsx — Full Treatment Management with Encounter creation, Dental Chart, Billing & Lab referral
 import { useState, useEffect, useCallback, useMemo } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useLocation } from 'react-router-dom'
 import {
   Activity, ClipboardList, Stethoscope, Search, Eye, Smile, Plus, Edit2, Trash2,
   DollarSign, FlaskConical, CheckCircle2, X, UserPlus, ChevronRight,
@@ -94,6 +94,7 @@ function getCategoryLabel(cat: string | null) {
 
 export default function Treatments() {
   const navigate = useNavigate()
+  const location = useLocation()
   const { confirmAction, ConfirmActionModal } = useConfirmAction()
 
   const [activeTab, setActiveTab] = useState('encounters')
@@ -172,6 +173,20 @@ export default function Treatments() {
   }, [])
 
   useEffect(() => { loadData() }, [loadData])
+
+  // Coming from Appointments → 'تکمیل نوبت' opens the encounter it just
+  // created, so staff can go straight into recording treatments instead
+  // of hunting for the patient again in a separate list.
+  useEffect(() => {
+    const openId = (location.state as { openEncounterId?: string } | null)?.openEncounterId
+    if (!openId || encounters.length === 0) return
+    const enc = encounters.find((e) => e.id === openId)
+    if (enc) {
+      setDetailEnc(enc)
+      // Clear the state so refreshing/navigating back doesn't reopen it.
+      window.history.replaceState({}, '')
+    }
+  }, [location.state, encounters])
 
   // Load tooth records when detailEnc changes
   useEffect(() => {

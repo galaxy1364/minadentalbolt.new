@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Calendar, Clock, CheckCircle2, User, ChevronRight, ChevronLeft, Plus, Search, Trash2, AlertCircle, Edit2, Stethoscope, DollarSign, FileText, Activity, List, Grid, X, UserPlus } from 'lucide-react'
-import { fetchAppointments, createAppointment, updateAppointment, deleteAppointment, checkConflict, fetchPatients, fetchDoctors, fetchUnits, peekNextFileNumber, createPatient } from '../lib/api'
+import { fetchAppointments, createAppointment, updateAppointment, deleteAppointment, checkConflict, fetchPatients, fetchDoctors, fetchUnits, peekNextFileNumber, createPatient, createEncounter } from '../lib/api'
 import { toJalaliString, toJalaliStringPretty, getJalaliDateInfo, formatTime, formatCurrency, toPersianDigits, persianWeekdaysShort, getHoliday } from '../lib/persianDate'
 import { Appointment, AppointmentWithRelations, Patient, Doctor, Unit } from '../types'
 import { Modal, Card, Button, Input, Select, Textarea, EmptyState, showToast } from '../components/ui'
@@ -222,6 +222,13 @@ export default function Appointments() {
   // ── Preview + Confirm for status change ──
   const quickStatus = (appt: AppointmentWithRelations, newStatus: string) => {
     const sm = getStatus(newStatus)
+    // Completing an appointment is the natural moment to start the real
+    // clinical record — without this link, staff had to separately
+    // re-open Treatments, re-pick the same patient, and build an
+    // encounter completely from scratch with no connection back to the
+    // appointment that was just finished. That's real friction in a busy
+    // clinic and a place data entry could just get skipped.
+    const offerEncounter = newStatus === 'completed'
     confirmAction({
       type: 'status',
       title: 'تغییر وضعیت نوبت',
@@ -230,8 +237,26 @@ export default function Appointments() {
         { label: 'زمان', value: `${toJalaliStringPretty(appt.date)} ${toPersianDigits(appt.start_time)}`, icon: <Clock size={16} /> },
         { label: 'وضعیت فعلی', value: getStatus(appt.status).label },
         { label: 'وضعیت جدید', value: sm.label, highlight: true },
+        ...(offerEncounter ? [{ label: 'ثبت ویزیت', value: 'همزمان یک ویزیت جدید برای ثبت درمان باز می‌شود' }] : []),
       ],
-      onConfirm: async () => { await updateAppointment(appt.id, { status: newStatus }); await loadData() },
+      onConfirm: async () => {
+        await updateAppointment(appt.id, { status: newStatus })
+        if (offerEncounter) {
+          const enc = await createEncounter({
+            clinic_id: '', patient_id: appt.patient_id, doctor_id: appt.doctor_id || null,
+            appointment_id: appt.id,
+            encounter_date: appt.date, chief_complaint: appt.notes || null,
+            diagnosis: null, treatment_plan: null,
+            status: 'in_progress', total_amount: null, paid_amount: null,
+            discount_amount: null, created_by: null,
+            notes: null,
+          } as any)
+          showToast('success', 'نوبت تکمیل شد — ویزیت جدید باز شد')
+          navigate('/treatments', { state: { openEncounterId: enc.id } })
+          return
+        }
+        await loadData()
+      },
     })
   }
 
