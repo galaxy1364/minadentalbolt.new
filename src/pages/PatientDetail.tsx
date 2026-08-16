@@ -1,11 +1,11 @@
 // PatientDetail.tsx - Persian RTL Dental Clinic Patient Detail Page
 import { useState, useEffect, useCallback } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { ArrowRight, Edit2, Phone, Mail, MapPin, Calendar, CreditCard, Activity, FileText, Image as ImageIcon, Shield, Pill, Smile, Award, AlertCircle, Clock, CheckCircle2, Layers, Plus, Trash2 } from 'lucide-react'
-import { fetchPatient, updatePatient, fetchTimeline, fetchTreatments, fetchAppointments, fetchPayments, fetchToothRecords, createToothRecord, updateToothRecord, fetchPrescriptions, fetchRadiologyImages, fetchEncounters, fetchDoctors, fetchImplantCases, fetchTreatmentPhases, createTreatmentPhase, updateTreatmentPhase, deleteTreatmentPhase } from '../lib/api'
+import { ArrowRight, Edit2, Phone, Mail, MapPin, Calendar, CreditCard, Activity, FileText, Image as ImageIcon, Shield, Pill, Smile, Award, AlertCircle, Clock, CheckCircle2, Layers, Plus, Trash2, FileSignature, Printer } from 'lucide-react'
+import { fetchPatient, updatePatient, fetchTimeline, fetchTreatments, fetchAppointments, fetchPayments, fetchToothRecords, createToothRecord, updateToothRecord, fetchPrescriptions, fetchRadiologyImages, fetchEncounters, fetchDoctors, fetchImplantCases, fetchTreatmentPhases, createTreatmentPhase, updateTreatmentPhase, deleteTreatmentPhase, fetchConsentForms, createConsentForm, updateConsentForm, deleteConsentForm } from '../lib/api'
 import { toJalaliString, toJalaliStringPretty, formatCurrency, toPersianDigits, formatTime } from '../lib/persianDate'
 import { calcPatientBalance } from '../lib/finance'
-import { Patient, Doctor, PatientTimeline, Treatment, Appointment, Payment, ToothRecord, Prescription, RadiologyImage, Encounter, ImplantCase, TreatmentPhase } from '../types'
+import { Patient, Doctor, PatientTimeline, Treatment, Appointment, Payment, ToothRecord, Prescription, RadiologyImage, Encounter, ImplantCase, TreatmentPhase, ConsentForm } from '../types'
 import { Modal, Card, Button, Input, Select, Textarea, Badge, Spinner, EmptyState, Tabs, showToast, Wizard } from '../components/ui'
 import { useConfirmAction } from '../components/ConfirmAction'
 import { h } from '../lib/haptics'
@@ -133,6 +133,7 @@ export default function PatientDetail() {
   const [treatments, setTreatments] = useState<Treatment[]>([])
   const [implantCases, setImplantCases] = useState<ImplantCase[]>([])
   const [phases, setPhases] = useState<TreatmentPhase[]>([])
+  const [consentForms, setConsentForms] = useState<ConsentForm[]>([])
   const [appointments, setAppointments] = useState<Appointment[]>([])
   const [payments, setPayments] = useState<Payment[]>([])
   const [toothRecords, setToothRecords] = useState<ToothRecord[]>([])
@@ -228,7 +229,7 @@ export default function PatientDetail() {
   const loadTabData = useCallback(async () => {
     if (!id) return
     try {
-      const [tl, tr, ap, pm, tr_records, pres, radio, enc, implAll, ph] = await Promise.all([
+      const [tl, tr, ap, pm, tr_records, pres, radio, enc, implAll, ph, cf] = await Promise.all([
         fetchTimeline(id),
         fetchTreatments(undefined, id),
         fetchAppointments(),
@@ -239,6 +240,7 @@ export default function PatientDetail() {
         fetchEncounters(id),
         fetchImplantCases(),
         fetchTreatmentPhases(id),
+        fetchConsentForms(id),
       ])
       setTimeline(tl)
       setTreatments(tr)
@@ -250,6 +252,7 @@ export default function PatientDetail() {
       setEncounters(enc)
       setImplantCases(implAll.filter((c) => c.patient_id === id))
       setPhases(ph.sort((a, b) => a.phase_number - b.phase_number))
+      setConsentForms(cf)
     } catch (err) {
       console.error('Error loading tab data:', err)
     }
@@ -434,6 +437,115 @@ export default function PatientDetail() {
     })
   }
 
+  // ── Consent forms (فرم رضایت‌نامه) ──────────────────────────────
+  const [consentModalOpen, setConsentModalOpen] = useState(false)
+  const [editingConsent, setEditingConsent] = useState<ConsentForm | null>(null)
+  const [savingConsent, setSavingConsent] = useState(false)
+  const [consentForm, setConsentForm] = useState({
+    doctor_id: '', treatment_description: '', risks: '', notes: '', signed_by_patient: false,
+  })
+
+  const openCreateConsent = () => {
+    h.tap()
+    setEditingConsent(null)
+    setConsentForm({ doctor_id: '', treatment_description: '', risks: '', notes: '', signed_by_patient: false })
+    setConsentModalOpen(true)
+  }
+
+  const openEditConsent = (c: ConsentForm) => {
+    setEditingConsent(c)
+    setConsentForm({
+      doctor_id: c.doctor_id || '', treatment_description: c.treatment_description || '',
+      risks: c.risks || '', notes: c.notes || '', signed_by_patient: c.signed_by_patient || false,
+    })
+    setConsentModalOpen(true)
+  }
+
+  const handleSaveConsent = () => {
+    if (!consentForm.treatment_description.trim()) { showToast('error', 'شرح درمان الزامی است'); return }
+    if (!id) return
+    const payload = {
+      patient_id: id, doctor_id: consentForm.doctor_id || null,
+      treatment_description: consentForm.treatment_description, risks: consentForm.risks || null,
+      notes: consentForm.notes || null, signed_by_patient: consentForm.signed_by_patient,
+      signed_at: consentForm.signed_by_patient ? new Date().toISOString() : null,
+    } as any
+    confirmAction({
+      type: editingConsent ? 'edit' : 'create',
+      title: editingConsent ? 'ویرایش فرم رضایت‌نامه' : 'فرم رضایت‌نامه‌ی جدید',
+      fields: [
+        { label: 'شرح درمان', value: consentForm.treatment_description, highlight: true },
+        { label: 'وضعیت امضا', value: consentForm.signed_by_patient ? 'امضا شده' : 'امضا نشده' },
+      ],
+      confirmLabel: editingConsent ? 'ذخیره' : 'ثبت',
+      onConfirm: async () => {
+        setSavingConsent(true)
+        try {
+          if (editingConsent) await updateConsentForm(editingConsent.id, payload)
+          else await createConsentForm(payload)
+          showToast('success', editingConsent ? 'ویرایش شد' : 'ثبت شد')
+          setConsentModalOpen(false)
+          if (id) setConsentForms(await fetchConsentForms(id))
+        } catch { showToast('error', 'خطا در ذخیره') }
+        finally { setSavingConsent(false) }
+      },
+    })
+  }
+
+  const handleDeleteConsent = (c: ConsentForm) => {
+    h.tap()
+    confirmAction({
+      type: 'delete',
+      title: 'حذف فرم رضایت‌نامه',
+      warning: 'این عملیات قابل بازگشت نیست',
+      fields: [{ label: 'شرح درمان', value: c.treatment_description || '-', highlight: true }],
+      confirmLabel: 'تایید حذف',
+      onConfirm: async () => {
+        await deleteConsentForm(c.id)
+        showToast('success', 'حذف شد')
+        if (id) setConsentForms(await fetchConsentForms(id))
+      },
+    })
+  }
+
+  const handlePrintConsent = (c: ConsentForm) => {
+    const doc = doctors.find((d) => d.id === c.doctor_id)
+    const win = window.open('', '_blank', 'width=650,height=850')
+    if (!win) { showToast('error', 'اجازه‌ی باز کردن پنجره‌ی چاپ داده نشد'); return }
+    win.document.write(`<!DOCTYPE html><html dir="rtl" lang="fa"><head><meta charset="utf-8"><title>فرم رضایت‌نامه</title>
+      <style>
+        body { font-family: Tahoma, Arial, sans-serif; padding: 32px; color: #1e293b; line-height: 1.9; }
+        .header { text-align: center; border-bottom: 2px solid #0d9488; padding-bottom: 16px; margin-bottom: 24px; }
+        .header h1 { color: #0d9488; margin: 0 0 4px; font-size: 22px; }
+        .meta { display: flex; justify-content: space-between; margin-bottom: 20px; font-size: 13px; color: #475569; }
+        .section { margin-bottom: 20px; }
+        .section h2 { font-size: 14px; color: #0d9488; margin-bottom: 6px; }
+        .section p { font-size: 13px; margin: 0; white-space: pre-wrap; }
+        .sign-row { display: flex; justify-content: space-between; margin-top: 60px; font-size: 13px; }
+        .sign-box { width: 45%; border-top: 1px solid #94a3b8; padding-top: 6px; text-align: center; color: #64748b; }
+        @media print { body { padding: 12px; } }
+      </style>
+      </head><body>
+        <div class="header"><h1>کلینیک دندانپزشکی مینا</h1><p>فرم رضایت‌نامه‌ی آگاهانه‌ی درمان</p></div>
+        <div class="meta">
+          <span><b>بیمار:</b> ${patient ? `${patient.first_name} ${patient.last_name}` : '-'}</span>
+          <span><b>پزشک:</b> ${doc ? `دکتر ${doc.name || doc.specialty}` : '-'}</span>
+          <span><b>تاریخ:</b> ${toJalaliStringPretty(c.created_at)}</span>
+        </div>
+        <div class="section"><h2>شرح درمان</h2><p>${c.treatment_description || '-'}</p></div>
+        ${c.risks ? `<div class="section"><h2>خطرات و عوارض احتمالی</h2><p>${c.risks}</p></div>` : ''}
+        ${c.notes ? `<div class="section"><h2>یادداشت</h2><p>${c.notes}</p></div>` : ''}
+        <div class="section"><p>اینجانب با آگاهی کامل از شرح درمان و خطرات احتمالی ذکرشده در بالا، رضایت خود را برای انجام این درمان اعلام می‌کنم.</p></div>
+        <div class="sign-row">
+          <div class="sign-box">امضای بیمار / ولی بیمار</div>
+          <div class="sign-box">امضا و مهر پزشک</div>
+        </div>
+      </body></html>`)
+    win.document.close()
+    win.focus()
+    setTimeout(() => win.print(), 300)
+  }
+
   // ===========================================================================
   // Render: Patient Header
   // ===========================================================================
@@ -531,6 +643,7 @@ export default function PatientDetail() {
     { key: 'timeline', label: 'تایم‌لاین', icon: <Clock size={16} /> },
     { key: 'treatments', label: 'درمان‌ها', icon: <Activity size={16} /> },
     { key: 'phases', label: 'طرح درمان مرحله‌ای', icon: <Layers size={16} /> },
+    { key: 'consent', label: 'فرم رضایت‌نامه', icon: <FileSignature size={16} /> },
     { key: 'appointments', label: 'نوبت‌ها', icon: <Calendar size={16} /> },
     { key: 'payments', label: 'پرداخت‌ها', icon: <CreditCard size={16} /> },
     { key: 'teeth', label: 'نمودار دندان‌ها', icon: <Smile size={16} /> },
@@ -793,6 +906,50 @@ export default function PatientDetail() {
       </div>
     )
   }
+
+  // ===========================================================================
+  // Render: Consent Forms Tab
+  // ===========================================================================
+
+  const renderConsentForms = () => (
+    <div className="space-y-4">
+      <div className="flex items-center justify-between">
+        <div>
+          <p className="text-sm font-bold text-slate-800 dark:text-slate-100">فرم‌های رضایت‌نامه</p>
+          <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+            {consentForms.length > 0 ? `${toPersianDigits(consentForms.filter((c) => c.signed_by_patient).length)} از ${toPersianDigits(consentForms.length)} امضا شده` : 'هنوز فرمی ثبت نشده'}
+          </p>
+        </div>
+        <Button variant="primary" size="sm" onClick={openCreateConsent}><Plus size={14} className="inline ml-1" /> فرم جدید</Button>
+      </div>
+
+      {consentForms.length === 0 ? (
+        <EmptyState icon={<FileSignature size={40} />} title="فرم رضایت‌نامه ثبت نشده" description="پیش از درمان‌های جراحی یا پرخطر (ایمپلنت، کشیدن، جراحی) رضایت آگاهانه‌ی بیمار را اینجا ثبت و چاپ کنید" />
+      ) : (
+        <div className="space-y-2">
+          {consentForms.map((c) => {
+            const doc = doctors.find((d) => d.id === c.doctor_id)
+            return (
+              <Card key={c.id} className="p-3.5">
+                <div className="flex items-start justify-between gap-2">
+                  <div className="min-w-0 flex-1">
+                    <p className="text-sm font-bold text-slate-800 dark:text-slate-100 truncate">{c.treatment_description}</p>
+                    <p className="text-[11px] text-slate-400 mt-0.5">{doc ? `دکتر ${doc.name || doc.specialty}` : 'بدون پزشک'} — {toJalaliStringPretty(c.created_at)}</p>
+                  </div>
+                  <Badge color={c.signed_by_patient ? 'success' : 'warning'}>{c.signed_by_patient ? 'امضا شده' : 'امضا نشده'}</Badge>
+                </div>
+                <div className="flex gap-2 mt-2.5 pt-2.5 border-t border-slate-100 dark:border-slate-700">
+                  <button onClick={() => handlePrintConsent(c)} className="flex items-center gap-1 text-xs text-primary-600 hover:underline"><Printer size={12} /> چاپ</button>
+                  <button onClick={() => openEditConsent(c)} className="text-xs text-slate-500 hover:underline">ویرایش</button>
+                  <button onClick={() => handleDeleteConsent(c)} className="text-xs text-error-500 hover:underline">حذف</button>
+                </div>
+              </Card>
+            )
+          })}
+        </div>
+      )}
+    </div>
+  )
 
   // ===========================================================================
   // Render: Appointments Tab
@@ -1237,6 +1394,7 @@ export default function PatientDetail() {
       {activeTab === 'timeline' && renderTimeline()}
       {activeTab === 'treatments' && renderTreatments()}
       {activeTab === 'phases' && renderPhases()}
+      {activeTab === 'consent' && renderConsentForms()}
       {activeTab === 'appointments' && renderAppointments()}
       {activeTab === 'payments' && renderPayments()}
       {activeTab === 'teeth' && renderTeethChart()}
@@ -1297,6 +1455,24 @@ export default function PatientDetail() {
       />
 
       {ConfirmActionModal}
+
+      {/* Consent Form Modal */}
+      <Modal open={consentModalOpen} onClose={() => setConsentModalOpen(false)} title={editingConsent ? 'ویرایش فرم رضایت‌نامه' : 'فرم رضایت‌نامه‌ی جدید'} size="md">
+        <div className="space-y-3">
+          <Select label="پزشک" value={consentForm.doctor_id} onChange={(v) => setConsentForm({ ...consentForm, doctor_id: v })} options={doctors.filter((d) => d.is_active).map((d) => ({ value: d.id, label: `دکتر ${d.name || d.specialty || 'پزشک'}` }))} placeholder="انتخاب پزشک..." />
+          <Textarea label="شرح درمان" value={consentForm.treatment_description} onChange={(v) => setConsentForm({ ...consentForm, treatment_description: v })} placeholder="مثلاً: جراحی ایمپلنت دندان ۱۶ همراه با پیوند استخوان" rows={3} />
+          <Textarea label="خطرات و عوارض احتمالی" value={consentForm.risks} onChange={(v) => setConsentForm({ ...consentForm, risks: v })} placeholder="خطرات این درمان را برای بیمار توضیح دهید" rows={3} />
+          <Textarea label="یادداشت" value={consentForm.notes} onChange={(v) => setConsentForm({ ...consentForm, notes: v })} placeholder="یادداشت اضافی" rows={2} />
+          <label className="flex items-center gap-2 cursor-pointer p-2 rounded-xl bg-slate-50 dark:bg-slate-800/60">
+            <input type="checkbox" checked={consentForm.signed_by_patient} onChange={(e) => setConsentForm({ ...consentForm, signed_by_patient: e.target.checked })} className="w-4 h-4 rounded accent-primary-600" />
+            <span className="text-sm text-slate-700 dark:text-slate-200">بیمار این فرم را امضا کرده است</span>
+          </label>
+          <div className="flex justify-end gap-2 pt-2 border-t border-slate-100 dark:border-slate-700">
+            <Button variant="secondary" onClick={() => setConsentModalOpen(false)}>انصراف</Button>
+            <Button variant="primary" onClick={handleSaveConsent} disabled={savingConsent}>{savingConsent ? <Spinner size={16} /> : editingConsent ? 'ذخیره' : 'ثبت'}</Button>
+          </div>
+        </div>
+      </Modal>
     </div>
   )
 }
