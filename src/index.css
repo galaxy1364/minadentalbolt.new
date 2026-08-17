@@ -274,9 +274,16 @@ input, textarea, select { font-size: 16px !important; }
 
 /* ── Slide in from right (detail views) ─────────────── */
 @keyframes slide-in-right {
-  from { opacity: 0; transform: translateX(30px); }
-  to   { opacity: 1; transform: translateX(0); }
+  from { opacity: 0; }
+  to   { opacity: 1; }
 }
+/* Deliberately opacity-only — a lingering `transform` (even translateX(0)
+   after the animation ends via fill-mode) can make Android's touch-scroll
+   handling treat this wrapper as its own scroll/compositing boundary and
+   swallow the gesture instead of scrolling the page, a real cross-engine
+   Android quirk (reported on both Chrome/Blink and Firefox/Gecko) that
+   iOS Safari doesn't exhibit. This wraps literally every page's content,
+   so removing the transform here fixes it everywhere at once. */
 .slide-in-right { animation: slide-in-right 0.3s cubic-bezier(0.32,0.72,0,1) both; }
 
 /* ── Time badge ─────────────────────────────────────── */
