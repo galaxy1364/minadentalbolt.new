@@ -33,7 +33,7 @@ Deno.serve(async (req: Request) => {
       .select(`
         *,
         patient:patients (first_name, last_name, phone),
-        doctor:doctors (display_name),
+        doctor:doctors (name),
         unit:units (name)
       `)
       .eq('id', appointmentId)
@@ -65,7 +65,7 @@ Deno.serve(async (req: Request) => {
 
     // Build message
     const patientName = `${appointment.patient.first_name} ${appointment.patient.last_name}`;
-    const doctorName = appointment.doctor?.display_name || 'پزشک';
+    const doctorName = appointment.doctor?.name || 'پزشک';
     const unitName = appointment.unit?.name || '';
 
     let message: string;
