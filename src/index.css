@@ -10,8 +10,20 @@ body {
   overscroll-behavior-y: none;
   -webkit-tap-highlight-color: transparent;
   overflow-x: hidden;
+  /* Deliberately NOT setting overflow-y here — see note on <html> below. */
 }
-html { overflow-x: hidden; max-width: 100vw; }
+/* overflow-x is set on body only, not here too. Per the CSS spec, if
+   overflow-x is non-visible on an element while overflow-y is left at
+   its default 'visible', the UA must compute overflow-y as 'auto' —
+   so having overflow-x:hidden independently on BOTH <html> and <body>
+   creates two separate, competing auto-scroll containers instead of
+   one clear document scrolling element. Different engines resolve
+   that ambiguity differently (which element becomes
+   document.scrollingElement, and which one touch-drag gestures
+   target), which is a real, documented source of "scrolls fine on
+   iOS Safari, completely frozen on Android Chrome/Firefox" bugs —
+   exactly this app's symptom. Only body owns overflow-x now. */
+html { max-width: 100vw; }
 
 input, textarea, select { font-size: 16px !important; }
 
