@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { Calendar, Clock, CheckCircle2, User, ChevronRight, ChevronLeft, Plus, Search, Trash2, AlertCircle, Edit2, Stethoscope, DollarSign, FileText, Activity, List, Grid, X, UserPlus } from 'lucide-react'
 import { fetchAppointments, createAppointment, updateAppointment, deleteAppointment, checkConflict, fetchPatients, fetchDoctors, fetchUnits, peekNextFileNumber, createPatient, createEncounter, fetchDoctorSchedules } from '../lib/api'
 import { toJalaliString, toJalaliStringPretty, getJalaliDateInfo, formatTime, formatCurrency, toPersianDigits, persianWeekdaysShort, getHoliday } from '../lib/persianDate'
+import { doctorColor } from '../lib/doctorColors'
 import { Appointment, AppointmentWithRelations, Patient, Doctor, Unit } from '../types'
 import { Modal, Card, Button, Input, Select, Textarea, EmptyState, showToast } from '../components/ui'
 import { ModuleHeader } from '../components/ModuleHeader'
@@ -424,7 +425,7 @@ export default function Appointments() {
                 const tm = getType(appt.type)
                 const sm = getStatus(appt.status)
                 return (
-                  <div key={appt.id} className="appt-card p-3.5" onClick={() => openWizard(appt)}>
+                  <div key={appt.id} className="appt-card p-3.5" style={{ borderRight: `3px solid ${doctorColor(doctors.find((d) => d.id === appt.doctor_id)?.color, 0)}` }} onClick={() => openWizard(appt)}>
                     <div className="flex items-center gap-3">
                       <div className="time-badge !min-w-[50px] !text-sm">
                         {toPersianDigits(appt.start_time)}
@@ -468,6 +469,7 @@ export default function Appointments() {
               <div
                 key={appt.id}
                 className="appt-card p-3.5 stagger-item"
+                style={{ borderRight: `3px solid ${doctorColor(doctors.find((d) => d.id === appt.doctor_id)?.color, 0)}` }}
                 onClick={() => openWizard(appt)}
               >
                 <div className="flex items-start gap-3">

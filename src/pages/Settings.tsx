@@ -28,6 +28,7 @@ import { Card, Button, Input, Select, Textarea, Badge, Spinner, EmptyState, Stat
 import { useConfirmAction } from '../components/ConfirmAction'
 import { h, setHapticsEnabled, setSoundEnabled, getHapticsEnabled, getSoundEnabled } from '../lib/haptics'
 import { CLINIC_ID } from '../lib/supabase'
+import { DOCTOR_COLOR_PALETTE } from '../lib/doctorColors'
 import { getErrorLog, clearErrorLog, LoggedError } from '../lib/errorLog'
 import { fetchAuditLog, clearAuditLog } from '../lib/auditLog'
 import { listBackupSnapshots, restoreFromSnapshot } from '../lib/autoBackup'
@@ -99,7 +100,7 @@ export default function Settings() {
   const [doctorSchedule, setDoctorSchedule] = useState<DoctorSchedule[]>([])
   const [savingSchedule, setSavingSchedule] = useState(false)
   const weekdays = ['یکشنبه', 'دوشنبه', 'سه‌شنبه', 'چهارشنبه', 'پنجشنبه', 'جمعه', 'شنبه']
-  const [doctorForm, setDoctorForm] = useState({ name: '', specialty: '', license_number: '', is_active: 'true' })
+  const [doctorForm, setDoctorForm] = useState({ name: '', specialty: '', license_number: '', is_active: 'true', color: DOCTOR_COLOR_PALETTE[0] })
   const [savingDoctor, setSavingDoctor] = useState(false)
 
   const [unitModal, setUnitModal] = useState(false)
@@ -242,7 +243,13 @@ export default function Settings() {
   }
 
   // ── Doctor handlers ──
-  const openCreateDoctor = () => { setEditingDoctor(null); setDoctorForm({ name: '', specialty: '', license_number: '', is_active: 'true' }); setDoctorSchedule([]); setDoctorModal(true) }
+  const openCreateDoctor = () => {
+    setEditingDoctor(null)
+    const usedCount = doctors.length
+    setDoctorForm({ name: '', specialty: '', license_number: '', is_active: 'true', color: DOCTOR_COLOR_PALETTE[usedCount % DOCTOR_COLOR_PALETTE.length] })
+    setDoctorSchedule([])
+    setDoctorModal(true)
+  }
 
   // Working-hours editor for a doctor — each weekday is either absent
   // from doctorSchedule (day off) or present with start/end times.
@@ -289,7 +296,7 @@ export default function Settings() {
   }
   const openEditDoctor = (d: Doctor) => {
     setEditingDoctor(d)
-    setDoctorForm({ name: d.name || '', specialty: d.specialty || '', license_number: d.license_number || '', is_active: d.is_active ? 'true' : 'false' })
+    setDoctorForm({ name: d.name || '', specialty: d.specialty || '', license_number: d.license_number || '', is_active: d.is_active ? 'true' : 'false', color: d.color || DOCTOR_COLOR_PALETTE[0] })
     setDoctorModal(true)
     fetchDoctorSchedules().then((all) => setDoctorSchedule(all.filter((sc) => sc.doctor_id === d.id)))
   }
@@ -297,7 +304,7 @@ export default function Settings() {
     if (!doctorForm.name.trim()) { showToast('error', 'نام پزشک الزامی است'); return }
     setSavingDoctor(true)
     try {
-      const payload: DoctorInput = { clinic_id: CLINIC_ID, user_id: null, staff_id: editingDoctor?.staff_id ?? null, name: doctorForm.name.trim(), specialty: doctorForm.specialty.trim() || null, license_number: doctorForm.license_number || null, is_active: doctorForm.is_active === 'true' }
+      const payload: DoctorInput = { clinic_id: CLINIC_ID, user_id: null, staff_id: editingDoctor?.staff_id ?? null, name: doctorForm.name.trim(), specialty: doctorForm.specialty.trim() || null, license_number: doctorForm.license_number || null, color: doctorForm.color, is_active: doctorForm.is_active === 'true' }
       if (editingDoctor) { await updateDoctor(editingDoctor.id, payload); showToast('success', 'پزشک ویرایش شد') }
       else { await createDoctor(payload); showToast('success', 'پزشک اضافه شد') }
       setDoctorModal(false); loadData()
@@ -731,6 +738,22 @@ export default function Settings() {
           <Input label="تخصص" value={doctorForm.specialty} onChange={(v) => setDoctorForm({ ...doctorForm, specialty: v })} placeholder="مثلا: دندانپزشک عمومی" />
           <Input label="شماره پروانه" value={doctorForm.license_number} onChange={(v) => setDoctorForm({ ...doctorForm, license_number: v })} placeholder="شماره پروانه" dir="ltr" />
           <Select label="وضعیت" value={doctorForm.is_active} onChange={(v) => setDoctorForm({ ...doctorForm, is_active: v })} options={[{ value: 'true', label: 'فعال' }, { value: 'false', label: 'غیرفعال' }]} />
+
+          <div>
+            <p className="text-sm font-medium text-slate-700 dark:text-slate-200 mb-2">رنگ پزشک (برای نوبت‌دهی و تقویم)</p>
+            <div className="flex flex-wrap gap-2.5">
+              {DOCTOR_COLOR_PALETTE.map((c) => (
+                <button
+                  key={c}
+                  type="button"
+                  onClick={() => setDoctorForm({ ...doctorForm, color: c })}
+                  aria-label={`انتخاب رنگ ${c}`}
+                  className={`w-9 h-9 rounded-full transition-all-smooth ${doctorForm.color === c ? 'ring-2 ring-offset-2 ring-slate-800 dark:ring-slate-200 scale-110' : ''}`}
+                  style={{ background: c }}
+                />
+              ))}
+            </div>
+          </div>
 
           {editingDoctor && (
             <div className="pt-3 border-t border-slate-100 dark:border-slate-700">

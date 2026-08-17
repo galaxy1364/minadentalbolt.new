@@ -21,6 +21,7 @@ type CalEvent = {
   subtitle: string
   status?: string
   patientId?: string
+  doctorColorHex?: string
 }
 
 export default function CalendarPage() {
@@ -66,6 +67,7 @@ export default function CalendarPage() {
         id: `appt-${a.id}`, date: a.date, type: 'appointment',
         title: a.patient ? `${a.patient.first_name} ${a.patient.last_name}` : 'نوبت',
         subtitle: `ساعت ${toPersianDigits(a.start_time)}`, status: a.status, patientId: a.patient_id,
+        doctorColorHex: a.doctor?.color || undefined,
       })
     }
     for (const l of labOrders) {
@@ -161,7 +163,10 @@ export default function CalendarPage() {
               return (
                 <Card key={e.id} className="p-3 cursor-pointer hover:shadow-md transition-all-smooth">
                   <div className="flex items-center gap-3" onClick={() => navigate(eventTarget(e))}>
-                    <div className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 ${meta.color}`}>
+                    <div
+                      className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 ${e.doctorColorHex ? '' : meta.color}`}
+                      style={e.doctorColorHex ? { background: `${e.doctorColorHex}22`, color: e.doctorColorHex } : undefined}
+                    >
                       {meta.icon}
                     </div>
                     <div className="min-w-0 flex-1">

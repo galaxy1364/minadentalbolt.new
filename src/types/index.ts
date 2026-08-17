@@ -47,13 +47,16 @@ export interface Doctor {
   id: string
   user_id: string | null
   clinic_id: string
-  /** Links this scheduling record back to its پرسنل (staff) row, if it
-   * was created/synced from Staff — keeps the two tables from drifting
-   * apart. Doctors added directly (not via Staff) can have this null. */
   staff_id: string | null
   name: string | null
   specialty: string | null
   license_number: string | null
+  /** Fixed color for this doctor, shown consistently everywhere an
+   * appointment/schedule item needs to visually indicate whose it is
+   * (booking wizard, calendar, appointment lists) — without this,
+   * there was no way to tell doctors apart at a glance in a
+   * multi-doctor clinic. */
+  color: string | null
   is_active: boolean
   created_at: string
   updated_at: string

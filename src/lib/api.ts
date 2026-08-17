@@ -2,6 +2,7 @@
 // All reads come from local IndexedDB (instant). All writes go to local DB + sync queue.
 import { supabase, CLINIC_ID } from './supabase'
 import { db } from './db'
+import { DOCTOR_COLOR_PALETTE } from './doctorColors'
 import { queueOperation } from './sync'
 import {
   Patient, PatientInput, Doctor, Unit, Appointment, AppointmentInput,
@@ -538,9 +539,11 @@ async function syncDoctorRecordForStaff(staff: Staff): Promise<void> {
       await queueOperation('doctors', 'update', existing.id, { name: updated.name, specialty: updated.specialty, license_number: updated.license_number, is_active: updated.is_active })
     } else {
       const docId = uid()
+      const existingCount = await db.doctors.where('clinic_id').equals(CLINIC_ID).count()
       const doc: Doctor = {
         id: docId, user_id: null, clinic_id: CLINIC_ID, staff_id: staff.id,
         name: staff.full_name, specialty: staff.specialty ?? null, license_number: staff.license_number ?? null,
+        color: DOCTOR_COLOR_PALETTE[existingCount % DOCTOR_COLOR_PALETTE.length],
         is_active: staff.is_active, created_at: nowISO(), updated_at: nowISO(), sync_version: 1,
       } as Doctor
       await db.doctors.put(doc)
