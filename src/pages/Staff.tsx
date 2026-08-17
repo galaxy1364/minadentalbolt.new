@@ -358,7 +358,7 @@ export default function Staff() {
               showToast('error', 'رمز عبور موقت باید حداقل ۶ کاراکتر باشد')
             } else {
               try {
-                const { error: inviteError } = await supabase.functions.invoke('invite-staff', {
+                const { data: inviteData, error: inviteError } = await supabase.functions.invoke('invite-staff', {
                   body: {
                     email: formData.email || null,
                     phone: formData.phone || null,
@@ -368,11 +368,25 @@ export default function Staff() {
                     clinic_id: CLINIC_ID,
                   },
                 })
-                if (inviteError) throw inviteError
+                if (inviteError) {
+                  // FunctionsHttpError carries the actual server response
+                  // body (with the real reason) on .context — surfacing
+                  // it instead of a generic message is the difference
+                  // between "خطا در ساخت حساب" (useless) and knowing
+                  // exactly what failed.
+                  let serverMessage = inviteError.message
+                  try {
+                    const body = await inviteError.context?.json?.()
+                    if (body?.error) serverMessage = body.error
+                  } catch { /* response wasn't JSON — keep the generic message */ }
+                  throw new Error(serverMessage)
+                }
+                if (inviteData?.error) throw new Error(inviteData.error)
                 showToast('success', 'حساب ورود ساخته شد')
               } catch (inviteErr) {
                 console.error('Error creating login:', inviteErr)
-                showToast('error', 'خطا در ساخت حساب ورود — تابع invite-staff را دیپلوی کرده‌اید؟')
+                const msg = inviteErr instanceof Error ? inviteErr.message : ''
+                showToast('error', msg ? `خطا در ساخت حساب ورود: ${msg}` : 'خطا در ساخت حساب ورود')
               }
             }
           }

@@ -235,6 +235,12 @@ export default function Appointments() {
         if (editingAppt) await updateAppointment(editingAppt.id, payload)
         else await createAppointment(payload)
         setWizardOpen(false)
+        // The list defaults to "امروز" (today) — a newly-booked appointment
+        // for any other date would silently vanish from view even though
+        // it saved correctly, looking exactly like "ثبت می‌شه ولی نمایش
+        // داده نمی‌شه". Switch to "همه" so it's guaranteed visible right
+        // after creating it, regardless of which date was picked.
+        if (!editingAppt && wizardData.date !== todayStr) setActiveFilter('all')
         await loadData()
       },
     })
