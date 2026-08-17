@@ -17,7 +17,7 @@ export const ROLES = {
 
 // Mirrors Layout's REQUIRE_LOGIN flag: while login is disabled, nobody has
 // a role yet, so role-based restrictions must not block navigation either.
-export const REQUIRE_LOGIN = false
+export const REQUIRE_LOGIN = true
 
 export type Role = keyof typeof ROLES
 
