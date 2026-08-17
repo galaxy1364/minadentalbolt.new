@@ -134,6 +134,11 @@ class MinadentDB extends Dexie {
     this.version(3).stores({
       personal_finance_items: 'id, clinic_id, item_type, status, due_date',
     })
+    // v4: doctors.staff_id links a doctor's scheduling record back to
+    // their staff/HR row, so پرسنل and نوبت‌دهی never drift apart again.
+    this.version(4).stores({
+      doctors: 'id, clinic_id, specialty, is_active, staff_id',
+    })
   }
 }
 

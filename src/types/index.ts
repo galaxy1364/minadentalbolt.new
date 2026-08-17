@@ -47,6 +47,10 @@ export interface Doctor {
   id: string
   user_id: string | null
   clinic_id: string
+  /** Links this scheduling record back to its پرسنل (staff) row, if it
+   * was created/synced from Staff — keeps the two tables from drifting
+   * apart. Doctors added directly (not via Staff) can have this null. */
+  staff_id: string | null
   name: string | null
   specialty: string | null
   license_number: string | null

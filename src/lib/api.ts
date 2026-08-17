@@ -514,7 +514,46 @@ export async function createStaff(s: StaffInput): Promise<Staff> {
   const staff: Staff = { ...rest, id, clinic_id: CLINIC_ID, created_at: nowISO(), updated_at: nowISO() }
   await db.staff.put(staff)
   await queueOperation('staff', 'insert', id, staff)
+  await syncDoctorRecordForStaff(staff)
   return staff
+}
+
+/**
+ * Keeps the `doctors` table (what Appointments/Treatments/Implants
+ * actually query for scheduling) in sync with `staff` (HR/commission).
+ * Adding/editing someone in پرسنل with is_doctor checked was
+ * previously invisible everywhere else in the app — this closes that
+ * gap for every future create/update, not just a one-time backfill.
+ */
+async function syncDoctorRecordForStaff(staff: Staff): Promise<void> {
+  const existing = await db.doctors.where('staff_id').equals(staff.id).first()
+  if (staff.is_doctor) {
+    if (existing) {
+      const updated: Doctor = {
+        ...existing, name: staff.full_name, specialty: staff.specialty ?? existing.specialty,
+        license_number: staff.license_number ?? existing.license_number,
+        is_active: staff.is_active, updated_at: nowISO(),
+      }
+      await db.doctors.put(updated)
+      await queueOperation('doctors', 'update', existing.id, { name: updated.name, specialty: updated.specialty, license_number: updated.license_number, is_active: updated.is_active })
+    } else {
+      const docId = uid()
+      const doc: Doctor = {
+        id: docId, user_id: null, clinic_id: CLINIC_ID, staff_id: staff.id,
+        name: staff.full_name, specialty: staff.specialty ?? null, license_number: staff.license_number ?? null,
+        is_active: staff.is_active, created_at: nowISO(), updated_at: nowISO(), sync_version: 1,
+      } as Doctor
+      await db.doctors.put(doc)
+      await queueOperation('doctors', 'insert', docId, doc)
+    }
+  } else if (existing && existing.is_active) {
+    // is_doctor was unchecked — deactivate the linked doctor record
+    // rather than deleting it (appointments/treatments may already
+    // reference it historically).
+    const updated: Doctor = { ...existing, is_active: false, updated_at: nowISO() }
+    await db.doctors.put(updated)
+    await queueOperation('doctors', 'update', existing.id, { is_active: false })
+  }
 }
 
 // ── Expenses ─────────────────────────────────────────────────
@@ -996,6 +1035,7 @@ export async function updateStaff(id: string, updates: Partial<StaffInput>): Pro
   const updated: Staff = { ...existing, ...rest, updated_at: nowISO() }
   await db.staff.put(updated)
   await queueOperation('staff', 'update', id, rest)
+  await syncDoctorRecordForStaff(updated)
   return updated
 }
 

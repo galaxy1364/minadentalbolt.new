@@ -297,7 +297,7 @@ export default function Settings() {
     if (!doctorForm.name.trim()) { showToast('error', 'نام پزشک الزامی است'); return }
     setSavingDoctor(true)
     try {
-      const payload: DoctorInput = { clinic_id: CLINIC_ID, user_id: null, name: doctorForm.name.trim(), specialty: doctorForm.specialty.trim() || null, license_number: doctorForm.license_number || null, is_active: doctorForm.is_active === 'true' }
+      const payload: DoctorInput = { clinic_id: CLINIC_ID, user_id: null, staff_id: editingDoctor?.staff_id ?? null, name: doctorForm.name.trim(), specialty: doctorForm.specialty.trim() || null, license_number: doctorForm.license_number || null, is_active: doctorForm.is_active === 'true' }
       if (editingDoctor) { await updateDoctor(editingDoctor.id, payload); showToast('success', 'پزشک ویرایش شد') }
       else { await createDoctor(payload); showToast('success', 'پزشک اضافه شد') }
       setDoctorModal(false); loadData()
