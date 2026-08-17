@@ -40,15 +40,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }
 
   useEffect(() => {
-    supabase.auth.getSession().then(({ data }) => {
+    supabase.auth.getSession().then(async ({ data }) => {
       setSession(data.session)
-      if (data.session?.user) loadProfile(data.session.user.id)
+      // Wait for the role/profile lookup to finish BEFORE letting the app
+      // render — otherwise Layout's loading gate flips to "ready" while
+      // profile is still null, and every role-filtered menu (بیشتر, nav,
+      // route access) briefly — or in some renders, persistently —
+      // computes as empty because canAccess(undefined, ...) only allows
+      // '/'. This was a real bug, not an intentional restriction.
+      if (data.session?.user) await loadProfile(data.session.user.id)
       setLoading(false)
     })
 
-    const { data: sub } = supabase.auth.onAuthStateChange((_event, newSession) => {
+    const { data: sub } = supabase.auth.onAuthStateChange(async (_event, newSession) => {
       setSession(newSession)
-      if (newSession?.user) loadProfile(newSession.user.id)
+      if (newSession?.user) await loadProfile(newSession.user.id)
       else setProfile(null)
     })
 
