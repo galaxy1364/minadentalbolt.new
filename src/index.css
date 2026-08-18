@@ -35,9 +35,9 @@ input, textarea, select { font-size: 16px !important; }
 .dark .card-ios { background: #1e293b; box-shadow: 0 2px 20px rgba(0,0,0,0.3); }
 .dark .card-shadow { box-shadow: 0 1px 4px rgba(0,0,0,0.2); }
 .dark .card-shadow-lg { box-shadow: 0 8px 40px rgba(0,0,0,0.4); }
-.dark .glass { background: rgba(30,41,59,0.72); }
+.dark .glass { background: color-mix(in srgb, var(--module-color, #0d9488) 16%, rgba(30,41,59,0.72)); }
 .dark .glass-ultra { background: rgba(30,41,59,0.55); }
-.dark .tab-bar { background: rgba(15,23,42,0.88); border-top-color: rgba(255,255,255,0.08); }
+.dark .tab-bar { background: color-mix(in srgb, var(--module-color, #0d9488) 20%, rgba(15,23,42,0.88)); border-top-color: rgba(255,255,255,0.08); }
 .dark .appt-card { background: rgba(30,41,59,0.96); border-color: rgba(255,255,255,0.05); }
 .dark .quick-stat { background: rgba(30,41,59,0.96); border-color: rgba(255,255,255,0.04); }
 .dark .segmented { background: rgba(30,41,59,0.8); }
@@ -58,7 +58,7 @@ input, textarea, select { font-size: 16px !important; }
 
 /* ── iOS 27 Liquid Glass ─────────────────────────────── */
 .glass {
-  background: rgba(255,255,255,0.72);
+  background: color-mix(in srgb, var(--module-color, #0d9488) 10%, rgba(255,255,255,0.72));
   backdrop-filter: blur(40px) saturate(200%);
   -webkit-backdrop-filter: blur(40px) saturate(200%);
 }
@@ -131,7 +131,7 @@ input, textarea, select { font-size: 16px !important; }
 
 /* ── Bottom tab bar (iOS 27 liquid glass) ───────────── */
 .tab-bar {
-  background: rgba(255,255,255,0.88);
+  background: color-mix(in srgb, var(--module-color, #0d9488) 14%, rgba(255,255,255,0.88));
   backdrop-filter: blur(50px) saturate(200%);
   -webkit-backdrop-filter: blur(50px) saturate(200%);
   border-top: 0.5px solid rgba(0,0,0,0.08);
@@ -884,15 +884,22 @@ input, textarea, select { font-size: 16px !important; }
   z-index: 0;
   overflow: hidden;
   pointer-events: none;
+  /* A persistent, subtle tinted wash across the WHOLE background (not
+     just under the two blurred blobs), so no area of the page is ever
+     plain white — the blobs add depth/motion on top of this. */
+  background: linear-gradient(160deg, color-mix(in srgb, var(--module-color, #0d9488) 10%, transparent), transparent 55%);
+}
+.dark .module-page-bg {
+  background: linear-gradient(160deg, color-mix(in srgb, var(--module-color, #0d9488) 16%, transparent), transparent 55%);
 }
 .module-page-blob {
   position: absolute;
   border-radius: 50%;
   filter: blur(80px);
-  opacity: 0.22;
+  opacity: 0.42;
   will-change: transform;
 }
-.dark .module-page-blob { opacity: 0.14; }
+.dark .module-page-blob { opacity: 0.30; }
 .module-page-blob-1 {
   width: 60vmax; height: 60vmax;
   top: -25%; right: -20%;

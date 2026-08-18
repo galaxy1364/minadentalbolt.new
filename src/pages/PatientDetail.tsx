@@ -366,11 +366,15 @@ export default function PatientDetail() {
     status: 'planned', start_date: '', end_date: '',
   })
 
-  const openCreatePhase = () => {
+  const openCreatePhase = (prefillToothNumber?: string) => {
     h.tap()
     setEditingPhase(null)
     setPhaseWizardStep(0)
-    setPhaseForm({ doctor_id: '', title: '', description: '', procedures: '', estimated_cost: '', actual_cost: '', estimated_duration_days: '', status: 'planned', start_date: '', end_date: '' })
+    setPhaseForm({
+      doctor_id: '', title: prefillToothNumber ? `درمان دندان ${toPersianDigits(prefillToothNumber)}` : '', description: '',
+      procedures: prefillToothNumber ? `دندان ${toPersianDigits(prefillToothNumber)}` : '',
+      estimated_cost: '', actual_cost: '', estimated_duration_days: '', status: 'planned', start_date: '', end_date: '',
+    })
     setPhaseModalOpen(true)
   }
 
@@ -1097,6 +1101,14 @@ export default function PatientDetail() {
       toothRecords={toothRecords}
       treatments={treatments}
       onUpdateTooth={handleUpdateTooth}
+      onAddTreatment={(toothNumber) => {
+        // Links the tooth chart directly into the treatment-phases
+        // workflow: starting a plan for a specific tooth from the chart
+        // itself, instead of the chart being a dead-end visualization
+        // disconnected from how treatment actually gets planned.
+        setActiveTab('phases')
+        openCreatePhase(toothNumber)
+      }}
     />
   )
 
