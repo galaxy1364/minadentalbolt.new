@@ -11,6 +11,7 @@ import { InventoryItem, InventoryItemWithRelations, InventoryCategory } from '..
 import { Wizard, Card, Button, Input, Select, Textarea, Badge, Spinner, EmptyState, Tabs, showToast } from '../components/ui'
 import { scoreFields } from '../lib/fuzzySearch'
 import { ModuleHeader, ModuleStatCard, ReorderableStatGrid } from '../components/ModuleHeader'
+import { CurrencyInput } from '../components/CurrencyInput'
 
 // ============================================================================
 // Constants
@@ -464,7 +465,7 @@ export default function Inventory() {
                   <Input label="تعداد فعلی" type="number" value={formData.quantity} onChange={(v) => setFormData({ ...formData, quantity: v })} placeholder="0" />
                   <Input label="حداقل موجودی" type="number" value={formData.min_quantity} onChange={(v) => setFormData({ ...formData, min_quantity: v })} placeholder="0" />
                 </div>
-                <Input label="قیمت واحد (تومان)" type="number" value={formData.unit_cost} onChange={(v) => setFormData({ ...formData, unit_cost: v })} placeholder="0" />
+                <CurrencyInput label="قیمت واحد (تومان)" value={formData.unit_cost} onChange={(v) => setFormData({ ...formData, unit_cost: v })} />
               </>
             ),
           },

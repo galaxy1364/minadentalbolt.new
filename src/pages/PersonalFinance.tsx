@@ -13,6 +13,7 @@ import type { PersonalFinanceItem } from '../types'
 import { Wizard, Card, Button, Input, Select, Textarea, Badge, EmptyState, Tabs, showToast } from '../components/ui'
 import { PersianDateInput } from '../components/PersianDateInput'
 import { ModuleHeader, ModuleStatCard, ReorderableStatGrid } from '../components/ModuleHeader'
+import { CurrencyInput } from '../components/CurrencyInput'
 
 const typeTabs: { key: PersonalFinanceItem['item_type']; label: string; icon: JSX.Element }[] = [
   { key: 'loan', label: 'وام', icon: <Landmark size={16} /> },
@@ -249,17 +250,17 @@ export default function PersonalFinance() {
             content: (
               <>
                 <div className="grid grid-cols-2 gap-3">
-                  <Input label="مبلغ کل (ت)" type="number" value={form.total_amount} onChange={(v) => setForm({ ...form, total_amount: v })} placeholder="0" />
-                  <Input label="پرداخت‌شده تا الان (ت)" type="number" value={form.paid_amount} onChange={(v) => setForm({ ...form, paid_amount: v })} placeholder="0" />
+                  <CurrencyInput label="مبلغ کل (ت)" value={form.total_amount} onChange={(v) => setForm({ ...form, total_amount: v })} />
+                  <CurrencyInput label="پرداخت‌شده تا الان (ت)" value={form.paid_amount} onChange={(v) => setForm({ ...form, paid_amount: v })} />
                 </div>
                 {tab === 'loan' && (
                   <div className="grid grid-cols-2 gap-3">
-                    <Input label="قسط ماهانه (ت)" type="number" value={form.monthly_amount} onChange={(v) => setForm({ ...form, monthly_amount: v })} placeholder="0" />
+                    <CurrencyInput label="قسط ماهانه (ت)" value={form.monthly_amount} onChange={(v) => setForm({ ...form, monthly_amount: v })} />
                     <Input label="نرخ سود (٪)" type="number" value={form.interest_rate} onChange={(v) => setForm({ ...form, interest_rate: v })} placeholder="0" />
                   </div>
                 )}
                 {tab === 'rent' && (
-                  <Input label="اجاره‌ی ماهانه (ت)" type="number" value={form.monthly_amount} onChange={(v) => setForm({ ...form, monthly_amount: v })} placeholder="0" />
+                  <CurrencyInput label="اجاره‌ی ماهانه (ت)" value={form.monthly_amount} onChange={(v) => setForm({ ...form, monthly_amount: v })} />
                 )}
               </>
             ),

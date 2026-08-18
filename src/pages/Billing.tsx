@@ -1116,7 +1116,7 @@ export default function Billing() {
           content: (
             <>
               <Select label="بیمار" value={planForm.patient_id} onChange={(v) => setPlanForm((p) => ({ ...p, patient_id: v }))} options={patientOptions} placeholder="انتخاب بیمار" />
-              <Input label="مبلغ کل (تومان)" type="number" value={planForm.total_amount} onChange={(v) => setPlanForm((p) => ({ ...p, total_amount: v }))} placeholder="0" dir="ltr" />
+              <CurrencyInput label="مبلغ کل (تومان)" value={planForm.total_amount} onChange={(v) => setPlanForm((p) => ({ ...p, total_amount: v }))} />
             </>
           ),
         },

@@ -77,12 +77,14 @@ export function toJalaliStringPretty(dateStr: string): string {
 
 export function getJalaliMonthYear(dateStr: string): { year: number; month: number } {
   const d = new Date(dateStr)
+  if (isNaN(d.getTime())) return getJalaliMonthYear(new Date().toISOString().slice(0, 10))
   const [jy, jm] = toJalali(d.getFullYear(), d.getMonth() + 1, d.getDate())
   return { year: jy, month: jm }
 }
 
 export function getJalaliDateInfo(dateStr: string): { year: number; month: number; day: number; weekday: number; monthName: string } {
   const d = new Date(dateStr)
+  if (isNaN(d.getTime())) return getJalaliDateInfo(new Date().toISOString().slice(0, 10))
   const [jy, jm, jd] = toJalali(d.getFullYear(), d.getMonth() + 1, d.getDate())
   return { year: jy, month: jm, day: jd, weekday: d.getDay(), monthName: persianMonths[jm - 1] }
 }

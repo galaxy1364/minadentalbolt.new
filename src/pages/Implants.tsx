@@ -11,6 +11,7 @@ import { ImplantCase, ImplantCaseWithRelations, ImplantComponent, Patient, Docto
 import { Wizard, Card, Button, Input, Select, Textarea, Badge, Spinner, EmptyState, showToast } from '../components/ui'
 import { PersianDateInput } from '../components/PersianDateInput'
 import { ModuleHeader, ModuleStatCard, ReorderableStatGrid } from '../components/ModuleHeader'
+import { CurrencyInput } from '../components/CurrencyInput'
 
 // ============================================================================
 // Constants
@@ -938,8 +939,8 @@ export default function Implants() {
             content: (
               <>
                 <div className="grid grid-cols-3 gap-2">
-                  <Input label="کل هزینه (ت)" type="number" value={caseForm.total_cost} onChange={(v) => setCaseForm({ ...caseForm, total_cost: v })} placeholder="0" />
-                  <Input label="پرداختی (ت)" type="number" value={caseForm.paid_amount} onChange={(v) => setCaseForm({ ...caseForm, paid_amount: v })} placeholder="0" />
+                  <CurrencyInput label="کل هزینه (ت)" value={caseForm.total_cost} onChange={(v) => setCaseForm({ ...caseForm, total_cost: v })} />
+                  <CurrencyInput label="پرداختی (ت)" value={caseForm.paid_amount} onChange={(v) => setCaseForm({ ...caseForm, paid_amount: v })} />
                   <Input label="گارانتی (سال)" type="number" value={caseForm.warranty_years} onChange={(v) => setCaseForm({ ...caseForm, warranty_years: v })} placeholder="5" />
                 </div>
                 <div className="flex flex-col gap-3 p-3 bg-slate-50 dark:bg-slate-700/50 rounded-xl">
@@ -998,7 +999,7 @@ export default function Implants() {
                       سهم جراح = (هزینه‌ی کل − هزینه‌ی اقلامی که تیک «کسر در سهم جراح» خورده‌اند) ÷ ۲. هزینه‌ی فیکسچر همیشه مستقل حساب می‌شود.
                     </p>
                   ) : (
-                    <Input label="مبلغ توافقی جراح (تومان)" type="number" value={caseForm.surgery_fee_amount} onChange={(v) => setCaseForm({ ...caseForm, surgery_fee_amount: v })} placeholder="0" />
+                    <CurrencyInput label="مبلغ توافقی جراح (تومان)" value={caseForm.surgery_fee_amount} onChange={(v) => setCaseForm({ ...caseForm, surgery_fee_amount: v })} />
                   )}
                 </div>
                 <div className="p-3 bg-slate-50 dark:bg-slate-700/50 rounded-xl">
@@ -1011,7 +1012,7 @@ export default function Implants() {
                   />
                   <p className="text-xs text-slate-400 mt-2">اگر روکش/پروتز را پزشک دیگری کار می‌کند، اینجا انتخاب کنید تا سهم‌بندی هرکدام جدا محاسبه شود.</p>
                   {caseForm.prosthesis_doctor_id && (
-                    <Input label="دستمزد توافقی پروتزکار (تومان)" type="number" value={caseForm.prosthesis_fee_amount} onChange={(v) => setCaseForm({ ...caseForm, prosthesis_fee_amount: v })} placeholder="0" />
+                    <CurrencyInput label="دستمزد توافقی پروتزکار (تومان)" value={caseForm.prosthesis_fee_amount} onChange={(v) => setCaseForm({ ...caseForm, prosthesis_fee_amount: v })} />
                   )}
                 </div>
               </>
@@ -1068,7 +1069,7 @@ export default function Implants() {
               <>
                 <div className="grid grid-cols-2 gap-3">
                   <Input label="شماره سریال" value={componentForm.serial_number} onChange={(v) => setComponentForm({ ...componentForm, serial_number: v })} placeholder="سریال" dir="ltr" />
-                  <Input label="هزینه (تومان)" type="number" value={componentForm.cost} onChange={(v) => setComponentForm({ ...componentForm, cost: v })} placeholder="0" />
+                  <CurrencyInput label="هزینه (تومان)" value={componentForm.cost} onChange={(v) => setComponentForm({ ...componentForm, cost: v })} />
                 </div>
                 <PersianDateInput label="تاریخ نصب" value={componentForm.placed_date} onChange={(v) => setComponentForm({ ...componentForm, placed_date: v })} />
                 {componentForm.component_type === 'fixture' ? (

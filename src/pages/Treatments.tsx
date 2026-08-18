@@ -20,6 +20,7 @@ import { ModuleHeader, ModuleStatCard, ReorderableStatGrid } from '../components
 import { useConfirmAction } from '../components/ConfirmAction'
 import { h } from '../lib/haptics'
 import DentalChart from '../components/DentalChart'
+import { CurrencyInput } from '../components/CurrencyInput'
 
 // ── Constants ──────────────────────────────────────────────────
 
@@ -780,8 +781,8 @@ export default function Treatments() {
             content: (
               <>
                 <div className="grid grid-cols-2 gap-3">
-                  <Input label="مبلغ کل (تومان)" value={encForm.total_amount} onChange={(v) => setEncForm((p) => ({ ...p, total_amount: v }))} type="number" dir="ltr" />
-                  <Input label="تخفیف (تومان)" value={encForm.discount_amount} onChange={(v) => setEncForm((p) => ({ ...p, discount_amount: v }))} type="number" dir="ltr" />
+                  <CurrencyInput label="مبلغ کل (تومان)" value={encForm.total_amount} onChange={(v) => setEncForm((p) => ({ ...p, total_amount: v }))} />
+                  <CurrencyInput label="تخفیف (تومان)" value={encForm.discount_amount} onChange={(v) => setEncForm((p) => ({ ...p, discount_amount: v }))} />
                 </div>
                 <Select label="وضعیت" value={encForm.status} onChange={(v) => setEncForm((p) => ({ ...p, status: v }))} options={encounterStatuses.map((s) => ({ value: s.value, label: s.label }))} />
               </>
@@ -940,7 +941,7 @@ export default function Treatments() {
                 </div>
                 <div className="grid grid-cols-3 gap-3">
                   <Input label="تعداد" value={treatForm.quantity} onChange={(v) => setTreatForm((p) => ({ ...p, quantity: v }))} type="number" dir="ltr" />
-                  <Input label="قیمت واحد (ت)" value={treatForm.unit_price} onChange={(v) => setTreatForm((p) => ({ ...p, unit_price: v }))} type="number" dir="ltr" />
+                  <CurrencyInput label="قیمت واحد (ت)" value={treatForm.unit_price} onChange={(v) => setTreatForm((p) => ({ ...p, unit_price: v }))} />
                   <Input label="تخفیف (ت)" value={treatForm.discount} onChange={(v) => setTreatForm((p) => ({ ...p, discount: v }))} type="number" dir="ltr" />
                 </div>
                 <div className="grid grid-cols-2 gap-3">
@@ -969,7 +970,7 @@ export default function Treatments() {
                     </div>
                     <div className="grid grid-cols-2 gap-2">
                       <Input label="رنگ / شماره سایه" value={treatForm.lab_shade} onChange={(v) => setTreatForm((p) => ({ ...p, lab_shade: v }))} placeholder="مثال: A2 یا 3M2" dir="ltr" />
-                      <Input label="هزینه لابراتوار (ت)" value={treatForm.lab_cost} onChange={(v) => setTreatForm((p) => ({ ...p, lab_cost: v }))} type="number" dir="ltr" />
+                      <CurrencyInput label="هزینه لابراتوار (ت)" value={treatForm.lab_cost} onChange={(v) => setTreatForm((p) => ({ ...p, lab_cost: v }))} />
                     </div>
                     <p className="text-xs text-accent-600 flex items-center gap-1"><CheckCircle2 size={12} /> با تایید، سفارش لابراتوار (با جنس و رنگ) خودکار ثبت می‌شود؛ هزینه به مانده‌حساب بیمار اضافه می‌شود</p>
                   </div>

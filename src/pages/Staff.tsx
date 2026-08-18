@@ -13,6 +13,7 @@ import { ROLES } from '../lib/permissions'
 import { scoreFields } from '../lib/fuzzySearch'
 import { useConfirmAction } from '../components/ConfirmAction'
 import { h } from '../lib/haptics'
+import { CurrencyInput } from '../components/CurrencyInput'
 
 const staffRoles: { value: string; label: string; color: string }[] = [
   { value: 'doctor', label: 'پزشک', color: 'primary' },
@@ -810,7 +811,7 @@ export default function Staff() {
                   {shareTypes.find((t) => t.value === formData.share_type)?.desc}
                 </p>
                 {formData.share_type === 'fixed' ? (
-                  <Input label="مبلغ ثابت سهم (تومان)" type="number" value={formData.fixed_share_amount} onChange={(v) => setFormData({ ...formData, fixed_share_amount: v })} placeholder="0" />
+                  <CurrencyInput label="مبلغ ثابت سهم (تومان)" value={formData.fixed_share_amount} onChange={(v) => setFormData({ ...formData, fixed_share_amount: v })} />
                 ) : (
                   <div>
                     <label className="block text-sm font-medium text-slate-700 dark:text-slate-200 mb-1.5">

@@ -11,6 +11,7 @@ import { PersianDateInput } from '../components/PersianDateInput'
 import { useConfirmAction } from '../components/ConfirmAction'
 import { h } from '../lib/haptics'
 import DentalChart from '../components/DentalChart'
+import { CurrencyInput } from '../components/CurrencyInput'
 
 // ============================================================================
 // Constants
@@ -1433,8 +1434,8 @@ export default function PatientDetail() {
               <>
                 <Textarea label="رویه‌های این فاز" value={phaseForm.procedures} onChange={(v) => setPhaseForm({ ...phaseForm, procedures: v })} placeholder="مثلاً: کشیدن دندان ۱۶، ۱۷" rows={2} />
                 <div className="grid grid-cols-2 gap-3">
-                  <Input label="هزینه‌ی تخمینی (ت)" type="number" value={phaseForm.estimated_cost} onChange={(v) => setPhaseForm({ ...phaseForm, estimated_cost: v })} placeholder="0" />
-                  <Input label="هزینه‌ی واقعی (ت)" type="number" value={phaseForm.actual_cost} onChange={(v) => setPhaseForm({ ...phaseForm, actual_cost: v })} placeholder="0" />
+                  <CurrencyInput label="هزینه‌ی تخمینی (ت)" value={phaseForm.estimated_cost} onChange={(v) => setPhaseForm({ ...phaseForm, estimated_cost: v })} />
+                  <CurrencyInput label="هزینه‌ی واقعی (ت)" value={phaseForm.actual_cost} onChange={(v) => setPhaseForm({ ...phaseForm, actual_cost: v })} />
                 </div>
                 <Input label="مدت تخمینی (روز)" type="number" value={phaseForm.estimated_duration_days} onChange={(v) => setPhaseForm({ ...phaseForm, estimated_duration_days: v })} placeholder="30" />
               </>
