@@ -58,7 +58,27 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       else setProfile(null)
     })
 
-    return () => sub.subscription.unsubscribe()
+    // Safety net for the exact scenario this clinic app will actually
+    // see: the PWA left open for a full workday, phone locked/
+    // backgrounded for hours in between patients. Mobile browsers can
+    // throttle or fully suspend JS timers while backgrounded, so
+    // supabase-js's own autoRefreshToken timer isn't guaranteed to fire
+    // in time — the token can quietly expire while nobody's looking.
+    // Since RLS now requires a real authenticated session (no more
+    // permissive anon fallback), an expired token means sync silently
+    // stops working for the rest of the day unless something notices.
+    // Re-checking on visibility/focus forces supabase-js to refresh if
+    // the token's stale, catching this before it causes a real problem.
+    const revalidateSession = () => { supabase.auth.getSession() }
+    const onVisible = () => { if (document.visibilityState === 'visible') revalidateSession() }
+    window.addEventListener('focus', revalidateSession)
+    document.addEventListener('visibilitychange', onVisible)
+
+    return () => {
+      sub.subscription.unsubscribe()
+      window.removeEventListener('focus', revalidateSession)
+      document.removeEventListener('visibilitychange', onVisible)
+    }
   }, [])
 
   async function signIn(identifier: string, password: string) {
