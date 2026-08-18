@@ -76,6 +76,8 @@ export default function Appointments() {
     start_time: '09:00', end_time: '09:30',
     type: 'consultation', status: 'scheduled',
     notes: '', estimated_fee: '',
+    recurrence: 'none' as 'none' | 'weekly' | 'biweekly' | 'monthly',
+    recurrenceCount: '4',
   })
 
   const { config, confirmAction, close, ConfirmActionModal } = useConfirmAction()
@@ -144,6 +146,7 @@ export default function Appointments() {
         date: appt.date, start_time: appt.start_time, end_time: appt.end_time,
         type: appt.type || 'consultation', status: appt.status,
         notes: appt.notes || '', estimated_fee: appt.estimated_fee ? String(appt.estimated_fee) : '',
+        recurrence: 'none', recurrenceCount: '4',
       })
     } else {
       setEditingAppt(null)
@@ -153,6 +156,7 @@ export default function Appointments() {
         start_time: '09:00', end_time: '09:30',
         type: 'consultation', status: 'scheduled',
         notes: '', estimated_fee: '',
+        recurrence: 'none', recurrenceCount: '4',
       })
     }
     setWizardStep(0)
@@ -171,6 +175,20 @@ export default function Appointments() {
     setWizardStep((s) => Math.min(s + 1, 3))
   }
   const wizardPrev = () => { h.cancel(); setWizardStep((s) => Math.max(s - 1, 0)) }
+
+  // For weekly/biweekly/monthly recurring appointments — generates the
+  // series of dates starting from wizardData.date.
+  const generateRecurrenceDates = (startDate: string, recurrence: string, count: number): string[] => {
+    const dates: string[] = []
+    const d = new Date(startDate)
+    for (let i = 0; i < count; i++) {
+      dates.push(d.toISOString().slice(0, 10))
+      if (recurrence === 'weekly') d.setDate(d.getDate() + 7)
+      else if (recurrence === 'biweekly') d.setDate(d.getDate() + 14)
+      else if (recurrence === 'monthly') d.setMonth(d.getMonth() + 1)
+    }
+    return dates
+  }
 
   // ── Preview + Confirm for create/edit ──
   const wizardSave = async () => {
@@ -216,15 +234,21 @@ export default function Appointments() {
     }
     if (scheduleWarning) fields.push({ label: '⚠ هشدار برنامه‌ی کاری', value: scheduleWarning })
 
+    const isRecurring = !editingAppt && wizardData.recurrence !== 'none' && Number(wizardData.recurrenceCount) > 1
+    const recurDates = isRecurring ? generateRecurrenceDates(wizardData.date, wizardData.recurrence, Number(wizardData.recurrenceCount)) : [wizardData.date]
+    if (isRecurring) {
+      fields.push({ label: 'تکرار', value: `${toPersianDigits(recurDates.length)} جلسه — تا ${toJalaliStringPretty(recurDates[recurDates.length - 1])}`, highlight: true })
+    }
+
     confirmAction({
       type: editingAppt ? 'edit' : 'create',
-      title: editingAppt ? 'ویرایش نوبت' : 'ثبت نوبت جدید',
+      title: editingAppt ? 'ویرایش نوبت' : isRecurring ? 'ثبت سری نوبت‌ها' : 'ثبت نوبت جدید',
       fields,
       confirmLabel: editingAppt ? 'تایید ویرایش' : 'تایید و ثبت',
       onConfirm: async () => {
-        const payload = {
+        const basePayload = {
           patient_id: wizardData.patient_id, doctor_id: wizardData.doctor_id || null, unit_id: wizardData.unit_id || null,
-          date: wizardData.date, start_time: wizardData.start_time, end_time: wizardData.end_time,
+          start_time: wizardData.start_time, end_time: wizardData.end_time,
           type: wizardData.type, status: wizardData.status,
           notes: wizardData.notes || null,
           estimated_fee: wizardData.estimated_fee ? Number(wizardData.estimated_fee) : null,
@@ -232,8 +256,24 @@ export default function Appointments() {
           last_reminder_sent: null, reminder_count: 0, reminder_enabled: false,
           booking_source: null, confirmed_at: null, confirmed_by: null,
         } as any
-        if (editingAppt) await updateAppointment(editingAppt.id, payload)
-        else await createAppointment(payload)
+
+        if (editingAppt) {
+          await updateAppointment(editingAppt.id, { ...basePayload, date: wizardData.date })
+        } else if (isRecurring) {
+          // Each occurrence gets its own conflict check — a series
+          // shouldn't silently double-book a date that's already taken;
+          // conflicting dates are skipped and reported, not overwritten.
+          let created = 0, skipped = 0
+          for (const date of recurDates) {
+            const c = await checkConflict(wizardData.doctor_id, date, wizardData.start_time, wizardData.end_time, undefined, wizardData.unit_id || null)
+            if (c) { skipped++; continue }
+            await createAppointment({ ...basePayload, date })
+            created++
+          }
+          showToast(skipped > 0 ? 'error' : 'success', skipped > 0 ? `${toPersianDigits(created)} نوبت ثبت شد، ${toPersianDigits(skipped)} مورد به‌خاطر تداخل رد شد` : `${toPersianDigits(created)} نوبت با موفقیت ثبت شد`)
+        } else {
+          await createAppointment({ ...basePayload, date: wizardData.date })
+        }
         setWizardOpen(false)
         // The list defaults to "امروز" (today) — a newly-booked appointment
         // for any other date would silently vanish from view even though
@@ -724,6 +764,29 @@ export default function Appointments() {
                     <p className="text-xs text-slate-500">{persianWeekdaysShort[new Date(wizardData.date).getDay()]}{wizardData.start_time ? ` - ساعت ${toPersianDigits(wizardData.start_time)}` : ''}</p>
                   </div>
                 </div>
+                {/* Recurring appointment (for multi-session treatments) */}
+                {!editingAppt && (
+                  <div className="p-3 rounded-2xl bg-slate-50 border border-slate-100">
+                    <p className="text-xs font-semibold text-slate-500 mb-2">تکرار نوبت (برای درمان‌های چندجلسه‌ای)</p>
+                    <div className="grid grid-cols-4 gap-1.5">
+                      {([['none', 'بدون تکرار'], ['weekly', 'هفتگی'], ['biweekly', 'دوهفته‌ای'], ['monthly', 'ماهانه']] as const).map(([v, label]) => (
+                        <button
+                          key={v}
+                          onClick={() => { h.select(); setWizardData((p) => ({ ...p, recurrence: v })) }}
+                          className={`filter-tab !text-[11px] ${wizardData.recurrence === v ? 'active' : ''}`}
+                        >
+                          {label}
+                        </button>
+                      ))}
+                    </div>
+                    {wizardData.recurrence !== 'none' && (
+                      <div className="mt-2.5">
+                        <Input label="تعداد جلسات" type="number" value={wizardData.recurrenceCount} onChange={(v) => setWizardData((p) => ({ ...p, recurrenceCount: v }))} placeholder="4" />
+                        <p className="text-[11px] text-slate-400 mt-1">مجموعاً {toPersianDigits(wizardData.recurrenceCount || '0')} نوبت با همین ساعت و پزشک ساخته می‌شود — هرکدام جدا برای تداخل زمانی بررسی می‌شوند.</p>
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
             )}
 

@@ -1,9 +1,10 @@
 // Reports.tsx - Persian RTL Dental Clinic Reports & Analytics
 import { useState, useEffect, useCallback, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { TrendingUp, Users, Activity, Calendar, DollarSign, BarChart3, PieChart as PieIcon, Smile, ArrowUp, ArrowDown, Download, FileSpreadsheet } from 'lucide-react'
+import { TrendingUp, Users, Activity, Calendar, DollarSign, BarChart3, PieChart as PieIcon, Smile, ArrowUp, ArrowDown, Download, FileSpreadsheet, AlertTriangle } from 'lucide-react'
 import { AreaChart, Area, BarChart, Bar, LineChart, Line, PieChart, Pie, Cell, XAxis, YAxis, Tooltip as RTooltip, ResponsiveContainer, Legend } from 'recharts'
-import { fetchPayments, fetchPatients, fetchEncounters, fetchTreatments, fetchProcedures, fetchAppointments, fetchExpenses } from '../lib/api'
+import { fetchPayments, fetchPatients, fetchEncounters, fetchTreatments, fetchProcedures, fetchAppointments, fetchExpenses, fetchImplantCases } from '../lib/api'
+import { calcAllPatientBalances } from '../lib/finance'
 import { toJalaliString, toJalaliStringPretty, getJalaliMonthYear, formatCurrency, formatNumber, toPersianDigits, persianMonths } from '../lib/persianDate'
 import { h } from '../lib/haptics'
 import { Payment, Patient, Encounter, Treatment, Procedure, Appointment, Expense } from '../types'
@@ -65,6 +66,7 @@ export default function Reports() {
   const [activeTab, setActiveTab] = useState('revenue')
   const [payments, setPayments] = useState<Payment[]>([])
   const [patients, setPatients] = useState<Patient[]>([])
+  const [implantCases, setImplantCases] = useState<any[]>([])
   const [encounters, setEncounters] = useState<Encounter[]>([])
   const [treatments, setTreatments] = useState<Treatment[]>([])
   const [procedures, setProcedures] = useState<Procedure[]>([])
@@ -79,7 +81,7 @@ export default function Reports() {
   const loadData = useCallback(async () => {
     setLoading(true)
     try {
-      const [pays, pats, encs, trets, procs, appts, exps] = await Promise.all([
+      const [pays, pats, encs, trets, procs, appts, exps, implCases] = await Promise.all([
         fetchPayments(),
         fetchPatients(),
         fetchEncounters(),
@@ -87,6 +89,7 @@ export default function Reports() {
         fetchProcedures(),
         fetchAppointments(),
         fetchExpenses(),
+        fetchImplantCases(),
       ])
       setPayments(pays)
       setPatients(pats)
@@ -95,6 +98,7 @@ export default function Reports() {
       setProcedures(procs)
       setAppointments(appts)
       setExpenses(exps)
+      setImplantCases(implCases)
     } catch (err) {
       console.error('Error loading reports:', err)
       showToast('error', 'خطا در بارگذاری گزارش‌ها')
@@ -359,6 +363,34 @@ export default function Reports() {
 
   const tooltipStyle = { direction: 'rtl' as const, fontSize: 12, borderRadius: 12, border: 'none', boxShadow: '0 4px 12px rgba(0,0,0,0.1)' }
 
+  // ── Aging Report (سن بدهی) ──────────────────────────────────────
+  // Buckets each patient's outstanding balance by days since their
+  // most recent treatment activity — the standard 30/60/90-day aging
+  // view real clinics use to prioritize collection follow-ups.
+  const agingData = useMemo(() => {
+    const { byPatient } = calcAllPatientBalances(payments, treatments, implantCases)
+    const encMap = new Map(encounters.map((e) => [e.id, e]))
+    const todayStr = new Date().toISOString().slice(0, 10)
+    const daysSince = (dateStr: string) => Math.floor((new Date(todayStr).getTime() - new Date(dateStr).getTime()) / 86400000)
+
+    const rows: { patientId: string; name: string; balance: number; days: number; bucket: '0-30' | '31-60' | '61-90' | '90+' }[] = []
+    for (const [patientId, fin] of byPatient.entries()) {
+      if (fin.balance <= 0) continue
+      const patient = patients.find((p) => p.id === patientId)
+      if (!patient) continue
+      const patientTreatments = treatments.filter((t) => t.patient_id === patientId)
+      const dates = patientTreatments.map((t) => encMap.get(t.encounter_id)?.encounter_date).filter(Boolean) as string[]
+      const mostRecent = dates.length > 0 ? dates.sort().reverse()[0] : todayStr
+      const days = Math.max(0, daysSince(mostRecent))
+      const bucket = days <= 30 ? '0-30' : days <= 60 ? '31-60' : days <= 90 ? '61-90' : '90+'
+      rows.push({ patientId, name: `${patient.first_name} ${patient.last_name}`, balance: fin.balance, days, bucket })
+    }
+    rows.sort((a, b) => b.days - a.days)
+    const totals = { '0-30': 0, '31-60': 0, '61-90': 0, '90+': 0 } as Record<string, number>
+    for (const r of rows) totals[r.bucket] += r.balance
+    return { rows, totals, grandTotal: rows.reduce((s, r) => s + r.balance, 0) }
+  }, [payments, treatments, implantCases, patients, encounters])
+
   return (
     <div className="space-y-6">
       <ModuleHeader
@@ -378,6 +410,7 @@ export default function Reports() {
       <Tabs
         tabs={[
           { key: 'revenue', label: 'درآمد', icon: <DollarSign size={16} /> },
+          { key: 'aging', label: 'سن بدهی', icon: <AlertTriangle size={16} /> },
           { key: 'patients', label: 'بیماران', icon: <Users size={16} /> },
           { key: 'treatments', label: 'درمان‌ها', icon: <Activity size={16} /> },
           { key: 'appointments', label: 'نوبت‌ها', icon: <Calendar size={16} /> },
@@ -452,6 +485,46 @@ export default function Reports() {
               </ResponsiveContainer>
             )}
           </Card>
+        </div>
+      )}
+
+      {/* Aging Tab */}
+      {activeTab === 'aging' && (
+        <div className="space-y-4">
+          <div className="grid grid-cols-2 gap-2.5">
+            {(['0-30', '31-60', '61-90', '90+'] as const).map((bucket) => (
+              <Card key={bucket} className={`p-3.5 ${bucket === '90+' ? 'border-2 border-error-200' : ''}`}>
+                <p className="text-[11px] text-slate-400">{bucket === '0-30' ? '۰ تا ۳۰ روز' : bucket === '31-60' ? '۳۱ تا ۶۰ روز' : bucket === '61-90' ? '۶۱ تا ۹۰ روز' : 'بیش از ۹۰ روز'}</p>
+                <p className={`text-base font-extrabold ${bucket === '90+' ? 'text-error-600' : 'text-slate-700'}`}>{formatCurrency(agingData.totals[bucket])} ت</p>
+              </Card>
+            ))}
+          </div>
+          <Card className="p-4">
+            <div className="flex items-center justify-between mb-3">
+              <p className="text-sm font-bold text-slate-700">مجموع بدهی معوق</p>
+              <p className="text-lg font-extrabold text-error-600">{formatCurrency(agingData.grandTotal)} تومان</p>
+            </div>
+          </Card>
+          {agingData.rows.length === 0 ? (
+            <EmptyState icon={<AlertTriangle size={40} />} title="بدهی معوقی نیست" description="همه‌ی بیماران تسویه‌حساب دارند" />
+          ) : (
+            <div className="space-y-2">
+              {agingData.rows.map((r) => (
+                <Card key={r.patientId} className="p-3.5">
+                  <div className="flex items-center justify-between gap-2 cursor-pointer" onClick={() => navigate(`/patients/${r.patientId}`)}>
+                  <div>
+                    <p className="text-sm font-bold text-slate-800">{r.name}</p>
+                    <p className="text-[11px] text-slate-400">{toPersianDigits(r.days)} روز از آخرین فعالیت</p>
+                  </div>
+                  <div className="text-left">
+                    <p className="text-sm font-extrabold text-error-600">{formatCurrency(r.balance)} ت</p>
+                    <Badge color={r.bucket === '90+' ? 'error' : r.bucket === '61-90' ? 'warning' : 'slate'}>{r.bucket === '0-30' ? 'جدید' : r.bucket === '90+' ? 'بحرانی' : 'پیگیری'}</Badge>
+                  </div>
+                  </div>
+                </Card>
+              ))}
+            </div>
+          )}
         </div>
       )}
 
