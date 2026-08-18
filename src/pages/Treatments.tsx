@@ -751,7 +751,15 @@ export default function Treatments() {
                     </div>
                   )}
                 </div>
-                <Select label="پزشک (الزامی)" value={encForm.doctor_id} onChange={(v) => { h.select(); setEncForm((p) => ({ ...p, doctor_id: v })) }} options={doctors.filter((d) => d.is_active || d.id === encForm.doctor_id).map((d) => ({ value: d.id, label: `${d.name || d.specialty || `پزشک ${d.id.slice(0, 4)}`}${!d.is_active ? ' (غیرفعال)' : ''}` }))} placeholder="انتخاب پزشک..." />
+                {doctors.filter((d) => d.is_active).length === 0 ? (
+                  <div className="p-4 rounded-2xl bg-warning-50 border border-warning-200 text-center">
+                    <p className="text-sm font-bold text-warning-700 mb-1">هنوز پزشکی ثبت نشده است</p>
+                    <p className="text-xs text-warning-600 mb-3">برای ثبت ویزیت، اول باید حداقل یک پزشک اضافه کنید.</p>
+                    <Button variant="secondary" size="sm" onClick={() => { setEncModalOpen(false); navigate('/staff') }}>رفتن به پرسنل</Button>
+                  </div>
+                ) : (
+                  <Select label="پزشک (الزامی)" value={encForm.doctor_id} onChange={(v) => { h.select(); setEncForm((p) => ({ ...p, doctor_id: v })) }} options={doctors.filter((d) => d.is_active || d.id === encForm.doctor_id).map((d) => ({ value: d.id, label: `${d.name || d.specialty || `پزشک ${d.id.slice(0, 4)}`}${!d.is_active ? ' (غیرفعال)' : ''}` }))} placeholder="انتخاب پزشک..." />
+                )}
                 <Input label="تاریخ ویزیت" value={encForm.encounter_date} onChange={(v) => setEncForm((p) => ({ ...p, encounter_date: v }))} type="date" dir="ltr" />
               </>
             ),

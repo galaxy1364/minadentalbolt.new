@@ -711,13 +711,26 @@ export default function Appointments() {
             {/* Step 1: Doctor + Unit */}
             {wizardStep === 1 && (
               <div className="space-y-3">
-                <Select
-                  label="پزشک"
-                  value={wizardData.doctor_id}
-                  onChange={(v) => { h.select(); setWizardData((p) => ({ ...p, doctor_id: v })) }}
-                  options={doctors.filter((d) => d.is_active || d.id === wizardData.doctor_id).map((d) => ({ value: d.id, label: `دکتر ${d.name || d.specialty || 'پزشک'}${!d.is_active ? ' (غیرفعال)' : ''}` }))}
-                  placeholder="انتخاب پزشک..."
-                />
+                {doctors.filter((d) => d.is_active).length === 0 ? (
+                  <div className="p-4 rounded-2xl bg-warning-50 border border-warning-200 text-center">
+                    <p className="text-sm font-bold text-warning-700 mb-1">هنوز پزشکی ثبت نشده است</p>
+                    <p className="text-xs text-warning-600 mb-3">برای رزرو نوبت، اول باید حداقل یک پزشک اضافه کنید.</p>
+                    <Button variant="secondary" size="sm" onClick={() => { setWizardOpen(false); navigate('/staff') }}>رفتن به پرسنل</Button>
+                  </div>
+                ) : (
+                  <Select
+                    label="پزشک"
+                    value={wizardData.doctor_id}
+                    onChange={(v) => { h.select(); setWizardData((p) => ({ ...p, doctor_id: v })) }}
+                    options={doctors.filter((d) => d.is_active || d.id === wizardData.doctor_id).map((d) => ({ value: d.id, label: `دکتر ${d.name || d.specialty || 'پزشک'}${!d.is_active ? ' (غیرفعال)' : ''}` }))}
+                    placeholder="انتخاب پزشک..."
+                  />
+                )}
+                {units.filter((u) => u.is_active).length === 0 ? (
+                  <div className="p-3 rounded-2xl bg-slate-50 border border-slate-200 text-center">
+                    <p className="text-xs text-slate-500 mb-2">یونیتی ثبت نشده — این فیلد اختیاری است، می‌توانید بعداً از تنظیمات اضافه کنید.</p>
+                  </div>
+                ) : (
                 <Select
                   label="یونیت"
                   value={wizardData.unit_id}
@@ -725,6 +738,7 @@ export default function Appointments() {
                   options={units.filter((u) => u.is_active || u.id === wizardData.unit_id).map((u) => ({ value: u.id, label: `${u.name}${!u.is_active ? ' (غیرفعال)' : ''}` }))}
                   placeholder="انتخاب یونیت..."
                 />
+                )}
               </div>
             )}
 
