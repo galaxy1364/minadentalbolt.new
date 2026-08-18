@@ -38,6 +38,12 @@ interface ToothData {
   notes?: string
   record?: ToothRecord
   treatments: Treatment[]
+  /** True when this tooth's condition comes from treatment(s) that are
+   * still 'planned'/'in_progress' — none of them actually completed
+   * yet. Lets the chart show real progress (upcoming work looks
+   * different from finished work) instead of coloring a not-yet-done
+   * treatment identically to a completed one. */
+  isPlannedOnly?: boolean
 }
 
 // ── Constants ─────────────────────────────────────────────────
@@ -547,6 +553,13 @@ export default function DentalChart({ toothRecords, treatments, onUpdateTooth, o
       condition = 'extraction'
     }
 
+    // Only meaningful for conditions DERIVED from treatments (not a
+    // manually-set record condition like missing/implant) — true when
+    // every matching treatment is still planned/in_progress, i.e.
+    // nothing for this tooth has actually been completed yet.
+    const derivedFromTreatments = !record?.is_missing && !record?.is_implant && (!record?.condition || record.condition === 'healthy')
+    const isPlannedOnly = derivedFromTreatments && toothTreatments.length > 0 && toothTreatments.every((t) => t.status !== 'completed')
+
     return {
       number,
       condition,
@@ -554,6 +567,7 @@ export default function DentalChart({ toothRecords, treatments, onUpdateTooth, o
       notes: record?.notes || '',
       record,
       treatments: toothTreatments,
+      isPlannedOnly,
     }
   }
 
@@ -585,7 +599,7 @@ export default function DentalChart({ toothRecords, treatments, onUpdateTooth, o
           <div
             key={num}
             onClick={() => setSelectedTooth(data)}
-            className={`rounded-lg p-0.5 cursor-pointer transition-all-smooth hover:bg-slate-100 ${selectedTooth?.number === num ? 'bg-primary-50 ring-2 ring-primary-300' : ''}`}
+            className={`relative rounded-lg p-0.5 cursor-pointer transition-all-smooth hover:bg-slate-100 ${selectedTooth?.number === num ? 'bg-primary-50 ring-2 ring-primary-300' : ''} ${data.isPlannedOnly ? 'opacity-60' : ''}`}
           >
             <ToothSVG
               number={num}
@@ -595,6 +609,11 @@ export default function DentalChart({ toothRecords, treatments, onUpdateTooth, o
               selected={selectedTooth?.number === num}
               labelOverride={getToothLabel(num)}
             />
+            {data.isPlannedOnly && (
+              <span className="absolute -top-0.5 -left-0.5 w-3 h-3 rounded-full bg-warning-400 border border-white flex items-center justify-center" title="برنامه‌ریزی‌شده — هنوز انجام نشده">
+                <Clock size={8} className="text-white" />
+              </span>
+            )}
           </div>
         )
       })}
@@ -614,6 +633,10 @@ export default function DentalChart({ toothRecords, treatments, onUpdateTooth, o
             </span>
           )
         })}
+        <span className="flex items-center gap-1">
+          <span className="w-3 h-3 rounded-full bg-warning-400 flex items-center justify-center"><Clock size={7} className="text-white" /></span>
+          <span className="text-slate-600">برنامه‌ریزی‌شده (انجام‌نشده)</span>
+        </span>
       </div>
 
       {/* Controls */}
