@@ -7,6 +7,7 @@ import { h } from '../lib/haptics'
 import { useConfirmAction } from '../components/ConfirmAction'
 import type { LabOrder, Laboratory, Patient, Doctor, Treatment } from '../types'
 import { Wizard, Card, Button, Input, Select, Textarea, Badge, Spinner, EmptyState, showToast } from '../components/ui'
+import { PersianDateInput } from '../components/PersianDateInput'
 import { ModuleHeader, ModuleStatCard, ReorderableStatGrid } from '../components/ModuleHeader'
 
 // ============================================================================
@@ -789,7 +790,7 @@ export default function Laboratory() {
             label: 'موعد و هزینه',
             content: (
               <>
-                <Input label="موعد تحویل" type="date" value={orderForm.deadline} onChange={(v) => setOrderForm((p) => ({ ...p, deadline: v }))} />
+                <PersianDateInput label="موعد تحویل" value={orderForm.deadline} onChange={(v) => setOrderForm((p) => ({ ...p, deadline: v }))} />
                 <Input label="هزینه (تومان)" type="number" value={orderForm.cost} onChange={(v) => setOrderForm((p) => ({ ...p, cost: v }))} placeholder="0" dir="ltr" />
                 <Select label="وضعیت" value={orderForm.status} onChange={(v) => setOrderForm((p) => ({ ...p, status: v }))} options={labOrderStatuses.map((s) => ({ value: s.value, label: s.label }))} />
               </>

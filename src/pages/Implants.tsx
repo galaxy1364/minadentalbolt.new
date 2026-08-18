@@ -9,6 +9,7 @@ import { h } from '../lib/haptics'
 import { useConfirmAction } from '../components/ConfirmAction'
 import { ImplantCase, ImplantCaseWithRelations, ImplantComponent, Patient, Doctor } from '../types'
 import { Wizard, Card, Button, Input, Select, Textarea, Badge, Spinner, EmptyState, showToast } from '../components/ui'
+import { PersianDateInput } from '../components/PersianDateInput'
 import { ModuleHeader, ModuleStatCard, ReorderableStatGrid } from '../components/ModuleHeader'
 
 // ============================================================================
@@ -900,7 +901,7 @@ export default function Implants() {
                 )}
                 <div className="grid grid-cols-2 gap-3">
                   <Input label="شماره دندان *" value={caseForm.tooth_number} onChange={(v) => setCaseForm({ ...caseForm, tooth_number: v })} placeholder="مثلا: ۱۱" />
-                  <Input label="تاریخ جراحی" type="date" value={caseForm.surgery_date} onChange={(v) => setCaseForm({ ...caseForm, surgery_date: v })} />
+                  <PersianDateInput label="تاریخ جراحی" value={caseForm.surgery_date} onChange={(v) => setCaseForm({ ...caseForm, surgery_date: v })} />
                 </div>
               </>
             ),
@@ -1069,7 +1070,7 @@ export default function Implants() {
                   <Input label="شماره سریال" value={componentForm.serial_number} onChange={(v) => setComponentForm({ ...componentForm, serial_number: v })} placeholder="سریال" dir="ltr" />
                   <Input label="هزینه (تومان)" type="number" value={componentForm.cost} onChange={(v) => setComponentForm({ ...componentForm, cost: v })} placeholder="0" />
                 </div>
-                <Input label="تاریخ نصب" type="date" value={componentForm.placed_date} onChange={(v) => setComponentForm({ ...componentForm, placed_date: v })} />
+                <PersianDateInput label="تاریخ نصب" value={componentForm.placed_date} onChange={(v) => setComponentForm({ ...componentForm, placed_date: v })} />
                 {componentForm.component_type === 'fixture' ? (
                   <p className="text-xs text-slate-400 mt-2">هزینه‌ی فیکسچر همیشه از محاسبه‌ی سهم جراح کنار گذاشته می‌شود (جداگانه محاسبه می‌شود).</p>
                 ) : (

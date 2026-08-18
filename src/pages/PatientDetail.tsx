@@ -7,6 +7,7 @@ import { toJalaliString, toJalaliStringPretty, formatCurrency, toPersianDigits, 
 import { calcPatientBalance } from '../lib/finance'
 import { Patient, Doctor, PatientTimeline, Treatment, Appointment, Payment, ToothRecord, Prescription, RadiologyImage, Encounter, ImplantCase, TreatmentPhase, ConsentForm } from '../types'
 import { Modal, Card, Button, Input, Select, Textarea, Badge, Spinner, EmptyState, Tabs, showToast, Wizard } from '../components/ui'
+import { PersianDateInput } from '../components/PersianDateInput'
 import { useConfirmAction } from '../components/ConfirmAction'
 import { h } from '../lib/haptics'
 import DentalChart from '../components/DentalChart'
@@ -1288,7 +1289,7 @@ export default function PatientDetail() {
               <Input label="تلفن" value={formData.phone} onChange={(v) => setFormData((p) => ({ ...p, phone: v }))} dir="ltr" />
               <Input label="تلفن دوم" value={formData.phone2} onChange={(v) => setFormData((p) => ({ ...p, phone2: v }))} dir="ltr" />
               <Input label="ایمیل" type="email" value={formData.email} onChange={(v) => setFormData((p) => ({ ...p, email: v }))} dir="ltr" />
-              <Input label="تاریخ تولد" type="date" value={formData.birth_date} onChange={(v) => setFormData((p) => ({ ...p, birth_date: v }))} />
+              <PersianDateInput label="تاریخ تولد" value={formData.birth_date} onChange={(v) => setFormData((p) => ({ ...p, birth_date: v }))} />
               <Select label="جنسیت" value={formData.gender} onChange={(v) => setFormData((p) => ({ ...p, gender: v }))} options={genderOptions} placeholder="انتخاب کنید" />
               <Select label="گروه خونی" value={formData.blood_type} onChange={(v) => setFormData((p) => ({ ...p, blood_type: v }))} options={bloodTypes.map((b) => ({ value: b, label: b }))} placeholder="انتخاب کنید" />
             </div>
@@ -1444,8 +1445,8 @@ export default function PatientDetail() {
             content: (
               <>
                 <div className="grid grid-cols-2 gap-3">
-                  <Input label="تاریخ شروع" type="date" value={phaseForm.start_date} onChange={(v) => setPhaseForm({ ...phaseForm, start_date: v })} />
-                  <Input label="تاریخ پایان" type="date" value={phaseForm.end_date} onChange={(v) => setPhaseForm({ ...phaseForm, end_date: v })} />
+                  <PersianDateInput label="تاریخ شروع" value={phaseForm.start_date} onChange={(v) => setPhaseForm({ ...phaseForm, start_date: v })} />
+                  <PersianDateInput label="تاریخ پایان" value={phaseForm.end_date} onChange={(v) => setPhaseForm({ ...phaseForm, end_date: v })} />
                 </div>
                 <Select label="وضعیت" value={phaseForm.status} onChange={(v) => setPhaseForm({ ...phaseForm, status: v })} options={phaseStatuses.map((s) => ({ value: s.value, label: s.label }))} />
               </>

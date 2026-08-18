@@ -9,6 +9,7 @@ import { h } from '../lib/haptics'
 import { useConfirmAction } from '../components/ConfirmAction'
 import { WaitingListEntry, WaitingListEntryWithRelations, Patient, Doctor, Unit } from '../types'
 import { Wizard, Card, Button, Input, Select, Textarea, Badge, Spinner, EmptyState, showToast } from '../components/ui'
+import { PersianDateInput } from '../components/PersianDateInput'
 import { ModuleHeader, ModuleStatCard, ReorderableStatGrid } from '../components/ModuleHeader'
 
 // ============================================================================
@@ -553,7 +554,7 @@ export default function WaitingList() {
             content: (
               <>
                 <div className="grid grid-cols-2 gap-3">
-                  <Input label="تاریخ ترجیحی" type="date" value={formData.preferred_date} onChange={(v) => setFormData({ ...formData, preferred_date: v })} />
+                  <PersianDateInput label="تاریخ ترجیحی" value={formData.preferred_date} onChange={(v) => setFormData({ ...formData, preferred_date: v })} />
                   <Input label="ساعت ترجیحی" type="time" value={formData.preferred_time} onChange={(v) => setFormData({ ...formData, preferred_time: v })} />
                 </div>
                 <Select label="اولویت" value={formData.priority} onChange={(v) => setFormData({ ...formData, priority: v })} options={priorityOptions} />

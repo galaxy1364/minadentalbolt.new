@@ -8,6 +8,7 @@ import { fetchRadiologyImages, fetchPatients, createRadiologyImage, deleteRadiol
 import { toJalaliString, toJalaliStringPretty, formatNumber, toPersianDigits } from '../lib/persianDate'
 import { RadiologyImage, Patient } from '../types'
 import { Card, Button, Badge, Spinner, EmptyState, Modal, Wizard, Input, Select, Textarea, showToast } from '../components/ui'
+import { PersianDateInput } from '../components/PersianDateInput'
 import { ModuleHeader, ModuleStatCard, ReorderableStatGrid } from '../components/ModuleHeader'
 import { useConfirmAction } from '../components/ConfirmAction'
 
@@ -487,7 +488,7 @@ export default function Radiology() {
             content: (
               <>
                 <Input label="آدرس تصویر (URL)" value={uploadForm.image_url} onChange={(v) => setUploadForm((p) => ({ ...p, image_url: v }))} placeholder="https://..." dir="ltr" />
-                <Input label="تاریخ تصویربرداری" type="date" value={uploadForm.taken_at} onChange={(v) => setUploadForm((p) => ({ ...p, taken_at: v }))} />
+                <PersianDateInput label="تاریخ تصویربرداری" value={uploadForm.taken_at} onChange={(v) => setUploadForm((p) => ({ ...p, taken_at: v }))} />
               </>
             ),
           },

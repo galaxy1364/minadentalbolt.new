@@ -5,6 +5,7 @@ import { fetchPatients, createPatient, updatePatient, deletePatient, fetchDoctor
 import { toJalaliStringPretty, formatCurrency, toPersianDigits } from '../lib/persianDate'
 import { Patient, Doctor, Payment, Treatment, ImplantCase } from '../types'
 import { Modal, Card, Button, Input, Select, Textarea, Spinner, EmptyState, showToast, HighlightText, SkeletonList } from '../components/ui'
+import { PersianDateInput } from '../components/PersianDateInput'
 import { ModuleHeader } from '../components/ModuleHeader'
 import { useConfirmAction, ConfirmActionConfig } from '../components/ConfirmAction'
 import { h } from '../lib/haptics'
@@ -419,14 +420,14 @@ export default function Patients() {
                   {/* Content */}
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 mb-0.5">
-                      <h3 className="font-bold text-sm text-slate-800 truncate">
+                      <h3 className={`font-bold text-sm truncate ${fin.balance > 0 ? 'text-error-600' : 'text-slate-800'}`}>
                         <HighlightText text={`${patient.first_name} ${patient.last_name}`} query={searchQuery} />
                       </h3>
                       {vipMeta.value > 0 && <span className="text-[10px]">{vipMeta.icon}</span>}
                     </div>
                     <div className="flex items-center gap-2 flex-wrap text-[11px] text-slate-500">
                       {patient.file_number && (
-                        <span className="flex items-center gap-0.5 font-mono">
+                        <span className={`flex items-center gap-0.5 font-mono ${fin.balance > 0 ? 'text-error-500 font-bold' : ''}`}>
                           <FileText size={10} /> <HighlightText text={patient.file_number} query={searchQuery} />
                         </span>
                       )}
@@ -514,7 +515,7 @@ export default function Patients() {
                 <Input label="تلفن" value={formData.phone} onChange={(v) => setFormData((p) => ({ ...p, phone: v }))} placeholder="09xxxxxxxxx" dir="ltr" />
                 <Input label="تلفن دوم" value={formData.phone2} onChange={(v) => setFormData((p) => ({ ...p, phone2: v }))} placeholder="تلفن ثانویه" dir="ltr" />
                 <Input label="ایمیل" type="email" value={formData.email} onChange={(v) => setFormData((p) => ({ ...p, email: v }))} placeholder="email@example.com" dir="ltr" />
-                <Input label="تاریخ تولد" type="date" value={formData.birth_date} onChange={(v) => setFormData((p) => ({ ...p, birth_date: v }))} />
+                <PersianDateInput label="تاریخ تولد" value={formData.birth_date} onChange={(v) => setFormData((p) => ({ ...p, birth_date: v }))} />
                 <Select label="جنسیت" value={formData.gender} onChange={(v) => setFormData((p) => ({ ...p, gender: v }))} options={genderOptions} placeholder="انتخاب" />
                 <Select label="گروه خونی" value={formData.blood_type} onChange={(v) => setFormData((p) => ({ ...p, blood_type: v }))} options={bloodTypes.map((bt) => ({ value: bt, label: bt }))} placeholder="انتخاب" />
               </div>

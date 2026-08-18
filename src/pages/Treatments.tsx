@@ -15,6 +15,7 @@ import {
 import { toJalaliString, toJalaliStringPretty, formatCurrency, formatNumber, toPersianDigits } from '../lib/persianDate'
 import { Encounter, EncounterWithRelations, Treatment, Procedure, Patient, Doctor, Laboratory, ToothRecord, LabOrder } from '../types'
 import { Card, Button, Badge, Spinner, EmptyState, Tabs, Input, Select, Textarea, Modal, Wizard, showToast } from '../components/ui'
+import { PersianDateInput } from '../components/PersianDateInput'
 import { ModuleHeader, ModuleStatCard, ReorderableStatGrid } from '../components/ModuleHeader'
 import { useConfirmAction } from '../components/ConfirmAction'
 import { h } from '../lib/haptics'
@@ -760,7 +761,7 @@ export default function Treatments() {
                 ) : (
                   <Select label="پزشک (الزامی)" value={encForm.doctor_id} onChange={(v) => { h.select(); setEncForm((p) => ({ ...p, doctor_id: v })) }} options={doctors.filter((d) => d.is_active || d.id === encForm.doctor_id).map((d) => ({ value: d.id, label: `${d.name || d.specialty || `پزشک ${d.id.slice(0, 4)}`}${!d.is_active ? ' (غیرفعال)' : ''}` }))} placeholder="انتخاب پزشک..." />
                 )}
-                <Input label="تاریخ ویزیت" value={encForm.encounter_date} onChange={(v) => setEncForm((p) => ({ ...p, encounter_date: v }))} type="date" dir="ltr" />
+                <PersianDateInput label="تاریخ ویزیت" value={encForm.encounter_date} onChange={(v) => setEncForm((p) => ({ ...p, encounter_date: v }))} />
               </>
             ),
           },

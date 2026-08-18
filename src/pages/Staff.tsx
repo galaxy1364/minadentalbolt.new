@@ -7,6 +7,7 @@ import { CLINIC_ID, supabase } from '../lib/supabase'
 import { toJalaliString, toJalaliStringPretty, formatCurrency, formatNumber, toPersianDigits } from '../lib/persianDate'
 import type { Staff as StaffType, StaffInput, EncounterWithRelations, LabOrderWithRelations, Treatment } from '../types'
 import { Modal, Wizard, Card, Button, Input, Select, Badge, Spinner, EmptyState, showToast } from '../components/ui'
+import { PersianDateInput } from '../components/PersianDateInput'
 import { ModuleHeader, ModuleStatCard, ReorderableStatGrid } from '../components/ModuleHeader'
 import { ROLES } from '../lib/permissions'
 import { scoreFields } from '../lib/fuzzySearch'
@@ -516,9 +517,9 @@ export default function Staff() {
         {showSharePanel && (
           <div className="flex items-center gap-2 mb-3">
             <label className="text-[11px] font-medium text-slate-500 shrink-0">بازه:</label>
-            <input type="date" value={sharePeriodStart} onChange={(e) => setSharePeriodStart(e.target.value)} className="flex-1 px-2 py-1.5 rounded-lg border border-slate-200 text-xs" />
+            <PersianDateInput value={sharePeriodStart} onChange={setSharePeriodStart} className="flex-1" />
             <span className="text-slate-400 text-xs">تا</span>
-            <input type="date" value={sharePeriodEnd} onChange={(e) => setSharePeriodEnd(e.target.value)} className="flex-1 px-2 py-1.5 rounded-lg border border-slate-200 text-xs" />
+            <PersianDateInput value={sharePeriodEnd} onChange={setSharePeriodEnd} className="flex-1" />
           </div>
         )}
 
@@ -847,7 +848,7 @@ export default function Staff() {
             label: 'استخدام',
             content: (
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <Input label="تاریخ استخدام" type="date" value={formData.hire_date} onChange={(v) => setFormData({ ...formData, hire_date: v })} />
+                <PersianDateInput label="تاریخ استخدام" value={formData.hire_date} onChange={(v) => setFormData({ ...formData, hire_date: v })} />
                 <Input label={formData.is_doctor ? 'حقوق ثابت پزشک (تومان، در صورت وجود)' : 'دستمزد ماهانه (تومان)'} type="number" value={formData.salary} onChange={(v) => setFormData({ ...formData, salary: v })} placeholder="0" />
               </div>
             ),

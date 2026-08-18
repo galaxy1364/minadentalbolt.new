@@ -11,6 +11,7 @@ import { h } from '../lib/haptics'
 import { useConfirmAction } from '../components/ConfirmAction'
 import type { PersonalFinanceItem } from '../types'
 import { Wizard, Card, Button, Input, Select, Textarea, Badge, EmptyState, Tabs, showToast } from '../components/ui'
+import { PersianDateInput } from '../components/PersianDateInput'
 import { ModuleHeader, ModuleStatCard, ReorderableStatGrid } from '../components/ModuleHeader'
 
 const typeTabs: { key: PersonalFinanceItem['item_type']; label: string; icon: JSX.Element }[] = [
@@ -267,7 +268,7 @@ export default function PersonalFinance() {
             label: 'سررسید و وضعیت',
             content: (
               <>
-                <Input label="تاریخ سررسید" type="date" value={form.due_date} onChange={(v) => setForm({ ...form, due_date: v })} />
+                <PersianDateInput label="تاریخ سررسید" value={form.due_date} onChange={(v) => setForm({ ...form, due_date: v })} />
                 <Select label="وضعیت" value={form.status} onChange={(v) => setForm({ ...form, status: v as any })} options={Object.entries(statusMeta).map(([k, v]) => ({ value: k, label: v.label }))} />
                 <Textarea label="یادداشت" value={form.notes} onChange={(v) => setForm({ ...form, notes: v })} rows={2} />
               </>

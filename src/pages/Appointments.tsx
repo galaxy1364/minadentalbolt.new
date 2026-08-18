@@ -11,6 +11,7 @@ import { useConfirmAction, ConfirmActionConfig } from '../components/ConfirmActi
 import { h } from '../lib/haptics'
 import { usePullToRefresh } from '../lib/usePullToRefresh'
 import { PersianCalendar } from '../components/PersianCalendar'
+import { CurrencyInput } from '../components/CurrencyInput'
 
 const typeMeta: Record<string, { label: string; color: string; bg: string; dot: string }> = {
   consultation:  { label: 'مشاوره',      color: 'text-primary-700',  bg: 'bg-primary-50',  dot: 'bg-primary-500' },
@@ -759,7 +760,7 @@ export default function Appointments() {
                 <div>
                   <p className="text-xs font-semibold text-slate-500 mb-2">ساعت‌های خالی</p>
                   <div className="flex items-center gap-2 flex-wrap">
-                    {['09:00', '09:30', '10:00', '10:30', '11:00', '11:30', '14:00', '14:30', '15:00', '15:30', '16:00', '16:30', '17:00', '17:30', '18:00', '18:30'].map((t) => (
+                    {['09:00', '09:30', '10:00', '10:30', '11:00', '11:30', '14:00', '14:30', '15:00', '15:30', '16:00', '16:30', '17:00', '17:30', '18:00', '18:30', '19:00', '19:30', '20:00', '20:30', '21:00', '21:30', '22:00', '22:30', '23:00', '23:30'].map((t) => (
                       <button
                         key={t}
                         onClick={() => { h.select(); setWizardData((p) => ({ ...p, start_time: t, end_time: `${String(parseInt(t.split(':')[0])+1).padStart(2,'0')}:00` })) }}
@@ -834,7 +835,7 @@ export default function Appointments() {
                   <Select label="نوع نوبت" value={wizardData.type} onChange={(v) => { h.select(); setWizardData((p) => ({ ...p, type: v })) }} options={typeOptions} />
                   <Select label="وضعیت" value={wizardData.status} onChange={(v) => { h.select(); setWizardData((p) => ({ ...p, status: v })) }} options={statusOptions} />
                 </div>
-                <Input label="هزینه برآوردی (تومان)" type="number" value={wizardData.estimated_fee} onChange={(v) => setWizardData((p) => ({ ...p, estimated_fee: v }))} placeholder="0" dir="ltr" />
+                <CurrencyInput label="هزینه برآوردی (تومان)" value={wizardData.estimated_fee} onChange={(v) => setWizardData((p) => ({ ...p, estimated_fee: v }))} />
                 <Textarea label="یادداشت" value={wizardData.notes} onChange={(v) => setWizardData((p) => ({ ...p, notes: v }))} placeholder="یادداشت..." rows={2} />
               </div>
             )}

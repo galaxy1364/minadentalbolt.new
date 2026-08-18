@@ -10,6 +10,8 @@ import { useConfirmAction } from '../components/ConfirmAction'
 import { Payment, Encounter, Cheque, PaymentPlan, PaymentPlanWithRelations, Patient, Expense, Treatment, ImplantCase, Installment } from '../types'
 import { calcAllPatientBalances } from '../lib/finance'
 import { Wizard, Card, Button, Input, Select, Textarea, Badge, Spinner, EmptyState, Tabs, showToast } from '../components/ui'
+import { PersianDateInput } from '../components/PersianDateInput'
+import { CurrencyInput } from '../components/CurrencyInput'
 import { ModuleHeader, ModuleStatCard, ReorderableStatGrid } from '../components/ModuleHeader'
 
 // ============================================================================
@@ -934,8 +936,8 @@ export default function Billing() {
           content: (
             <>
               <Input label="دسته‌بندی" value={expenseForm.category} onChange={(v) => setExpenseForm((p) => ({ ...p, category: v }))} placeholder="مثال: اجاره، حقوق، تجهیزات..." />
-              <Input label="مبلغ (تومان)" type="number" value={expenseForm.amount} onChange={(v) => setExpenseForm((p) => ({ ...p, amount: v }))} placeholder="0" dir="ltr" />
-              <Input label="تاریخ" type="date" value={expenseForm.date} onChange={(v) => setExpenseForm((p) => ({ ...p, date: v }))} />
+              <CurrencyInput label="مبلغ (تومان)" value={expenseForm.amount} onChange={(v) => setExpenseForm((p) => ({ ...p, amount: v }))} />
+              <PersianDateInput label="تاریخ" value={expenseForm.date} onChange={(v) => setExpenseForm((p) => ({ ...p, date: v }))} />
             </>
           ),
         },
@@ -1011,7 +1013,7 @@ export default function Billing() {
               {paymentForm.patient_id && encounterOptions.length > 0 && (
                 <Select label="ویزیت مرتبط" value={paymentForm.encounter_id} onChange={(v) => setPaymentForm((p) => ({ ...p, encounter_id: v }))} options={encounterOptions} placeholder="بدون ویزیت" />
               )}
-              <Input label="مبلغ (تومان)" type="number" value={paymentForm.amount} onChange={(v) => setPaymentForm((p) => ({ ...p, amount: v }))} placeholder="0" dir="ltr" />
+              <CurrencyInput label="مبلغ (تومان)" value={paymentForm.amount} onChange={(v) => setPaymentForm((p) => ({ ...p, amount: v }))} />
             </>
           ),
         },
@@ -1023,7 +1025,7 @@ export default function Billing() {
                 <Select label="روش پرداخت" value={paymentForm.payment_method} onChange={(v) => setPaymentForm((p) => ({ ...p, payment_method: v }))} options={paymentMethods.map((m) => ({ value: m.value, label: m.label }))} />
                 <Select label="وضعیت" value={paymentForm.status} onChange={(v) => setPaymentForm((p) => ({ ...p, status: v }))} options={paymentStatuses.map((s) => ({ value: s.value, label: s.label }))} />
               </div>
-              <Input label="تاریخ پرداخت" type="date" value={paymentForm.payment_date} onChange={(v) => setPaymentForm((p) => ({ ...p, payment_date: v }))} />
+              <PersianDateInput label="تاریخ پرداخت" value={paymentForm.payment_date} onChange={(v) => setPaymentForm((p) => ({ ...p, payment_date: v }))} />
               <Input label="شماره مرجع" value={paymentForm.reference} onChange={(v) => setPaymentForm((p) => ({ ...p, reference: v }))} placeholder="شماره تراکنش" dir="ltr" />
             </>
           ),
@@ -1055,7 +1057,7 @@ export default function Billing() {
           content: (
             <>
               <Select label="بیمار" value={chequeForm.patient_id} onChange={(v) => setChequeForm((p) => ({ ...p, patient_id: v }))} options={patientOptions} placeholder="انتخاب بیمار" />
-              <Input label="مبلغ (تومان)" type="number" value={chequeForm.amount} onChange={(v) => setChequeForm((p) => ({ ...p, amount: v }))} placeholder="0" dir="ltr" />
+              <CurrencyInput label="مبلغ (تومان)" value={chequeForm.amount} onChange={(v) => setChequeForm((p) => ({ ...p, amount: v }))} />
               <Input label="در وجه" value={chequeForm.payee_name} onChange={(v) => setChequeForm((p) => ({ ...p, payee_name: v }))} />
             </>
           ),
@@ -1080,8 +1082,8 @@ export default function Billing() {
           content: (
             <>
               <div className="grid grid-cols-2 gap-3">
-                <Input label="تاریخ صدور" type="date" value={chequeForm.issue_date} onChange={(v) => setChequeForm((p) => ({ ...p, issue_date: v }))} />
-                <Input label="تاریخ سررسید" type="date" value={chequeForm.due_date} onChange={(v) => setChequeForm((p) => ({ ...p, due_date: v }))} />
+                <PersianDateInput label="تاریخ صدور" value={chequeForm.issue_date} onChange={(v) => setChequeForm((p) => ({ ...p, issue_date: v }))} />
+                <PersianDateInput label="تاریخ سررسید" value={chequeForm.due_date} onChange={(v) => setChequeForm((p) => ({ ...p, due_date: v }))} />
               </div>
               <Select label="وضعیت" value={chequeForm.status} onChange={(v) => setChequeForm((p) => ({ ...p, status: v }))} options={chequeStatuses.map((s) => ({ value: s.value, label: s.label }))} />
             </>
@@ -1125,7 +1127,7 @@ export default function Billing() {
             <>
               <div className="grid grid-cols-2 gap-3">
                 <Input label="تعداد اقساط" type="number" value={planForm.installment_count} onChange={(v) => setPlanForm((p) => ({ ...p, installment_count: v }))} dir="ltr" />
-                <Input label="تاریخ شروع" type="date" value={planForm.start_date} onChange={(v) => setPlanForm((p) => ({ ...p, start_date: v }))} />
+                <PersianDateInput label="تاریخ شروع" value={planForm.start_date} onChange={(v) => setPlanForm((p) => ({ ...p, start_date: v }))} />
               </div>
               {planForm.total_amount && planForm.installment_count && Number(planForm.installment_count) > 0 && (
                 <div className="p-3 rounded-xl bg-primary-50 dark:bg-primary-900/20 text-primary-700 dark:text-primary-400 text-sm">
