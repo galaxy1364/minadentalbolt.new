@@ -1,6 +1,6 @@
 // Billing.tsx - Persian RTL Dental Clinic Billing & Payments Management
 import { useState, useEffect, useCallback, useMemo } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useLocation } from 'react-router-dom'
 import { CreditCard, Plus, Search, DollarSign, TrendingUp, Wallet, Calendar, CheckCircle2, AlertCircle, Edit2, Filter, Receipt, Banknote, Clock, Trash2, Printer } from 'lucide-react'
 import { BarChart, Bar, XAxis, YAxis, Tooltip as RTooltip, ResponsiveContainer, PieChart, Pie, Cell as RCell } from 'recharts'
 import { fetchPayments, createPayment, updatePayment, deletePayment, fetchEncounters, fetchCheques, createCheque, updateCheque, deleteCheque, fetchPaymentPlans, createPaymentPlan, updatePaymentPlan, deletePaymentPlan, updateInstallment, fetchPatients, fetchExpenses, createExpense, updateExpense, deleteExpense, fetchTreatments, fetchImplantCases } from '../lib/api'
@@ -56,6 +56,7 @@ const persianMonthNames = ['فروردین', 'اردیبهشت', 'خرداد', '
 export default function Billing() {
   const { confirmAction, ConfirmActionModal } = useConfirmAction()
   const navigate = useNavigate()
+  const location = useLocation()
 
   const [payments, setPayments] = useState<Payment[]>([])
   const [encounters, setEncounters] = useState<Encounter[]>([])
@@ -171,6 +172,24 @@ export default function Billing() {
   useEffect(() => {
     loadData()
   }, [loadData])
+
+  // Arrived here from a finished treatment session's 'ارسال به مالی'
+  // button — carries the patient, encounter, and calculated total so
+  // staff doesn't re-enter anything already known, and opens straight
+  // into recording the payment instead of a plain patient list.
+  useEffect(() => {
+    const state = location.state as { openPaymentForPatientId?: string; suggestedAmount?: number; fromEncounterId?: string } | null
+    if (!state?.openPaymentForPatientId) return
+    setPaymentForm((p) => ({
+      ...p,
+      patient_id: state.openPaymentForPatientId!,
+      encounter_id: state.fromEncounterId || '',
+      amount: state.suggestedAmount ? String(state.suggestedAmount) : '',
+    }))
+    setPaymentWizardStep(0)
+    setPaymentModalOpen(true)
+    window.history.replaceState({}, '')
+  }, [location.state])
 
   // ===========================================================================
   // Derived Data

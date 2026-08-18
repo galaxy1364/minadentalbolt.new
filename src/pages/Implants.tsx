@@ -1,6 +1,6 @@
 // Implants.tsx - Persian RTL Dental Clinic Implant Cases Management
 import { useState, useEffect, useCallback, useMemo } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useLocation } from 'react-router-dom'
 import { Smile, Plus, Search, Edit2, Eye, Filter, Package, Calendar, DollarSign, ShieldCheck, AlertTriangle, CheckCircle2, Clock, Activity, Layers, Trash2 } from 'lucide-react'
 import { fetchImplantCases, createImplantCase, updateImplantCase, deleteImplantCase, createImplantComponent, deleteImplantComponent, fetchPatients, fetchDoctors, createExpense } from '../lib/api'
 import { CLINIC_ID } from '../lib/supabase'
@@ -108,6 +108,7 @@ function getComponentTypeLabel(type: string | null) {
 export default function Implants() {
   const { confirmAction, ConfirmActionModal } = useConfirmAction()
   const navigate = useNavigate()
+  const location = useLocation()
 
   const [cases, setCases] = useState<ImplantCaseWithRelations[]>([])
   const [patients, setPatients] = useState<Patient[]>([])
@@ -196,6 +197,26 @@ export default function Implants() {
   useEffect(() => {
     loadData()
   }, [loadData])
+
+  // Arrived here from a treatment session that included an implant
+  // procedure — 'ارسال به ایمپلنت' carries the patient and doctor
+  // straight into a new case instead of leaving staff to re-find the
+  // patient and start from a blank form.
+  useEffect(() => {
+    const state = location.state as { quickStartPatientId?: string; quickStartDoctorId?: string } | null
+    if (!state?.quickStartPatientId) return
+    setEditingCase(null)
+    setCaseWizardStep(0)
+    setCaseForm({
+      patient_id: state.quickStartPatientId, doctor_id: state.quickStartDoctorId || '', tooth_number: '', brand: '', model: '', diameter: '', length: '',
+      surgery_date: '', bone_graft: false, gbr: false, membrane_used: false, extraction_needed: false,
+      sinus_lift: false, immediate_loading: false,
+      total_cost: '', paid_amount: '', warranty_years: '', notes: '',
+      surgery_fee_mode: 'formula', surgery_fee_amount: '', prosthesis_doctor_id: '', prosthesis_fee_amount: '',
+    })
+    setCaseModalOpen(true)
+    window.history.replaceState({}, '')
+  }, [location.state])
 
   // ===========================================================================
   // Derived Data
