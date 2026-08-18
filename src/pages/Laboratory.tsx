@@ -758,7 +758,15 @@ export default function Laboratory() {
             validate: () => (!orderForm.lab_id ? 'انتخاب لابراتوار الزامی است' : !orderForm.patient_id ? 'انتخاب بیمار الزامی است' : null),
             content: (
               <>
-                <Select label="لابراتوار" value={orderForm.lab_id} onChange={(v) => setOrderForm((p) => ({ ...p, lab_id: v }))} options={labOptions} placeholder="انتخاب لابراتوار" />
+                {labs.filter((l) => l.is_active).length === 0 ? (
+                  <div className="p-4 rounded-2xl bg-warning-50 border border-warning-200 text-center">
+                    <p className="text-sm font-bold text-warning-700 mb-1">هنوز لابراتواری ثبت نشده است</p>
+                    <p className="text-xs text-warning-600 mb-3">برای ثبت سفارش، اول باید حداقل یک لابراتوار اضافه کنید.</p>
+                    <Button variant="secondary" size="sm" onClick={() => { setOrderModalOpen(false); setView('labs') }}>رفتن به لیست لابراتوارها</Button>
+                  </div>
+                ) : (
+                  <Select label="لابراتوار" value={orderForm.lab_id} onChange={(v) => setOrderForm((p) => ({ ...p, lab_id: v }))} options={labOptions} placeholder="انتخاب لابراتوار" />
+                )}
                 <Select label="بیمار" value={orderForm.patient_id} onChange={(v) => setOrderForm((p) => ({ ...p, patient_id: v }))} options={patientOptions} placeholder="انتخاب بیمار" />
                 <Select label="پزشک" value={orderForm.doctor_id} onChange={(v) => setOrderForm((p) => ({ ...p, doctor_id: v }))} options={doctorOptions} placeholder="انتخاب پزشک" />
               </>

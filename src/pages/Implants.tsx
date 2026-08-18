@@ -889,7 +889,15 @@ export default function Implants() {
             content: (
               <>
                 <Select label="بیمار *" value={caseForm.patient_id} onChange={(v) => setCaseForm({ ...caseForm, patient_id: v })} options={patientOptions} placeholder="انتخاب بیمار" />
-                <Select label="پزشک" value={caseForm.doctor_id} onChange={(v) => setCaseForm({ ...caseForm, doctor_id: v })} options={doctorOptions} placeholder="انتخاب پزشک" />
+                {doctors.filter((d) => d.is_active).length === 0 ? (
+                  <div className="p-4 rounded-2xl bg-warning-50 border border-warning-200 text-center">
+                    <p className="text-sm font-bold text-warning-700 mb-1">هنوز پزشکی ثبت نشده است</p>
+                    <p className="text-xs text-warning-600 mb-3">برای ثبت مورد ایمپلنت، اول باید حداقل یک پزشک اضافه کنید.</p>
+                    <Button variant="secondary" size="sm" onClick={() => { setCaseModalOpen(false); navigate('/staff') }}>رفتن به پرسنل</Button>
+                  </div>
+                ) : (
+                  <Select label="پزشک" value={caseForm.doctor_id} onChange={(v) => setCaseForm({ ...caseForm, doctor_id: v })} options={doctorOptions} placeholder="انتخاب پزشک" />
+                )}
                 <div className="grid grid-cols-2 gap-3">
                   <Input label="شماره دندان *" value={caseForm.tooth_number} onChange={(v) => setCaseForm({ ...caseForm, tooth_number: v })} placeholder="مثلا: ۱۱" />
                   <Input label="تاریخ جراحی" type="date" value={caseForm.surgery_date} onChange={(v) => setCaseForm({ ...caseForm, surgery_date: v })} />
