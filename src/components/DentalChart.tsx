@@ -183,6 +183,10 @@ function ToothSVG({
   const fillColor = fillColors[condition]
   const strokeColor = strokeColors[condition]
   const sw = selected ? 3 : 1.5
+  // Subtle depth/gloss — a soft drop-shadow plus a light highlight
+  // ellipse on the crown gives these flat SVG shapes a dimensional,
+  // glossy-porcelain feel without needing full WebGL 3D rendering.
+  const dropShadowStyle = { filter: selected ? 'drop-shadow(0 3px 5px rgba(13,148,136,0.35))' : 'drop-shadow(0 1.5px 2px rgba(15,23,42,0.12))' }
 
   // Surface fill colors (for caries on specific surfaces)
   const getSurfaceFill = (surface: ToothSurface): string => {
@@ -193,7 +197,7 @@ function ToothSVG({
 
   if (condition === 'missing' || condition === 'extraction') {
     return (
-      <svg width={size} height={size * 1.2} viewBox="0 0 48 56" onClick={onClick} className="cursor-pointer transition-all">
+      <svg width={size} height={size * 1.2} viewBox="0 0 48 56" onClick={onClick} className="cursor-pointer transition-all" style={dropShadowStyle}>
         <g opacity="0.4">
           <text x="24" y="30" textAnchor="middle" fontSize="14" fill="#94a3b8" fontWeight="bold">
             ✕
@@ -210,7 +214,7 @@ function ToothSVG({
   if (isMolar) {
     // Molar: wide crown with multiple cusps
     return (
-      <svg width={size} height={size * 1.2} viewBox="0 0 48 56" onClick={onClick} className="cursor-pointer transition-all">
+      <svg width={size} height={size * 1.2} viewBox="0 0 48 56" onClick={onClick} className="cursor-pointer transition-all" style={dropShadowStyle}>
         {/* Root */}
         <path
           d="M 14 28 Q 12 40, 16 48 M 34 28 Q 36 40, 32 48"
@@ -228,6 +232,8 @@ function ToothSVG({
           strokeWidth={sw}
           strokeLinejoin="round"
         />
+        {/* Gloss highlight — gives the flat crown a subtle porcelain sheen */}
+        <ellipse cx="17" cy="11" rx="6" ry="3" fill="white" opacity="0.35" transform="rotate(-20 17 11)" />
         {/* Occlusal surface (center) */}
         <ellipse cx="24" cy="17" rx="10" ry="6" fill={getSurfaceFill('occlusal')} stroke={strokeColor} strokeWidth="0.8" opacity="0.7" />
         {/* Cusps */}
@@ -248,7 +254,7 @@ function ToothSVG({
   } else if (isPremolar) {
     // Premolar: smaller crown, 2 cusps
     return (
-      <svg width={size} height={size * 1.2} viewBox="0 0 48 56" onClick={onClick} className="cursor-pointer transition-all">
+      <svg width={size} height={size * 1.2} viewBox="0 0 48 56" onClick={onClick} className="cursor-pointer transition-all" style={dropShadowStyle}>
         {/* Root */}
         <path d="M 20 28 Q 18 42, 22 48 M 28 28 Q 30 42, 26 48" fill="none" stroke={strokeColor} strokeWidth={sw} strokeLinecap="round" opacity="0.5" />
         {/* Crown */}
@@ -259,6 +265,7 @@ function ToothSVG({
           strokeWidth={sw}
           strokeLinejoin="round"
         />
+        <ellipse cx="19" cy="10" rx="5" ry="2.5" fill="white" opacity="0.35" transform="rotate(-20 19 10)" />
         {/* Occlusal */}
         <ellipse cx="24" cy="16" rx="7" ry="5" fill={getSurfaceFill('occlusal')} stroke={strokeColor} strokeWidth="0.8" opacity="0.7" />
         {/* 2 cusps */}
@@ -273,7 +280,7 @@ function ToothSVG({
     // Anterior (incisor/canine): single root, narrow crown
     const isCanine = number % 10 === 3
     return (
-      <svg width={size} height={size * 1.2} viewBox="0 0 48 56" onClick={onClick} className="cursor-pointer transition-all">
+      <svg width={size} height={size * 1.2} viewBox="0 0 48 56" onClick={onClick} className="cursor-pointer transition-all" style={dropShadowStyle}>
         {/* Root */}
         <path
           d={isCanine ? "M 24 28 Q 22 44, 24 50" : "M 20 28 Q 18 44, 22 50 M 28 28 Q 30 44, 26 50"}
@@ -301,6 +308,7 @@ function ToothSVG({
             strokeLinejoin="round"
           />
         )}
+        <ellipse cx="21" cy="8" rx="4" ry="2" fill="white" opacity="0.35" transform="rotate(-15 21 8)" />
         {/* Lingual surface (back) */}
         <path d="M 18 8 Q 24 12, 30 8" fill="none" stroke={strokeColor} strokeWidth="0.8" opacity="0.4" />
         <text x="24" y="50" textAnchor="middle" fontSize="9" fill={strokeColor} fontWeight="700">
@@ -509,12 +517,9 @@ interface DentalChartProps {
   onAddTreatment?: (toothNumber: string) => void
 }
 
-type NotationSystem = 'fdi' | 'palmer'
-
 export default function DentalChart({ toothRecords, treatments, onUpdateTooth, onAddTreatment }: DentalChartProps) {
   const [selectedTooth, setSelectedTooth] = useState<ToothData | null>(null)
   const [showPrimary, setShowPrimary] = useState(false)
-  const [notation, setNotation] = useState<NotationSystem>('palmer')
 
   const allTeeth = useMemo(() => {
     const permanent = [...upperRight, ...upperLeft, ...lowerLeft, ...lowerRight]
@@ -583,14 +588,11 @@ export default function DentalChart({ toothRecords, treatments, onUpdateTooth, o
     setSelectedTooth(null)
   }
 
-  const getToothLabel = (fdiNumber: number): string => {
-    if (notation === 'palmer') return fdiToPalmer(fdiNumber)
-    return toPersianDigits(fdiNumber)
-  }
+  const getToothLabel = (fdiNumber: number): string => fdiToPalmer(fdiNumber)
 
   const renderQuadrant = (teeth: number[], _label: string, palmerSymbol?: string) => (
     <div className="flex items-center gap-0.5 relative">
-      {palmerSymbol && notation === 'palmer' && (
+      {palmerSymbol && (
         <span className="text-2xl font-bold text-slate-400 ml-0.5 mr-0.5 select-none">{palmerSymbol}</span>
       )}
       {teeth.map((num) => {
@@ -641,15 +643,8 @@ export default function DentalChart({ toothRecords, treatments, onUpdateTooth, o
 
       {/* Controls */}
       <div className="flex items-center justify-between flex-wrap gap-2">
-        <div className="flex items-center gap-1 p-1 rounded-xl bg-slate-100">
-          <button
-            onClick={() => { h.select(); setNotation('palmer') }}
-            className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all-smooth ${notation === 'palmer' ? 'bg-white text-primary-600 shadow-sm' : 'text-slate-500'}`}
-          >پالمر</button>
-          <button
-            onClick={() => { h.select(); setNotation('fdi') }}
-            className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all-smooth ${notation === 'fdi' ? 'bg-white text-primary-600 shadow-sm' : 'text-slate-500'}`}
-          >FDI</button>
+        <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-primary-50 dark:bg-primary-900/30 text-primary-700 dark:text-primary-400 text-xs font-bold">
+          <Grid3x3 size={13} /> نماد پالمر (Palmer)
         </div>
         <label className="flex items-center gap-2 text-xs text-slate-500 cursor-pointer">
           <input
