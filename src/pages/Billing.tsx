@@ -1,7 +1,7 @@
 // Billing.tsx - Persian RTL Dental Clinic Billing & Payments Management
 import { useState, useEffect, useCallback, useMemo } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
-import { CreditCard, Plus, Search, DollarSign, TrendingUp, Wallet, Calendar, CheckCircle2, AlertCircle, Edit2, Filter, Receipt, Banknote, Clock, Trash2, Printer } from 'lucide-react'
+import { CreditCard, Plus, Search, DollarSign, TrendingUp, Wallet, Calendar, CalendarClock, CheckCircle2, AlertCircle, Edit2, Filter, Receipt, Banknote, Clock, Trash2, Printer } from 'lucide-react'
 import { BarChart, Bar, XAxis, YAxis, Tooltip as RTooltip, ResponsiveContainer, PieChart, Pie, Cell as RCell } from 'recharts'
 import { fetchPayments, createPayment, updatePayment, deletePayment, fetchEncounters, fetchCheques, createCheque, updateCheque, deleteCheque, fetchPaymentPlans, createPaymentPlan, updatePaymentPlan, deletePaymentPlan, updateInstallment, fetchPatients, fetchExpenses, createExpense, updateExpense, deleteExpense, fetchTreatments, fetchImplantCases } from '../lib/api'
 import { toJalaliString, toJalaliStringPretty, formatCurrency, formatNumber, toPersianDigits } from '../lib/persianDate'
@@ -9,6 +9,7 @@ import { h } from '../lib/haptics'
 import { useConfirmAction } from '../components/ConfirmAction'
 import { Payment, Encounter, Cheque, PaymentPlan, PaymentPlanWithRelations, Patient, Expense, Treatment, ImplantCase, Installment } from '../types'
 import { calcAllPatientBalances } from '../lib/finance'
+import { downloadICSReminder } from '../lib/icsReminder'
 import { Wizard, Card, Button, Input, Select, Textarea, Badge, Spinner, EmptyState, Tabs, showToast } from '../components/ui'
 import { PersianDateInput } from '../components/PersianDateInput'
 import { CurrencyInput } from '../components/CurrencyInput'
@@ -86,6 +87,7 @@ export default function Billing() {
     patient_id: '',
     encounter_id: '',
     amount: '',
+    discountPercent: '',
     payment_method: 'cash',
     reference: '',
     notes: '',
@@ -206,6 +208,14 @@ export default function Billing() {
     return p ? `${p.first_name} ${p.last_name}` : 'نامشخص'
   }
 
+  // Top-level (not nested inside another useMemo) so both `stats` below
+  // and the payment-form debt breakdown can both read the full
+  // per-patient balance objects (not just the plain balance number).
+  const patientBalancesMap = useMemo(
+    () => calcAllPatientBalances(payments, treatments, implantCases).byPatient,
+    [payments, treatments, implantCases],
+  )
+
   const stats = useMemo(() => {
     const totalRevenue = payments.filter((p) => p.status === 'completed').reduce((sum, p) => sum + p.amount, 0)
     const now = new Date()
@@ -215,15 +225,14 @@ export default function Billing() {
     const pendingChequeAmount = pendingCheques.reduce((sum, c) => sum + c.amount, 0)
     const totalExpenses = expenses.reduce((sum, e) => sum + (e.amount || 0), 0)
 
-    // Calculate outstanding balances per patient — same shared basis
-    // (treatments minus payments) as Dashboard and Patients, so the
-    // number is provably identical everywhere instead of silently
-    // drifting from a cached encounters.total_amount/paid_amount field.
-    const { byPatient: patientBalancesMap, totalOutstanding: outstandingBalance } = calcAllPatientBalances(payments, treatments, implantCases)
+    // Same shared basis (treatments minus payments) as Dashboard and
+    // Patients, so the number is provably identical everywhere instead
+    // of silently drifting from a cached encounters.total_amount field.
+    const outstandingBalance = Array.from(patientBalancesMap.values()).reduce((s, fin) => s + (fin.balance > 0 ? fin.balance : 0), 0)
     const patientBalances = new Map(Array.from(patientBalancesMap.entries()).map(([id, fin]) => [id, fin.balance]))
 
     return { totalRevenue, monthlyRevenue, pendingCheques: pendingCheques.length, pendingChequeAmount, outstandingBalance, patientBalances, totalExpenses }
-  }, [payments, cheques, encounters, expenses, treatments, implantCases])
+  }, [payments, cheques, encounters, expenses, treatments, implantCases, patientBalancesMap])
 
   // Revenue chart data - last 6 months
   const revenueChartData = useMemo(() => {
@@ -300,6 +309,7 @@ export default function Billing() {
       fields: [
         { label: 'بیمار', value: patient ? `${patient.first_name} ${patient.last_name}` : '-', highlight: true },
         { label: 'مبلغ', value: `${formatCurrency(Number(paymentForm.amount))} ت` },
+        ...(paymentForm.discountPercent && Number(paymentForm.discountPercent) > 0 ? [{ label: 'تخفیف اعمال‌شده', value: `${toPersianDigits(paymentForm.discountPercent)}٪` }] : []),
         { label: 'روش', value: paymentMethods.find((m) => m.value === paymentForm.payment_method)?.label || paymentForm.payment_method },
         { label: 'تاریخ', value: toJalaliString(paymentForm.payment_date) },
       ],
@@ -740,6 +750,21 @@ export default function Billing() {
                     {c.status !== 'cleared' && (
                       <button onClick={() => handleDeleteCheque(c)} aria-label="حذف چک" className="p-1.5 rounded-lg text-slate-400 hover:text-error-600 hover:bg-error-50 transition-colors"><Trash2 size={14} /></button>
                     )}
+                    {c.status === 'pending' && (
+                      <button
+                        onClick={() => downloadICSReminder({
+                          title: `سررسید چک — ${getPatientName(c.patient_id)}`,
+                          description: `مبلغ ${formatCurrency(c.amount)} تومان`,
+                          dueDate: c.due_date,
+                          filename: `cheque-reminder-${c.id}.ics`,
+                        })}
+                        aria-label="افزودن یادآوری به تقویم گوشی"
+                        title="افزودن یادآوری به تقویم گوشی"
+                        className="p-1.5 rounded-lg text-slate-400 hover:text-primary-600 hover:bg-primary-50 transition-colors"
+                      >
+                        <CalendarClock size={14} />
+                      </button>
+                    )}
                   </div>
                 </div>
                 {c.notes && <p className="text-xs text-slate-400 mt-2">{c.notes}</p>}
@@ -817,6 +842,19 @@ export default function Billing() {
                             <>
                               <Badge color="warning">در انتظار</Badge>
                               <Button size="sm" variant="success" onClick={() => markInstallmentPaid(inst, plan)}>پرداخت</Button>
+                              <button
+                                onClick={() => downloadICSReminder({
+                                  title: `سررسید قسط — ${getPatientName(plan.patient_id)}`,
+                                  description: `قسط ${inst.installment_number} — مبلغ ${formatCurrency(inst.amount)} تومان`,
+                                  dueDate: inst.due_date,
+                                  filename: `installment-reminder-${inst.id}.ics`,
+                                })}
+                                aria-label="افزودن یادآوری به تقویم گوشی"
+                                title="افزودن یادآوری به تقویم گوشی"
+                                className="p-1.5 rounded-lg text-slate-400 hover:text-primary-600 hover:bg-primary-50 transition-colors"
+                              >
+                                <CalendarClock size={14} />
+                              </button>
                             </>
                           )}
                         </div>
@@ -1029,10 +1067,53 @@ export default function Billing() {
           content: (
             <>
               <Select label="بیمار" value={paymentForm.patient_id} onChange={(v) => setPaymentForm((p) => ({ ...p, patient_id: v, encounter_id: '' }))} options={patientOptions} placeholder="انتخاب بیمار" />
+              {paymentForm.patient_id && (() => {
+                const fin = patientBalancesMap.get(paymentForm.patient_id)
+                if (!fin) return null
+                return (
+                  <div className="p-3 rounded-2xl bg-slate-50 border border-slate-100 space-y-1.5">
+                    <div className="flex items-center justify-between text-xs">
+                      <span className="text-slate-500">کل هزینه‌ی درمان</span>
+                      <span className="font-bold text-slate-700">{formatCurrency(fin.totalCost)} ت</span>
+                    </div>
+                    <div className="flex items-center justify-between text-xs">
+                      <span className="text-slate-500">قبلاً پرداخت‌شده</span>
+                      <span className="font-bold text-success-600">{formatCurrency(fin.paid)} ت</span>
+                    </div>
+                    <div className="flex items-center justify-between text-sm pt-1.5 border-t border-slate-200">
+                      <span className="font-bold text-slate-700">مانده‌حساب</span>
+                      <span className={`font-extrabold ${fin.balance > 0 ? 'text-error-600' : 'text-success-600'}`}>{formatCurrency(Math.abs(fin.balance))} ت {fin.balance > 0 ? '(بدهکار)' : fin.balance < 0 ? '(بستانکار)' : ''}</span>
+                    </div>
+                    {fin.balance > 0 && (
+                      <button
+                        type="button"
+                        onClick={() => setPaymentForm((p) => ({ ...p, amount: String(fin.balance) }))}
+                        className="text-[11px] text-primary-600 font-semibold hover:underline"
+                      >
+                        پر کردن مبلغ با کل بدهی
+                      </button>
+                    )}
+                  </div>
+                )
+              })()}
               {paymentForm.patient_id && encounterOptions.length > 0 && (
                 <Select label="ویزیت مرتبط" value={paymentForm.encounter_id} onChange={(v) => setPaymentForm((p) => ({ ...p, encounter_id: v }))} options={encounterOptions} placeholder="بدون ویزیت" />
               )}
-              <CurrencyInput label="مبلغ (تومان)" value={paymentForm.amount} onChange={(v) => setPaymentForm((p) => ({ ...p, amount: v }))} />
+              <div className="grid grid-cols-2 gap-3">
+                <CurrencyInput label="مبلغ (تومان)" value={paymentForm.amount} onChange={(v) => setPaymentForm((p) => ({ ...p, amount: v }))} />
+                <Input
+                  label="تخفیف (٪)"
+                  type="number"
+                  value={paymentForm.discountPercent || ''}
+                  onChange={(v) => {
+                    const fin = patientBalancesMap.get(paymentForm.patient_id)
+                    const base = fin ? fin.balance : Number(paymentForm.amount) || 0
+                    const pct = Number(v) || 0
+                    setPaymentForm((p) => ({ ...p, discountPercent: v, amount: pct > 0 && base > 0 ? String(Math.round(base * (1 - pct / 100))) : p.amount }))
+                  }}
+                  placeholder="0"
+                />
+              </div>
             </>
           ),
         },

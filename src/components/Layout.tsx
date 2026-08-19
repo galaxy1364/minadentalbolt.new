@@ -17,6 +17,8 @@ import {
   getModuleByPath, setModuleTheme, type ModuleIdentity,
 } from '../theme/modules'
 import { subscribeSync, initSyncEngine, syncNow, SyncStatus } from '../lib/sync'
+import { fetchPayments, fetchTreatments, fetchImplantCases } from '../lib/api'
+import { calcAllPatientBalances } from '../lib/finance'
 import { h } from '../lib/haptics'
 import { CheckCircle2, CloudOff } from 'lucide-react'
 
@@ -230,7 +232,23 @@ function BottomTabBar() {
   const location = useLocation()
   const { profile } = useAuth()
   const [moreOpen, setMoreOpen] = useState(false)
+  const [debtorCount, setDebtorCount] = useState(0)
   const isActive = (path: string) => path === '/' ? location.pathname === '/' : location.pathname.startsWith(path)
+
+  // Badge on the مالی (Billing) nav icon — how many patients currently
+  // owe money, refreshed on every navigation so it stays live as
+  // payments get recorded elsewhere in the app. Pure local Dexie reads,
+  // so this is cheap even running on every route change.
+  useEffect(() => {
+    let cancelled = false
+    Promise.all([fetchPayments(), fetchTreatments(), fetchImplantCases()]).then(([pays, trts, impl]) => {
+      if (cancelled) return
+      const { byPatient } = calcAllPatientBalances(pays, trts, impl)
+      const count = Array.from(byPatient.values()).filter((f) => f.balance > 0).length
+      setDebtorCount(count)
+    }).catch(() => {})
+    return () => { cancelled = true }
+  }, [location.pathname])
   const visiblePrimary = primaryModules.filter((item: ModuleIdentity) => canAccess(profile?.role, item.path))
   const visibleSecondary = secondaryModules.filter((item: ModuleIdentity) => canAccess(profile?.role, item.path))
   const isMoreActive = visibleSecondary.some((n) => isActive(n.path))
@@ -253,10 +271,15 @@ function BottomTabBar() {
                 style={active ? { color: item.color } : undefined}
               >
                 <div
-                  className="p-1.5 rounded-xl transition-all-smooth"
+                  className="relative p-1.5 rounded-xl transition-all-smooth"
                   style={active ? { background: item.colorLight } : undefined}
                 >
                   <Icon size={active ? 22 : 20} strokeWidth={active ? 2.5 : 1.8} />
+                  {item.path === '/billing' && debtorCount > 0 && (
+                    <span className="absolute -top-1 -left-1 min-w-[16px] h-4 px-1 rounded-full bg-error-500 text-white text-[9px] font-bold flex items-center justify-center border border-white dark:border-slate-900">
+                      {debtorCount > 99 ? '99+' : debtorCount}
+                    </span>
+                  )}
                 </div>
                 <span className={`text-[10px] font-medium leading-none ${active ? '' : 'text-slate-400 dark:text-slate-500'}`}
                   style={active ? { color: item.color } : undefined}

@@ -2,7 +2,7 @@
 // Deliberately separate from Billing.tsx (clinic business finances) —
 // this tracks the owner's personal financial obligations.
 import { useState, useEffect, useMemo } from 'react'
-import { PiggyBank, Plus, Landmark, Home, Banknote, HandCoins, Trash2, Edit2 } from 'lucide-react'
+import { PiggyBank, Plus, Landmark, Home, Banknote, HandCoins, Trash2, Edit2, CalendarClock } from 'lucide-react'
 import {
   fetchPersonalFinanceItems, createPersonalFinanceItem, updatePersonalFinanceItem, deletePersonalFinanceItem,
 } from '../lib/api'
@@ -14,6 +14,7 @@ import { Wizard, Card, Button, Input, Select, Textarea, Badge, EmptyState, Tabs,
 import { PersianDateInput } from '../components/PersianDateInput'
 import { ModuleHeader, ModuleStatCard, ReorderableStatGrid } from '../components/ModuleHeader'
 import { CurrencyInput } from '../components/CurrencyInput'
+import { downloadICSReminder } from '../lib/icsReminder'
 
 const typeTabs: { key: PersonalFinanceItem['item_type']; label: string; icon: JSX.Element }[] = [
   { key: 'loan', label: 'وام', icon: <Landmark size={16} /> },
@@ -211,6 +212,19 @@ export default function PersonalFinance() {
                 <div className="flex gap-2 mt-2.5 pt-2.5 border-t border-slate-100 dark:border-slate-700">
                   {remaining > 0 && item.status === 'active' && (
                     <button onClick={() => quickMarkPaid(item)} className="text-xs text-success-600 hover:underline">تسویه کامل</button>
+                  )}
+                  {item.due_date && item.status === 'active' && (
+                    <button
+                      onClick={() => downloadICSReminder({
+                        title: `سررسید ${typeTabs.find((t) => t.key === item.item_type)?.label} — ${item.title}`,
+                        description: `مبلغ باقی‌مانده: ${formatCurrency(remaining)} تومان`,
+                        dueDate: item.due_date!,
+                        filename: `finance-reminder-${item.id}.ics`,
+                      })}
+                      className="text-xs text-primary-600 hover:underline"
+                    >
+                      <CalendarClock size={11} className="inline ml-0.5" /> یادآوری
+                    </button>
                   )}
                   <button onClick={() => openEdit(item)} className="text-xs text-primary-600 hover:underline"><Edit2 size={11} className="inline ml-0.5" /> ویرایش</button>
                   <button onClick={() => handleDelete(item)} className="text-xs text-error-500 hover:underline"><Trash2 size={11} className="inline ml-0.5" /> حذف</button>
