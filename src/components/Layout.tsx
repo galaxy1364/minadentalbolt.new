@@ -416,6 +416,7 @@ const routeImports: Record<string, () => Promise<unknown>> = {
   '/calendar':       () => import('../pages/Calendar'),
   '/personal-finance': () => import('../pages/PersonalFinance'),
   '/sms': () => import('../pages/SMS'),
+  '/reminders': () => import('../pages/Reminders'),
 }
 
 const prefetched = new Set<string>()
@@ -446,7 +447,9 @@ const WaitingList  = lazyPage('/waiting-list')
 const Archive      = lazyPage('/archive')
 const CalendarPage = lazyPage('/calendar')
 const PersonalFinance = lazyPage('/personal-finance')
+const PublicBooking = React.lazy(() => import('../pages/PublicBooking'))
 const SMS = lazyPage('/sms')
+const Reminders = lazyPage('/reminders')
 
 function LL({ children, path }: { children: React.ReactNode; path: string }) {
   const { profile } = useAuth()
@@ -492,6 +495,20 @@ function NotFound() {
 export function Layout() {
   const { session, loading } = useAuth()
 
+  // Public online booking form (نوبت‌دهی آنلاین) — must bypass the auth
+  // gate entirely below, since it's meant to be reachable by anyone
+  // (patients on the clinic's own website), not just logged-in staff.
+  // Checked via the raw hash since HashRouter's own route matching
+  // only runs AFTER the auth gate further down, which would otherwise
+  // always show the login screen first for an unauthenticated visitor.
+  if (window.location.hash.startsWith('#/book')) {
+    return (
+      <React.Suspense fallback={<div className="min-h-screen flex items-center justify-center"><Spinner size={32} /></div>}>
+        <PublicBooking />
+      </React.Suspense>
+    )
+  }
+
   if (REQUIRE_LOGIN && loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-slate-50 dark:bg-slate-900">
@@ -528,6 +545,7 @@ export function Layout() {
           <Route path="/calendar"        element={<LL path="/calendar"><CalendarPage /></LL>} />
           <Route path="/personal-finance" element={<LL path="/personal-finance"><PersonalFinance /></LL>} />
           <Route path="/sms" element={<LL path="/sms"><SMS /></LL>} />
+          <Route path="/reminders" element={<LL path="/reminders"><Reminders /></LL>} />
           <Route path="*"                element={<NotFound />} />
         </Routes>
       </LayoutInner>

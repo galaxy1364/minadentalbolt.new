@@ -1365,3 +1365,45 @@ export async function setStaffLoginActive(userId: string, isActive: boolean): Pr
   const { error } = await supabase.from('users').update({ is_active: isActive }).eq('id', userId)
   if (error) throw new Error(error.message)
 }
+
+// ── Online Booking Requests (نوبت‌دهی آنلاین) ─────────────────────
+export async function fetchOnlineBookingRequests(): Promise<any[]> {
+  const { data, error } = await supabase
+    .from('online_booking_requests')
+    .select('*')
+    .eq('clinic_id', CLINIC_ID)
+    .order('created_at', { ascending: false })
+  if (error) throw new Error(error.message)
+  return data || []
+}
+
+export async function rejectBookingRequest(id: string): Promise<void> {
+  const { error } = await supabase.from('online_booking_requests')
+    .update({ status: 'rejected', reviewed_at: nowISO() })
+    .eq('id', id)
+  if (error) throw new Error(error.message)
+}
+
+export async function convertBookingRequestToAppointment(
+  request: { id: string; full_name: string; phone: string; preferred_date: string | null; preferred_time: string | null; reason: string | null },
+  patientId: string,
+  doctorId: string,
+  date: string,
+  startTime: string,
+  endTime: string,
+): Promise<Appointment> {
+  const appt = await createAppointment({
+    patient_id: patientId, doctor_id: doctorId, unit_id: null,
+    date, start_time: startTime, end_time: endTime,
+    type: 'consultation', status: 'scheduled',
+    notes: request.reason ? `از نوبت‌دهی آنلاین: ${request.reason}` : 'ثبت‌شده از نوبت‌دهی آنلاین',
+    estimated_fee: null, duration_minutes: null, reminder_sent: false, created_by: null,
+    last_reminder_sent: null, reminder_count: 0, reminder_enabled: true,
+    booking_source: 'online', confirmed_at: null, confirmed_by: null,
+  } as any)
+  const { error } = await supabase.from('online_booking_requests')
+    .update({ status: 'converted', converted_appointment_id: appt.id, reviewed_at: nowISO() })
+    .eq('id', request.id)
+  if (error) throw new Error(error.message)
+  return appt
+}

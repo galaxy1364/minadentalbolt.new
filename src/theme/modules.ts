@@ -1,7 +1,7 @@
 import {
   Gauge, UserRound, CalendarClock, Stethoscope, Wallet, Microscope,
   Bone, ShieldCheck, Boxes, Pill, ScanLine, IdCard,
-  PieChart, Hourglass, SlidersHorizontal, Archive, CalendarDays, PiggyBank, MessageSquareText,
+  PieChart, Hourglass, SlidersHorizontal, Archive, CalendarDays, PiggyBank, MessageSquareText, BellRing,
 } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 
@@ -187,10 +187,19 @@ export const modules: Record<string, ModuleIdentity> = {
     colorDark: '#831843',
     gradient: ['#f472b6', '#db2777'],
   },
+  reminders: {
+    path: '/reminders',
+    label: 'یادآوری‌ها',
+    icon: BellRing,
+    color: '#ea580c',
+    colorLight: '#fff7ed',
+    colorDark: '#7c2d12',
+    gradient: ['#fb923c', '#ea580c'],
+  },
 }
 
 export const primaryModuleKeys = ['dashboard', 'patients', 'appointments', 'treatments', 'billing', 'laboratory']
-export const secondaryModuleKeys = ['implants', 'insurance', 'inventory', 'prescriptions', 'radiology', 'staff', 'reports', 'waitingList', 'calendar', 'personalFinance', 'sms', 'archive', 'settings']
+export const secondaryModuleKeys = ['implants', 'insurance', 'inventory', 'prescriptions', 'radiology', 'staff', 'reports', 'waitingList', 'calendar', 'personalFinance', 'sms', 'reminders', 'archive', 'settings']
 
 export const primaryModules = primaryModuleKeys.map(k => modules[k])
 export const secondaryModules = secondaryModuleKeys.map(k => modules[k])

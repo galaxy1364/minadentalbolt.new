@@ -1,11 +1,11 @@
 import { useState, useEffect, useCallback, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Calendar, Clock, CheckCircle2, User, ChevronRight, ChevronLeft, Plus, Search, Trash2, AlertCircle, Edit2, Stethoscope, DollarSign, FileText, Activity, List, Grid, X, UserPlus } from 'lucide-react'
-import { fetchAppointments, createAppointment, updateAppointment, deleteAppointment, checkConflict, fetchPatients, fetchDoctors, fetchUnits, peekNextFileNumber, createPatient, createEncounter, fetchDoctorSchedules } from '../lib/api'
+import { Calendar, Clock, CheckCircle2, User, ChevronRight, ChevronLeft, Plus, Search, Trash2, AlertCircle, Edit2, Stethoscope, DollarSign, FileText, Activity, List, Grid, X, UserPlus, Globe } from 'lucide-react'
+import { fetchAppointments, createAppointment, updateAppointment, deleteAppointment, checkConflict, fetchPatients, fetchDoctors, fetchUnits, peekNextFileNumber, createPatient, createEncounter, fetchDoctorSchedules, fetchOnlineBookingRequests, rejectBookingRequest } from '../lib/api'
 import { toJalaliString, toJalaliStringPretty, getJalaliDateInfo, formatTime, formatCurrency, toPersianDigits, persianWeekdaysShort, getHoliday, jsDateToPersianWeekday } from '../lib/persianDate'
 import { doctorColor } from '../lib/doctorColors'
 import { Appointment, AppointmentWithRelations, Patient, Doctor, Unit } from '../types'
-import { Modal, Card, Button, Input, Select, Textarea, EmptyState, showToast } from '../components/ui'
+import { Modal, Card, Button, Input, Select, Textarea, EmptyState, showToast, Badge } from '../components/ui'
 import { ModuleHeader } from '../components/ModuleHeader'
 import { useConfirmAction, ConfirmActionConfig } from '../components/ConfirmAction'
 import { h } from '../lib/haptics'
@@ -57,6 +57,8 @@ export default function Appointments() {
   const [doctors, setDoctors] = useState<Doctor[]>([])
   const [units, setUnits] = useState<Unit[]>([])
   const [loading, setLoading] = useState(true)
+  const [bookingRequests, setBookingRequests] = useState<any[]>([])
+  const [reqModalOpen, setReqModalOpen] = useState<any>(null)
 
   const [activeFilter, setActiveFilter] = useState('today')
   const [searchQuery, setSearchQuery] = useState('')
@@ -86,8 +88,9 @@ export default function Appointments() {
   const loadData = useCallback(async () => {
     setLoading(true)
     try {
-      const [a, p, d, u] = await Promise.all([fetchAppointments(), fetchPatients(), fetchDoctors(), fetchUnits()])
+      const [a, p, d, u, br] = await Promise.all([fetchAppointments(), fetchPatients(), fetchDoctors(), fetchUnits(), fetchOnlineBookingRequests().catch(() => [])])
       setAppointments(a); setPatients(p); setDoctors(d); setUnits(u)
+      setBookingRequests(br.filter((r: any) => r.status === 'pending'))
     } catch { showToast('error', 'خطا در بارگذاری نوبت‌ها') }
     finally { setLoading(false) }
   }, [])
@@ -170,6 +173,29 @@ export default function Appointments() {
     setPatientSearch('')
     setShowPatientResults(false)
     setQuickPatient({ first_name: '', last_name: '', phone: '' })
+    setWizardOpen(true)
+    h.pop()
+  }
+
+  // Pre-fills the same wizard from an approved online booking request —
+  // staff pick/create the matching patient (patientSearch pre-filled
+  // with the phone the visitor gave) and confirm the doctor/date/time,
+  // reusing the exact same booking flow rather than a separate one.
+  const openWizardFromRequest = (req: any) => {
+    setReqModalOpen(null)
+    setEditingAppt(null)
+    setWizardData({
+      patient_id: '', doctor_id: '', unit_id: '',
+      date: req.preferred_date || todayStr,
+      start_time: '09:00', end_time: '09:30',
+      type: 'consultation', status: 'scheduled',
+      notes: req.reason ? `از نوبت‌دهی آنلاین: ${req.reason}` : 'از نوبت‌دهی آنلاین',
+      estimated_fee: '', recurrence: 'none', recurrenceCount: '4',
+    })
+    setWizardStep(0)
+    setPatientSearch(req.phone)
+    setShowPatientResults(true)
+    setQuickPatient({ first_name: req.full_name.split(' ')[0] || '', last_name: req.full_name.split(' ').slice(1).join(' ') || '', phone: req.phone })
     setWizardOpen(true)
     h.pop()
   }
@@ -389,6 +415,39 @@ export default function Appointments() {
           </button>
         }
       />
+
+      {/* ── Online booking requests (نوبت‌دهی آنلاین) ── */}
+      {bookingRequests.length > 0 && (
+        <div className="p-3.5 rounded-2xl bg-gradient-to-l from-primary-50 to-white dark:from-primary-900/20 dark:to-transparent border border-primary-100 dark:border-primary-800">
+          <div className="flex items-center justify-between mb-2.5">
+            <p className="text-xs font-bold text-primary-700 dark:text-primary-400 flex items-center gap-1.5">
+              <Globe size={14} /> درخواست‌های نوبت آنلاین
+            </p>
+            <Badge color="error">{toPersianDigits(bookingRequests.length)}</Badge>
+          </div>
+          <div className="space-y-2">
+            {bookingRequests.map((req) => (
+              <div key={req.id} className="flex items-center gap-2 p-2.5 rounded-xl bg-white dark:bg-slate-800">
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-bold text-slate-800 dark:text-slate-100 truncate">{req.full_name}</p>
+                  <p className="text-[11px] text-slate-400">
+                    {toPersianDigits(req.phone)}
+                    {req.preferred_date && ` — ${toJalaliStringPretty(req.preferred_date)}`}
+                    {req.preferred_time && ` ساعت ${toPersianDigits(req.preferred_time)}`}
+                  </p>
+                </div>
+                <button onClick={() => openWizardFromRequest(req)} className="px-2.5 py-1.5 rounded-lg bg-primary-600 text-white text-[11px] font-bold shrink-0">تبدیل به نوبت</button>
+                <button
+                  onClick={async () => { h.warning(); await rejectBookingRequest(req.id); await loadData() }}
+                  className="px-2.5 py-1.5 rounded-lg bg-slate-100 dark:bg-slate-700 text-slate-500 dark:text-slate-300 text-[11px] font-bold shrink-0"
+                >
+                  رد
+                </button>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* ── Stats cards ── */}
       <div className="grid grid-cols-3 gap-2.5">
