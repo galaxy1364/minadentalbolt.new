@@ -593,9 +593,9 @@ export default function PatientDetail() {
 
           {/* Avatar */}
           <div
-            className={`w-16 h-16 md:w-20 md:h-20 rounded-2xl bg-gradient-to-br ${getAvatarColor(patient.id)} flex items-center justify-center text-white font-bold text-xl md:text-2xl flex-shrink-0`}
+            className={`w-16 h-16 md:w-20 md:h-20 rounded-2xl overflow-hidden bg-gradient-to-br ${getAvatarColor(patient.id)} flex items-center justify-center text-white font-bold text-xl md:text-2xl flex-shrink-0`}
           >
-            {getInitials(patient)}
+            {patient.avatar_url ? <img src={patient.avatar_url} alt="" className="w-full h-full object-cover" /> : getInitials(patient)}
           </div>
 
           {/* Info */}

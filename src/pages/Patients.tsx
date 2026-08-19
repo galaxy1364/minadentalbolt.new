@@ -5,6 +5,7 @@ import { fetchPatients, createPatient, updatePatient, deletePatient, fetchDoctor
 import { toJalaliStringPretty, formatCurrency, toPersianDigits } from '../lib/persianDate'
 import { Patient, Doctor, Payment, Treatment, ImplantCase } from '../types'
 import { Modal, Card, Button, Input, Select, Textarea, Spinner, EmptyState, showToast, HighlightText, SkeletonList } from '../components/ui'
+import { PatientPhotoUpload } from '../components/PatientPhotoUpload'
 import { PersianDateInput } from '../components/PersianDateInput'
 import { ModuleHeader } from '../components/ModuleHeader'
 import { useConfirmAction, ConfirmActionConfig } from '../components/ConfirmAction'
@@ -67,6 +68,7 @@ const emptyForm = {
   postal_code: '', medical_history: '', allergies: '', medications: '', medical_conditions: '',
   insurance_info: '', insurance_number: '', notes: '', vip_level: '0',
   file_number: '', file_number_manual: false, is_active: 'true', primary_doctor_id: '', tags: '',
+  avatar_url: '', referral_source: '',
 }
 
 export default function Patients() {
@@ -192,6 +194,7 @@ export default function Patients() {
       vip_level: String(patient.vip_level ?? 0), file_number: patient.file_number || '',
       file_number_manual: patient.file_number_manual ?? false, is_active: String(patient.is_active),
       primary_doctor_id: patient.primary_doctor_id || '', tags: (patient.tags || []).join(', '),
+      avatar_url: patient.avatar_url || '', referral_source: patient.referral_source || '',
     })
     setModalOpen(true)
     h.pop()
@@ -256,7 +259,7 @@ export default function Patients() {
           file_number_manual: formData.file_number_manual, is_active: formData.is_active === 'true',
           primary_doctor_id: formData.primary_doctor_id || null,
           tags: formData.tags ? formData.tags.split(',').map((t) => t.trim()).filter(Boolean) : [],
-          avatar_url: null, credit_limit: null, referral_source: null,
+          avatar_url: formData.avatar_url || null, credit_limit: null, referral_source: formData.referral_source || null,
         } as any
         if (editingPatient) await updatePatient(editingPatient.id, payload)
         else await createPatient(payload)
@@ -442,8 +445,8 @@ export default function Patients() {
               >
                 <div className="flex items-center gap-3">
                   {/* Avatar */}
-                  <div className={`w-11 h-11 rounded-2xl bg-gradient-to-br ${getAvatarColor(patient.id)} flex items-center justify-center text-white font-bold text-sm flex-shrink-0 shadow-ios`}>
-                    {getInitials(patient)}
+                  <div className={`w-11 h-11 rounded-2xl overflow-hidden bg-gradient-to-br ${getAvatarColor(patient.id)} flex items-center justify-center text-white font-bold text-sm flex-shrink-0 shadow-ios`}>
+                    {patient.avatar_url ? <img src={patient.avatar_url} alt="" className="w-full h-full object-cover" /> : getInitials(patient)}
                   </div>
 
                   {/* Content */}
@@ -537,7 +540,8 @@ export default function Patients() {
             </div>
             <div>
               <h4 className="text-xs font-bold text-slate-500 mb-3 uppercase tracking-wider">اطلاعات شخصی</h4>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+              <PatientPhotoUpload value={formData.avatar_url} onChange={(url) => setFormData((p) => ({ ...p, avatar_url: url }))} />
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mt-3">
                 <Input label="نام" value={formData.first_name} onChange={(v) => setFormData((p) => ({ ...p, first_name: v }))} placeholder="نام" />
                 <Input label="نام خانوادگی" value={formData.last_name} onChange={(v) => setFormData((p) => ({ ...p, last_name: v }))} placeholder="نام خانوادگی" />
                 <Input label="کد ملی" value={formData.national_id} onChange={(v) => setFormData((p) => ({ ...p, national_id: v }))} placeholder="کد ملی" dir="ltr" />
@@ -576,6 +580,17 @@ export default function Patients() {
                 <Select label="پزشک اصلی" value={formData.primary_doctor_id} onChange={(v) => setFormData((p) => ({ ...p, primary_doctor_id: v }))} options={doctors.map((d) => ({ value: d.id, label: `دکتر ${d.name || d.specialty || 'پزشک'}` }))} placeholder="بدون پزشک اصلی" />
                 <Input label="برچسب‌ها" value={formData.tags} onChange={(v) => setFormData((p) => ({ ...p, tags: v }))} placeholder="برچسب۱, برچسب۲" />
                 <Select label="وضعیت" value={formData.is_active} onChange={(v) => setFormData((p) => ({ ...p, is_active: v }))} options={[{ value: 'true', label: 'فعال' }, { value: 'false', label: 'غیرفعال' }]} />
+                <Select
+                  label="چطور با ما آشنا شدید؟"
+                  value={formData.referral_source}
+                  onChange={(v) => setFormData((p) => ({ ...p, referral_source: v }))}
+                  options={[
+                    { value: 'instagram', label: 'اینستاگرام' }, { value: 'google', label: 'جستجوی گوگل' },
+                    { value: 'referral', label: 'معرفی توسط بیمار دیگر' }, { value: 'walk_in', label: 'مراجعه‌ی حضوری' },
+                    { value: 'website', label: 'وب‌سایت' }, { value: 'other', label: 'سایر' },
+                  ]}
+                  placeholder="انتخاب..."
+                />
               </div>
             </div>
             <Textarea label="یادداشت" value={formData.notes} onChange={(v) => setFormData((p) => ({ ...p, notes: v }))} placeholder="یادداشت‌های بیمار..." />
