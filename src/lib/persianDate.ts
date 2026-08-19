@@ -223,8 +223,20 @@ export function getGregorianHolidays(year: number, month: number): Map<string, s
 }
 
 export function jalaliToGregorian(jy: number, jm: number, jd: number): string {
-  const [gy, gm, gd] = toGregorian(jy, jm, jd)
-  return `${gy}-${String(gm).padStart(2, '0')}-${String(gd).padStart(2, '0')}`
+  // Defensive guard: jalaali-js throws on non-finite input (e.g. NaN
+  // year/month, which is exactly what produced a real corrupted
+  // "N-0a-0N"-style date saved to a patient's treatment phase before
+  // this file's toGregorian was replaced with jalaali-js). Falling
+  // back to today instead of letting a malformed string reach a
+  // Postgres `date` column (which silently gets stuck failing to sync
+  // forever) or crashing the calendar outright.
+  try {
+    const [gy, gm, gd] = toGregorian(jy, jm, jd)
+    if (!Number.isFinite(gy) || !Number.isFinite(gm) || !Number.isFinite(gd)) throw new Error('non-finite result')
+    return `${gy}-${String(gm).padStart(2, '0')}-${String(gd).padStart(2, '0')}`
+  } catch {
+    return new Date().toISOString().slice(0, 10)
+  }
 }
 
 export function formatTime(timeStr: string): string {

@@ -410,6 +410,15 @@ export default function PatientDetail() {
   const handleSavePhase = () => {
     if (!phaseForm.title.trim()) { showToast('error', 'عنوان فاز الزامی است'); return }
     if (!id) return
+    // Defense in depth: a malformed date string (e.g. the historical
+    // "N-0a-0N" corruption this exact form once produced, before the
+    // Jalali conversion bug was fixed) would silently fail to sync
+    // forever once saved, since Postgres's `date` column type rejects
+    // it — but the local save "succeeds" with no visible error. Catch
+    // it here, before it ever reaches that state again.
+    const isValidDate = (s: string) => /^\d{4}-\d{2}-\d{2}$/.test(s) && !isNaN(new Date(s).getTime())
+    if (phaseForm.start_date && !isValidDate(phaseForm.start_date)) { showToast('error', 'تاریخ شروع نامعتبر است — دوباره از تقویم انتخاب کنید'); return }
+    if (phaseForm.end_date && !isValidDate(phaseForm.end_date)) { showToast('error', 'تاریخ پایان نامعتبر است — دوباره از تقویم انتخاب کنید'); return }
     const nextNumber = editingPhase ? editingPhase.phase_number : (phases.length > 0 ? Math.max(...phases.map((p) => p.phase_number)) + 1 : 1)
     const payload = {
       patient_id: id, doctor_id: phaseForm.doctor_id || null,
