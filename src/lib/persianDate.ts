@@ -1,3 +1,5 @@
+import { toJalaali, toGregorian as jalaaliToGregorian, isLeapJalaaliYear } from 'jalaali-js'
+
 // Jalali (Shamsi) date conversion utilities
 
 export const persianMonths = [
@@ -6,7 +8,7 @@ export const persianMonths = [
 ]
 
 export const persianWeekdays = [
-  'یکشنبه', 'دوشنبه', 'سه‌شنبه', 'چهارشنبه', 'پنجشنبه', 'جمعه', 'شنبه',
+  'شنبه', 'یکشنبه', 'دوشنبه', 'سه‌شنبه', 'چهارشنبه', 'پنجشنبه', 'جمعه',
 ]
 
 // Iranian week starts on شنبه (Saturday) and ends on جمعه (Friday) — in
@@ -24,52 +26,21 @@ export function jsDateToPersianWeekday(date: Date): number {
   return (date.getDay() + 1) % 7
 }
 
+// Real, thoroughly-tested Gregorian<->Jalali conversion via jalaali-js
+// (the standard, widely-used implementation of the correct algorithm)
+// — the previous hand-rolled version here had a genuine, confirmed bug
+// (off by a full day, and structurally wrong around Nowruz/leap-year
+// boundaries), caught because a user's real device showed a different
+// date than this app computed. Kept the same function names/signatures
+// so every caller in this file needs zero changes.
 function toJalali(gy: number, gm: number, gd: number): [number, number, number] {
-  const g_d_m = [0, 31, 59, 90, 120, 151, 181, 212, 243, 273, 304, 334]
-  let jy = gy <= 1600 ? 0 : 979
-  gy -= gy <= 1600 ? 621 : 1600
-  const gy2 = gm > 2 ? gy + 1 : gy
-  let days = 365 * gy + Math.floor((gy2 + 3) / 4) - Math.floor((gy2 + 99) / 100) + Math.floor((gy2 + 399) / 400) - 80 + g_d_m[gm - 1] + gd - 1
-  jy += 33 * Math.floor(days / 12053)
-  days %= 12053
-  jy += 4 * Math.floor(days / 1461)
-  days %= 1461
-  if (days > 365) {
-    jy += Math.floor((days - 1) / 365)
-    days = (days - 1) % 365
-  }
-  const jm = days < 186 ? 1 + Math.floor(days / 31) : 7 + Math.floor((days - 186) / 30)
-  const jd = 1 + (days < 186 ? days % 31 : (days - 186) % 30)
+  const { jy, jm, jd } = toJalaali(gy, gm, gd)
   return [jy, jm, jd]
 }
 
 function toGregorian(jy: number, jm: number, jd: number): [number, number, number] {
-  let gy = jy <= 979 ? 621 : 1600
-  jy -= jy <= 979 ? 0 : 979
-  let days = 365 * jy + Math.floor(jy / 33) * 8 + Math.floor((jy % 33 + 3) / 4) + 78 + jd + (jm < 7 ? (jm - 1) * 31 : (jm - 7) * 30 + 186)
-  gy += 400 * Math.floor(days / 146097)
-  days %= 146097
-  if (days > 36524) {
-    gy += 100 * Math.floor(--days / 36524)
-    days %= 36524
-    if (days > 0) days++
-  }
-  gy += 4 * Math.floor(days / 1461)
-  days %= 1461
-  if (days > 365) {
-    gy += Math.floor((days - 1) / 365)
-    days = (days - 1) % 365
-  }
-  const sal_a = [0, 31, 29, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31]
-  let leap = true
-  let gm = 0
-  for (gm = 0; gm < 13; gm++) {
-    let v = sal_a[gm]
-    if (gm === 2 && !leap) v = 28
-    if (days < v) break
-    days -= v
-  }
-  return [gy, gm, days + 1]
+  const { gy, gm, gd } = jalaaliToGregorian(jy, jm, jd)
+  return [gy, gm, gd]
 }
 
 export function toJalaliString(dateStr: string): string {
@@ -105,8 +76,7 @@ export function getJalaliDateInfo(dateStr: string): { year: number; month: numbe
 // ── Jalali leap year calculation ──────────────────────────
 // Algorithm: a year is leap if (year mod 33) is in {1, 5, 9, 13, 17, 22, 26, 30}
 export function isJalaliLeapYear(jy: number): boolean {
-  const r = jy % 33
-  return r === 1 || r === 5 || r === 9 || r === 13 || r === 17 || r === 22 || r === 26 || r === 30
+  return isLeapJalaaliYear(jy)
 }
 
 export function getJalaliMonthGrid(year: number, month: number): (number | null)[][] {
