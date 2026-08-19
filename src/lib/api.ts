@@ -21,7 +21,7 @@ import {
   ImplantCase, ImplantCaseInput, ImplantCaseWithRelations, ImplantComponent,
   ImplantComponentInput, SmsTemplate, SmsTemplateInput, DoctorSchedule,
   DoctorScheduleInput, TreatmentPackage, TreatmentPackageInput, ConsentForm,
-  PersonalFinanceItem, PersonalFinanceItemInput,
+  PersonalFinanceItem, PersonalFinanceItemInput, CashRegisterSession,
   ConsentFormInput, DashboardStats, DoctorInput, UnitInput,
 } from '../types'
 
@@ -1311,4 +1311,41 @@ export async function updatePersonalFinanceItem(id: string, updates: Partial<Per
 export async function deletePersonalFinanceItem(id: string): Promise<void> {
   await db.personal_finance_items.delete(id)
   await queueOperation('personal_finance_items', 'delete', id)
+}
+
+// ── Smart Cash Register (صندوق‌داری هوشمند) ──────────────────────
+export async function fetchCashRegisterSessions(): Promise<CashRegisterSession[]> {
+  const items = await db.cash_register_sessions.where('clinic_id').equals(CLINIC_ID).toArray()
+  return items.sort((a, b) => b.opened_at.localeCompare(a.opened_at))
+}
+
+export async function getOpenCashRegisterSession(): Promise<CashRegisterSession | null> {
+  const items = await db.cash_register_sessions.where({ clinic_id: CLINIC_ID, status: 'open' }).toArray()
+  return items[0] || null
+}
+
+export async function openCashRegisterSession(openingBalance: number): Promise<CashRegisterSession> {
+  const id = uid()
+  const session: CashRegisterSession = {
+    id, clinic_id: CLINIC_ID, opened_at: nowISO(), closed_at: null,
+    opening_balance: openingBalance, expected_closing_balance: null, counted_closing_balance: null,
+    discrepancy: null, opened_by: null, closed_by: null, status: 'open', notes: null,
+    created_at: nowISO(), updated_at: nowISO(),
+  }
+  await db.cash_register_sessions.put(session)
+  await queueOperation('cash_register_sessions', 'insert', id, session)
+  return session
+}
+
+export async function closeCashRegisterSession(id: string, expectedBalance: number, countedBalance: number, notes: string | null): Promise<CashRegisterSession> {
+  const existing = await db.cash_register_sessions.get(id)
+  if (!existing) throw new Error('صندوق یافت نشد')
+  const updated: CashRegisterSession = {
+    ...existing, closed_at: nowISO(), expected_closing_balance: expectedBalance,
+    counted_closing_balance: countedBalance, discrepancy: countedBalance - expectedBalance,
+    status: 'closed', notes, updated_at: nowISO(),
+  }
+  await db.cash_register_sessions.put(updated)
+  await queueOperation('cash_register_sessions', 'update', id, updated)
+  return updated
 }

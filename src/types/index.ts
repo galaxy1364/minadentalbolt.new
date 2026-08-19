@@ -876,3 +876,22 @@ export interface PersonalFinanceItem {
 }
 
 export type PersonalFinanceItemInput = Omit<PersonalFinanceItem, 'id' | 'created_at' | 'updated_at'> & { clinic_id?: string }
+
+export interface CashRegisterSession {
+  id: string
+  clinic_id: string
+  opened_at: string
+  closed_at: string | null
+  opening_balance: number
+  expected_closing_balance: number | null
+  counted_closing_balance: number | null
+  discrepancy: number | null
+  opened_by: string | null
+  closed_by: string | null
+  status: 'open' | 'closed'
+  notes: string | null
+  created_at: string
+  updated_at: string
+}
+
+export type CashRegisterSessionInput = Omit<CashRegisterSession, 'id' | 'created_at' | 'updated_at'> & { clinic_id?: string }

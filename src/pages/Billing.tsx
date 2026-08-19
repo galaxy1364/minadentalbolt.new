@@ -10,6 +10,8 @@ import { useConfirmAction } from '../components/ConfirmAction'
 import { Payment, Encounter, Cheque, PaymentPlan, PaymentPlanWithRelations, Patient, Expense, Treatment, ImplantCase, Installment } from '../types'
 import { calcAllPatientBalances } from '../lib/finance'
 import { downloadICSReminder } from '../lib/icsReminder'
+import { fetchCashRegisterSessions, openCashRegisterSession, closeCashRegisterSession } from '../lib/api'
+import type { CashRegisterSession } from '../types'
 import { Wizard, Card, Button, Input, Select, Textarea, Badge, Spinner, EmptyState, Tabs, showToast } from '../components/ui'
 import { PersianDateInput } from '../components/PersianDateInput'
 import { CurrencyInput } from '../components/CurrencyInput'
@@ -82,6 +84,12 @@ export default function Billing() {
   // Payment modal
   const [paymentModalOpen, setPaymentModalOpen] = useState(false)
   const [paymentWizardStep, setPaymentWizardStep] = useState(0)
+  const [cashSessions, setCashSessions] = useState<CashRegisterSession[]>([])
+  const [openSession, setOpenSession] = useState<CashRegisterSession | null>(null)
+  const [openingBalanceInput, setOpeningBalanceInput] = useState('')
+  const [countedBalanceInput, setCountedBalanceInput] = useState('')
+  const [closingNotes, setClosingNotes] = useState('')
+  const [savingRegister, setSavingRegister] = useState(false)
   const [savingPayment, setSavingPayment] = useState(false)
   const [paymentForm, setPaymentForm] = useState({
     patient_id: '',
@@ -145,7 +153,7 @@ export default function Billing() {
   const loadData = useCallback(async () => {
     setLoading(true)
     try {
-      const [pays, encs, chqs, plans, pats, exps, trts, implCases] = await Promise.all([
+      const [pays, encs, chqs, plans, pats, exps, trts, implCases, cashSess] = await Promise.all([
         fetchPayments(),
         fetchEncounters(),
         fetchCheques(),
@@ -154,6 +162,7 @@ export default function Billing() {
         fetchExpenses(),
         fetchTreatments(),
         fetchImplantCases(),
+        fetchCashRegisterSessions(),
       ])
       setPayments(pays)
       setEncounters(encs)
@@ -163,6 +172,8 @@ export default function Billing() {
       setExpenses(exps)
       setTreatments(trts)
       setImplantCases(implCases)
+      setCashSessions(cashSess)
+      setOpenSession(cashSess.find((s) => s.status === 'open') || null)
     } catch (err) {
       console.error('Error loading billing data:', err)
       showToast('error', 'خطا در بارگذاری اطلاعات مالی')
@@ -684,6 +695,142 @@ export default function Billing() {
               </Card>
             )
           })}
+        </div>
+      )}
+    </div>
+  )
+
+  // ===========================================================================
+  // Render: Cash Register Tab (صندوق‌داری هوشمند)
+  // ===========================================================================
+
+  const handleOpenRegister = () => {
+    const opening = Number(openingBalanceInput) || 0
+    confirmAction({
+      type: 'create',
+      title: 'باز کردن صندوق',
+      fields: [{ label: 'موجودی اولیه', value: `${formatCurrency(opening)} ت`, highlight: true }],
+      confirmLabel: 'باز کردن',
+      onConfirm: async () => {
+        setSavingRegister(true)
+        try {
+          await openCashRegisterSession(opening)
+          showToast('success', 'صندوق باز شد')
+          setOpeningBalanceInput('')
+          await loadData()
+        } catch { showToast('error', 'خطا در باز کردن صندوق') }
+        finally { setSavingRegister(false) }
+      },
+    })
+  }
+
+  // Expected cash = opening balance + every completed CASH payment
+  // recorded since the register opened — the real-world number that
+  // should be sitting in the physical drawer right now.
+  const expectedCashInDrawer = useMemo(() => {
+    if (!openSession) return 0
+    const cashSincOpen = payments
+      .filter((p) => p.status === 'completed' && p.payment_method === 'cash' && p.payment_date >= openSession.opened_at.slice(0, 10))
+      .reduce((s, p) => s + p.amount, 0)
+    return openSession.opening_balance + cashSincOpen
+  }, [openSession, payments])
+
+  const handleCloseRegister = () => {
+    if (!openSession) return
+    const counted = Number(countedBalanceInput) || 0
+    const discrepancy = counted - expectedCashInDrawer
+    confirmAction({
+      type: 'status',
+      title: 'بستن صندوق',
+      warning: discrepancy !== 0 ? `مغایرت ${formatCurrency(Math.abs(discrepancy))} تومان ${discrepancy > 0 ? '(اضافه)' : '(کسری)'} شناسایی شد` : undefined,
+      fields: [
+        { label: 'موجودی مورد انتظار', value: `${formatCurrency(expectedCashInDrawer)} ت` },
+        { label: 'موجودی شمارش‌شده', value: `${formatCurrency(counted)} ت`, highlight: true },
+        { label: 'مغایرت', value: `${discrepancy === 0 ? 'بدون مغایرت' : formatCurrency(Math.abs(discrepancy)) + ' ت'}` },
+      ],
+      confirmLabel: 'بستن صندوق',
+      onConfirm: async () => {
+        setSavingRegister(true)
+        try {
+          await closeCashRegisterSession(openSession.id, expectedCashInDrawer, counted, closingNotes || null)
+          showToast('success', 'صندوق بسته شد')
+          setCountedBalanceInput(''); setClosingNotes('')
+          await loadData()
+        } catch { showToast('error', 'خطا در بستن صندوق') }
+        finally { setSavingRegister(false) }
+      },
+    })
+  }
+
+  const renderCashRegisterTab = () => (
+    <div className="space-y-4">
+      {!openSession ? (
+        <Card className="p-5 text-center">
+          <Wallet size={32} className="mx-auto text-slate-300 mb-2" />
+          <p className="text-sm font-bold text-slate-700 mb-1">صندوق بسته است</p>
+          <p className="text-xs text-slate-500 mb-4">برای شروع کار روزانه، صندوق را با موجودی اولیه باز کنید</p>
+          <div className="max-w-xs mx-auto space-y-3">
+            <CurrencyInput label="موجودی اولیه (تومان)" value={openingBalanceInput} onChange={setOpeningBalanceInput} />
+            <Button variant="primary" onClick={handleOpenRegister} disabled={savingRegister} className="w-full justify-center">
+              {savingRegister ? <Spinner size={16} /> : 'باز کردن صندوق'}
+            </Button>
+          </div>
+        </Card>
+      ) : (
+        <>
+          <Card className="p-5">
+            <div className="flex items-center justify-between mb-3">
+              <div>
+                <p className="text-sm font-bold text-slate-800">صندوق باز است</p>
+                <p className="text-xs text-slate-400">از {toJalaliStringPretty(openSession.opened_at.slice(0, 10))}</p>
+              </div>
+              <Badge color="success">فعال</Badge>
+            </div>
+            <div className="grid grid-cols-2 gap-2.5 mb-4">
+              <div className="p-3 rounded-xl bg-slate-50">
+                <p className="text-[11px] text-slate-400">موجودی اولیه</p>
+                <p className="text-sm font-extrabold text-slate-700">{formatCurrency(openSession.opening_balance)} ت</p>
+              </div>
+              <div className="p-3 rounded-xl bg-primary-50">
+                <p className="text-[11px] text-primary-500">موجودی مورد انتظار الان</p>
+                <p className="text-sm font-extrabold text-primary-700">{formatCurrency(expectedCashInDrawer)} ت</p>
+              </div>
+            </div>
+            <div className="space-y-3 pt-3 border-t border-slate-100">
+              <p className="text-xs font-bold text-slate-500">بستن صندوق (پایان روز)</p>
+              <CurrencyInput label="موجودی شمارش‌شده (تومان)" value={countedBalanceInput} onChange={setCountedBalanceInput} />
+              <Textarea label="یادداشت (اختیاری)" value={closingNotes} onChange={setClosingNotes} rows={2} placeholder="توضیح مغایرت در صورت وجود" />
+              <Button variant="primary" onClick={handleCloseRegister} disabled={savingRegister || !countedBalanceInput} className="w-full justify-center">
+                {savingRegister ? <Spinner size={16} /> : 'بستن صندوق'}
+              </Button>
+            </div>
+          </Card>
+        </>
+      )}
+
+      {cashSessions.filter((s) => s.status === 'closed').length > 0 && (
+        <div>
+          <p className="text-xs font-bold text-slate-500 mb-2">تاریخچه‌ی صندوق</p>
+          <div className="space-y-2">
+            {cashSessions.filter((s) => s.status === 'closed').slice(0, 15).map((s) => (
+              <Card key={s.id} className="p-3.5">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs text-slate-500">{toJalaliStringPretty(s.opened_at.slice(0, 10))}</span>
+                  {s.discrepancy === 0 ? (
+                    <Badge color="success">بدون مغایرت</Badge>
+                  ) : (
+                    <Badge color="error">مغایرت {formatCurrency(Math.abs(s.discrepancy || 0))} ت</Badge>
+                  )}
+                </div>
+                <div className="grid grid-cols-3 gap-2 mt-2 text-[11px] text-slate-500">
+                  <span>اولیه: {formatCurrency(s.opening_balance)}</span>
+                  <span>مورد انتظار: {formatCurrency(s.expected_closing_balance || 0)}</span>
+                  <span>شمارش‌شده: {formatCurrency(s.counted_closing_balance || 0)}</span>
+                </div>
+                {s.notes && <p className="text-[11px] text-slate-400 mt-1.5">{s.notes}</p>}
+              </Card>
+            ))}
+          </div>
         </div>
       )}
     </div>
@@ -1258,6 +1405,7 @@ export default function Billing() {
 
   const tabs = [
     { key: 'payments', label: 'پرداخت‌ها', icon: <CreditCard size={16} /> },
+    { key: 'register', label: 'صندوق', icon: <Wallet size={16} /> },
     { key: 'cheques', label: 'چک‌ها', icon: <Banknote size={16} /> },
     { key: 'plans', label: 'طرح‌های قسطی', icon: <Calendar size={16} /> },
     { key: 'expenses', label: 'هزینه‌ها', icon: <Receipt size={16} /> },
@@ -1278,6 +1426,7 @@ export default function Billing() {
       <Tabs tabs={tabs} active={activeTab} onChange={setActiveTab} />
 
       {activeTab === 'payments' && renderPaymentsTab()}
+      {activeTab === 'register' && renderCashRegisterTab()}
       {activeTab === 'cheques' && renderChequesTab()}
       {activeTab === 'plans' && renderPlansTab()}
       {activeTab === 'expenses' && renderExpensesTab()}

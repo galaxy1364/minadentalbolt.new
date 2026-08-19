@@ -81,6 +81,7 @@ export default function Patients() {
   const [searchQuery, setSearchQuery] = useState('')
   const [filterVip, setFilterVip] = useState('')
   const [filterGender, setFilterGender] = useState('')
+  const [filterTag, setFilterTag] = useState('')
   const [filterActive, setFilterActive] = useState('')
   const [showFilters, setShowFilters] = useState(false)
 
@@ -113,11 +114,20 @@ export default function Patients() {
     return map
   }, [patients, payments, treatments, implantCases])
 
+  // All distinct patient tags currently in use — powers the grouping/
+  // segmentation filter row (مینادنت's "گروه‌بندی و تفکیک بیماران").
+  const allTags = useMemo(() => {
+    const set = new Set<string>()
+    for (const p of patients) for (const t of p.tags || []) set.add(t)
+    return Array.from(set).sort()
+  }, [patients])
+
   const filteredPatients = useMemo(() => {
     let result = patients.filter((p) => {
       if (filterVip !== '' && (p.vip_level ?? 0) !== Number(filterVip)) return false
       if (filterGender && p.gender !== filterGender) return false
       if (filterActive !== '' && p.is_active !== (filterActive === 'true')) return false
+      if (filterTag && !(p.tags || []).includes(filterTag)) return false
       return true
     })
 
@@ -139,7 +149,7 @@ export default function Patients() {
     }
 
     return result
-  }, [patients, searchQuery, filterVip, filterGender, filterActive])
+  }, [patients, searchQuery, filterVip, filterGender, filterActive, filterTag])
 
   const stats = useMemo(() => {
     const total = patients.length
@@ -379,8 +389,24 @@ export default function Patients() {
             <Select label="جنسیت" value={filterGender} onChange={(v) => { h.select(); setFilterGender(v) }} options={genderOptions} placeholder="همه" />
             <Select label="وضعیت" value={filterActive} onChange={(v) => { h.select(); setFilterActive(v) }} options={[{ value: 'true', label: 'فعال' }, { value: 'false', label: 'غیرفعال' }]} placeholder="همه" />
           </div>
-          {(filterVip || filterGender || filterActive) && (
-            <button onClick={() => { h.cancel(); setFilterVip(''); setFilterGender(''); setFilterActive('') }} className="text-xs text-primary-600 mt-2">پاک کردن فیلترها</button>
+          {allTags.length > 0 && (
+            <div className="mt-3">
+              <p className="text-[11px] font-medium text-slate-500 mb-1.5">گروه‌بندی بر اساس برچسب</p>
+              <div className="flex flex-wrap gap-1.5">
+                {allTags.map((tag) => (
+                  <button
+                    key={tag}
+                    onClick={() => { h.select(); setFilterTag(filterTag === tag ? '' : tag) }}
+                    className={`px-2.5 py-1 rounded-full text-[11px] font-medium transition-all-smooth ${filterTag === tag ? 'bg-primary-600 text-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}`}
+                  >
+                    {tag}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+          {(filterVip || filterGender || filterActive || filterTag) && (
+            <button onClick={() => { h.cancel(); setFilterVip(''); setFilterGender(''); setFilterActive(''); setFilterTag('') }} className="text-xs text-primary-600 mt-2">پاک کردن فیلترها</button>
           )}
         </Card>
       )}
@@ -391,8 +417,8 @@ export default function Patients() {
           <EmptyState
             icon={<Users size={32} />}
             title="بیماری یافت نشد"
-            description={searchQuery || filterVip || filterGender || filterActive ? "فیلترها را تغییر دهید" : "برای ثبت بیمار جدید کلیک کنید"}
-            action={!searchQuery && !filterVip && !filterGender && !filterActive ? <Button size="sm" onClick={openCreateModal}><Plus size={16} /> افزودن</Button> : undefined}
+            description={searchQuery || filterVip || filterGender || filterActive || filterTag ? "فیلترها را تغییر دهید" : "برای ثبت بیمار جدید کلیک کنید"}
+            action={!searchQuery && !filterVip && !filterGender && !filterActive && !filterTag ? <Button size="sm" onClick={openCreateModal}><Plus size={16} /> افزودن</Button> : undefined}
           />
         </Card>
       ) : (

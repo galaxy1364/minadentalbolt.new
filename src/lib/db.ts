@@ -5,7 +5,7 @@ import type {
   Prescription, RadiologyImage, TreatmentPhase, PatientTimeline,
   WaitingListEntry, Staff, Expense, TreatmentPackage, ConsentForm,
   ToothRecord, InventoryItem, InventoryCategory, PaymentPlan, Installment,
-  Cheque, DoctorSchedule, ImplantCase, ImplantComponent, SmsTemplate, PersonalFinanceItem,
+  Cheque, DoctorSchedule, ImplantCase, ImplantComponent, SmsTemplate, PersonalFinanceItem, CashRegisterSession,
 } from '../types'
 
 export interface SyncQueueEntry {
@@ -83,6 +83,7 @@ class MinadentDB extends Dexie {
   audit_log!: Table<AuditLogEntry, number>
   backup_snapshots!: Table<BackupSnapshot, number>
   personal_finance_items!: Table<PersonalFinanceItem, string>
+  cash_register_sessions!: Table<CashRegisterSession, string>
 
   constructor() {
     super('minadent')
@@ -139,6 +140,10 @@ class MinadentDB extends Dexie {
     this.version(4).stores({
       doctors: 'id, clinic_id, specialty, is_active, staff_id',
     })
+    // v5: صندوق‌داری هوشمند (smart cash register) daily sessions.
+    this.version(5).stores({
+      cash_register_sessions: 'id, clinic_id, status, opened_at',
+    })
   }
 }
 
@@ -170,7 +175,7 @@ export const TABLE_NAMES = [
   'patient_timeline', 'waiting_list', 'staff', 'expenses', 'treatment_packages',
   'consent_forms', 'tooth_records', 'inventory_items', 'inventory_categories',
   'payment_plans', 'installments', 'cheques', 'doctor_schedules',
-  'implant_cases', 'implant_components', 'sms_templates', 'personal_finance_items',
+  'implant_cases', 'implant_components', 'sms_templates', 'personal_finance_items', 'cash_register_sessions',
 ] as const
 
 export type TableName = typeof TABLE_NAMES[number]
