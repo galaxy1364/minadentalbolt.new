@@ -980,9 +980,19 @@ function AutoBackupCard() {
 // Audit Log Tab — who changed what, when
 // ============================================================================
 
+const AUDIT_CATEGORIES: { key: string; label: string; tables: string[] }[] = [
+  { key: 'financial', label: 'مالی و چک', tables: ['payments', 'cheques', 'expenses', 'payment_plans', 'installments', 'cash_register_sessions'] },
+  { key: 'treatment', label: 'طرح درمان', tables: ['treatments', 'treatment_phases', 'encounters', 'tooth_records'] },
+  { key: 'records', label: 'پرونده‌ها', tables: ['patients'] },
+  { key: 'rbac', label: 'RBAC و امنیت', tables: ['users', 'staff'] },
+  { key: 'system', label: 'سیستم', tables: [] }, // fallback for anything not in the above
+]
+
 function AuditLogTab() {
   const [entries, setEntries] = useState<AuditLogEntry[]>([])
   const [loading, setLoading] = useState(true)
+  const [search, setSearch] = useState('')
+  const [category, setCategory] = useState('all')
 
   useEffect(() => { fetchAuditLog(150).then((e) => { setEntries(e); setLoading(false) }) }, [])
 
@@ -990,6 +1000,33 @@ function AuditLogTab() {
     if (!window.confirm('گزارش فعالیت‌ها پاک شود؟')) return
     clearAuditLog().then(() => { setEntries([]); showToast('success', 'گزارش فعالیت‌ها پاک شد') })
   }
+
+  const handleExportJson = () => {
+    const blob = new Blob([JSON.stringify(entries, null, 2)], { type: 'application/json' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `audit-log-${new Date().toISOString().slice(0, 10)}.json`
+    document.body.appendChild(a); a.click(); document.body.removeChild(a)
+    setTimeout(() => URL.revokeObjectURL(url), 1000)
+    showToast('success', 'خروجی JSON دانلود شد')
+  }
+
+  const filteredEntries = entries.filter((e) => {
+    if (category !== 'all') {
+      const cat = AUDIT_CATEGORIES.find((c) => c.key === category)
+      if (cat) {
+        const inCategory = cat.tables.includes(e.table_name)
+        const isSystemFallback = cat.key === 'system' && !AUDIT_CATEGORIES.some((c) => c.key !== 'system' && c.tables.includes(e.table_name))
+        if (!inCategory && !isSystemFallback) return false
+      }
+    }
+    if (search.trim()) {
+      const q = search.toLowerCase()
+      if (!e.summary.toLowerCase().includes(q) && !(e.actor_name || '').toLowerCase().includes(q)) return false
+    }
+    return true
+  })
 
   const opColor: Record<string, string> = { insert: 'success', update: 'primary', delete: 'error' }
 
@@ -1000,18 +1037,30 @@ function AuditLogTab() {
           <h2 className="text-base font-bold text-slate-800 dark:text-slate-100 flex items-center gap-2">
             <History size={18} className="text-primary-600" /> گزارش فعالیت‌ها
           </h2>
-          {entries.length > 0 && <Button size="sm" variant="danger" onClick={handleClear}><Trash2 size={14} className="inline ml-1" /> پاک کردن</Button>}
+          <div className="flex items-center gap-1.5">
+            {entries.length > 0 && (
+              <Button size="sm" variant="secondary" onClick={handleExportJson}><Download size={14} className="inline ml-1" /> JSON</Button>
+            )}
+            {entries.length > 0 && <Button size="sm" variant="danger" onClick={handleClear}><Trash2 size={14} className="inline ml-1" /> پاک کردن</Button>}
+          </div>
         </div>
         <p className="text-xs text-slate-500 dark:text-slate-400 mb-4">
           هر ثبت، ویرایش یا حذف در برنامه اینجا با زمان و کاربر انجام‌دهنده ثبت می‌شود. تا وقتی سیستم ورود فعال نشده، همه‌چیز به نام «کاربر سیستم» ثبت می‌شود.
         </p>
+        <Input value={search} onChange={setSearch} placeholder="جستجو در متن لاگ یا نام کاربر..." className="mb-2.5" />
+        <div className="flex items-center gap-1.5 flex-wrap mb-3">
+          <button onClick={() => setCategory('all')} className={`px-2.5 py-1 rounded-full text-[11px] font-medium ${category === 'all' ? 'bg-primary-600 text-white' : 'bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300'}`}>همه</button>
+          {AUDIT_CATEGORIES.map((c) => (
+            <button key={c.key} onClick={() => setCategory(c.key)} className={`px-2.5 py-1 rounded-full text-[11px] font-medium ${category === c.key ? 'bg-primary-600 text-white' : 'bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300'}`}>{c.label}</button>
+          ))}
+        </div>
         {loading ? (
           <Spinner size={20} />
-        ) : entries.length === 0 ? (
-          <p className="text-xs text-slate-400 text-center py-6">هنوز فعالیتی ثبت نشده</p>
+        ) : filteredEntries.length === 0 ? (
+          <p className="text-xs text-slate-400 text-center py-6">{entries.length === 0 ? 'هنوز فعالیتی ثبت نشده' : 'نتیجه‌ای برای این فیلتر نیست'}</p>
         ) : (
           <div className="space-y-1.5 max-h-[500px] overflow-y-auto pr-1 -mr-1">
-            {entries.map((e) => (
+            {filteredEntries.map((e) => (
               <div key={e.id} className="flex items-center gap-3 p-2.5 rounded-xl bg-slate-50 dark:bg-slate-800/60">
                 <Badge color={opColor[e.operation] || 'slate'}>{e.summary}</Badge>
                 <span className="text-xs text-slate-500 dark:text-slate-400 flex-1 truncate">{e.actor_name}</span>
