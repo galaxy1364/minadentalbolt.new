@@ -1349,3 +1349,19 @@ export async function closeCashRegisterSession(id: string, expectedBalance: numb
   await queueOperation('cash_register_sessions', 'update', id, updated)
   return updated
 }
+
+// ── Staff login access (suspend/reactivate a login without deleting it) ──
+export async function fetchStaffLoginStatuses(): Promise<Map<string, { userId: string; isActive: boolean }>> {
+  const { data, error } = await supabase.from('users').select('id, staff_id, is_active').not('staff_id', 'is', null)
+  const map = new Map<string, { userId: string; isActive: boolean }>()
+  if (error || !data) return map
+  for (const row of data as any[]) {
+    if (row.staff_id) map.set(row.staff_id, { userId: row.id, isActive: row.is_active !== false })
+  }
+  return map
+}
+
+export async function setStaffLoginActive(userId: string, isActive: boolean): Promise<void> {
+  const { error } = await supabase.from('users').update({ is_active: isActive }).eq('id', userId)
+  if (error) throw new Error(error.message)
+}

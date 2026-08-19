@@ -15,6 +15,7 @@ interface InviteRequest {
   access_role: string;
   clinic_id: string;
   doctor_id?: string | null;
+  staff_id?: string | null;
 }
 
 const VALID_ROLES = ['owner', 'doctor', 'receptionist', 'assistant', 'lab', 'accountant'];
@@ -74,6 +75,7 @@ Deno.serve(async (req) => {
       full_name: body.full_name,
       role: body.access_role,
       doctor_id: body.access_role === 'doctor' ? (body.doctor_id || null) : null,
+      staff_id: body.staff_id || null,
       is_active: true,
     });
     if (rowErr) {

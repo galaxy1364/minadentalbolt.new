@@ -1,8 +1,8 @@
 // Staff.tsx - Persian RTL Dental Clinic Staff Management with Doctor Revenue Sharing
 import { useState, useEffect, useCallback, useMemo } from 'react'
-import { Users, Search, Plus, Phone, Mail, Calendar, DollarSign, Smile, Briefcase, Edit2, Trash2, Stethoscope, Calculator, Award, TrendingUp, Percent, UserCheck, ChevronDown, ChevronUp, Shield } from 'lucide-react'
+import { Users, Search, Plus, Phone, Mail, Calendar, DollarSign, Smile, Briefcase, Edit2, Trash2, Stethoscope, Calculator, Award, TrendingUp, Percent, UserCheck, ChevronDown, ChevronUp, Shield, Lock, Unlock } from 'lucide-react'
 import { PieChart, Pie, Cell, Tooltip as RTooltip, ResponsiveContainer } from 'recharts'
-import { fetchStaff, createStaff, updateStaff, deleteStaff, fetchEncounters, fetchLabOrders, fetchTreatments, createExpense, fetchDoctors } from '../lib/api'
+import { fetchStaff, createStaff, updateStaff, deleteStaff, fetchEncounters, fetchLabOrders, fetchTreatments, createExpense, fetchDoctors, fetchStaffLoginStatuses, setStaffLoginActive } from '../lib/api'
 import { CLINIC_ID, supabase } from '../lib/supabase'
 import { toJalaliString, toJalaliStringPretty, formatCurrency, formatNumber, toPersianDigits } from '../lib/persianDate'
 import type { Staff as StaffType, StaffInput, EncounterWithRelations, LabOrderWithRelations, Treatment } from '../types'
@@ -58,6 +58,7 @@ interface ShareResult {
 export default function Staff() {
   const { confirmAction, ConfirmActionModal } = useConfirmAction()
   const [staff, setStaff] = useState<StaffType[]>([])
+  const [staffLoginMap, setStaffLoginMap] = useState<Map<string, { userId: string; isActive: boolean }>>(new Map())
   const [encounters, setEncounters] = useState<EncounterWithRelations[]>([])
   const [labOrders, setLabOrders] = useState<LabOrderWithRelations[]>([])
   const [treatments, setTreatments] = useState<Treatment[]>([])
@@ -98,16 +99,18 @@ export default function Staff() {
   const loadData = useCallback(async () => {
     setLoading(true)
     try {
-      const [s, enc, labs, trts] = await Promise.all([
+      const [s, enc, labs, trts, loginStatuses] = await Promise.all([
         fetchStaff(),
         fetchEncounters().catch(() => []),
         fetchLabOrders().catch(() => []),
         fetchTreatments().catch(() => []),
+        fetchStaffLoginStatuses().catch(() => new Map()),
       ])
       setStaff(s)
       setEncounters(enc)
       setLabOrders(labs)
       setTreatments(trts)
+      setStaffLoginMap(loginStatuses)
     } catch (err) {
       console.error('Error loading staff:', err)
       showToast('error', 'خطا در بارگذاری پرسنل')
@@ -380,6 +383,7 @@ export default function Staff() {
                     access_role: formData.access_role,
                     clinic_id: CLINIC_ID,
                     doctor_id: linkedDoctorId,
+                    staff_id: savedStaff.id,
                   },
                 })
                 if (inviteError) {
@@ -413,6 +417,25 @@ export default function Staff() {
         } finally {
           setSaving(false)
         }
+      },
+    })
+  }
+
+  const handleToggleLoginAccess = (s: StaffType) => {
+    const login = staffLoginMap.get(s.id)
+    if (!login) return
+    const suspending = login.isActive
+    h.tap()
+    confirmAction({
+      type: 'status',
+      title: suspending ? 'تعلیق حساب ورود' : 'فعال‌سازی حساب ورود',
+      warning: suspending ? `${s.full_name} دیگر نمی‌تواند وارد اپلیکیشن شود، اما سوابق و اطلاعاتش دست‌نخورده می‌ماند.` : undefined,
+      fields: [{ label: 'پرسنل', value: s.full_name || '-', highlight: true }],
+      confirmLabel: suspending ? 'تعلیق حساب' : 'فعال‌سازی حساب',
+      onConfirm: async () => {
+        await setStaffLoginActive(login.userId, !suspending)
+        showToast('success', suspending ? 'حساب ورود تعلیق شد' : 'حساب ورود فعال شد')
+        await loadData()
       },
     })
   }
@@ -675,6 +698,15 @@ export default function Staff() {
                         </div>
                       </div>
                       <div className="flex gap-1">
+                        {staffLoginMap.has(s.id) && (
+                          <button
+                            onClick={() => handleToggleLoginAccess(s)}
+                            title={staffLoginMap.get(s.id)!.isActive ? 'تعلیق حساب ورود' : 'فعال‌سازی حساب ورود'}
+                            className={`p-1.5 rounded-lg transition-colors ${staffLoginMap.get(s.id)!.isActive ? 'text-slate-400 hover:text-warning-600 hover:bg-warning-50' : 'text-warning-600 bg-warning-50'}`}
+                          >
+                            {staffLoginMap.get(s.id)!.isActive ? <Lock size={15} /> : <Unlock size={15} />}
+                          </button>
+                        )}
                         <button onClick={() => openEditModal(s)} className="p-1.5 rounded-lg text-slate-400 hover:text-primary-600 hover:bg-primary-50 transition-colors">
                           <Edit2 size={15} />
                         </button>

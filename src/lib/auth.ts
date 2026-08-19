@@ -28,7 +28,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true)
 
   async function loadProfile(userId: string) {
-    const { data, error } = await supabase.from('users').select('id, clinic_id, full_name, role, doctor_id').eq('id', userId).maybeSingle()
+    const { data, error } = await supabase.from('users').select('id, clinic_id, full_name, role, doctor_id, is_active').eq('id', userId).maybeSingle()
+    if (!error && data && (data as any).is_active === false) {
+      // Login access was suspended (e.g. staff member on leave, access
+      // revoked) — the row still exists so their history/attribution
+      // stays intact, but they must not be able to use the app while
+      // suspended. Sign out immediately rather than silently letting
+      // them in, which is what happened before this check existed.
+      await supabase.auth.signOut()
+      setProfile(null)
+      currentActor.name = null
+      currentActor.role = null
+      return
+    }
     if (!error && data) {
       setProfile(data as StaffProfile)
       currentActor.name = (data as StaffProfile).full_name
