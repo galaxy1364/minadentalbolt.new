@@ -9,6 +9,7 @@ import { useConfirmAction } from '../components/ConfirmAction'
 import type { LabOrder, Laboratory, Patient, Doctor, Treatment } from '../types'
 import { Wizard, Card, Button, Input, Select, Textarea, Badge, Spinner, EmptyState, showToast } from '../components/ui'
 import { PersianDateInput } from '../components/PersianDateInput'
+import { PalmerToothPicker } from '../components/PalmerToothPicker'
 import { ModuleHeader, ModuleStatCard, ReorderableStatGrid } from '../components/ModuleHeader'
 import { CurrencyInput } from '../components/CurrencyInput'
 
@@ -794,7 +795,7 @@ export default function Laboratory() {
               <>
                 <Select label="نوع کار" value={orderForm.work_type} onChange={(v) => setOrderForm((p) => ({ ...p, work_type: v }))} options={workTypes} />
                 <div className="grid grid-cols-2 gap-3">
-                  <Input label="شماره دندان" value={orderForm.tooth_number} onChange={(v) => setOrderForm((p) => ({ ...p, tooth_number: v }))} placeholder="مثال: 16, 21" dir="ltr" />
+                  <PalmerToothPicker value={orderForm.tooth_number} onChange={(v) => setOrderForm((p) => ({ ...p, tooth_number: v }))} allowPrimary={false} />
                   <Input label="رنگ" value={orderForm.shade} onChange={(v) => setOrderForm((p) => ({ ...p, shade: v }))} placeholder="مثال: A2" dir="ltr" />
                 </div>
                 <Select label="جنس" value={orderForm.material} onChange={(v) => setOrderForm((p) => ({ ...p, material: v }))} options={materials} />

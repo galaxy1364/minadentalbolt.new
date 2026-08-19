@@ -16,6 +16,7 @@ import { toJalaliString, toJalaliStringPretty, formatCurrency, formatNumber, toP
 import { Encounter, EncounterWithRelations, Treatment, Procedure, Patient, Doctor, Laboratory, ToothRecord, LabOrder } from '../types'
 import { Card, Button, Badge, Spinner, EmptyState, Tabs, Input, Select, Textarea, Modal, Wizard, showToast } from '../components/ui'
 import { PersianDateInput } from '../components/PersianDateInput'
+import { PalmerToothPicker } from '../components/PalmerToothPicker'
 import { ModuleHeader, ModuleStatCard, ReorderableStatGrid } from '../components/ModuleHeader'
 import { useConfirmAction } from '../components/ConfirmAction'
 import { h } from '../lib/haptics'
@@ -967,16 +968,15 @@ export default function Treatments() {
           },
           {
             label: 'دندان و هزینه',
+            validate: () => (!treatForm.tooth_number ? 'انتخاب دندان الزامی است' : (!treatForm.unit_price || Number(treatForm.unit_price) <= 0) ? 'قیمت واحد الزامی است' : null),
             content: (
               <>
-                <div className="grid grid-cols-2 gap-3">
-                  <Input label="شماره دندان (FDI)" value={treatForm.tooth_number} onChange={(v) => setTreatForm((p) => ({ ...p, tooth_number: v }))} placeholder="مثال: 16 یا 11" dir="ltr" />
-                  <Select label="سطح دندان" value={treatForm.tooth_surface} onChange={(v) => setTreatForm((p) => ({ ...p, tooth_surface: v }))} options={[
+                <PalmerToothPicker value={treatForm.tooth_number} onChange={(v) => setTreatForm((p) => ({ ...p, tooth_number: v }))} />
+                <Select label="سطح دندان" value={treatForm.tooth_surface} onChange={(v) => setTreatForm((p) => ({ ...p, tooth_surface: v }))} options={[
                     { value: 'occlusal', label: 'اکلوزال' }, { value: 'mesial', label: 'مزیال' },
                     { value: 'distal', label: 'دیستال' }, { value: 'buccal', label: 'باکال' },
                     { value: 'lingual', label: 'لینگوال' },
                   ]} placeholder="انتخاب سطح..." />
-                </div>
                 <div className="grid grid-cols-3 gap-3">
                   <Input label="تعداد" value={treatForm.quantity} onChange={(v) => setTreatForm((p) => ({ ...p, quantity: v }))} type="number" dir="ltr" />
                   <CurrencyInput label="قیمت واحد (ت)" value={treatForm.unit_price} onChange={(v) => setTreatForm((p) => ({ ...p, unit_price: v }))} />
