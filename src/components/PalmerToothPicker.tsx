@@ -1,123 +1,120 @@
-// PalmerToothPicker.tsx — a real Palmer-notation tooth selector: pick
-// a quadrant then a position (1-8, or A-E for primary teeth). Stores/
-// emits the FDI number internally (e.g. "16") since that's the
-// canonical format the rest of the app — DentalChart coloring, lab
-// order tooth matching, implant cases — already uses everywhere, but
-// every part of the UI a doctor actually sees and interacts with is
-// 100% Palmer, per the explicit "فقط سیستم پالمر" requirement.
+// PalmerToothPicker.tsx — a real, visual Palmer-notation tooth
+// selector: a compact anatomical mini-chart (upper jaw row, lower jaw
+// row, correctly mirrored right/left) where you tap the actual tooth
+// position directly — no separate "pick a quadrant, then pick a
+// number" steps. Stores/emits the FDI number internally (e.g. "16")
+// since that's the canonical format the rest of the app — DentalChart
+// coloring, lab order tooth matching, implant cases — already uses
+// everywhere, but every part of the UI a doctor sees/taps is 100%
+// Palmer, per the explicit "فقط سیستم پالمر" requirement.
 import { useState, useEffect } from 'react'
 import { h } from '../lib/haptics'
 
-const quadrants = [
-  { key: 'UR', label: 'بالا راست', fdiBase: 10 },
-  { key: 'UL', label: 'بالا چپ', fdiBase: 20 },
-  { key: 'LL', label: 'پایین چپ', fdiBase: 30 },
-  { key: 'LR', label: 'پایین راست', fdiBase: 40 },
-] as const
+interface ToothEntry { fdi: number; palmer: string; side: 'راست' | 'چپ'; jaw: 'بالا' | 'پایین' }
 
-const primaryQuadrants = [
-  { key: 'UR', label: 'بالا راست (شیری)', fdiBase: 50 },
-  { key: 'UL', label: 'بالا چپ (شیری)', fdiBase: 60 },
-  { key: 'LL', label: 'پایین چپ (شیری)', fdiBase: 70 },
-  { key: 'LR', label: 'پایین راست (شیری)', fdiBase: 80 },
-] as const
-
-const primaryPositions = ['A', 'B', 'C', 'D', 'E']
-
-function parseExistingFdi(fdi: string): { quadKey: string; position: string; isPrimary: boolean } | null {
-  const n = Number(fdi)
-  if (!n || fdi.length !== 2) return null
-  const quadDigit = Math.floor(n / 10)
-  const posDigit = n % 10
-  if (quadDigit >= 1 && quadDigit <= 4) {
-    const q = quadrants.find((qq) => qq.fdiBase / 10 === quadDigit)
-    return q ? { quadKey: q.key, position: String(posDigit), isPrimary: false } : null
-  }
-  if (quadDigit >= 5 && quadDigit <= 8) {
-    const q = primaryQuadrants.find((qq) => qq.fdiBase / 10 === quadDigit)
-    return q ? { quadKey: q.key, position: primaryPositions[posDigit - 1] || String(posDigit), isPrimary: true } : null
-  }
-  return null
-}
+const upperRow: ToothEntry[] = [
+  { fdi: 18, palmer: '8', side: 'راست', jaw: 'بالا' }, { fdi: 17, palmer: '7', side: 'راست', jaw: 'بالا' },
+  { fdi: 16, palmer: '6', side: 'راست', jaw: 'بالا' }, { fdi: 15, palmer: '5', side: 'راست', jaw: 'بالا' },
+  { fdi: 14, palmer: '4', side: 'راست', jaw: 'بالا' }, { fdi: 13, palmer: '3', side: 'راست', jaw: 'بالا' },
+  { fdi: 12, palmer: '2', side: 'راست', jaw: 'بالا' }, { fdi: 11, palmer: '1', side: 'راست', jaw: 'بالا' },
+  { fdi: 21, palmer: '1', side: 'چپ', jaw: 'بالا' }, { fdi: 22, palmer: '2', side: 'چپ', jaw: 'بالا' },
+  { fdi: 23, palmer: '3', side: 'چپ', jaw: 'بالا' }, { fdi: 24, palmer: '4', side: 'چپ', jaw: 'بالا' },
+  { fdi: 25, palmer: '5', side: 'چپ', jaw: 'بالا' }, { fdi: 26, palmer: '6', side: 'چپ', jaw: 'بالا' },
+  { fdi: 27, palmer: '7', side: 'چپ', jaw: 'بالا' }, { fdi: 28, palmer: '8', side: 'چپ', jaw: 'بالا' },
+]
+const lowerRow: ToothEntry[] = [
+  { fdi: 48, palmer: '8', side: 'راست', jaw: 'پایین' }, { fdi: 47, palmer: '7', side: 'راست', jaw: 'پایین' },
+  { fdi: 46, palmer: '6', side: 'راست', jaw: 'پایین' }, { fdi: 45, palmer: '5', side: 'راست', jaw: 'پایین' },
+  { fdi: 44, palmer: '4', side: 'راست', jaw: 'پایین' }, { fdi: 43, palmer: '3', side: 'راست', jaw: 'پایین' },
+  { fdi: 42, palmer: '2', side: 'راست', jaw: 'پایین' }, { fdi: 41, palmer: '1', side: 'راست', jaw: 'پایین' },
+  { fdi: 31, palmer: '1', side: 'چپ', jaw: 'پایین' }, { fdi: 32, palmer: '2', side: 'چپ', jaw: 'پایین' },
+  { fdi: 33, palmer: '3', side: 'چپ', jaw: 'پایین' }, { fdi: 34, palmer: '4', side: 'چپ', jaw: 'پایین' },
+  { fdi: 35, palmer: '5', side: 'چپ', jaw: 'پایین' }, { fdi: 36, palmer: '6', side: 'چپ', jaw: 'پایین' },
+  { fdi: 37, palmer: '7', side: 'چپ', jaw: 'پایین' }, { fdi: 38, palmer: '8', side: 'چپ', jaw: 'پایین' },
+]
+const upperRowPrimary: ToothEntry[] = [
+  { fdi: 55, palmer: 'E', side: 'راست', jaw: 'بالا' }, { fdi: 54, palmer: 'D', side: 'راست', jaw: 'بالا' },
+  { fdi: 53, palmer: 'C', side: 'راست', jaw: 'بالا' }, { fdi: 52, palmer: 'B', side: 'راست', jaw: 'بالا' },
+  { fdi: 51, palmer: 'A', side: 'راست', jaw: 'بالا' }, { fdi: 61, palmer: 'A', side: 'چپ', jaw: 'بالا' },
+  { fdi: 62, palmer: 'B', side: 'چپ', jaw: 'بالا' }, { fdi: 63, palmer: 'C', side: 'چپ', jaw: 'بالا' },
+  { fdi: 64, palmer: 'D', side: 'چپ', jaw: 'بالا' }, { fdi: 65, palmer: 'E', side: 'چپ', jaw: 'بالا' },
+]
+const lowerRowPrimary: ToothEntry[] = [
+  { fdi: 85, palmer: 'E', side: 'راست', jaw: 'پایین' }, { fdi: 84, palmer: 'D', side: 'راست', jaw: 'پایین' },
+  { fdi: 83, palmer: 'C', side: 'راست', jaw: 'پایین' }, { fdi: 82, palmer: 'B', side: 'راست', jaw: 'پایین' },
+  { fdi: 81, palmer: 'A', side: 'راست', jaw: 'پایین' }, { fdi: 71, palmer: 'A', side: 'چپ', jaw: 'پایین' },
+  { fdi: 72, palmer: 'B', side: 'چپ', jaw: 'پایین' }, { fdi: 73, palmer: 'C', side: 'چپ', jaw: 'پایین' },
+  { fdi: 74, palmer: 'D', side: 'چپ', jaw: 'پایین' }, { fdi: 75, palmer: 'E', side: 'چپ', jaw: 'پایین' },
+]
 
 interface PalmerToothPickerProps {
   label?: string
-  value: string // FDI number string, e.g. "16"
+  value: string
   onChange: (fdi: string) => void
   allowPrimary?: boolean
 }
 
 export function PalmerToothPicker({ label = 'دندان (پالمر)', value, onChange, allowPrimary = true }: PalmerToothPickerProps) {
-  const initial = value ? parseExistingFdi(value) : null
-  const [isPrimary, setIsPrimary] = useState(initial?.isPrimary || false)
-  const [quadKey, setQuadKey] = useState(initial?.quadKey || '')
-  const [position, setPosition] = useState<string>(initial?.position || '')
+  const selectedFdi = value ? Number(value) : null
+  const [isPrimary, setIsPrimary] = useState(selectedFdi ? selectedFdi >= 51 && selectedFdi <= 85 : false)
 
   useEffect(() => {
-    const p = value ? parseExistingFdi(value) : null
-    setIsPrimary(p?.isPrimary || false)
-    setQuadKey(p?.quadKey || '')
-    setPosition(p?.position || '')
+    if (selectedFdi) setIsPrimary(selectedFdi >= 51 && selectedFdi <= 85)
   }, [value])
 
-  const commit = (newIsPrimary: boolean, newQuad: string, newPos: string) => {
-    if (!newQuad || !newPos) return
-    const list = newIsPrimary ? primaryQuadrants : quadrants
-    const q = list.find((qq) => qq.key === newQuad)
-    if (!q) return
-    if (newIsPrimary) {
-      const posIndex = primaryPositions.indexOf(newPos)
-      if (posIndex === -1) return
-      onChange(String(q.fdiBase + posIndex + 1))
-    } else {
-      onChange(String(q.fdiBase + Number(newPos)))
-    }
-  }
+  const upper = isPrimary ? upperRowPrimary : upperRow
+  const lower = isPrimary ? lowerRowPrimary : lowerRow
+  const selectedEntry = upper.concat(lower).find((t) => t.fdi === selectedFdi)
 
-  const activeQuadrants = isPrimary ? primaryQuadrants : quadrants
-  const activePositions = isPrimary ? primaryPositions : ['1', '2', '3', '4', '5', '6', '7', '8']
+  const ToothButton = ({ t }: { t: ToothEntry }) => {
+    const isSelected = selectedFdi === t.fdi
+    const isMidline = t.palmer === '1' || t.palmer === 'A'
+    return (
+      <button
+        type="button"
+        onClick={() => { h.select(); onChange(String(t.fdi)) }}
+        className={`relative flex items-center justify-center w-8 h-9 rounded-lg text-xs font-bold transition-all-smooth press-scale ${
+          isSelected
+            ? 'bg-primary-600 text-white shadow-md scale-110 z-10'
+            : 'bg-white dark:bg-slate-700 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-600 hover:border-primary-300'
+        } ${isMidline ? 'mr-1' : ''}`}
+      >
+        {t.palmer}
+      </button>
+    )
+  }
 
   return (
     <div>
-      <div className="flex items-center justify-between mb-1.5">
+      <div className="flex items-center justify-between mb-2">
         <label className="text-xs font-medium text-slate-600 dark:text-slate-300">{label}</label>
         {allowPrimary && (
           <button
             type="button"
-            onClick={() => { h.select(); const np = !isPrimary; setIsPrimary(np); setQuadKey(''); setPosition('') }}
+            onClick={() => { h.select(); setIsPrimary(!isPrimary) }}
             className="text-[11px] text-primary-600 font-semibold"
           >
             {isPrimary ? 'دائمی' : 'دندان شیری'}
           </button>
         )}
       </div>
-      <div className="grid grid-cols-4 gap-1.5 mb-2">
-        {activeQuadrants.map((q) => (
-          <button
-            key={q.key}
-            type="button"
-            onClick={() => { h.select(); setQuadKey(q.key); commit(isPrimary, q.key, position) }}
-            className={`py-2 rounded-xl text-xs font-bold transition-all-smooth ${quadKey === q.key ? 'bg-primary-600 text-white' : 'bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300'}`}
-          >
-            {q.label}
-          </button>
-        ))}
+
+      <div className="p-3 rounded-2xl bg-slate-50 dark:bg-slate-800/60 border border-slate-100 dark:border-slate-700">
+        <p className="text-center text-[10px] text-slate-400 mb-1.5">فک بالا</p>
+        <div className="flex items-center justify-center gap-0.5 flex-wrap">
+          {upper.map((t) => <ToothButton key={t.fdi} t={t} />)}
+        </div>
+        <div className="h-px bg-slate-200 dark:bg-slate-600 my-3" />
+        <div className="flex items-center justify-center gap-0.5 flex-wrap">
+          {lower.map((t) => <ToothButton key={t.fdi} t={t} />)}
+        </div>
+        <p className="text-center text-[10px] text-slate-400 mt-1.5">فک پایین</p>
       </div>
-      <div className="grid grid-cols-5 gap-1.5">
-        {activePositions.map((p) => (
-          <button
-            key={p}
-            type="button"
-            disabled={!quadKey}
-            onClick={() => { h.select(); setPosition(p); commit(isPrimary, quadKey, p) }}
-            className={`py-2 rounded-xl text-sm font-bold transition-all-smooth disabled:opacity-30 ${position === p ? 'bg-primary-600 text-white' : 'bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300'}`}
-          >
-            {p}
-          </button>
-        ))}
-      </div>
-      {quadKey && position && (
-        <p className="text-[11px] text-slate-400 mt-1.5">انتخاب‌شده: {activeQuadrants.find((q) => q.key === quadKey)?.label} — {position}</p>
+
+      {selectedEntry && (
+        <p className="text-[11px] text-slate-400 mt-1.5 text-center">
+          دندان انتخاب‌شده: {selectedEntry.palmer} (فک {selectedEntry.jaw} — سمت {selectedEntry.side})
+        </p>
       )}
     </div>
   )
