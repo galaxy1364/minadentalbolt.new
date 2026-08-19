@@ -415,6 +415,7 @@ const routeImports: Record<string, () => Promise<unknown>> = {
   '/archive':        () => import('../pages/Archive'),
   '/calendar':       () => import('../pages/Calendar'),
   '/personal-finance': () => import('../pages/PersonalFinance'),
+  '/sms': () => import('../pages/SMS'),
 }
 
 const prefetched = new Set<string>()
@@ -445,6 +446,7 @@ const WaitingList  = lazyPage('/waiting-list')
 const Archive      = lazyPage('/archive')
 const CalendarPage = lazyPage('/calendar')
 const PersonalFinance = lazyPage('/personal-finance')
+const SMS = lazyPage('/sms')
 
 function LL({ children, path }: { children: React.ReactNode; path: string }) {
   const { profile } = useAuth()
@@ -525,6 +527,7 @@ export function Layout() {
           <Route path="/archive"         element={<LL path="/archive"><Archive /></LL>} />
           <Route path="/calendar"        element={<LL path="/calendar"><CalendarPage /></LL>} />
           <Route path="/personal-finance" element={<LL path="/personal-finance"><PersonalFinance /></LL>} />
+          <Route path="/sms" element={<LL path="/sms"><SMS /></LL>} />
           <Route path="*"                element={<NotFound />} />
         </Routes>
       </LayoutInner>
