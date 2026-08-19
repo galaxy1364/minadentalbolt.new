@@ -4,11 +4,11 @@ import {
   Settings as SettingsIcon, Building2, Hash, MessageSquare, Package, Save, Smile,
   Cloud, Download, Upload, Vibrate, Volume2, Bell, Database, RefreshCw, Check,
   Smartphone, Shield, AlertTriangle, Eye, ChevronRight, Wifi, Plus, Edit2, Trash2,
-  Stethoscope, Wrench, ListOrdered, Tag, Copy, CheckCircle2, History, CloudOff, Sparkles,
+  Stethoscope, Wrench, ListOrdered, Tag, Copy, CheckCircle2, History, CloudOff, Sparkles, Megaphone,
 } from 'lucide-react'
 import {
   fetchSmsTemplates, fetchTreatmentPackages, fetchDoctors, fetchUnits, fetchProcedures,
-  fetchInventoryCategories,
+  fetchInventoryCategories, fetchPatients,
   createDoctor, updateDoctor, deleteDoctor,
   createUnit, updateUnit, deleteUnit,
   createProcedure, updateProcedure, deleteProcedure,
@@ -20,9 +20,10 @@ import {
 import { db, TABLE_NAMES } from '../lib/db'
 import { syncNow, subscribeSync, SyncStatus, getFailedSyncEntries, retryFailedEntry, retryAllFailedEntries, discardFailedEntry } from '../lib/sync'
 import { toJalaliString, toJalaliStringPretty, formatCurrency, formatNumber, toPersianDigits } from '../lib/persianDate'
+import { supabase } from '../lib/supabase'
 import {
   SmsTemplate, TreatmentPackage, Doctor, Unit, Procedure, InventoryCategory, DoctorSchedule,
-  DoctorInput, UnitInput, ProcedureInput, SmsTemplateInput, TreatmentPackageInput, InventoryCategoryInput,
+  DoctorInput, UnitInput, ProcedureInput, SmsTemplateInput, TreatmentPackageInput, InventoryCategoryInput, Patient,
 } from '../types'
 import { Card, Button, Input, Select, Textarea, Badge, Spinner, EmptyState, StatCard, Tabs, Modal, showToast } from '../components/ui'
 import { useConfirmAction } from '../components/ConfirmAction'
@@ -477,6 +478,7 @@ export default function Settings() {
           { key: 'haptics', label: 'لرزش و صدا', icon: <Vibrate size={16} /> },
           { key: 'file_number', label: 'شماره پرونده', icon: <Hash size={16} /> },
           { key: 'sms', label: 'قالب پیامک', icon: <MessageSquare size={16} /> },
+          { key: 'campaigns', label: 'پیامک انبوه', icon: <Megaphone size={16} /> },
           { key: 'packages', label: 'پکیج درمان', icon: <Package size={16} /> },
           { key: 'categories', label: 'دسته‌بندی انبار', icon: <Tag size={16} /> },
           { key: 'errors', label: 'گزارش خطاها', icon: <AlertTriangle size={16} /> },
@@ -700,6 +702,7 @@ export default function Settings() {
           )}
         </Card>
       )}
+      {activeTab === 'campaigns' && <SmsCampaignTab smsTemplates={smsTemplates} />}
 
       {/* Packages Tab */}
       {activeTab === 'packages' && (
@@ -1040,6 +1043,141 @@ function RbacMatrixTab() {
             )
           })}
         </div>
+      </Card>
+    </div>
+  )
+}
+
+// ============================================================================
+// SMS Campaign Tab (پیامک انبوه) — target patients by tag/VIP/all-active,
+// preview recipient count, compose (or pick a template), send via the
+// same send-sms Edge Function every other reminder already uses, one
+// call per recipient with a short delay between sends (real SMS
+// gateways rate-limit bursts). Basic real feature, not a mockup — will
+// clearly fail with an honest error if no SMS provider is connected,
+// same as every other SMS button in the app.
+// ============================================================================
+
+function SmsCampaignTab({ smsTemplates }: { smsTemplates: SmsTemplate[] }) {
+  const [patients, setPatients] = useState<Patient[]>([])
+  const [loading, setLoading] = useState(true)
+  const [targetType, setTargetType] = useState<'all' | 'tag' | 'vip'>('all')
+  const [targetTag, setTargetTag] = useState('')
+  const [targetVip, setTargetVip] = useState('1')
+  const [message, setMessage] = useState('')
+  const [sending, setSending] = useState(false)
+  const [progress, setProgress] = useState({ sent: 0, total: 0 })
+
+  useEffect(() => { fetchPatients().then((p) => { setPatients(p); setLoading(false) }) }, [])
+
+  const allTags = useMemo(() => {
+    const set = new Set<string>()
+    for (const p of patients) for (const t of p.tags || []) set.add(t)
+    return Array.from(set).sort()
+  }, [patients])
+
+  const recipients = useMemo(() => {
+    let pool = patients.filter((p) => p.is_active && p.phone)
+    if (targetType === 'tag' && targetTag) pool = pool.filter((p) => (p.tags || []).includes(targetTag))
+    if (targetType === 'vip') pool = pool.filter((p) => (p.vip_level ?? 0) >= Number(targetVip))
+    return pool
+  }, [patients, targetType, targetTag, targetVip])
+
+  const handleSend = () => {
+    if (!message.trim()) { showToast('error', 'متن پیامک را وارد کنید'); return }
+    if (recipients.length === 0) { showToast('error', 'هیچ گیرنده‌ای با این فیلتر پیدا نشد'); return }
+    if (!window.confirm(`پیامک برای ${recipients.length} بیمار ارسال شود؟ این عملیات قابل بازگشت نیست.`)) return
+    sendCampaign()
+  }
+
+  const sendCampaign = async () => {
+    setSending(true)
+    setProgress({ sent: 0, total: recipients.length })
+    let failCount = 0
+    for (let i = 0; i < recipients.length; i++) {
+      try {
+        const { error } = await supabase.functions.invoke('send-sms', {
+          body: { to: recipients[i].phone, message, type: 'campaign' },
+        })
+        if (error) failCount++
+      } catch { failCount++ }
+      setProgress({ sent: i + 1, total: recipients.length })
+      // A short pause between sends — real SMS gateways throttle/reject
+      // bursts sent with zero delay, a genuine constraint, not just
+      // caution for its own sake.
+      await new Promise((r) => setTimeout(r, 300))
+    }
+    setSending(false)
+    if (failCount === recipients.length) {
+      showToast('error', 'هیچ پیامکی ارسال نشد — سرویس پیامک متصل نیست (تنظیمات → کلید API پیامک)')
+    } else if (failCount > 0) {
+      showToast('error', `${recipients.length - failCount} پیامک ارسال شد، ${failCount} مورد ناموفق`)
+    } else {
+      showToast('success', `${recipients.length} پیامک با موفقیت ارسال شد`)
+    }
+  }
+
+  return (
+    <div className="space-y-4">
+      <Card className="p-5">
+        <h2 className="text-base font-bold text-slate-800 dark:text-slate-100 flex items-center gap-2 mb-1">
+          <Megaphone size={18} className="text-primary-600" /> پیامک انبوه (کمپین)
+        </h2>
+        <p className="text-xs text-slate-500 dark:text-slate-400 mb-4">
+          ارسال یک پیام به گروهی از بیماران هم‌زمان — برای اطلاع‌رسانی، تخفیف فصلی یا معرفی خدمت جدید.
+        </p>
+
+        <p className="text-xs font-bold text-slate-500 mb-2">گروه هدف</p>
+        <div className="flex items-center gap-1.5 flex-wrap mb-3">
+          <button onClick={() => setTargetType('all')} className={`px-3 py-1.5 rounded-xl text-xs font-bold ${targetType === 'all' ? 'bg-primary-600 text-white' : 'bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300'}`}>همه‌ی بیماران فعال</button>
+          <button onClick={() => setTargetType('tag')} className={`px-3 py-1.5 rounded-xl text-xs font-bold ${targetType === 'tag' ? 'bg-primary-600 text-white' : 'bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300'}`}>بر اساس برچسب</button>
+          <button onClick={() => setTargetType('vip')} className={`px-3 py-1.5 rounded-xl text-xs font-bold ${targetType === 'vip' ? 'bg-primary-600 text-white' : 'bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300'}`}>بر اساس سطح VIP</button>
+        </div>
+
+        {targetType === 'tag' && (
+          allTags.length === 0 ? (
+            <p className="text-xs text-slate-400 mb-3">هنوز برچسبی روی بیماران ثبت نشده (بیماران → ویرایش بیمار → برچسب‌ها)</p>
+          ) : (
+            <div className="flex items-center gap-1.5 flex-wrap mb-3">
+              {allTags.map((t) => (
+                <button key={t} onClick={() => setTargetTag(t)} className={`px-2.5 py-1 rounded-full text-[11px] font-medium ${targetTag === t ? 'bg-primary-600 text-white' : 'bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300'}`}>{t}</button>
+              ))}
+            </div>
+          )
+        )}
+        {targetType === 'vip' && (
+          <Select label="حداقل سطح VIP" value={targetVip} onChange={setTargetVip} options={[{ value: '1', label: 'برنزی و بالاتر' }, { value: '2', label: 'نقره‌ای و بالاتر' }, { value: '3', label: 'طلایی' }]} className="mb-3" />
+        )}
+
+        <div className="p-3 rounded-2xl bg-primary-50 dark:bg-primary-900/20 mb-3">
+          <p className="text-sm font-bold text-primary-700 dark:text-primary-400">{loading ? '...' : `${toPersianDigits(recipients.length)} گیرنده`}</p>
+          <p className="text-[11px] text-primary-600 dark:text-primary-500">فقط بیماران فعال با شماره تلفن ثبت‌شده</p>
+        </div>
+
+        {smsTemplates.filter((t) => t.is_active).length > 0 && (
+          <Select
+            label="شروع از یک قالب آماده (اختیاری)"
+            value=""
+            onChange={(v) => { const t = smsTemplates.find((tt) => tt.id === v); if (t) setMessage(t.template) }}
+            options={smsTemplates.filter((t) => t.is_active).map((t) => ({ value: t.id, label: t.name }))}
+            placeholder="انتخاب قالب..."
+            className="mb-3"
+          />
+        )}
+        <Textarea label="متن پیامک" value={message} onChange={setMessage} rows={4} placeholder="متن پیام برای همه‌ی گیرندگان..." />
+
+        {sending ? (
+          <div className="mt-3">
+            <div className="h-2 rounded-full bg-slate-100 dark:bg-slate-700 overflow-hidden">
+              <div className="h-full bg-primary-500 transition-all" style={{ width: `${(progress.sent / Math.max(progress.total, 1)) * 100}%` }} />
+            </div>
+            <p className="text-xs text-slate-500 mt-1.5 text-center">{toPersianDigits(progress.sent)} از {toPersianDigits(progress.total)} ارسال شد...</p>
+          </div>
+        ) : (
+          <Button variant="primary" onClick={handleSend} disabled={loading} className="w-full justify-center mt-3">
+            <Megaphone size={16} className="inline ml-1" /> ارسال کمپین به {toPersianDigits(recipients.length)} نفر
+          </Button>
+        )}
       </Card>
     </div>
   )
