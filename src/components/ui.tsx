@@ -125,7 +125,10 @@ export function Badge({ children, color = 'slate' }: { children: React.ReactNode
 export function EmptyState({ icon, title, description, action }: { icon: React.ReactNode; title: string; description?: string; action?: React.ReactNode }) {
   return (
     <div className="flex flex-col items-center justify-center py-16 text-center">
-      <div className="w-16 h-16 rounded-2xl bg-slate-100 dark:bg-slate-700 flex items-center justify-center text-slate-400 dark:text-slate-500 mb-4">{icon}</div>
+      <div
+        className="w-16 h-16 rounded-2xl flex items-center justify-center mb-4"
+        style={{ background: 'color-mix(in srgb, var(--module-color, #64748b) 14%, white)', color: 'var(--module-color, #64748b)' }}
+      >{icon}</div>
       <p className="text-sm font-medium text-slate-600 dark:text-slate-300 mb-1">{title}</p>
       {description && <p className="text-xs text-slate-400 dark:text-slate-500 mb-4">{description}</p>}
       {action}

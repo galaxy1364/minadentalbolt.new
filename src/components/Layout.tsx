@@ -179,16 +179,20 @@ function MoreDrawer({ open, onClose }: { open: boolean; onClose: () => void }) {
     <div className="fixed inset-0 z-50" onClick={() => { h.cancel(); onClose() }}>
       <div className="absolute inset-0 bg-black/25 backdrop-blur-sm" />
       <div
-        className="absolute bottom-0 left-0 right-0 bg-white dark:bg-slate-800 rounded-t-3xl shadow-ios-xl pb-safe drawer-in flex flex-col"
-        style={{ maxHeight: '90dvh' }}
+        className="absolute bottom-0 left-0 right-0 rounded-t-3xl shadow-ios-xl pb-safe drawer-in flex flex-col overflow-hidden"
+        style={{
+          maxHeight: '90dvh',
+          background: 'linear-gradient(160deg, rgba(139,92,246,0.12), rgba(6,182,212,0.10) 45%, rgba(255,255,255,1) 75%)',
+        }}
         onClick={(e) => e.stopPropagation()}
       >
+        <div className="dark:bg-slate-800/95 absolute inset-0 -z-10 dark:block hidden" />
         <div className="flex justify-center pt-3 pb-2 shrink-0">
           <div className="w-10 h-1 rounded-full bg-slate-200 dark:bg-slate-600" />
         </div>
         <div className="flex items-center justify-between px-5 pb-3 shrink-0">
           <h3 className="text-sm font-bold text-slate-700 dark:text-slate-200">همه ماژول‌ها</h3>
-          <button onClick={() => { h.cancel(); onClose() }} aria-label="بستن" className="p-1.5 rounded-xl bg-slate-100 dark:bg-slate-700 text-slate-500 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-600 transition-all-smooth press-scale">
+          <button onClick={() => { h.cancel(); onClose() }} aria-label="بستن" className="p-1.5 rounded-xl bg-white/70 dark:bg-slate-700 text-slate-500 dark:text-slate-300 hover:bg-white transition-all-smooth press-scale">
             <X size={16} />
           </button>
         </div>

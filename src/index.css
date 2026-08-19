@@ -884,13 +884,14 @@ input, textarea, select { font-size: 16px !important; }
   z-index: 0;
   overflow: hidden;
   pointer-events: none;
-  /* A persistent, subtle tinted wash across the WHOLE background (not
-     just under the two blurred blobs), so no area of the page is ever
-     plain white — the blobs add depth/motion on top of this. */
-  background: linear-gradient(160deg, color-mix(in srgb, var(--module-color, #0d9488) 10%, transparent), transparent 55%);
+  /* A persistent tinted wash across the FULL page height (not fading
+     out partway down) — previously faded to transparent at 55%,
+     leaving everything below the first screenful plain white on any
+     page taller than one viewport, which is most of them. */
+  background: linear-gradient(160deg, color-mix(in srgb, var(--module-color, #0d9488) 11%, transparent), color-mix(in srgb, var(--module-color, #0d9488) 5%, transparent) 50%, color-mix(in srgb, var(--module-color, #0d9488) 9%, transparent));
 }
 .dark .module-page-bg {
-  background: linear-gradient(160deg, color-mix(in srgb, var(--module-color, #0d9488) 16%, transparent), transparent 55%);
+  background: linear-gradient(160deg, color-mix(in srgb, var(--module-color, #0d9488) 18%, transparent), color-mix(in srgb, var(--module-color, #0d9488) 9%, transparent) 50%, color-mix(in srgb, var(--module-color, #0d9488) 15%, transparent));
 }
 .module-page-blob {
   position: absolute;
