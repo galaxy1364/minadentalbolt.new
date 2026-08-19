@@ -10,6 +10,8 @@ import { Modal, Card, Button, Input, Select, Textarea, Badge, Spinner, EmptyStat
 import { PersianDateInput } from '../components/PersianDateInput'
 import { useConfirmAction } from '../components/ConfirmAction'
 import { h } from '../lib/haptics'
+import { db } from '../lib/db'
+import type { AuditLogEntry } from '../lib/db'
 import DentalChart from '../components/DentalChart'
 import { CurrencyInput } from '../components/CurrencyInput'
 
@@ -124,6 +126,7 @@ export default function PatientDetail() {
   const { confirmAction, ConfirmActionModal } = useConfirmAction()
 
   const [patient, setPatient] = useState<Patient | null>(null)
+  const [recordHistory, setRecordHistory] = useState<AuditLogEntry[]>([])
   const [doctors, setDoctors] = useState<Doctor[]>([])
   const [loading, setLoading] = useState(true)
 
@@ -263,6 +266,19 @@ export default function PatientDetail() {
   useEffect(() => {
     loadPatient()
   }, [loadPatient])
+
+  // "چه فیلدی از پرونده توسط کی تغییر کرد" — a real data-integrity/
+  // accountability trail per patient, distinct from the clinical
+  // تایم‌لاین (which shows care events like treatments/payments, not
+  // record edits). Reads the same audit_log every mutation already
+  // writes to (via queueOperation -> logAudit), just filtered to this
+  // one patient's own row.
+  useEffect(() => {
+    if (!id) return
+    db.audit_log.where('table_name').equals('patients').and((e) => e.record_id === id).reverse().sortBy('id').then((entries) => {
+      setRecordHistory(entries.slice(0, 8))
+    }).catch(() => {})
+  }, [id])
 
   useEffect(() => {
     loadTabData()
@@ -743,6 +759,22 @@ export default function PatientDetail() {
           <Card className="p-4 lg:col-span-2">
             <h3 className="text-sm font-bold text-slate-700 mb-2">یادداشت‌ها</h3>
             <p className="text-sm text-slate-600 whitespace-pre-wrap">{patient.notes}</p>
+          </Card>
+        )}
+
+        {/* Record change history — accountability trail (who edited
+            THIS patient's own record, not clinical/care events) */}
+        {recordHistory.length > 0 && (
+          <Card className="p-4 lg:col-span-2">
+            <h3 className="text-sm font-bold text-slate-700 mb-3">آخرین تغییرات پرونده</h3>
+            <div className="space-y-2">
+              {recordHistory.map((entry) => (
+                <div key={entry.id} className="flex items-center justify-between gap-2 text-xs">
+                  <span className="text-slate-600">{entry.summary}</span>
+                  <span className="text-slate-400 shrink-0">{entry.actor_name || 'ناشناس'} — {toJalaliStringPretty(entry.created_at.slice(0, 10))}</span>
+                </div>
+              ))}
+            </div>
           </Card>
         )}
       </div>

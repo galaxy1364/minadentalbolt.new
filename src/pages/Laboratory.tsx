@@ -1,6 +1,7 @@
 // Laboratory.tsx - Persian RTL Dental Clinic Laboratory Management
 import { useState, useEffect, useCallback, useMemo } from 'react'
-import { FlaskConical, Plus, Search, Clock, CheckCircle2, AlertCircle, Edit2, Trash2, Phone, Filter, TrendingUp, Package } from 'lucide-react'
+import { FlaskConical, Plus, Search, Clock, CheckCircle2, AlertCircle, Edit2, Trash2, Phone, Filter, TrendingUp, Package, CalendarClock } from 'lucide-react'
+import { downloadICSReminder } from '../lib/icsReminder'
 import { fetchLabOrders, createLabOrder, updateLabOrder, fetchLabs, createLab, updateLab, deleteLab, fetchPatients, fetchDoctors, fetchTreatments, updateTreatment } from '../lib/api'
 import { toJalaliString, toJalaliStringPretty, formatCurrency, toPersianDigits } from '../lib/persianDate'
 import { h } from '../lib/haptics'
@@ -539,6 +540,19 @@ export default function Laboratory() {
                 {toPersianDigits(Math.abs(daysLeft))} روز تاخیر
               </span>
             )}
+            <button
+              onClick={() => downloadICSReminder({
+                title: `موعد تحویل لابراتوار — ${getPatientName(order.patient_id)}`,
+                description: `${workTypeMeta?.label || order.work_type || 'کار لابراتوار'} — ${getLabName(order.lab_id)}`,
+                dueDate: order.deadline!,
+                filename: `lab-reminder-${order.id}.ics`,
+              })}
+              aria-label="افزودن یادآوری به تقویم گوشی"
+              title="افزودن یادآوری به تقویم گوشی"
+              className="p-1 rounded-lg hover:bg-black/5"
+            >
+              <CalendarClock size={13} />
+            </button>
           </div>
         )}
 

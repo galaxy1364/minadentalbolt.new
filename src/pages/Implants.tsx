@@ -1,7 +1,8 @@
 // Implants.tsx - Persian RTL Dental Clinic Implant Cases Management
 import { useState, useEffect, useCallback, useMemo } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
-import { Smile, Plus, Search, Edit2, Eye, Filter, Package, Calendar, DollarSign, ShieldCheck, AlertTriangle, CheckCircle2, Clock, Activity, Layers, Trash2 } from 'lucide-react'
+import { Smile, Plus, Search, Edit2, Eye, Filter, Package, Calendar, DollarSign, ShieldCheck, AlertTriangle, CheckCircle2, Clock, Activity, Layers, Trash2, CalendarClock } from 'lucide-react'
+import { downloadICSReminder } from '../lib/icsReminder'
 import { fetchImplantCases, createImplantCase, updateImplantCase, deleteImplantCase, createImplantComponent, deleteImplantComponent, fetchPatients, fetchDoctors, createExpense } from '../lib/api'
 import { CLINIC_ID } from '../lib/supabase'
 import { toJalaliString, toJalaliStringPretty, formatCurrency, formatNumber, toPersianDigits } from '../lib/persianDate'
@@ -745,6 +746,21 @@ export default function Implants() {
                     <span className="flex items-center gap-1 text-slate-500">
                       <Calendar size={12} />
                       جراحی: {toJalaliString(c.surgery_date)}
+                      {c.surgery_date >= new Date().toISOString().slice(0, 10) && (
+                        <button
+                          onClick={() => downloadICSReminder({
+                            title: `جراحی ایمپلنت — ${patientName(c)}`,
+                            description: `دندان ${c.tooth_number ? toPersianDigits(c.tooth_number) : '-'}`,
+                            dueDate: c.surgery_date!,
+                            filename: `implant-surgery-reminder-${c.id}.ics`,
+                          })}
+                          aria-label="افزودن یادآوری به تقویم گوشی"
+                          title="افزودن یادآوری به تقویم گوشی"
+                          className="p-0.5 rounded hover:bg-black/5"
+                        >
+                          <CalendarClock size={12} />
+                        </button>
+                      )}
                     </span>
                   )}
                   {c.extraction_needed && <Badge color="slate">کشیدن دندان</Badge>}
