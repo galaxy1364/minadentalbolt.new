@@ -204,9 +204,12 @@ export default function Treatments() {
   const doctorMap = useMemo(() => new Map(doctors.map((d) => [d.id, d])), [doctors])
 
   const patientSearchResults = useMemo(() => {
-    if (!patientSearch.trim()) return patients.slice(0, 6)
+    // Same as Appointments — an archived (inactive) patient shouldn't
+    // be selectable for a NEW visit.
+    const pool = patients.filter((p) => p.is_active)
+    if (!patientSearch.trim()) return pool.slice(0, 6)
     const q = patientSearch.toLowerCase().trim()
-    return patients.filter((p) => {
+    return pool.filter((p) => {
       const name = `${p.first_name} ${p.last_name}`.toLowerCase()
       return name.includes(q) || (p.phone || '').includes(q) || (p.file_number || '').toLowerCase().includes(q)
     }).slice(0, 8)

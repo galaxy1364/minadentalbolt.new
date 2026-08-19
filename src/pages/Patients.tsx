@@ -82,7 +82,10 @@ export default function Patients() {
   const [filterVip, setFilterVip] = useState('')
   const [filterGender, setFilterGender] = useState('')
   const [filterTag, setFilterTag] = useState('')
-  const [filterActive, setFilterActive] = useState('')
+  // Defaults to active-only — an inactive patient genuinely "went to
+  // the archive" and shouldn't reappear mixed into the main list by
+  // default; the وضعیت filter can still opt into seeing them here too.
+  const [filterActive, setFilterActive] = useState('true')
   const [showFilters, setShowFilters] = useState(false)
 
   const [modalOpen, setModalOpen] = useState(false)
