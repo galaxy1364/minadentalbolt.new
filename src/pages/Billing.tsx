@@ -117,6 +117,7 @@ export default function Billing() {
     issue_date: new Date().toISOString().slice(0, 10),
     due_date: new Date().toISOString().slice(0, 10),
     payee_name: '',
+    sayad_id: '',
     notes: '',
     status: 'pending',
   })
@@ -368,7 +369,7 @@ export default function Billing() {
             bank_name: chequeForm.bank_name || null, branch: chequeForm.branch || null,
             cheque_number: chequeForm.cheque_number || null, account_number: chequeForm.account_number || null,
             issue_date: chequeForm.issue_date, due_date: chequeForm.due_date,
-            payee_name: chequeForm.payee_name || null, notes: chequeForm.notes || null,
+            payee_name: chequeForm.payee_name || null, sayad_id: chequeForm.sayad_id || null, notes: chequeForm.notes || null,
             status: chequeForm.status, created_by: null,
           } as any)
           showToast('success', 'چک ثبت شد'); setChequeModalOpen(false); await loadData()
@@ -885,6 +886,7 @@ export default function Billing() {
                         {getPatientName(c.patient_id)} - سررسید: {toJalaliStringPretty(c.due_date)}
                       </p>
                       {c.bank_name && <p className="text-xs text-slate-400">بانک: {c.bank_name} {c.cheque_number && `- شماره: ${toPersianDigits(c.cheque_number)}`}</p>}
+                      {(c as any).sayad_id && <p className="text-[11px] text-slate-400">شناسه صیاد: {toPersianDigits((c as any).sayad_id)}</p>}
                     </div>
                   </div>
                   <div className="flex items-center gap-2">
@@ -1333,6 +1335,7 @@ export default function Billing() {
                 <Input label="شماره چک" value={chequeForm.cheque_number} onChange={(v) => setChequeForm((p) => ({ ...p, cheque_number: v }))} dir="ltr" />
                 <Input label="شماره حساب" value={chequeForm.account_number} onChange={(v) => setChequeForm((p) => ({ ...p, account_number: v }))} dir="ltr" />
               </div>
+              <Input label="شناسه صیاد (اختیاری)" value={chequeForm.sayad_id} onChange={(v) => setChequeForm((p) => ({ ...p, sayad_id: v }))} placeholder="۱۶ رقمی، از روی چک" dir="ltr" />
             </>
           ),
         },

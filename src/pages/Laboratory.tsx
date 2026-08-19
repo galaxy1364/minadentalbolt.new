@@ -1,6 +1,6 @@
 // Laboratory.tsx - Persian RTL Dental Clinic Laboratory Management
 import { useState, useEffect, useCallback, useMemo } from 'react'
-import { FlaskConical, Plus, Search, Clock, CheckCircle2, AlertCircle, Edit2, Trash2, Phone, Filter, TrendingUp, Package, CalendarClock } from 'lucide-react'
+import { FlaskConical, Plus, Search, Clock, CheckCircle2, AlertCircle, Edit2, Trash2, Phone, Filter, TrendingUp, Package, CalendarClock, ChevronLeft } from 'lucide-react'
 import { downloadICSReminder } from '../lib/icsReminder'
 import { fetchLabOrders, createLabOrder, updateLabOrder, fetchLabs, createLab, updateLab, deleteLab, fetchPatients, fetchDoctors, fetchTreatments, updateTreatment } from '../lib/api'
 import { toJalaliString, toJalaliStringPretty, formatCurrency, toPersianDigits } from '../lib/persianDate'
@@ -16,6 +16,20 @@ import { CurrencyInput } from '../components/CurrencyInput'
 // ============================================================================
 // Constants
 // ============================================================================
+
+// Basic foundation for a lab-order pipeline tracker — a defined
+// sequence independent of the coarser `status` field. Not yet a full
+// visual multi-column tracker (that's future-upgrade scope), just a
+// compact progress bar + one-tap advance, so the underlying data
+// model and workflow exist now and can be built on later.
+const LAB_STAGES: { key: string; label: string }[] = [
+  { key: 'scan_impression', label: 'قالب‌گیری/اسکن' },
+  { key: 'sent_to_courier', label: 'ارسال به پیک' },
+  { key: 'cad_cam_design', label: 'طراحی CAD/CAM' },
+  { key: 'firing_layering', label: 'پخت و پرسلن‌گذاری' },
+  { key: 'quality_control', label: 'کنترل کیفی' },
+  { key: 'ready_delivery', label: 'آماده تحویل' },
+]
 
 const labOrderStatuses: { value: string; label: string; color: string }[] = [
   { value: 'ordered', label: 'سفارش داده شده', color: 'slate' },
@@ -381,6 +395,20 @@ export default function Laboratory() {
     })
   }
 
+  // Advances a lab order to the next pipeline stage (basic foundation
+  // for the fuller step-tracker) — no confirm dialog needed since this
+  // is a low-stakes, easily-reversible progress note, not a status
+  // change with real consequences.
+  const advanceStage = async (order: LabOrder) => {
+    const idx = LAB_STAGES.findIndex((s) => s.key === order.stage)
+    if (idx === -1 || idx >= LAB_STAGES.length - 1) return
+    h.select()
+    try {
+      await updateLabOrder(order.id, { stage: LAB_STAGES[idx + 1].key } as any)
+      await loadData()
+    } catch { showToast('error', 'خطا در به‌روزرسانی مرحله') }
+  }
+
   const openEditLab = (lab: Laboratory) => {
     h.tap()
     setEditingLab(lab)
@@ -519,6 +547,27 @@ export default function Laboratory() {
             <span className="font-medium">{getDoctorName(order.doctor_id)}</span>
           </div>
         </div>
+
+        {/* Pipeline stage progress — basic foundation, one tap to
+            advance; only shown for orders still actively in the shop */}
+        {order.status !== 'delivered' && order.status !== 'cancelled' && (
+          <div className="mb-3">
+            <div className="flex items-center gap-1 mb-1.5">
+              {LAB_STAGES.map((s, i) => {
+                const currentIdx = LAB_STAGES.findIndex((x) => x.key === order.stage)
+                return <div key={s.key} className={`flex-1 h-1.5 rounded-full ${i <= currentIdx ? 'bg-primary-500' : 'bg-slate-200 dark:bg-slate-600'}`} />
+              })}
+            </div>
+            <div className="flex items-center justify-between">
+              <span className="text-[11px] text-slate-500">مرحله: {LAB_STAGES.find((s) => s.key === order.stage)?.label || LAB_STAGES[0].label}</span>
+              {order.stage !== 'ready_delivery' && (
+                <button onClick={() => advanceStage(order)} className="text-[11px] text-primary-600 font-bold flex items-center gap-0.5">
+                  گام بعدی <ChevronLeft size={12} />
+                </button>
+              )}
+            </div>
+          </div>
+        )}
 
         {/* Deadline */}
         {order.deadline && order.status !== 'delivered' && order.status !== 'cancelled' && (

@@ -210,6 +210,10 @@ export interface LabOrder {
   material: string | null
   deadline: string | null
   status: string
+  /** Finer-grained pipeline stage than `status` — basic foundation for
+   * a future visual step-by-step tracker (scan -> courier -> CAD/CAM
+   * -> firing -> QC -> ready). Defaults to the first stage. */
+  stage: 'scan_impression' | 'sent_to_courier' | 'cad_cam_design' | 'firing_layering' | 'quality_control' | 'ready_delivery'
   cost: number | null
   received_at: string | null
   notes: string | null
@@ -477,6 +481,10 @@ export interface Cheque {
   issue_date: string
   due_date: string
   payee_name: string | null
+  /** شناسه صیاد (Sayad tracking ID) printed on the physical cheque —
+   * manually entered for now; foundation for real-time bank
+   * verification later. */
+  sayad_id: string | null
   status: string
   notes: string | null
   created_by: string | null

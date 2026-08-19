@@ -31,6 +31,8 @@ import { CLINIC_ID } from '../lib/supabase'
 import { DOCTOR_COLOR_PALETTE } from '../lib/doctorColors'
 import { getErrorLog, clearErrorLog, LoggedError } from '../lib/errorLog'
 import { fetchAuditLog, clearAuditLog } from '../lib/auditLog'
+import { allModules } from '../theme/modules'
+import { canAccess, ROLES } from '../lib/permissions'
 import { listBackupSnapshots, restoreFromSnapshot } from '../lib/autoBackup'
 import { checkForUpdate, applyUpdate } from '../lib/updateCheck'
 import { APP_VERSION, BUILD_DATE } from '../lib/appVersion'
@@ -479,6 +481,7 @@ export default function Settings() {
           { key: 'categories', label: 'دسته‌بندی انبار', icon: <Tag size={16} /> },
           { key: 'errors', label: 'گزارش خطاها', icon: <AlertTriangle size={16} /> },
           { key: 'audit', label: 'گزارش فعالیت‌ها', icon: <History size={16} /> },
+          { key: 'rbac', label: 'دسترسی نقش‌ها', icon: <Shield size={16} /> },
           { key: 'failed_sync', label: 'همگام‌سازی ناموفق', icon: <CloudOff size={16} /> },
           { key: 'updates', label: 'به‌روزرسانی', icon: <Sparkles size={16} /> },
         ]}
@@ -614,6 +617,7 @@ export default function Settings() {
 
       {/* Audit Log Tab */}
       {activeTab === 'audit' && <AuditLogTab />}
+      {activeTab === 'rbac' && <RbacMatrixTab />}
 
       {/* Failed Sync Tab */}
       {activeTab === 'failed_sync' && <FailedSyncTab />}
@@ -987,6 +991,59 @@ const AUDIT_CATEGORIES: { key: string; label: string; tables: string[] }[] = [
   { key: 'rbac', label: 'RBAC و امنیت', tables: ['users', 'staff'] },
   { key: 'system', label: 'سیستم', tables: [] }, // fallback for anything not in the above
 ]
+
+// ============================================================================
+// RBAC Matrix Tab — read-only display of which modules each role can
+// access, sourced from the same permissions.ts config the app actually
+// enforces (not a separate/fake list). Basic foundation for a future
+// per-role, per-module toggle EDITOR with custom roles — that's a
+// bigger architecture change (storing custom roles + permission sets
+// in the database) intentionally not attempted here.
+// ============================================================================
+
+function RbacMatrixTab() {
+  const [activeRole, setActiveRole] = useState<string>('owner')
+  const roleModuleAccess = allModules.filter((m) => canAccess(activeRole, m.path))
+
+  return (
+    <div className="space-y-4">
+      <Card className="p-5">
+        <h2 className="text-base font-bold text-slate-800 dark:text-slate-100 flex items-center gap-2 mb-1">
+          <Shield size={18} className="text-primary-600" /> دسترسی نقش‌ها (RBAC)
+        </h2>
+        <p className="text-xs text-slate-500 dark:text-slate-400 mb-4">
+          نمایش دسترسی هر نقش به ماژول‌های سیستم — همان تنظیماتی که واقعاً اعمال می‌شود. تعریف نقش سفارشی و تغییر دسترسی هر ماژول به‌صورت جداگانه، قابلیت آینده است.
+        </p>
+        <div className="flex items-center gap-1.5 flex-wrap mb-4">
+          {Object.entries(ROLES).map(([key, label]) => (
+            <button
+              key={key}
+              onClick={() => setActiveRole(key)}
+              className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all-smooth ${activeRole === key ? 'bg-primary-600 text-white' : 'bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300'}`}
+            >
+              {label} <span className="opacity-70">({toPersianDigits(allModules.filter((m) => canAccess(key, m.path)).length)} ماژول)</span>
+            </button>
+          ))}
+        </div>
+        <div className="p-3 rounded-2xl bg-primary-50 dark:bg-primary-900/20 mb-3">
+          <p className="text-sm font-bold text-primary-700 dark:text-primary-400">نقش انتخابی: {ROLES[activeRole as keyof typeof ROLES]}</p>
+          <p className="text-xs text-primary-600 dark:text-primary-500">دسترسی به {toPersianDigits(roleModuleAccess.length)} ماژول از {toPersianDigits(allModules.length)} ماژول</p>
+        </div>
+        <div className="grid grid-cols-2 gap-2">
+          {allModules.map((m) => {
+            const allowed = canAccess(activeRole, m.path)
+            return (
+              <div key={m.path} className={`flex items-center gap-2 p-2.5 rounded-xl ${allowed ? 'bg-success-50 dark:bg-success-900/20' : 'bg-slate-50 dark:bg-slate-800/60'}`}>
+                {allowed ? <CheckCircle2 size={14} className="text-success-600 shrink-0" /> : <div className="w-3.5 h-3.5 rounded-full border border-slate-300 shrink-0" />}
+                <span className={`text-xs font-medium ${allowed ? 'text-success-700 dark:text-success-400' : 'text-slate-400'}`}>{m.label}</span>
+              </div>
+            )
+          })}
+        </div>
+      </Card>
+    </div>
+  )
+}
 
 function AuditLogTab() {
   const [entries, setEntries] = useState<AuditLogEntry[]>([])
