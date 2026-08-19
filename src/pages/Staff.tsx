@@ -2,7 +2,7 @@
 import { useState, useEffect, useCallback, useMemo } from 'react'
 import { Users, Search, Plus, Phone, Mail, Calendar, DollarSign, Smile, Briefcase, Edit2, Trash2, Stethoscope, Calculator, Award, TrendingUp, Percent, UserCheck, ChevronDown, ChevronUp, Shield } from 'lucide-react'
 import { PieChart, Pie, Cell, Tooltip as RTooltip, ResponsiveContainer } from 'recharts'
-import { fetchStaff, createStaff, updateStaff, deleteStaff, fetchEncounters, fetchLabOrders, fetchTreatments, createExpense } from '../lib/api'
+import { fetchStaff, createStaff, updateStaff, deleteStaff, fetchEncounters, fetchLabOrders, fetchTreatments, createExpense, fetchDoctors } from '../lib/api'
 import { CLINIC_ID, supabase } from '../lib/supabase'
 import { toJalaliString, toJalaliStringPretty, formatCurrency, formatNumber, toPersianDigits } from '../lib/persianDate'
 import type { Staff as StaffType, StaffInput, EncounterWithRelations, LabOrderWithRelations, Treatment } from '../types'
@@ -345,11 +345,12 @@ export default function Staff() {
       onConfirm: async () => {
         setSaving(true)
         try {
+          let savedStaff
           if (editingId) {
-            await updateStaff(editingId, payload)
+            savedStaff = await updateStaff(editingId, payload)
             showToast('success', 'پرسنل با موفقیت ویرایش شد')
           } else {
-            await createStaff(payload)
+            savedStaff = await createStaff(payload)
             showToast('success', 'پرسنل با موفقیت اضافه شد')
           }
 
@@ -360,6 +361,16 @@ export default function Staff() {
               showToast('error', 'رمز عبور موقت باید حداقل ۶ کاراکتر باشد')
             } else {
               try {
+                // If this staff member is a doctor, syncDoctorRecordForStaff
+                // (in createStaff/updateStaff) already created/updated their
+                // linked doctors row — look it up so the login account can
+                // be tied to it too, closing the loop that let a logged-in
+                // doctor be identified as a specific doctors row at all.
+                let linkedDoctorId: string | null = null
+                if (payload.is_doctor) {
+                  const allDoctors = await fetchDoctors()
+                  linkedDoctorId = allDoctors.find((d) => d.staff_id === savedStaff.id)?.id || null
+                }
                 const { data: inviteData, error: inviteError } = await supabase.functions.invoke('invite-staff', {
                   body: {
                     email: formData.email || null,
@@ -368,6 +379,7 @@ export default function Staff() {
                     full_name: formData.full_name.trim(),
                     access_role: formData.access_role,
                     clinic_id: CLINIC_ID,
+                    doctor_id: linkedDoctorId,
                   },
                 })
                 if (inviteError) {

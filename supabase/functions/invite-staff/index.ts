@@ -14,6 +14,7 @@ interface InviteRequest {
   full_name: string;
   access_role: string;
   clinic_id: string;
+  doctor_id?: string | null;
 }
 
 const VALID_ROLES = ['owner', 'doctor', 'receptionist', 'assistant', 'lab', 'accountant'];
@@ -24,9 +25,6 @@ Deno.serve(async (req) => {
   }
 
   try {
-    // Only an already-authenticated caller may invite staff. We verify their
-    // token, then check their own `users` row says role = 'owner' before
-    // doing anything with the service-role client below.
     const authHeader = req.headers.get('Authorization') || '';
     const callerClient = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
@@ -75,10 +73,10 @@ Deno.serve(async (req) => {
       clinic_id: body.clinic_id || callerRow.clinic_id,
       full_name: body.full_name,
       role: body.access_role,
+      doctor_id: body.access_role === 'doctor' ? (body.doctor_id || null) : null,
       is_active: true,
     });
     if (rowErr) {
-      // Roll back the auth user so we don't leave an orphaned login with no role row
       await admin.auth.admin.deleteUser(created.user.id);
       return new Response(JSON.stringify({ error: rowErr.message }), { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
     }

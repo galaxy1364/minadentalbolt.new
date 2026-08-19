@@ -32,6 +32,7 @@ import { findBirthdays, findDebtors, findLapsedPatients, findDueInstallments, fi
 import { calcAllPatientBalances } from '../lib/finance'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../lib/auth'
+import DoctorDashboard from './DoctorDashboard'
 import { ErrorBoundary } from '../components/ErrorBoundary'
 import { h } from '../lib/haptics'
 import { usePullToRefresh } from '../lib/usePullToRefresh'
@@ -458,6 +459,16 @@ export default function Dashboard() {
   // 'owner' is the default while login is disabled / no role is set yet,
   // so the dashboard behaves exactly as before until roles are assigned.
   const role = profile?.role || 'owner'
+
+  // "برنامه مخصوص پزشک" — a doctor with a linked doctor_id sees their
+  // own focused view (their schedule/patients/earnings) instead of the
+  // clinic-wide admin dashboard below. Falls through to the normal
+  // dashboard if a doctor account hasn't been linked to a doctors row
+  // yet, rather than showing a broken/empty view.
+  if (role === 'doctor' && profile?.doctor_id) {
+    return <DoctorDashboard doctorId={profile.doctor_id} doctorName={profile.full_name || 'پزشک'} />
+  }
+
   const roleGreeting: Record<string, string> = {
     owner: 'داشبورد مدیریت',
     doctor: 'داشبورد پزشک',

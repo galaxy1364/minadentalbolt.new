@@ -8,6 +8,7 @@ export interface StaffProfile {
   clinic_id: string
   full_name: string | null
   role: string | null
+  doctor_id: string | null
 }
 
 interface AuthState {
@@ -27,7 +28,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true)
 
   async function loadProfile(userId: string) {
-    const { data, error } = await supabase.from('users').select('id, clinic_id, full_name, role').eq('id', userId).maybeSingle()
+    const { data, error } = await supabase.from('users').select('id, clinic_id, full_name, role, doctor_id').eq('id', userId).maybeSingle()
     if (!error && data) {
       setProfile(data as StaffProfile)
       currentActor.name = (data as StaffProfile).full_name
