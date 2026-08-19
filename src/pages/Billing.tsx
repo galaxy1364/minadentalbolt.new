@@ -96,7 +96,7 @@ export default function Billing() {
     encounter_id: '',
     amount: '',
     discountPercent: '',
-    payment_method: 'cash',
+    payment_method: '',
     reference: '',
     notes: '',
     status: 'completed',
@@ -313,10 +313,15 @@ export default function Billing() {
   const handleSavePayment = () => {
     if (!paymentForm.patient_id) { showToast('error', 'انتخاب بیمار الزامی است'); return }
     if (!paymentForm.amount || Number(paymentForm.amount) <= 0) { showToast('error', 'مبلغ را وارد کنید'); return }
+    if (!paymentForm.payment_method) { showToast('error', 'انتخاب روش پرداخت الزامی است'); return }
     const patient = patientMap.get(paymentForm.patient_id)
+    const fin = patientBalancesMap.get(paymentForm.patient_id)
     confirmAction({
       type: 'create',
       title: 'ثبت پرداخت',
+      warning: fin && fin.balance <= 0
+        ? '⚠ این بیمار از قبل تسویه‌حساب کامل دارد — مطمئن شوید این پرداخت تکراری نیست'
+        : undefined,
       fields: [
         { label: 'بیمار', value: patient ? `${patient.first_name} ${patient.last_name}` : '-', highlight: true },
         { label: 'مبلغ', value: `${formatCurrency(Number(paymentForm.amount))} ت` },
@@ -1240,6 +1245,12 @@ export default function Billing() {
                         پر کردن مبلغ با کل بدهی
                       </button>
                     )}
+                    {fin.balance <= 0 && (
+                      <div className="flex items-center gap-1.5 mt-1 text-[11px] text-warning-700 bg-warning-50 px-2 py-1.5 rounded-lg">
+                        <AlertCircle size={12} className="shrink-0" />
+                        این بیمار تسویه‌حساب کامل دارد — قبل از ثبت پرداخت جدید مطمئن شوید که این پرداخت تکراری نیست.
+                      </div>
+                    )}
                   </div>
                 )
               })()}
@@ -1266,10 +1277,11 @@ export default function Billing() {
         },
         {
           label: 'روش و تاریخ',
+          validate: () => (!paymentForm.payment_method ? 'انتخاب روش پرداخت الزامی است' : null),
           content: (
             <>
               <div className="grid grid-cols-2 gap-3">
-                <Select label="روش پرداخت" value={paymentForm.payment_method} onChange={(v) => setPaymentForm((p) => ({ ...p, payment_method: v }))} options={paymentMethods.map((m) => ({ value: m.value, label: m.label }))} />
+                <Select label="روش پرداخت *" value={paymentForm.payment_method} onChange={(v) => setPaymentForm((p) => ({ ...p, payment_method: v }))} options={paymentMethods.map((m) => ({ value: m.value, label: m.label }))} placeholder="انتخاب روش پرداخت..." />
                 <Select label="وضعیت" value={paymentForm.status} onChange={(v) => setPaymentForm((p) => ({ ...p, status: v }))} options={paymentStatuses.map((s) => ({ value: s.value, label: s.label }))} />
               </div>
               <PersianDateInput label="تاریخ پرداخت" value={paymentForm.payment_date} onChange={(v) => setPaymentForm((p) => ({ ...p, payment_date: v }))} />
