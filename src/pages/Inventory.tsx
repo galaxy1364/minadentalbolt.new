@@ -1,7 +1,8 @@
 // Inventory.tsx - Persian RTL Dental Clinic Inventory Management
 import { useState, useEffect, useCallback, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Package, Boxes, Search, Plus, Edit2, Trash2, AlertTriangle, TrendingDown, PackageCheck, Smile } from 'lucide-react'
+import { Package, Boxes, Search, Plus, Edit2, Trash2, AlertTriangle, TrendingDown, PackageCheck, Smile, ScanLine } from 'lucide-react'
+import { BarcodeScanner } from '../components/BarcodeScanner'
 import { BarChart, Bar, XAxis, YAxis, Tooltip as RTooltip, ResponsiveContainer, Cell } from 'recharts'
 import { fetchInventoryItems, fetchInventoryCategories, createInventoryItem, updateInventoryItem, deleteInventoryItem } from '../lib/api'
 import { toJalaliString, toJalaliStringPretty, formatCurrency, formatNumber, toPersianDigits } from '../lib/persianDate'
@@ -79,7 +80,10 @@ export default function Inventory() {
     supplier: '',
     location: '',
     notes: '',
+    barcode: '',
   })
+  const [scannerOpen, setScannerOpen] = useState(false)
+  const [scanMode, setScanMode] = useState<'quick' | 'form'>('quick')
 
   // ===========================================================================
   // Data Fetching
@@ -171,7 +175,7 @@ export default function Inventory() {
     setInvWizardStep(0)
     setFormData({
       name: '', brand: '', category_id: '', unit: 'piece',
-      quantity: '', min_quantity: '', unit_cost: '', supplier: '', location: '', notes: '',
+      quantity: '', min_quantity: '', unit_cost: '', supplier: '', location: '', notes: '', barcode: '',
     })
     setModalOpen(true)
   }
@@ -190,6 +194,7 @@ export default function Inventory() {
       supplier: item.supplier || '',
       location: item.location || '',
       notes: item.notes || '',
+      barcode: item.barcode || '',
     })
     setInvWizardStep(0)
     setModalOpen(true)
@@ -204,7 +209,7 @@ export default function Inventory() {
       min_quantity: formData.min_quantity ? Number(formData.min_quantity) : 0,
       unit_cost: formData.unit_cost ? Number(formData.unit_cost) : null,
       supplier: formData.supplier || null, location: formData.location || null,
-      notes: formData.notes || null, is_active: true,
+      notes: formData.notes || null, is_active: true, barcode: formData.barcode || null,
     } as any
     confirmAction({
       type: editingItem ? 'edit' : 'create',
@@ -226,6 +231,44 @@ export default function Inventory() {
         finally { setSaving(false) }
       },
     })
+  }
+
+  // Scan-to-find-or-create: if a matching barcode already exists, offer
+  // a one-tap quantity increment (the real workflow when receiving a
+  // fresh delivery of something already stocked); otherwise open the
+  // create form with the scanned code pre-filled so nothing needs
+  // retyping.
+  const handleBarcodeScanned = (code: string) => {
+    setScannerOpen(false)
+    if (scanMode === 'form') {
+      setFormData((p) => ({ ...p, barcode: code }))
+      showToast('success', 'بارکد ثبت شد')
+      return
+    }
+    const existing = items.find((i) => i.barcode === code)
+    if (existing) {
+      confirmAction({
+        type: 'status',
+        title: 'اقلام موجود پیدا شد',
+        fields: [
+          { label: 'نام', value: existing.name, highlight: true },
+          { label: 'موجودی فعلی', value: toPersianDigits(existing.quantity || 0) },
+        ],
+        confirmLabel: 'افزودن ۱ عدد به موجودی',
+        onConfirm: async () => {
+          try {
+            await updateInventoryItem(existing.id, { quantity: (existing.quantity || 0) + 1 } as any)
+            showToast('success', 'موجودی افزایش یافت')
+            await loadData()
+          } catch { showToast('error', 'خطا در به‌روزرسانی') }
+        },
+      })
+    } else {
+      setEditingItem(null)
+      setFormData({ name: '', brand: '', category_id: '', unit: 'piece', quantity: '1', min_quantity: '', unit_cost: '', supplier: '', location: '', notes: '', barcode: code })
+      showToast('success', 'بارکد جدید — اطلاعات اقلام را کامل کنید')
+      setModalOpen(true)
+    }
   }
 
   const handleDelete = (item: InventoryItemWithRelations) => {
@@ -264,7 +307,12 @@ export default function Inventory() {
         moduleKey="inventory"
         title="انبار"
         subtitle="مدیریت اقلام و مواد مصرفی"
-        action={<Button onClick={openCreateModal} variant="primary"><Plus size={16} className="inline ml-1" /> اقلام جدید</Button>}
+        action={
+          <div className="flex items-center gap-2">
+            <Button onClick={() => { h.tap(); setScanMode('quick'); setScannerOpen(true) }} variant="secondary"><ScanLine size={16} className="inline ml-1" /> اسکن بارکد</Button>
+            <Button onClick={openCreateModal} variant="primary"><Plus size={16} className="inline ml-1" /> اقلام جدید</Button>
+          </div>
+        }
       />
 
       {/* Stats Cards */}
@@ -452,6 +500,10 @@ export default function Inventory() {
               <>
                 <Input label="نام اقلام *" value={formData.name} onChange={(v) => setFormData({ ...formData, name: v })} placeholder="مثلا: دستکش نایلکس" />
                 <Input label="برند" value={formData.brand} onChange={(v) => setFormData({ ...formData, brand: v })} placeholder="برند سازنده" />
+                <div className="flex items-end gap-2">
+                  <Input label="بارکد" value={formData.barcode} onChange={(v) => setFormData({ ...formData, barcode: v })} placeholder="اسکن یا دستی وارد کنید" dir="ltr" className="flex-1" />
+                  <Button variant="secondary" onClick={() => { h.tap(); setScanMode('form'); setScannerOpen(true) }} className="shrink-0"><ScanLine size={16} /></Button>
+                </div>
                 <Select label="دسته‌بندی" value={formData.category_id} onChange={(v) => setFormData({ ...formData, category_id: v })} options={categoryOptions} placeholder="بدون دسته" />
               </>
             ),
@@ -483,6 +535,7 @@ export default function Inventory() {
       />
 
       {ConfirmActionModal}
+      {scannerOpen && <BarcodeScanner onScan={handleBarcodeScanned} onClose={() => setScannerOpen(false)} />}
     </div>
   )
 }

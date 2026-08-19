@@ -144,6 +144,10 @@ class MinadentDB extends Dexie {
     this.version(5).stores({
       cash_register_sessions: 'id, clinic_id, status, opened_at',
     })
+    // v6: barcode index on inventory_items for scan-to-find lookups.
+    this.version(6).stores({
+      inventory_items: 'id, clinic_id, category_id, name, brand, quantity, min_quantity, barcode',
+    })
   }
 }
 

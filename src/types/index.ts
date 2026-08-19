@@ -413,6 +413,10 @@ export interface InventoryItem {
   expiry_date: string | null
   location: string | null
   notes: string | null
+  /** Scanned/entered via camera barcode reader — powers scan-to-find
+   * (increment stock on an existing item) and scan-to-create
+   * (pre-fill a new item's barcode) in the Inventory module. */
+  barcode: string | null
   is_active: boolean
   created_at: string
   updated_at: string
