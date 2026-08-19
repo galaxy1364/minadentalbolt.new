@@ -99,7 +99,11 @@ export default function Settings() {
   const [editingDoctor, setEditingDoctor] = useState<Doctor | null>(null)
   const [doctorSchedule, setDoctorSchedule] = useState<DoctorSchedule[]>([])
   const [savingSchedule, setSavingSchedule] = useState(false)
-  const weekdays = ['یکشنبه', 'دوشنبه', 'سه‌شنبه', 'چهارشنبه', 'پنجشنبه', 'جمعه', 'شنبه']
+  // Saturday-first, matching persianDate.ts's jsDateToPersianWeekday
+  // convention (0=Saturday...6=Friday) — this array's index IS the
+  // day_of_week value stored on doctor_schedules, so this order isn't
+  // just cosmetic, it's the actual encoding.
+  const weekdays = ['شنبه', 'یکشنبه', 'دوشنبه', 'سه‌شنبه', 'چهارشنبه', 'پنجشنبه', 'جمعه']
   const [doctorForm, setDoctorForm] = useState({ name: '', specialty: '', license_number: '', is_active: 'true', color: DOCTOR_COLOR_PALETTE[0] })
   const [savingDoctor, setSavingDoctor] = useState(false)
 

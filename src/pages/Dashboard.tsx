@@ -21,7 +21,7 @@ import {
 } from '../lib/api'
 import {
   toJalaliStringPretty, getJalaliMonthYear, formatCurrency, formatNumber,
-  toPersianDigits, persianMonths, formatTime,
+  toPersianDigits, persianMonths, formatTime, jsDateToPersianWeekday,
 } from '../lib/persianDate'
 import type {
   AppointmentWithRelations, Patient, Payment, DashboardStats, Doctor, LabOrder,
@@ -114,7 +114,7 @@ function getDateRange(range: TimeRange): { start: Date; end: Date; prevStart: Da
       start = new Date(now.getFullYear(), now.getMonth(), now.getDate())
       break
     case 'week': {
-      const day = now.getDay()
+      const day = jsDateToPersianWeekday(now)
       start = new Date(now.getFullYear(), now.getMonth(), now.getDate() - day)
       break
     }

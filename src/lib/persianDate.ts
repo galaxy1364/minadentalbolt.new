@@ -9,7 +9,20 @@ export const persianWeekdays = [
   'یکشنبه', 'دوشنبه', 'سه‌شنبه', 'چهارشنبه', 'پنجشنبه', 'جمعه', 'شنبه',
 ]
 
-export const persianWeekdaysShort = ['ی', 'د', 'س', 'چ', 'پ', 'ج', 'ش']
+// Iranian week starts on شنبه (Saturday) and ends on جمعه (Friday) — in
+// an RTL grid, array index 0 renders in the RIGHTMOST column, so شنبه
+// must be first here for Friday to correctly land in the last (left)
+// column, matching every real Iranian calendar.
+export const persianWeekdaysShort = ['ش', 'ی', 'د', 'س', 'چ', 'پ', 'ج']
+
+// Converts a JS Date's native getDay() (0=Sunday...6=Saturday) to the
+// Saturday-first index (0=Saturday...6=Friday) used everywhere in this
+// app for weekday-column math and persianWeekdaysShort lookups —
+// centralizing this in one place instead of each caller doing its own
+// (previously inconsistent, sometimes wrong) getDay() math directly.
+export function jsDateToPersianWeekday(date: Date): number {
+  return (date.getDay() + 1) % 7
+}
 
 function toJalali(gy: number, gm: number, gd: number): [number, number, number] {
   const g_d_m = [0, 31, 59, 90, 120, 151, 181, 212, 243, 273, 304, 334]
@@ -86,7 +99,7 @@ export function getJalaliDateInfo(dateStr: string): { year: number; month: numbe
   const d = new Date(dateStr)
   if (isNaN(d.getTime())) return getJalaliDateInfo(new Date().toISOString().slice(0, 10))
   const [jy, jm, jd] = toJalali(d.getFullYear(), d.getMonth() + 1, d.getDate())
-  return { year: jy, month: jm, day: jd, weekday: d.getDay(), monthName: persianMonths[jm - 1] }
+  return { year: jy, month: jm, day: jd, weekday: jsDateToPersianWeekday(d), monthName: persianMonths[jm - 1] }
 }
 
 // ── Jalali leap year calculation ──────────────────────────
@@ -99,7 +112,7 @@ export function isJalaliLeapYear(jy: number): boolean {
 export function getJalaliMonthGrid(year: number, month: number): (number | null)[][] {
   const [gy, gm, gd] = toGregorian(year, month, 1)
   const firstDay = new Date(gy, gm - 1, gd)
-  const startWeekday = firstDay.getDay()
+  const startWeekday = jsDateToPersianWeekday(firstDay)
   const daysInMonth = month <= 6 ? 31 : month <= 11 ? 30 : (isJalaliLeapYear(year) ? 30 : 29)
   const grid: (number | null)[][] = []
   let currentDay = 1

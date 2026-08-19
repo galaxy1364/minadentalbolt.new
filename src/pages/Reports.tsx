@@ -5,7 +5,7 @@ import { TrendingUp, Users, Activity, Calendar, DollarSign, BarChart3, PieChart 
 import { AreaChart, Area, BarChart, Bar, LineChart, Line, PieChart, Pie, Cell, XAxis, YAxis, Tooltip as RTooltip, ResponsiveContainer, Legend } from 'recharts'
 import { fetchPayments, fetchPatients, fetchEncounters, fetchTreatments, fetchProcedures, fetchAppointments, fetchExpenses, fetchImplantCases } from '../lib/api'
 import { calcAllPatientBalances } from '../lib/finance'
-import { toJalaliString, toJalaliStringPretty, getJalaliMonthYear, formatCurrency, formatNumber, toPersianDigits, persianMonths } from '../lib/persianDate'
+import { toJalaliString, toJalaliStringPretty, getJalaliMonthYear, formatCurrency, formatNumber, toPersianDigits, persianMonths, jsDateToPersianWeekday } from '../lib/persianDate'
 import { h } from '../lib/haptics'
 import { Payment, Patient, Encounter, Treatment, Procedure, Appointment, Expense } from '../types'
 import { Card, Button, Badge, Spinner, EmptyState, Tabs, showToast } from '../components/ui'
@@ -238,11 +238,8 @@ export default function Reports() {
 
   const weeklyAppointmentData = useMemo(() => {
     const now = new Date()
-    // Persian week starts on Saturday (day 6 in JS getDay())
-    const jsDay = now.getDay()
-    const saturdayOffset = jsDay === 6 ? 0 : jsDay + 1 // Sat=0, Sun=1, Mon=2, ...
     const weekStart = new Date(now)
-    weekStart.setDate(now.getDate() - saturdayOffset)
+    weekStart.setDate(now.getDate() - jsDateToPersianWeekday(now))
     const days: { day: string; count: number }[] = []
     const weekdayShort = ['شن', 'یک', 'دو', 'سه', 'چه', 'پن', 'جم']
     for (let i = 0; i < 7; i++) {

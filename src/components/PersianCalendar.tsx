@@ -90,7 +90,7 @@ export function PersianCalendar({ selectedDate, onDateSelect, appointments = [],
           const isSelected = gregDate === selectedDate
           const hasAppt = apptDates.has(gregDate)
           const isHighlighted = highlightSet.has(gregDate)
-          const isFriday = i % 7 === 5
+          const isFriday = i % 7 === 6
 
           return (
             <button

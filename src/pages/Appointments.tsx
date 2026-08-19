@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Calendar, Clock, CheckCircle2, User, ChevronRight, ChevronLeft, Plus, Search, Trash2, AlertCircle, Edit2, Stethoscope, DollarSign, FileText, Activity, List, Grid, X, UserPlus } from 'lucide-react'
 import { fetchAppointments, createAppointment, updateAppointment, deleteAppointment, checkConflict, fetchPatients, fetchDoctors, fetchUnits, peekNextFileNumber, createPatient, createEncounter, fetchDoctorSchedules } from '../lib/api'
-import { toJalaliString, toJalaliStringPretty, getJalaliDateInfo, formatTime, formatCurrency, toPersianDigits, persianWeekdaysShort, getHoliday } from '../lib/persianDate'
+import { toJalaliString, toJalaliStringPretty, getJalaliDateInfo, formatTime, formatCurrency, toPersianDigits, persianWeekdaysShort, getHoliday, jsDateToPersianWeekday } from '../lib/persianDate'
 import { doctorColor } from '../lib/doctorColors'
 import { Appointment, AppointmentWithRelations, Patient, Doctor, Unit } from '../types'
 import { Modal, Card, Button, Input, Select, Textarea, EmptyState, showToast } from '../components/ui'
@@ -224,7 +224,7 @@ export default function Appointments() {
       const allSchedules = await fetchDoctorSchedules()
       const docSchedules = allSchedules.filter((s) => s.doctor_id === wizardData.doctor_id)
       if (docSchedules.length > 0) {
-        const weekday = new Date(wizardData.date).getDay()
+        const weekday = jsDateToPersianWeekday(new Date(wizardData.date))
         const daySched = docSchedules.find((s) => s.day_of_week === weekday)
         if (!daySched) {
           scheduleWarning = 'طبق برنامه‌ی کاری ثبت‌شده، این پزشک در این روز از هفته حضور ندارد'
@@ -776,7 +776,7 @@ export default function Appointments() {
                   <Calendar size={20} className="text-primary-600 flex-shrink-0" />
                   <div>
                     <p className="text-sm font-bold text-slate-800">{toJalaliStringPretty(wizardData.date)}</p>
-                    <p className="text-xs text-slate-500">{persianWeekdaysShort[new Date(wizardData.date).getDay()]}{wizardData.start_time ? ` - ساعت ${toPersianDigits(wizardData.start_time)}` : ''}</p>
+                    <p className="text-xs text-slate-500">{persianWeekdaysShort[jsDateToPersianWeekday(new Date(wizardData.date))]}{wizardData.start_time ? ` - ساعت ${toPersianDigits(wizardData.start_time)}` : ''}</p>
                   </div>
                 </div>
                 {/* Recurring appointment (for multi-session treatments) */}
