@@ -13,6 +13,7 @@ import { useAuth } from '../lib/auth'
 import { canAccess, REQUIRE_LOGIN } from '../lib/permissions'
 import { isAppLockEnabled } from '../lib/appLock'
 import { AppLockScreen } from './AppLockScreen'
+import { ModuleIconBadge } from './ModuleIconBadge'
 import { checkForUpdate, applyUpdate } from '../lib/updateCheck'
 import {
   primaryModules, secondaryModules, allModules,
@@ -210,17 +211,10 @@ function MoreDrawer({ open, onClose }: { open: boolean; onClose: () => void }) {
                   active ? 'text-slate-700 dark:text-slate-200' : 'text-slate-500 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-700/50'
                 }`}
               >
-                <div
-                  className="w-11 h-11 rounded-2xl flex items-center justify-center"
-                  style={{
-                    background: active
-                      ? `linear-gradient(135deg, ${item.gradient[0]}, ${item.gradient[1]})`
-                      : `${item.colorLight}`,
-                    color: active ? '#fff' : item.color,
-                    boxShadow: active ? `0 4px 14px ${item.color}40` : 'none',
-                  }}
-                >
-                  <Icon size={22} />
+                <div className="rounded-[30%]" style={active ? { boxShadow: `0 0 0 2.5px ${item.color}` } : undefined}>
+                  <ModuleIconBadge color={item.color} gradient={item.gradient} size={44} rounded="30%">
+                    <Icon size={22} />
+                  </ModuleIconBadge>
                 </div>
                 <span className="text-[11px] font-medium text-center leading-tight">{item.label}</span>
               </button>

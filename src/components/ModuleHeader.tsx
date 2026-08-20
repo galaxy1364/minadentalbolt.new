@@ -3,6 +3,7 @@ import type { ReactNode } from 'react'
 import { ChevronLeft, Settings2 } from 'lucide-react'
 import { modules } from '../theme/modules'
 import { h } from '../lib/haptics'
+import { ModuleIconBadge } from './ModuleIconBadge'
 
 export function ModuleHeader({ moduleKey, title, subtitle, action }: {
   moduleKey: keyof typeof modules
@@ -23,12 +24,9 @@ export function ModuleHeader({ moduleKey, title, subtitle, action }: {
         style={{ background: `radial-gradient(circle, ${mod.color}66, transparent 70%)` }}
       />
       <div className="relative flex items-center gap-3">
-        <div
-          className="w-12 h-12 rounded-2xl flex items-center justify-center shrink-0 text-white"
-          style={{ background: `linear-gradient(135deg, ${mod.gradient[0]}, ${mod.gradient[1]})` }}
-        >
+        <ModuleIconBadge color={mod.color} gradient={mod.gradient} size={48} rounded="26%">
           <Icon size={26} strokeWidth={2} />
-        </div>
+        </ModuleIconBadge>
         <div>
           <h1 className="text-lg font-extrabold text-slate-800 dark:text-slate-100 leading-tight">{title}</h1>
           {subtitle && <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">{subtitle}</p>}
@@ -57,12 +55,9 @@ export function ModuleStatCard({ moduleKey, icon, label, value }: {
         style={{ background: `radial-gradient(circle, ${mod.color}55, transparent 70%)` }}
       />
       <div className="relative flex items-center gap-2.5">
-        <div
-          className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0"
-          style={{ background: `linear-gradient(135deg, ${mod.gradient[0]}, ${mod.gradient[1]})`, color: '#fff' }}
-        >
+        <ModuleIconBadge color={mod.color} gradient={mod.gradient} size={40} rounded="28%">
           {icon}
-        </div>
+        </ModuleIconBadge>
         <div className="min-w-0">
           <p className="text-[11px] text-slate-500 dark:text-slate-400 truncate">{label}</p>
           <p className="text-base font-extrabold text-slate-800 dark:text-slate-100 truncate">{value}</p>
