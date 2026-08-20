@@ -1,14 +1,18 @@
+import type { ComponentType } from 'react'
 import {
   Gauge, UserRound, CalendarClock, Stethoscope, Wallet, Microscope,
   Bone, ShieldCheck, Boxes, Pill, ScanLine, IdCard,
   PieChart, Hourglass, SlidersHorizontal, Archive, CalendarDays, PiggyBank, MessageSquareText, BellRing,
 } from 'lucide-react'
-import type { LucideIcon } from 'lucide-react'
+import { GlyphAppointments, GlyphPatients, GlyphTreatments, GlyphBilling, GlyphLaboratory, GlyphDashboard } from '../components/ModuleGlyphs'
 
 export interface ModuleIdentity {
   path: string
   label: string
-  icon: LucideIcon
+  // Widened from lucide-react's own LucideIcon type so the six primary
+  // modules can use real custom-drawn glyphs (ModuleGlyphs.tsx) instead
+  // of a recolored generic icon — both shapes accept the same size prop.
+  icon: ComponentType<{ size?: number | string; strokeWidth?: number | string }>
   color: string
   colorLight: string
   colorDark: string
@@ -19,7 +23,7 @@ export const modules: Record<string, ModuleIdentity> = {
   dashboard: {
     path: '/',
     label: 'داشبورد',
-    icon: Gauge,
+    icon: GlyphDashboard,
     color: '#0d9488',
     colorLight: '#f0fdfa',
     colorDark: '#134e4a',
@@ -28,7 +32,7 @@ export const modules: Record<string, ModuleIdentity> = {
   patients: {
     path: '/patients',
     label: 'بیماران',
-    icon: UserRound,
+    icon: GlyphPatients,
     color: '#7c3aed',
     colorLight: '#f5f3ff',
     colorDark: '#4c1d95',
@@ -37,7 +41,7 @@ export const modules: Record<string, ModuleIdentity> = {
   appointments: {
     path: '/appointments',
     label: 'نوبت‌دهی',
-    icon: CalendarClock,
+    icon: GlyphAppointments,
     color: '#d97706',
     colorLight: '#fffbeb',
     colorDark: '#78350f',
@@ -46,7 +50,7 @@ export const modules: Record<string, ModuleIdentity> = {
   treatments: {
     path: '/treatments',
     label: 'درمان',
-    icon: Stethoscope,
+    icon: GlyphTreatments,
     color: '#e11d48',
     colorLight: '#fff1f2',
     colorDark: '#881337',
@@ -55,7 +59,7 @@ export const modules: Record<string, ModuleIdentity> = {
   billing: {
     path: '/billing',
     label: 'مالی',
-    icon: Wallet,
+    icon: GlyphBilling,
     color: '#059669',
     colorLight: '#ecfdf5',
     colorDark: '#064e3b',
@@ -64,7 +68,7 @@ export const modules: Record<string, ModuleIdentity> = {
   laboratory: {
     path: '/laboratory',
     label: 'لابراتوار',
-    icon: Microscope,
+    icon: GlyphLaboratory,
     color: '#0891b2',
     colorLight: '#ecfeff',
     colorDark: '#164e63',

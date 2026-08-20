@@ -211,12 +211,10 @@ function MoreDrawer({ open, onClose }: { open: boolean; onClose: () => void }) {
                   active ? 'text-slate-700 dark:text-slate-200' : 'text-slate-500 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-700/50'
                 }`}
               >
-                <div className="rounded-[30%]" style={active ? { boxShadow: `0 0 0 2.5px ${item.color}` } : undefined}>
-                  <ModuleIconBadge color={item.color} gradient={item.gradient} size={44} rounded="30%">
-                    <Icon size={22} />
-                  </ModuleIconBadge>
-                </div>
-                <span className="text-[11px] font-medium text-center leading-tight">{item.label}</span>
+                <ModuleIconBadge color={item.color} gradient={item.gradient} size={44} rounded="30%">
+                  <Icon size={22} />
+                </ModuleIconBadge>
+                <span className={`text-[11px] font-medium text-center leading-tight ${active ? 'font-bold' : ''}`}>{item.label}</span>
               </button>
             )
           })}
