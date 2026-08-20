@@ -4,8 +4,9 @@ import {
   Settings as SettingsIcon, Building2, Hash, MessageSquare, Package, Save, Smile,
   Cloud, Download, Upload, Vibrate, Volume2, Bell, Database, RefreshCw, Check,
   Smartphone, Shield, AlertTriangle, Eye, ChevronRight, Wifi, Plus, Edit2, Trash2,
-  Stethoscope, Wrench, ListOrdered, Tag, Copy, CheckCircle2, History, CloudOff, Sparkles, Megaphone,
+  Stethoscope, Wrench, ListOrdered, Tag, Copy, CheckCircle2, History, CloudOff, Sparkles, Megaphone, Fingerprint,
 } from 'lucide-react'
+import { isAppLockEnabled, setAppLockPin, disableAppLock, isBiometricAvailable, registerBiometric, hasBiometricRegistered } from '../lib/appLock'
 import {
   fetchSmsTemplates, fetchTreatmentPackages, fetchDoctors, fetchUnits, fetchProcedures,
   fetchInventoryCategories, fetchPatients,
@@ -476,6 +477,7 @@ export default function Settings() {
           { key: 'procedures', label: 'رویه‌ها', icon: <ListOrdered size={16} /> },
           { key: 'backup', label: 'پشتیبان', icon: <Cloud size={16} /> },
           { key: 'haptics', label: 'لرزش و صدا', icon: <Vibrate size={16} /> },
+          { key: 'app_lock', label: 'قفل امنیتی', icon: <Fingerprint size={16} /> },
           { key: 'file_number', label: 'شماره پرونده', icon: <Hash size={16} /> },
           { key: 'packages', label: 'پکیج درمان', icon: <Package size={16} /> },
           { key: 'categories', label: 'دسته‌بندی انبار', icon: <Tag size={16} /> },
@@ -657,6 +659,7 @@ export default function Settings() {
           </Card>
         </div>
       )}
+      {activeTab === 'app_lock' && <AppLockTab />}
 
       {/* File Number Tab */}
       {activeTab === 'file_number' && (
@@ -1026,6 +1029,114 @@ function RbacMatrixTab() {
   )
 }
 
+
+// ============================================================================
+// App Lock Tab — PIN setup (always works) + optional biometric
+// (Face ID / fingerprint) as a quick-unlock shortcut on top of it.
+// ============================================================================
+
+function AppLockTab() {
+  const [enabled, setEnabled] = useState(isAppLockEnabled())
+  const [bioAvailable, setBioAvailable] = useState(false)
+  const [bioRegistered, setBioRegistered] = useState(hasBiometricRegistered())
+  const [step, setStep] = useState<'idle' | 'set-pin' | 'confirm-pin'>('idle')
+  const [pin1, setPin1] = useState('')
+  const [pin2, setPin2] = useState('')
+
+  useEffect(() => { isBiometricAvailable().then(setBioAvailable) }, [])
+
+  const startSetup = () => { setStep('set-pin'); setPin1(''); setPin2('') }
+
+  const handlePin1Complete = (v: string) => { setPin1(v); setStep('confirm-pin') }
+  const handlePin2Complete = async (v: string) => {
+    if (v !== pin1) { showToast('error', 'رمزها یکسان نبودند — دوباره تلاش کنید'); setStep('set-pin'); setPin1(''); return }
+    await setAppLockPin(v)
+    setEnabled(true)
+    setStep('idle')
+    showToast('success', 'قفل امنیتی فعال شد')
+  }
+
+  const handleDisable = () => {
+    if (!window.confirm('قفل امنیتی غیرفعال شود؟')) return
+    disableAppLock()
+    setEnabled(false)
+    setBioRegistered(false)
+    showToast('success', 'قفل امنیتی غیرفعال شد')
+  }
+
+  const handleRegisterBiometric = async () => {
+    h.tap()
+    const ok = await registerBiometric()
+    if (ok) { setBioRegistered(true); showToast('success', 'اثرانگشت/فیس‌آیدی ثبت شد') }
+    else showToast('error', 'ثبت ناموفق بود — دستگاه یا مرورگر پشتیبانی نمی‌کند')
+  }
+
+  if (step !== 'idle') {
+    return (
+      <Card className="p-6">
+        <p className="text-sm font-bold text-slate-700 dark:text-slate-200 text-center mb-1">
+          {step === 'set-pin' ? 'یک رمز ۴ رقمی انتخاب کنید' : 'رمز را دوباره وارد کنید'}
+        </p>
+        <PinEntryInline onComplete={step === 'set-pin' ? handlePin1Complete : handlePin2Complete} />
+        <button onClick={() => setStep('idle')} className="block mx-auto mt-4 text-xs text-slate-400">انصراف</button>
+      </Card>
+    )
+  }
+
+  return (
+    <div className="space-y-4">
+      <Card className="p-5">
+        <h2 className="text-base font-bold text-slate-800 dark:text-slate-100 flex items-center gap-2 mb-1">
+          <Fingerprint size={18} className="text-primary-600" /> قفل امنیتی برنامه
+        </h2>
+        <p className="text-xs text-slate-500 dark:text-slate-400 mb-4">
+          هر بار که برنامه باز یا از پس‌زمینه بازگردانده می‌شود، قفل می‌شود — برای محافظت از پرونده‌ها و اطلاعات مالی بیماران در صورت گم‌شدن یا در دسترس بودن گوشی.
+        </p>
+        {!enabled ? (
+          <Button variant="primary" onClick={startSetup} className="w-full justify-center">فعال‌سازی قفل امنیتی</Button>
+        ) : (
+          <>
+            <div className="flex items-center justify-between p-3 rounded-xl bg-success-50 dark:bg-success-900/20 mb-3">
+              <span className="text-sm font-bold text-success-700 dark:text-success-400">قفل امنیتی فعال است</span>
+              <Badge color="success">رمز عبور</Badge>
+            </div>
+            {bioAvailable && (
+              <div className="flex items-center justify-between p-3 rounded-xl bg-slate-50 dark:bg-slate-800/60 mb-3">
+                <div>
+                  <p className="text-sm font-bold text-slate-700 dark:text-slate-200">فیس‌آیدی / اثرانگشت</p>
+                  <p className="text-[11px] text-slate-400">باز کردن سریع‌تر بدون تایپ رمز</p>
+                </div>
+                {bioRegistered ? <Badge color="success">فعال</Badge> : <Button size="sm" variant="secondary" onClick={handleRegisterBiometric}>فعال‌سازی</Button>}
+              </div>
+            )}
+            <Button variant="danger" onClick={handleDisable} className="w-full justify-center">غیرفعال‌سازی قفل امنیتی</Button>
+          </>
+        )}
+      </Card>
+    </div>
+  )
+}
+
+function PinEntryInline({ onComplete }: { onComplete: (pin: string) => void }) {
+  const [pin, setPin] = useState('')
+  const press = (d: string) => { h.tap(); const next = pin.length < 4 ? pin + d : pin; setPin(next); if (next.length === 4) { setTimeout(() => onComplete(next), 150) } }
+  const backspace = () => { h.tap(); setPin((p) => p.slice(0, -1)) }
+  return (
+    <div className="flex flex-col items-center">
+      <div className="flex gap-3 mb-6">
+        {[0, 1, 2, 3].map((i) => <div key={i} className={`w-3.5 h-3.5 rounded-full border-2 ${i < pin.length ? 'bg-primary-600 border-primary-600' : 'border-slate-300'}`} />)}
+      </div>
+      <div className="grid grid-cols-3 gap-3 w-full max-w-[240px]">
+        {['1', '2', '3', '4', '5', '6', '7', '8', '9'].map((d) => (
+          <button key={d} onClick={() => press(d)} className="w-14 h-14 rounded-full bg-slate-100 dark:bg-slate-700 text-lg font-bold text-slate-700 dark:text-slate-200 mx-auto">{d}</button>
+        ))}
+        <div />
+        <button onClick={() => press('0')} className="w-14 h-14 rounded-full bg-slate-100 dark:bg-slate-700 text-lg font-bold text-slate-700 dark:text-slate-200 mx-auto">0</button>
+        <button onClick={backspace} className="w-14 h-14 rounded-full flex items-center justify-center text-slate-400 mx-auto"><Trash2 size={16} /></button>
+      </div>
+    </div>
+  )
+}
 
 function AuditLogTab() {
   const [entries, setEntries] = useState<AuditLogEntry[]>([])

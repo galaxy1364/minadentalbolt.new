@@ -5,12 +5,13 @@
 // each module only surfacing its own reminders separately.
 import { useState, useEffect, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { CalendarClock, Banknote, CreditCard, FlaskConical, Bone, Settings2 } from 'lucide-react'
+import { CalendarClock, Banknote, CreditCard, FlaskConical, Bone, Settings2, Bell, BellOff } from 'lucide-react'
 import { ModuleHeader } from '../components/ModuleHeader'
 import { Card, Button, Badge, Spinner, EmptyState, Select } from '../components/ui'
 import { fetchCheques, fetchAllInstallments, fetchLabOrders, fetchImplantCases, fetchPatients } from '../lib/api'
 import { toJalaliStringPretty, toPersianDigits, formatCurrency } from '../lib/persianDate'
 import { downloadICSReminder } from '../lib/icsReminder'
+import { requestNotificationPermission, getNotificationPermission, notifyOnceForReminder } from '../lib/notifications'
 import { h } from '../lib/haptics'
 
 const LEAD_DAYS_KEY = 'minadent-reminder-lead-days'
@@ -31,6 +32,7 @@ export default function Reminders() {
   const [items, setItems] = useState<ReminderItem[]>([])
   const [leadDays, setLeadDays] = useState(() => localStorage.getItem(LEAD_DAYS_KEY) || '3')
   const [filter, setFilter] = useState<'all' | ReminderItem['category']>('all')
+  const [notifPermission, setNotifPermission] = useState(getNotificationPermission())
 
   useEffect(() => {
     Promise.all([fetchCheques(), fetchAllInstallments(), fetchLabOrders(), fetchImplantCases(), fetchPatients()])
@@ -70,6 +72,26 @@ export default function Reminders() {
   const filteredItems = useMemo(() => items.filter((it) => filter === 'all' || it.category === filter), [items, filter])
   const urgentCount = items.filter((it) => it.daysLeft <= Number(leadDays)).length
 
+  // Real OS notifications for urgent items — fires once per item per
+  // day (see notifyOnceForReminder), only while the app is open, since
+  // true background push needs a server this client-only app doesn't
+  // have. Still a genuine notification the phone shows outside the
+  // browser, not a fake in-app toast.
+  useEffect(() => {
+    if (notifPermission !== 'granted') return
+    for (const it of items) {
+      if (it.daysLeft > Number(leadDays)) continue
+      const meta = { cheque: 'چک', installment: 'قسط', lab: 'لابراتوار', implant: 'ایمپلنت' }[it.category]
+      notifyOnceForReminder(it.id, `یادآوری ${meta}`, `${it.title} — ${it.patientName} — ${it.daysLeft < 0 ? 'گذشته' : it.daysLeft === 0 ? 'امروز' : `${it.daysLeft} روز مانده`}`)
+    }
+  }, [items, leadDays, notifPermission])
+
+  const handleEnableNotifications = async () => {
+    h.tap()
+    const perm = await requestNotificationPermission()
+    setNotifPermission(perm)
+  }
+
   const categoryMeta: Record<ReminderItem['category'], { label: string; icon: JSX.Element; color: string }> = {
     cheque: { label: 'چک', icon: <Banknote size={14} />, color: 'text-purple-600 bg-purple-50' },
     installment: { label: 'قسط', icon: <CreditCard size={14} />, color: 'text-blue-600 bg-blue-50' },
@@ -80,6 +102,26 @@ export default function Reminders() {
   return (
     <div className="space-y-4">
       <ModuleHeader moduleKey="reminders" title="یادآوری‌ها" subtitle="همه‌ی سررسیدهای فعال، یک‌جا" />
+
+      {notifPermission !== 'unsupported' && notifPermission !== 'granted' && (
+        <Card className="p-4 border-2 border-warning-200 bg-warning-50 dark:bg-warning-900/10">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-warning-100 dark:bg-warning-900/30 flex items-center justify-center shrink-0">
+              <Bell size={18} className="text-warning-600" />
+            </div>
+            <div className="flex-1">
+              <p className="text-sm font-bold text-warning-700 dark:text-warning-400">نوتیفیکیشن واقعی گوشی</p>
+              <p className="text-[11px] text-warning-600 dark:text-warning-500">برای دریافت هشدار فوری روی گوشی، اجازه‌ی نوتیفیکیشن را فعال کنید</p>
+            </div>
+            <Button size="sm" variant="primary" onClick={handleEnableNotifications}>فعال‌سازی</Button>
+          </div>
+        </Card>
+      )}
+      {notifPermission === 'denied' && (
+        <Card className="p-3 bg-slate-50 dark:bg-slate-800/60">
+          <p className="text-[11px] text-slate-500 flex items-center gap-1.5"><BellOff size={13} /> نوتیفیکیشن مسدود شده — از تنظیمات مرورگر/گوشی فعالش کنید</p>
+        </Card>
+      )}
 
       <Card className="p-4">
         <div className="flex items-center gap-2 mb-1">

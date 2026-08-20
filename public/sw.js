@@ -24,6 +24,21 @@ self.addEventListener('activate', (event) => {
   self.clients.claim()
 })
 
+// Tapping a reminder notification focuses an already-open tab if one
+// exists, or opens a new one — standard PWA notification-click
+// behavior so the notification actually leads somewhere useful.
+self.addEventListener('notificationclick', (event) => {
+  event.notification.close()
+  event.waitUntil(
+    self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then((clientList) => {
+      for (const client of clientList) {
+        if ('focus' in client) return client.focus()
+      }
+      if (self.clients.openWindow) return self.clients.openWindow('/#/reminders')
+    })
+  )
+})
+
 // Network-first for same-origin requests: always try to fetch the latest
 // version first, and only fall back to the cache when the network fails
 // (i.e. genuinely offline). This is the opposite of cache-first — it

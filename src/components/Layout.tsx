@@ -11,6 +11,8 @@ import { MinadentLogo } from './MinadentLogo'
 import Login from '../pages/Login'
 import { useAuth } from '../lib/auth'
 import { canAccess, REQUIRE_LOGIN } from '../lib/permissions'
+import { isAppLockEnabled } from '../lib/appLock'
+import { AppLockScreen } from './AppLockScreen'
 import { checkForUpdate, applyUpdate } from '../lib/updateCheck'
 import {
   primaryModules, secondaryModules, allModules,
@@ -494,6 +496,17 @@ function NotFound() {
 
 export function Layout() {
   const { session, loading } = useAuth()
+  const [locked, setLocked] = useState(isAppLockEnabled())
+
+  // Re-lock when returning to the app after being backgrounded — the
+  // whole point of a biometric/PIN lock is that it re-engages after
+  // the phone was put down, not just once at cold start.
+  useEffect(() => {
+    if (!isAppLockEnabled()) return
+    const onVisible = () => { if (document.visibilityState === 'visible') setLocked(true) }
+    document.addEventListener('visibilitychange', onVisible)
+    return () => document.removeEventListener('visibilitychange', onVisible)
+  }, [])
 
   // Public online booking form (نوبت‌دهی آنلاین) — must bypass the auth
   // gate entirely below, since it's meant to be reachable by anyone
@@ -519,6 +532,10 @@ export function Layout() {
 
   if (REQUIRE_LOGIN && !session) {
     return <Login />
+  }
+
+  if (locked) {
+    return <AppLockScreen onUnlock={() => setLocked(false)} />
   }
 
   return (
