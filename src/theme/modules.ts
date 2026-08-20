@@ -4,7 +4,7 @@ import {
   Bone, ShieldCheck, Boxes, Pill, ScanLine, IdCard,
   PieChart, Hourglass, SlidersHorizontal, Archive, CalendarDays, PiggyBank, MessageSquareText, BellRing,
 } from 'lucide-react'
-import { GlyphAppointments, GlyphPatients, GlyphTreatments, GlyphBilling, GlyphLaboratory, GlyphDashboard } from '../components/ModuleGlyphs'
+import { GlyphAppointments, GlyphPatients, GlyphTreatments, GlyphBilling, GlyphLaboratory, GlyphDashboard, GlyphImplants, GlyphInsurance, GlyphPersonalFinance, GlyphSms, GlyphReminders } from '../components/ModuleGlyphs'
 
 export interface ModuleIdentity {
   path: string
@@ -77,7 +77,7 @@ export const modules: Record<string, ModuleIdentity> = {
   implants: {
     path: '/implants',
     label: 'ایمپلنت',
-    icon: Bone,
+    icon: GlyphImplants,
     color: '#2563eb',
     colorLight: '#eff6ff',
     colorDark: '#1e3a8a',
@@ -86,7 +86,7 @@ export const modules: Record<string, ModuleIdentity> = {
   insurance: {
     path: '/insurance',
     label: 'بیمه',
-    icon: ShieldCheck,
+    icon: GlyphInsurance,
     color: '#4f46e5',
     colorLight: '#eef2ff',
     colorDark: '#312e81',
@@ -176,7 +176,7 @@ export const modules: Record<string, ModuleIdentity> = {
   personalFinance: {
     path: '/personal-finance',
     label: 'مالی شخصی',
-    icon: PiggyBank,
+    icon: GlyphPersonalFinance,
     color: '#0891b2',
     colorLight: '#ecfeff',
     colorDark: '#164e63',
@@ -185,7 +185,7 @@ export const modules: Record<string, ModuleIdentity> = {
   sms: {
     path: '/sms',
     label: 'پیامک',
-    icon: MessageSquareText,
+    icon: GlyphSms,
     color: '#db2777',
     colorLight: '#fdf2f8',
     colorDark: '#831843',
@@ -194,7 +194,7 @@ export const modules: Record<string, ModuleIdentity> = {
   reminders: {
     path: '/reminders',
     label: 'یادآوری‌ها',
-    icon: BellRing,
+    icon: GlyphReminders,
     color: '#ea580c',
     colorLight: '#fff7ed',
     colorDark: '#7c2d12',

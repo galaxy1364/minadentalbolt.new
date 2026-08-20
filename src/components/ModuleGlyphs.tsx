@@ -85,3 +85,64 @@ export function GlyphDashboard({ size = 24 }: GlyphProps) {
     </svg>
   )
 }
+
+// ایمپلنت — a tooth with a small implant screw/fixture beside it.
+export function GlyphImplants({ size = 24 }: GlyphProps) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+      <path d={toothPath} fill="currentColor" fillOpacity="0.95" />
+      <path d="M17.5 1.6v3.2" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
+      <path d="M15.6 3.4h3.8M15.9 4.7h3.2M16.2 6h2.6" stroke="currentColor" strokeWidth="1" strokeLinecap="round" />
+      <circle cx="17.5" cy="1.6" r="1.3" fill="currentColor" />
+    </svg>
+  )
+}
+
+// بیمه — a tooth guarded by a small shield-check mark.
+export function GlyphInsurance({ size = 24 }: GlyphProps) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+      <path d={toothPath} fill="currentColor" fillOpacity="0.95" />
+      <path d="M17.5 1.4 20 2.3v2c0 1.6-1 2.9-2.5 3.4-1.5-.5-2.5-1.8-2.5-3.4v-2z" fill="currentColor" />
+      <path d="M16.3 4.1l.9.9 1.5-1.7" stroke="white" strokeWidth="0.8" strokeLinecap="round" strokeLinejoin="round" fill="none" />
+    </svg>
+  )
+}
+
+// مالی شخصی — a tooth beside a small piggy-bank silhouette.
+export function GlyphPersonalFinance({ size = 24 }: GlyphProps) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+      <path d={toothPath} fill="currentColor" fillOpacity="0.95" />
+      <ellipse cx="17.5" cy="4.6" rx="3" ry="2.3" fill="currentColor" />
+      <circle cx="20" cy="3.2" r="0.9" fill="currentColor" />
+      <path d="M15.5 4.6h.01" stroke="white" strokeWidth="1.4" strokeLinecap="round" />
+      <path d="M16.5 6.6v1M18.5 6.6v1" stroke="currentColor" strokeWidth="1.1" strokeLinecap="round" />
+    </svg>
+  )
+}
+
+// پیامک — a tooth with a small speech/message bubble.
+export function GlyphSms({ size = 24 }: GlyphProps) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+      <path d={toothPath} fill="currentColor" fillOpacity="0.95" />
+      <path d="M14.3 1.8h5.4c.7 0 1.3.6 1.3 1.3v2.4c0 .7-.6 1.3-1.3 1.3h-3.4l-1.7 1.5V6.8h-.3c-.7 0-1.3-.6-1.3-1.3V3.1c0-.7.6-1.3 1.3-1.3z" fill="currentColor" />
+      <circle cx="16" cy="4.1" r="0.5" fill="white" />
+      <circle cx="17.5" cy="4.1" r="0.5" fill="white" />
+      <circle cx="19" cy="4.1" r="0.5" fill="white" />
+    </svg>
+  )
+}
+
+// یادآوری‌ها — a tooth with a small alarm-bell mark.
+export function GlyphReminders({ size = 24 }: GlyphProps) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+      <path d={toothPath} fill="currentColor" fillOpacity="0.95" />
+      <path d="M17.5 1.9c-1.4 0-2.4 1-2.4 2.4 0 1.6-.4 2-.9 2.5h6.6c-.5-.5-.9-.9-.9-2.5 0-1.4-1-2.4-2.4-2.4z" fill="currentColor" />
+      <path d="M16.5 7.2a1 1 0 002 0" stroke="currentColor" strokeWidth="0.9" strokeLinecap="round" fill="none" />
+      <circle cx="17.5" cy="1.6" r="0.6" fill="currentColor" />
+    </svg>
+  )
+}
