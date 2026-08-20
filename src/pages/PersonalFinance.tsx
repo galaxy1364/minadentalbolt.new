@@ -176,9 +176,11 @@ export default function PersonalFinance() {
         ]}
       />
 
-      <div className="flex items-center justify-between">
-        <Tabs tabs={typeTabs} active={tab} onChange={(k) => setTab(k as PersonalFinanceItem['item_type'])} />
-        <Button variant="primary" size="sm" onClick={openCreate}><Plus size={14} className="inline ml-1" /> افزودن</Button>
+      <div className="flex items-center gap-2">
+        <div className="min-w-0 flex-1">
+          <Tabs tabs={typeTabs} active={tab} onChange={(k) => setTab(k as PersonalFinanceItem['item_type'])} />
+        </div>
+        <Button variant="primary" size="sm" onClick={openCreate} className="shrink-0"><Plus size={14} className="inline ml-1" /> افزودن</Button>
       </div>
 
       {itemsForTab.length === 0 ? (

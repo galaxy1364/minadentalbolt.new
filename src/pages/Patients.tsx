@@ -411,8 +411,8 @@ export default function Patients() {
               </div>
             </div>
           )}
-          {(filterVip || filterGender || filterActive || filterTag) && (
-            <button onClick={() => { h.cancel(); setFilterVip(''); setFilterGender(''); setFilterActive(''); setFilterTag('') }} className="text-xs text-primary-600 mt-2">پاک کردن فیلترها</button>
+          {(filterVip || filterGender || (filterActive && filterActive !== 'true') || filterTag) && (
+            <button onClick={() => { h.cancel(); setFilterVip(''); setFilterGender(''); setFilterActive('true'); setFilterTag('') }} className="text-xs text-primary-600 mt-2">پاک کردن فیلترها</button>
           )}
         </Card>
       )}
@@ -420,12 +420,32 @@ export default function Patients() {
       {/* Patient list */}
       {filteredPatients.length === 0 ? (
         <Card className="p-6">
-          <EmptyState
-            icon={<Users size={32} />}
-            title="بیماری یافت نشد"
-            description={searchQuery || filterVip || filterGender || filterActive || filterTag ? "فیلترها را تغییر دهید" : "برای ثبت بیمار جدید کلیک کنید"}
-            action={!searchQuery && !filterVip && !filterGender && !filterActive && !filterTag ? <Button size="sm" onClick={openCreateModal}><Plus size={16} /> افزودن</Button> : undefined}
-          />
+          {(() => {
+            // "فعال" defaults to true (not a filter the user explicitly
+            // chose), so it shouldn't count as "you applied a filter" —
+            // that made the empty state always say "change your
+            // filters" and hide the add-patient button, even for a
+            // genuinely brand-new clinic with zero patients at all.
+            const userChoseAFilter = !!(searchQuery || filterVip || filterGender || (filterActive && filterActive !== 'true') || filterTag)
+            const hasAnyPatientsAtAll = patients.length > 0
+            const hiddenByActiveDefault = !userChoseAFilter && hasAnyPatientsAtAll
+            return (
+              <EmptyState
+                icon={<Users size={32} />}
+                title="بیماری یافت نشد"
+                description={
+                  userChoseAFilter ? 'فیلترها را تغییر دهید'
+                  : hiddenByActiveDefault ? 'همه‌ی بیماران شما غیرفعال هستند — برای دیدنشان، فیلتر وضعیت را روی «غیرفعال» بگذارید یا به بایگانی مراجعه کنید'
+                  : 'برای ثبت بیمار جدید کلیک کنید'
+                }
+                action={
+                  hiddenByActiveDefault
+                    ? <Button size="sm" variant="secondary" onClick={() => { h.tap(); setFilterActive('false') }}>نمایش غیرفعال‌ها</Button>
+                    : !userChoseAFilter ? <Button size="sm" onClick={openCreateModal}><Plus size={16} /> افزودن</Button> : undefined
+                }
+              />
+            )
+          })()}
         </Card>
       ) : (
         <div className="space-y-2">
