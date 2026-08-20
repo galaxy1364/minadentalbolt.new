@@ -1,7 +1,7 @@
 // Bump this on every deploy-worthy change so old caches are dropped and
 // clients pick up fresh JS/CSS immediately instead of being stuck on a
 // stale cached bundle.
-const CACHE_NAME = 'minadent-v2'
+const CACHE_NAME = 'minadent-v3'
 const STATIC_ASSETS = [
   '/',
   '/index.html',

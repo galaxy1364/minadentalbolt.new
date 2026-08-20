@@ -3,10 +3,18 @@
 // corners applied via CSS so it scales correctly at any `size`,
 // matching the same rounding used for the generated PWA/home-screen
 // icons built from the same source image.
+//
+// Cache-busted with the app version: this file's static filename
+// (unlike the hashed JS bundle filenames) meant CDN/browser caching
+// kept showing an old cached copy after the artwork was updated, even
+// with a hard refresh in some cases — appending ?v=<version> forces a
+// fresh fetch every time APP_VERSION changes.
+import { APP_VERSION } from '../lib/appVersion'
+
 export function MinadentLogo({ size = 36, className = '' }: { size?: number; className?: string }) {
   return (
     <img
-      src="/logo-256.png"
+      src={`/logo-256.png?v=${APP_VERSION}`}
       width={size}
       height={size}
       alt="مینادنت"
