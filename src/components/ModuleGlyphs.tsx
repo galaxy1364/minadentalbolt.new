@@ -146,3 +146,110 @@ export function GlyphReminders({ size = 24 }: GlyphProps) {
     </svg>
   )
 }
+
+// انبار — a tooth with a small stacked-boxes mark.
+export function GlyphInventory({ size = 24 }: GlyphProps) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+      <path d={toothPath} fill="currentColor" fillOpacity="0.95" />
+      <rect x="14.4" y="1.6" width="2.6" height="2.6" rx="0.5" fill="currentColor" />
+      <rect x="17.4" y="1.6" width="2.6" height="2.6" rx="0.5" fill="currentColor" opacity="0.7" />
+      <rect x="15.9" y="4.5" width="2.6" height="2.6" rx="0.5" fill="currentColor" opacity="0.85" />
+    </svg>
+  )
+}
+
+// نسخه — a tooth with a small pill/capsule mark.
+export function GlyphPrescriptions({ size = 24 }: GlyphProps) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+      <path d={toothPath} fill="currentColor" fillOpacity="0.95" />
+      <rect x="14.4" y="3.6" width="6.2" height="2.8" rx="1.4" fill="currentColor" transform="rotate(-35 17.5 5)" />
+      <path d="M15.6 4.9l3.8-2.6" stroke="white" strokeOpacity="0.7" strokeWidth="0.7" strokeLinecap="round" />
+    </svg>
+  )
+}
+
+// رادیولوژی — a tooth with a small X-ray scan-frame mark.
+export function GlyphRadiology({ size = 24 }: GlyphProps) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+      <path d={toothPath} fill="currentColor" fillOpacity="0.95" />
+      <path d="M14.6 2h1.6M20.4 2h-1.6M14.6 7h1.6M20.4 7h-1.6M14.6 2v1.6M14.6 5.4V7M20.4 2v1.6M20.4 5.4V7" stroke="currentColor" strokeWidth="1" strokeLinecap="round" />
+      <path d="M15.4 4.5h4.2" stroke="currentColor" strokeWidth="0.9" strokeLinecap="round" opacity="0.7" />
+    </svg>
+  )
+}
+
+// پرسنل — a tooth with a small ID-badge/lanyard mark.
+export function GlyphStaff({ size = 24 }: GlyphProps) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+      <path d={toothPath} fill="currentColor" fillOpacity="0.95" />
+      <rect x="15.3" y="2.2" width="4.4" height="5.2" rx="1" fill="currentColor" />
+      <circle cx="17.5" cy="4" r="0.9" fill="white" fillOpacity="0.85" />
+      <path d="M16 6.4c0-.7.6-1.1 1.5-1.1s1.5.4 1.5 1.1" stroke="white" strokeOpacity="0.85" strokeWidth="0.6" strokeLinecap="round" fill="none" />
+      <path d="M16.7 1v1.4M18.3 1v1.4" stroke="currentColor" strokeWidth="0.8" strokeLinecap="round" />
+    </svg>
+  )
+}
+
+// گزارش‌ها — a tooth with a small bar/pie chart mark.
+export function GlyphReports({ size = 24 }: GlyphProps) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+      <path d={toothPath} fill="currentColor" fillOpacity="0.95" />
+      <rect x="14.6" y="4.6" width="1.5" height="2.6" rx="0.5" fill="currentColor" opacity="0.6" />
+      <rect x="16.7" y="3.2" width="1.5" height="4" rx="0.5" fill="currentColor" opacity="0.8" />
+      <rect x="18.8" y="1.6" width="1.5" height="5.6" rx="0.5" fill="currentColor" />
+    </svg>
+  )
+}
+
+// انتظار — a tooth with a small hourglass mark.
+export function GlyphWaitingList({ size = 24 }: GlyphProps) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+      <path d={toothPath} fill="currentColor" fillOpacity="0.95" />
+      <path d="M15.3 1.8h4.4M15.3 7h4.4M15.5 1.9c0 1.7 1 2.5 2 2.5s2-.8 2-2.5M15.5 6.9c0-1.7 1-2.5 2-2.5s2 .8 2 2.5" fill="currentColor" stroke="currentColor" strokeWidth="0.5" strokeLinejoin="round" />
+    </svg>
+  )
+}
+
+// تنظیمات — a tooth with a small gear mark.
+export function GlyphSettings({ size = 24 }: GlyphProps) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+      <path d={toothPath} fill="currentColor" fillOpacity="0.95" />
+      <circle cx="17.5" cy="4.3" r="1.6" fill="none" stroke="currentColor" strokeWidth="1.3" />
+      <circle cx="17.5" cy="4.3" r="0.5" fill="currentColor" />
+      <path d="M17.5 1.4v1M17.5 6.2v1M20.4 4.3h-1M15.6 4.3h-1M19.6 2.2l-.7.7M16.1 6.4l-.7.7M19.6 6.4l-.7-.7M16.1 2.2l-.7-.7" stroke="currentColor" strokeWidth="1" strokeLinecap="round" />
+    </svg>
+  )
+}
+
+// بایگانی — a tooth with a small archive-box mark.
+export function GlyphArchive({ size = 24 }: GlyphProps) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+      <path d={toothPath} fill="currentColor" fillOpacity="0.95" />
+      <rect x="14.5" y="1.8" width="6" height="2" rx="0.6" fill="currentColor" />
+      <path d="M15 3.8h5v2.8a1 1 0 01-1 1h-3a1 1 0 01-1-1V3.8z" fill="currentColor" opacity="0.85" />
+      <path d="M16.5 5h2" stroke="white" strokeOpacity="0.7" strokeWidth="0.8" strokeLinecap="round" />
+    </svg>
+  )
+}
+
+// تقویم — a tooth with a small full-month calendar grid mark.
+export function GlyphCalendar({ size = 24 }: GlyphProps) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+      <path d={toothPath} fill="currentColor" fillOpacity="0.95" />
+      <rect x="14.6" y="1.8" width="5.8" height="5.2" rx="1" fill="currentColor" />
+      <path d="M14.6 3.4h5.8" stroke="white" strokeOpacity="0.6" strokeWidth="0.6" />
+      <circle cx="15.9" cy="4.9" r="0.5" fill="white" fillOpacity="0.8" />
+      <circle cx="17.5" cy="4.9" r="0.5" fill="white" fillOpacity="0.8" />
+      <circle cx="15.9" cy="6.2" r="0.5" fill="white" fillOpacity="0.8" />
+    </svg>
+  )
+}

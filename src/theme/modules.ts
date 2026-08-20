@@ -1,10 +1,5 @@
 import type { ComponentType } from 'react'
-import {
-  Gauge, UserRound, CalendarClock, Stethoscope, Wallet, Microscope,
-  Bone, ShieldCheck, Boxes, Pill, ScanLine, IdCard,
-  PieChart, Hourglass, SlidersHorizontal, Archive, CalendarDays, PiggyBank, MessageSquareText, BellRing,
-} from 'lucide-react'
-import { GlyphAppointments, GlyphPatients, GlyphTreatments, GlyphBilling, GlyphLaboratory, GlyphDashboard, GlyphImplants, GlyphInsurance, GlyphPersonalFinance, GlyphSms, GlyphReminders } from '../components/ModuleGlyphs'
+import { GlyphAppointments, GlyphPatients, GlyphTreatments, GlyphBilling, GlyphLaboratory, GlyphDashboard, GlyphImplants, GlyphInsurance, GlyphPersonalFinance, GlyphSms, GlyphReminders, GlyphInventory, GlyphPrescriptions, GlyphRadiology, GlyphStaff, GlyphReports, GlyphWaitingList, GlyphSettings, GlyphArchive, GlyphCalendar } from '../components/ModuleGlyphs'
 
 export interface ModuleIdentity {
   path: string
@@ -95,7 +90,7 @@ export const modules: Record<string, ModuleIdentity> = {
   inventory: {
     path: '/inventory',
     label: 'انبار',
-    icon: Boxes,
+    icon: GlyphInventory,
     color: '#ea580c',
     colorLight: '#fff7ed',
     colorDark: '#7c2d12',
@@ -104,7 +99,7 @@ export const modules: Record<string, ModuleIdentity> = {
   prescriptions: {
     path: '/prescriptions',
     label: 'نسخه',
-    icon: Pill,
+    icon: GlyphPrescriptions,
     color: '#c026d3',
     colorLight: '#fdf4ff',
     colorDark: '#701a75',
@@ -113,7 +108,7 @@ export const modules: Record<string, ModuleIdentity> = {
   radiology: {
     path: '/radiology',
     label: 'رادیولوژی',
-    icon: ScanLine,
+    icon: GlyphRadiology,
     color: '#db2777',
     colorLight: '#fdf2f8',
     colorDark: '#831843',
@@ -122,7 +117,7 @@ export const modules: Record<string, ModuleIdentity> = {
   staff: {
     path: '/staff',
     label: 'پرسنل',
-    icon: IdCard,
+    icon: GlyphStaff,
     color: '#65a30d',
     colorLight: '#f7fee7',
     colorDark: '#365314',
@@ -131,7 +126,7 @@ export const modules: Record<string, ModuleIdentity> = {
   reports: {
     path: '/reports',
     label: 'گزارش‌ها',
-    icon: PieChart,
+    icon: GlyphReports,
     color: '#0284c7',
     colorLight: '#f0f9ff',
     colorDark: '#0c4a6e',
@@ -140,7 +135,7 @@ export const modules: Record<string, ModuleIdentity> = {
   waitingList: {
     path: '/waiting-list',
     label: 'انتظار',
-    icon: Hourglass,
+    icon: GlyphWaitingList,
     color: '#ca8a04',
     colorLight: '#fefce8',
     colorDark: '#713f12',
@@ -149,7 +144,7 @@ export const modules: Record<string, ModuleIdentity> = {
   settings: {
     path: '/settings',
     label: 'تنظیمات',
-    icon: SlidersHorizontal,
+    icon: GlyphSettings,
     color: '#475569',
     colorLight: '#f8fafc',
     colorDark: '#1e293b',
@@ -158,7 +153,7 @@ export const modules: Record<string, ModuleIdentity> = {
   archive: {
     path: '/archive',
     label: 'بایگانی',
-    icon: Archive,
+    icon: GlyphArchive,
     color: '#78716c',
     colorLight: '#fafaf9',
     colorDark: '#292524',
@@ -167,7 +162,7 @@ export const modules: Record<string, ModuleIdentity> = {
   calendar: {
     path: '/calendar',
     label: 'تقویم',
-    icon: CalendarDays,
+    icon: GlyphCalendar,
     color: '#9333ea',
     colorLight: '#faf5ff',
     colorDark: '#581c87',
