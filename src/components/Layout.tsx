@@ -14,6 +14,7 @@ import { canAccess, REQUIRE_LOGIN } from '../lib/permissions'
 import { isAppLockEnabled } from '../lib/appLock'
 import { AppLockScreen } from './AppLockScreen'
 import { ModuleIconBadge } from './ModuleIconBadge'
+import { APP_VERSION } from '../lib/appVersion'
 import { checkForUpdate, applyUpdate } from '../lib/updateCheck'
 import {
   primaryModules, secondaryModules, allModules,
@@ -356,7 +357,7 @@ function LayoutInner({ children }: { children: React.ReactNode }) {
           >
             <MinadentLogo size={36} className="shrink-0" />
             <div>
-              <p className="text-[15px] font-extrabold text-slate-800 dark:text-slate-100 leading-none">مینادنت</p>
+              <p className="text-[15px] font-extrabold text-slate-800 dark:text-slate-100 leading-none">مینادنت <span className="text-[9px] font-normal text-slate-300 dark:text-slate-600 align-middle">v{APP_VERSION}</span></p>
               {currentItem && (
                 <p className="text-[10px] font-medium leading-none mt-0.5" style={{ color: currentItem.color }}>
                   {currentItem.label}
