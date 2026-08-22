@@ -14,6 +14,8 @@ import {
   AreaChart, Area, XAxis, YAxis, Tooltip as RTooltip, ResponsiveContainer,
   RadialBarChart, RadialBar, PolarAngleAxis, BarChart, Bar, Cell,
 } from 'recharts'
+import { ModuleIconBadge } from '../components/ModuleIconBadge'
+import { GlyphPatients, GlyphAppointments, GlyphBilling, GlyphLaboratory, GlyphImplants, GlyphWaitingList, GlyphInventory } from '../components/ModuleGlyphs'
 import {
   fetchDashboardStats, fetchAppointments, fetchPatients, fetchPayments,
   fetchEncounters, fetchInventoryItems, fetchLabOrders, fetchWaitingList,
@@ -176,13 +178,13 @@ function Sparkline({ data, color, width = 64, height = 24 }: { data: number[]; c
 // violet, lime ("کله‌غازی"), sky blue, pink, amber, rose.
 type TileColor = 'violet' | 'lime' | 'sky' | 'pink' | 'amber' | 'rose'
 
-const tileThemes: Record<TileColor, { bg: string; blob: string; iconBg: string; text: string; sparkColor: string; ring: string }> = {
-  violet: { bg: 'from-white to-violet-100 dark:from-slate-800 dark:to-violet-950/50', blob: 'from-violet-400/60 dark:from-violet-500/40', iconBg: 'bg-gradient-to-br from-violet-500 to-purple-600', text: 'text-violet-700 dark:text-violet-300', sparkColor: '#8b5cf6', ring: 'focus:ring-violet-300' },
-  lime:   { bg: 'from-white to-lime-100 dark:from-slate-800 dark:to-lime-950/40',     blob: 'from-lime-400/60 dark:from-lime-500/35',     iconBg: 'bg-gradient-to-br from-lime-500 to-green-600',   text: 'text-lime-700 dark:text-lime-300',   sparkColor: '#84cc16', ring: 'focus:ring-lime-300' },
-  sky:    { bg: 'from-white to-sky-100 dark:from-slate-800 dark:to-sky-950/50',       blob: 'from-sky-400/60 dark:from-sky-500/40',       iconBg: 'bg-gradient-to-br from-sky-500 to-blue-600',     text: 'text-sky-700 dark:text-sky-300',     sparkColor: '#0ea5e9', ring: 'focus:ring-sky-300' },
-  pink:   { bg: 'from-white to-pink-100 dark:from-slate-800 dark:to-pink-950/50',     blob: 'from-pink-400/60 dark:from-pink-500/40',     iconBg: 'bg-gradient-to-br from-pink-500 to-fuchsia-600', text: 'text-pink-700 dark:text-pink-300',   sparkColor: '#ec4899', ring: 'focus:ring-pink-300' },
-  amber:  { bg: 'from-white to-amber-100 dark:from-slate-800 dark:to-amber-950/50',   blob: 'from-amber-400/60 dark:from-amber-500/40',   iconBg: 'bg-gradient-to-br from-amber-500 to-orange-600', text: 'text-amber-700 dark:text-amber-300', sparkColor: '#f59e0b', ring: 'focus:ring-amber-300' },
-  rose:   { bg: 'from-white to-rose-100 dark:from-slate-800 dark:to-rose-950/50',     blob: 'from-rose-400/60 dark:from-rose-500/40',     iconBg: 'bg-gradient-to-br from-rose-500 to-red-600',     text: 'text-rose-700 dark:text-rose-300',   sparkColor: '#f43f5e', ring: 'focus:ring-rose-300' },
+const tileThemes: Record<TileColor, { bg: string; blob: string; iconBg: string; gradient: [string, string]; solidColor: string; text: string; sparkColor: string; ring: string }> = {
+  violet: { bg: 'from-white to-violet-100 dark:from-slate-800 dark:to-violet-950/50', blob: 'from-violet-400/60 dark:from-violet-500/40', iconBg: 'bg-gradient-to-br from-violet-500 to-purple-600', gradient: ['#a78bfa', '#9333ea'], solidColor: '#8b5cf6', text: 'text-violet-700 dark:text-violet-300', sparkColor: '#8b5cf6', ring: 'focus:ring-violet-300' },
+  lime:   { bg: 'from-white to-lime-100 dark:from-slate-800 dark:to-lime-950/40',     blob: 'from-lime-400/60 dark:from-lime-500/35',     iconBg: 'bg-gradient-to-br from-lime-500 to-green-600',   gradient: ['#a3e635', '#16a34a'], solidColor: '#84cc16', text: 'text-lime-700 dark:text-lime-300',   sparkColor: '#84cc16', ring: 'focus:ring-lime-300' },
+  sky:    { bg: 'from-white to-sky-100 dark:from-slate-800 dark:to-sky-950/50',       blob: 'from-sky-400/60 dark:from-sky-500/40',       iconBg: 'bg-gradient-to-br from-sky-500 to-blue-600',     gradient: ['#38bdf8', '#2563eb'], solidColor: '#0ea5e9', text: 'text-sky-700 dark:text-sky-300',     sparkColor: '#0ea5e9', ring: 'focus:ring-sky-300' },
+  pink:   { bg: 'from-white to-pink-100 dark:from-slate-800 dark:to-pink-950/50',     blob: 'from-pink-400/60 dark:from-pink-500/40',     iconBg: 'bg-gradient-to-br from-pink-500 to-fuchsia-600', gradient: ['#f472b6', '#c026d3'], solidColor: '#ec4899', text: 'text-pink-700 dark:text-pink-300',   sparkColor: '#ec4899', ring: 'focus:ring-pink-300' },
+  amber:  { bg: 'from-white to-amber-100 dark:from-slate-800 dark:to-amber-950/50',   blob: 'from-amber-400/60 dark:from-amber-500/40',   iconBg: 'bg-gradient-to-br from-amber-500 to-orange-600', gradient: ['#fbbf24', '#ea580c'], solidColor: '#f59e0b', text: 'text-amber-700 dark:text-amber-300', sparkColor: '#f59e0b', ring: 'focus:ring-amber-300' },
+  rose:   { bg: 'from-white to-rose-100 dark:from-slate-800 dark:to-rose-950/50',     blob: 'from-rose-400/60 dark:from-rose-500/40',     iconBg: 'bg-gradient-to-br from-rose-500 to-red-600',     gradient: ['#fb7185', '#dc2626'], solidColor: '#f43f5e', text: 'text-rose-700 dark:text-rose-300',   sparkColor: '#f43f5e', ring: 'focus:ring-rose-300' },
 }
 
 function StatTile({
@@ -215,9 +217,9 @@ function StatTile({
     >
       <div className={`absolute -top-6 -left-6 w-24 h-24 rounded-full bg-gradient-to-br ${theme.blob} to-transparent blur-xl pointer-events-none breathe-slow`} />
       <div className="relative flex items-center gap-2 mb-1.5">
-        <div className={`w-7 h-7 rounded-lg ${theme.iconBg} flex items-center justify-center text-white shrink-0`}>
+        <ModuleIconBadge color={theme.solidColor} gradient={theme.gradient} size={28} rounded="28%">
           {isValidElement(icon) ? cloneElement(icon as React.ReactElement<any>, { size: 14 }) : icon}
-        </div>
+        </ModuleIconBadge>
         <p className="text-[11px] font-semibold text-slate-500 dark:text-slate-400 truncate">{label}</p>
       </div>
       <div className="relative flex items-baseline gap-1">
@@ -261,9 +263,11 @@ function QuickAction({ icon, label, color, onClick, delay }: { icon: React.React
       className={`tile-in card-lift relative overflow-hidden flex flex-col items-center gap-1.5 p-3 rounded-2xl bg-gradient-to-br ${theme.bg} border border-slate-100 dark:border-slate-700 shadow-sm min-w-[76px] flex-1 focus:outline-none focus:ring-4 ${theme.ring}`}
     >
       <div className={`absolute -bottom-6 -left-6 w-20 h-20 rounded-full bg-gradient-to-br ${theme.blob} to-transparent blur-xl pointer-events-none breathe-slow`} />
-      <div className={`relative w-9 h-9 rounded-xl ${theme.iconBg} flex items-center justify-center text-white float-bounce`}>
-        {isValidElement(icon) ? cloneElement(icon as React.ReactElement<any>, { size: 17 }) : icon}
-      </div>
+      <ModuleIconBadge color={theme.solidColor} gradient={theme.gradient} size={36} rounded="26%">
+        <div className="float-bounce">
+          {isValidElement(icon) ? cloneElement(icon as React.ReactElement<any>, { size: 17 }) : icon}
+        </div>
+      </ModuleIconBadge>
       <span className={`relative text-[11px] font-bold ${theme.text}`}>{label}</span>
     </button>
   )
@@ -904,12 +908,12 @@ export default function Dashboard() {
   // ── Quick Actions ──────────────────────────────────────────────
 
   const allQuickActions: { key: string; label: string; icon: React.ReactNode; color: TileColor; path: string }[] = [
-    { key: 'appt',   label: 'نوبت جدید',   icon: <Calendar size={20} />, color: 'amber', path: '/appointments' },
-    { key: 'patient',label: 'بیمار جدید',  icon: <Users size={20} />,    color: 'violet', path: '/patients' },
-    { key: 'implant',label: 'ایمپلنت',      icon: <Smile size={20} />,    color: 'sky',   path: '/implants' },
-    { key: 'wait',   label: 'لیست انتظار', icon: <Clock size={20} />,    color: 'lime',  path: '/waiting-list' },
-    { key: 'cash',   label: 'صندوق',        icon: <Wallet size={20} />,   color: 'pink',  path: '/billing' },
-    { key: 'inv',    label: 'موجودی',       icon: <Package size={20} />,  color: 'rose',  path: '/inventory' },
+    { key: 'appt',   label: 'نوبت جدید',   icon: <GlyphAppointments size={20} />, color: 'amber', path: '/appointments' },
+    { key: 'patient',label: 'بیمار جدید',  icon: <GlyphPatients size={20} />,    color: 'violet', path: '/patients' },
+    { key: 'implant',label: 'ایمپلنت',      icon: <GlyphImplants size={20} />,    color: 'sky',   path: '/implants' },
+    { key: 'wait',   label: 'لیست انتظار', icon: <GlyphWaitingList size={20} />,    color: 'lime',  path: '/waiting-list' },
+    { key: 'cash',   label: 'صندوق',        icon: <GlyphBilling size={20} />,   color: 'pink',  path: '/billing' },
+    { key: 'inv',    label: 'موجودی',       icon: <GlyphInventory size={20} />,  color: 'rose',  path: '/inventory' },
   ]
 
   // Role-aware ordering: each role's most-used actions float to the front
@@ -1098,7 +1102,7 @@ export default function Dashboard() {
         {/* Stat tiles — compact 2x2/4x1 bento grid, part of the same block */}
         <div className="relative grid grid-cols-2 lg:grid-cols-4 gap-2.5">
           <StatTile
-            icon={<Users />}
+            icon={<GlyphPatients />}
             label="بیماران"
             value={currentPatientCount}
             color="violet"
@@ -1109,7 +1113,7 @@ export default function Dashboard() {
             ariaLabel={`بیماران: ${currentPatientCount}، تغییر ${patientChange} درصد`}
           />
           <StatTile
-            icon={<Calendar />}
+            icon={<GlyphAppointments />}
             label="نوبت‌ها"
             value={currentApptCount}
             suffix={timeRange === 'today' ? `امروز` : ''}
@@ -1123,7 +1127,7 @@ export default function Dashboard() {
             narrative={apptNarrative}
           />
           <StatTile
-            icon={<DollarSign />}
+            icon={<GlyphBilling />}
             label="درآمد دوره"
             value={Math.round(currentRevenue / 1000000)}
             suffix="م ت"
@@ -1136,7 +1140,7 @@ export default function Dashboard() {
             narrative={revenueNarrative}
           />
           <StatTile
-            icon={<FlaskConical />}
+            icon={<GlyphLaboratory />}
             label="لابراتوار"
             value={stats?.activeLabOrders ?? 0}
             color="pink"
