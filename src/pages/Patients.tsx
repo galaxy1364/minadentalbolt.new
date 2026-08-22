@@ -13,6 +13,7 @@ import { h } from '../lib/haptics'
 import { usePullToRefresh } from '../lib/usePullToRefresh'
 import { scoreFields } from '../lib/fuzzySearch'
 import { calcPatientBalance } from '../lib/finance'
+import { calculateAge } from '../lib/patientUtils'
 
 const vipLevels: { value: number; label: string; color: string; icon: string }[] = [
   { value: 0, label: 'عادی', color: 'slate', icon: '' },
@@ -50,17 +51,6 @@ function getInitials(p: Patient): string {
 // Shared with Dashboard/Billing (src/lib/finance.ts) so this number can
 // never silently diverge between pages again.
 const calcBalance = calcPatientBalance
-
-function calculateAge(birthDate: string | null): number | null {
-  if (!birthDate) return null
-  const d = new Date(birthDate)
-  if (isNaN(d.getTime())) return null
-  const now = new Date()
-  let age = now.getFullYear() - d.getFullYear()
-  const m = now.getMonth() - d.getMonth()
-  if (m < 0 || (m === 0 && now.getDate() < d.getDate())) age--
-  return age >= 0 && age < 150 ? age : null
-}
 
 const emptyForm = {
   first_name: '', last_name: '', national_id: '', phone: '', phone2: '', email: '',

@@ -10,6 +10,7 @@ import { Modal, Card, Button, Input, Select, Textarea, Badge, Spinner, EmptyStat
 import { PersianDateInput } from '../components/PersianDateInput'
 import { useConfirmAction } from '../components/ConfirmAction'
 import { h } from '../lib/haptics'
+import { calculateAge } from '../lib/patientUtils'
 import { db } from '../lib/db'
 import type { AuditLogEntry } from '../lib/db'
 import DentalChart from '../components/DentalChart'
@@ -95,17 +96,6 @@ function getAvatarColor(id: string): string {
 
 function getInitials(patient: Patient): string {
   return ((patient.first_name?.charAt(0) || '') + (patient.last_name?.charAt(0) || '')).trim() || '?'
-}
-
-function calculateAge(birthDate: string | null): number | null {
-  if (!birthDate) return null
-  const birth = new Date(birthDate)
-  if (isNaN(birth.getTime())) return null
-  const today = new Date()
-  let age = today.getFullYear() - birth.getFullYear()
-  const m = today.getMonth() - birth.getMonth()
-  if (m < 0 || (m === 0 && today.getDate() < birth.getDate())) age--
-  return age
 }
 
 function getVipLabel(level: number | null): { label: string; color: string } {
