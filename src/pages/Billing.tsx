@@ -94,6 +94,7 @@ export default function Billing() {
   const [paymentForm, setPaymentForm] = useState({
     patient_id: '',
     encounter_id: '',
+    implant_case_id: '',
     amount: '',
     discountPercent: '',
     payment_method: '',
@@ -350,6 +351,7 @@ export default function Billing() {
         try {
           await createPayment({
             patient_id: paymentForm.patient_id, encounter_id: paymentForm.encounter_id || null,
+            implant_case_id: paymentForm.implant_case_id || null,
             amount: Number(paymentForm.amount), payment_method: paymentForm.payment_method,
             reference: paymentForm.reference || null, notes: paymentForm.notes || null,
             status: paymentForm.status, payment_date: paymentForm.payment_date, created_by: null,
@@ -1259,6 +1261,7 @@ export default function Billing() {
 
   const patientOptions = patients.map((p) => ({ value: p.id, label: `${p.first_name} ${p.last_name}${p.file_number ? ` - ${p.file_number}` : ''}` }))
   const encounterOptions = encounters.filter((e) => e.patient_id === paymentForm.patient_id).map((e) => ({ value: e.id, label: `ویزیت ${toJalaliStringPretty(e.encounter_date)}` }))
+  const implantCaseOptions = implantCases.filter((c) => c.patient_id === paymentForm.patient_id).map((c) => ({ value: c.id, label: `پرونده ایمپلنت - ${formatCurrency(c.total_cost || 0)} ت` }))
 
   const renderPaymentModal = () => (
     <Wizard
@@ -1276,7 +1279,7 @@ export default function Billing() {
           validate: () => (!paymentForm.patient_id ? 'انتخاب بیمار الزامی است' : (!paymentForm.amount || Number(paymentForm.amount) <= 0) ? 'مبلغ را وارد کنید' : null),
           content: (
             <>
-              <Select label="بیمار" value={paymentForm.patient_id} onChange={(v) => setPaymentForm((p) => ({ ...p, patient_id: v, encounter_id: '' }))} options={patientOptions} placeholder="انتخاب بیمار" />
+              <Select label="بیمار" value={paymentForm.patient_id} onChange={(v) => setPaymentForm((p) => ({ ...p, patient_id: v, encounter_id: '', implant_case_id: '' }))} options={patientOptions} placeholder="انتخاب بیمار" />
               {paymentForm.patient_id && (() => {
                 const fin = patientBalancesMap.get(paymentForm.patient_id)
                 if (!fin) return null
@@ -1313,7 +1316,10 @@ export default function Billing() {
                 )
               })()}
               {paymentForm.patient_id && encounterOptions.length > 0 && (
-                <Select label="ویزیت مرتبط" value={paymentForm.encounter_id} onChange={(v) => setPaymentForm((p) => ({ ...p, encounter_id: v }))} options={encounterOptions} placeholder="بدون ویزیت" />
+                <Select label="ویزیت مرتبط" value={paymentForm.encounter_id} onChange={(v) => setPaymentForm((p) => ({ ...p, encounter_id: v, implant_case_id: v ? '' : p.implant_case_id }))} options={encounterOptions} placeholder="بدون ویزیت" />
+              )}
+              {paymentForm.patient_id && implantCaseOptions.length > 0 && (
+                <Select label="پرونده ایمپلنت مرتبط" value={paymentForm.implant_case_id} onChange={(v) => setPaymentForm((p) => ({ ...p, implant_case_id: v, encounter_id: v ? '' : p.encounter_id }))} options={implantCaseOptions} placeholder="بدون پرونده ایمپلنت" />
               )}
               <div className="grid grid-cols-2 gap-3">
                 <CurrencyInput label="مبلغ (تومان)" value={paymentForm.amount} onChange={(v) => setPaymentForm((p) => ({ ...p, amount: v }))} />

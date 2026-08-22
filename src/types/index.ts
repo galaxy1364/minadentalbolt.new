@@ -154,6 +154,11 @@ export interface Payment {
   clinic_id: string
   patient_id: string
   encounter_id: string | null
+  /** Links this payment to an implant case so its paid_amount stays in
+   * sync with the real payment ledger — mirrors encounter_id's role for
+   * encounters.paid_amount. Independent of encounter_id: a payment is
+   * attributed to at most one of the two, never both. */
+  implant_case_id: string | null
   amount: number
   payment_method: string
   reference: string | null

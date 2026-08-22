@@ -349,6 +349,17 @@ export async function createPayment(p: PaymentInput): Promise<Payment> {
       await queueOperation('encounters', 'update', enc.id, { paid_amount: updatedEnc.paid_amount })
     }
   }
+  // Update implant case paid_amount — same sync as encounters above.
+  // Previously implant_cases.paid_amount had no link at all to the real
+  // payment ledger and was purely hand-typed in the Implants form.
+  if (payment.implant_case_id && payment.status === 'completed') {
+    const implantCase = await db.implant_cases.get(payment.implant_case_id)
+    if (implantCase) {
+      const updatedCase = { ...implantCase, paid_amount: (implantCase.paid_amount ?? 0) + (payment.amount ?? 0), updated_at: nowISO() }
+      await db.implant_cases.put(updatedCase)
+      await queueOperation('implant_cases', 'update', implantCase.id, { paid_amount: updatedCase.paid_amount })
+    }
+  }
   return payment
 }
 
@@ -812,6 +823,15 @@ export async function deletePayment(id: string): Promise<void> {
       await queueOperation('encounters', 'update', enc.id, { paid_amount: updatedEnc.paid_amount })
     }
   }
+  // Reverse implant case paid_amount
+  if (payment?.implant_case_id && payment.status === 'completed') {
+    const implantCase = await db.implant_cases.get(payment.implant_case_id)
+    if (implantCase) {
+      const updatedCase = { ...implantCase, paid_amount: Math.max(0, (implantCase.paid_amount ?? 0) - (payment.amount ?? 0)), updated_at: nowISO() }
+      await db.implant_cases.put(updatedCase)
+      await queueOperation('implant_cases', 'update', implantCase.id, { paid_amount: updatedCase.paid_amount })
+    }
+  }
   await db.payments.delete(id)
   await queueOperation('payments', 'delete', id)
 }
@@ -1032,6 +1052,17 @@ export async function updatePayment(id: string, updates: Partial<PaymentInput>):
       const updatedEnc = { ...enc, paid_amount: totalPaid, updated_at: nowISO() }
       await db.encounters.put(updatedEnc)
       await queueOperation('encounters', 'update', enc.id, { paid_amount: totalPaid })
+    }
+  }
+  // Recalculate implant case paid_amount if amount or status changed
+  if (updated.implant_case_id && (rest.amount !== undefined || rest.status !== undefined)) {
+    const allPayments = await db.payments.where('implant_case_id').equals(updated.implant_case_id).and((p) => p.status === 'completed').toArray()
+    const totalPaid = allPayments.reduce((sum, p) => sum + (p.amount ?? 0), 0)
+    const implantCase = await db.implant_cases.get(updated.implant_case_id)
+    if (implantCase) {
+      const updatedCase = { ...implantCase, paid_amount: totalPaid, updated_at: nowISO() }
+      await db.implant_cases.put(updatedCase)
+      await queueOperation('implant_cases', 'update', implantCase.id, { paid_amount: totalPaid })
     }
   }
   return updated

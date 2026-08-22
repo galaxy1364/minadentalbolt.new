@@ -148,11 +148,18 @@ class MinadentDB extends Dexie {
     this.version(6).stores({
       inventory_items: 'id, clinic_id, category_id, name, brand, quantity, min_quantity, barcode',
     })
-    // v7: guarantee cheques for installment payment plans — link cheques
-    // to the plan they secure via payment_plan_id (purpose itself doesn't
-    // need indexing, payment_plan_id does for the plan-detail lookup).
+    // v7 (continued): payments can now also link to an implant case
+    // (mirrors encounter_id's paid_amount sync role) — see cheques above.
     this.version(7).stores({
       cheques: 'id, clinic_id, patient_id, status, due_date, payment_plan_id',
+    })
+    // v8: index payments.implant_case_id for the lookup used when syncing
+    // an implant case's paid_amount to its real payment ledger. Added as
+    // its own version rather than folded into v7 above — v7 already
+    // shipped, and Dexie version definitions must never change after
+    // release or upgrades break for anyone already on that version.
+    this.version(8).stores({
+      payments: 'id, clinic_id, patient_id, encounter_id, implant_case_id, payment_date, status, payment_method',
     })
   }
 }
