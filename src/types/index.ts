@@ -485,6 +485,13 @@ export interface Cheque {
    * manually entered for now; foundation for real-time bank
    * verification later. */
   sayad_id: string | null
+  /** 'payment': a normal cheque representing an actual scheduled deposit.
+   * 'guarantee': collateral held against a payment_plan's full remaining
+   * balance — not itself a scheduled deposit, so it should never be
+   * counted in cash-flow-in projections the way a payment cheque is. */
+  purpose: 'payment' | 'guarantee'
+  /** Set only when purpose is 'guarantee' — the plan this cheque secures. */
+  payment_plan_id: string | null
   status: string
   notes: string | null
   created_by: string | null

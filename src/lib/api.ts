@@ -649,7 +649,11 @@ export async function fetchAllInstallments(): Promise<Installment[]> {
   return db.installments.where('clinic_id').equals(CLINIC_ID).toArray()
 }
 
-export async function createPaymentPlan(p: PaymentPlanInput, installments: InstallmentInput[]): Promise<PaymentPlan> {
+export async function createPaymentPlan(
+  p: PaymentPlanInput,
+  installments: InstallmentInput[],
+  guaranteeCheque?: Omit<ChequeInput, 'purpose' | 'payment_plan_id' | 'amount'>,
+): Promise<PaymentPlan> {
   const { clinic_id, ...rest } = p
   const planId = uid()
   const plan: PaymentPlan = { ...rest, id: planId, clinic_id: CLINIC_ID, created_at: nowISO(), updated_at: nowISO(), sync_version: 1 }
@@ -665,6 +669,20 @@ export async function createPaymentPlan(p: PaymentPlanInput, installments: Insta
     }
     await db.installments.put(inst)
     await queueOperation('installments', 'insert', instId, inst)
+  }
+  // A payment plan always requires a guarantee cheque covering the full
+  // plan amount — collateral held separately from the (cash-only) monthly
+  // installments, not a scheduled deposit itself. Created atomically with
+  // the plan so a plan can never exist without one.
+  if (guaranteeCheque) {
+    const { clinic_id: _ci2, ...chequeRest } = guaranteeCheque
+    const chequeId = uid()
+    const cheque: Cheque = {
+      ...chequeRest, amount: plan.total_amount, purpose: 'guarantee', payment_plan_id: planId,
+      id: chequeId, clinic_id: CLINIC_ID, created_at: nowISO(), updated_at: nowISO(), sync_version: 1,
+    }
+    await db.cheques.put(cheque)
+    await queueOperation('cheques', 'insert', chequeId, cheque)
   }
   return plan
 }

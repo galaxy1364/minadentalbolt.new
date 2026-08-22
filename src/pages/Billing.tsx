@@ -133,6 +133,16 @@ export default function Billing() {
     installment_count: '3',
     start_date: new Date().toISOString().slice(0, 10),
     notes: '',
+    // Guarantee cheque — always required, covers the full remaining
+    // balance, separate from the (cash-only) monthly installments.
+    guarantee_bank_name: '',
+    guarantee_branch: '',
+    guarantee_cheque_number: '',
+    guarantee_account_number: '',
+    guarantee_sayad_id: '',
+    guarantee_issue_date: new Date().toISOString().slice(0, 10),
+    guarantee_due_date: '',
+    guarantee_payee_name: '',
   })
 
   // Expense modal
@@ -233,7 +243,11 @@ export default function Billing() {
     const now = new Date()
     const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString()
     const monthlyRevenue = payments.filter((p) => p.status === 'completed' && p.payment_date >= monthStart).reduce((sum, p) => sum + p.amount, 0)
-    const pendingCheques = cheques.filter((c) => c.status === 'pending' || c.status === 'deposited')
+    // Guarantee cheques are collateral against a payment plan's balance —
+    // that balance is already counted once in outstandingBalance via the
+    // plan's installments, so including the guarantee cheque here too
+    // would double-count the same debt as if it were separate incoming cash.
+    const pendingCheques = cheques.filter((c) => c.purpose !== 'guarantee' && (c.status === 'pending' || c.status === 'deposited'))
     const pendingChequeAmount = pendingCheques.reduce((sum, c) => sum + c.amount, 0)
     const totalExpenses = expenses.reduce((sum, e) => sum + (e.amount || 0), 0)
 
@@ -370,6 +384,10 @@ export default function Billing() {
             cheque_number: chequeForm.cheque_number || null, account_number: chequeForm.account_number || null,
             issue_date: chequeForm.issue_date, due_date: chequeForm.due_date,
             payee_name: chequeForm.payee_name || null, sayad_id: toEnglishDigits(chequeForm.sayad_id || '').trim() || null, notes: chequeForm.notes || null,
+            // A cheque created here (the general چک module) is always a
+            // normal payment cheque, never a plan's guarantee cheque —
+            // those are only ever created atomically inside createPaymentPlan.
+            purpose: 'payment', payment_plan_id: null,
             status: chequeForm.status, created_by: null,
           } as any)
           showToast('success', 'چک ثبت شد'); setChequeModalOpen(false); await loadData()
@@ -384,6 +402,14 @@ export default function Billing() {
     if (!planForm.total_amount || Number(planForm.total_amount) <= 0) { showToast('error', 'مبلغ کل را وارد کنید'); return }
     const count = Number(planForm.installment_count)
     if (count < 1) { showToast('error', 'تعداد اقساط باید حداقل ۱ باشد'); return }
+    // Guarantee cheque is always mandatory for a payment plan — it secures
+    // the full balance, separate from the cash-only monthly installments.
+    if (!planForm.guarantee_cheque_number.trim()) { showToast('error', 'شماره چک ضمانت الزامی است'); return }
+    if (!planForm.guarantee_due_date) { showToast('error', 'تاریخ سررسید چک ضمانت الزامی است'); return }
+    const guaranteeSayadDigits = toEnglishDigits(planForm.guarantee_sayad_id || '').trim()
+    if (guaranteeSayadDigits && (guaranteeSayadDigits.length !== 16 || !/^[0-9]+$/.test(guaranteeSayadDigits))) {
+      showToast('error', 'شناسه صیاد چک ضمانت باید ۱۶ رقم باشد'); return
+    }
     const patient = patientMap.get(planForm.patient_id)
     confirmAction({
       type: 'create',
@@ -393,6 +419,7 @@ export default function Billing() {
         { label: 'مبلغ کل', value: `${formatCurrency(Number(planForm.total_amount))} ت` },
         { label: 'تعداد اقساط', value: toPersianDigits(count) },
         { label: 'مبلغ هر قسط', value: `${formatCurrency(Math.round(Number(planForm.total_amount) / count))} ت` },
+        { label: 'چک ضمانت', value: `${formatCurrency(Number(planForm.total_amount))} ت — شماره ${planForm.guarantee_cheque_number}`, highlight: true },
       ],
       confirmLabel: 'ایجاد طرح',
       onConfirm: async () => {
@@ -411,8 +438,19 @@ export default function Billing() {
             patient_id: planForm.patient_id, encounter_id: planForm.encounter_id || null,
             total_amount: totalAmount, installment_count: count, start_date: planForm.start_date,
             status: 'active', notes: planForm.notes || null, created_by: null,
-          } as any, installments as any)
-          showToast('success', 'طرح قسطی ایجاد شد'); setPlanModalOpen(false); await loadData()
+          } as any, installments as any, {
+            patient_id: planForm.patient_id,
+            bank_name: planForm.guarantee_bank_name || null,
+            branch: planForm.guarantee_branch || null,
+            cheque_number: planForm.guarantee_cheque_number,
+            account_number: planForm.guarantee_account_number || null,
+            sayad_id: guaranteeSayadDigits || null,
+            issue_date: planForm.guarantee_issue_date,
+            due_date: planForm.guarantee_due_date,
+            payee_name: planForm.guarantee_payee_name || null,
+            status: 'pending', notes: 'چک ضمانت طرح قسطی', created_by: null,
+          } as any)
+          showToast('success', 'طرح قسطی و چک ضمانت ایجاد شد'); setPlanModalOpen(false); await loadData()
         } catch { showToast('error', 'خطا') }
         finally { setSavingPlan(false) }
       },
@@ -881,7 +919,12 @@ export default function Billing() {
                       <Banknote size={18} />
                     </div>
                     <div>
-                      <p className="text-sm font-bold text-slate-800">{formatCurrency(c.amount)} تومان</p>
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <p className="text-sm font-bold text-slate-800">{formatCurrency(c.amount)} تومان</p>
+                        {c.purpose === 'guarantee' && (
+                          <span className="text-[10px] px-1.5 py-0.5 rounded-md bg-amber-100 text-amber-700 font-bold">ضمانت طرح قسطی</span>
+                        )}
+                      </div>
                       <p className="text-xs text-slate-500">
                         {getPatientName(c.patient_id)} - سررسید: {toJalaliStringPretty(c.due_date)}
                       </p>
@@ -1408,6 +1451,40 @@ export default function Billing() {
                   <p className="text-xs text-primary-500 mt-1">اقساط به صورت ماهانه و از تاریخ شروع محاسبه می‌شوند</p>
                 </div>
               )}
+            </>
+          ),
+        },
+        {
+          label: 'چک ضمانت',
+          validate: () => {
+            if (!planForm.guarantee_cheque_number.trim()) return 'شماره چک ضمانت الزامی است'
+            if (!planForm.guarantee_due_date) return 'تاریخ سررسید چک ضمانت الزامی است'
+            const digits = toEnglishDigits(planForm.guarantee_sayad_id || '').trim()
+            if (digits && (digits.length !== 16 || !/^[0-9]+$/.test(digits))) return 'شناسه صیاد باید ۱۶ رقم باشد'
+            return null
+          },
+          content: (
+            <>
+              <div className="p-3 rounded-xl bg-amber-50 dark:bg-amber-900/20 text-amber-700 dark:text-amber-400 text-sm mb-1">
+                <p>هر طرح قسطی نیازمند یک چک ضمانت به مبلغ کل بدهی است. این چک جدا از اقساط ماهانه (که نقدی ثبت می‌شوند) نگهداری می‌شود.</p>
+                {planForm.total_amount && (
+                  <p className="mt-1 font-bold">مبلغ چک ضمانت: {formatCurrency(Number(planForm.total_amount))} تومان</p>
+                )}
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <Input label="نام بانک" value={planForm.guarantee_bank_name} onChange={(v) => setPlanForm((p) => ({ ...p, guarantee_bank_name: v }))} />
+                <Input label="شعبه" value={planForm.guarantee_branch} onChange={(v) => setPlanForm((p) => ({ ...p, guarantee_branch: v }))} />
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <Input label="شماره چک" value={planForm.guarantee_cheque_number} onChange={(v) => setPlanForm((p) => ({ ...p, guarantee_cheque_number: v }))} dir="ltr" />
+                <Input label="شماره حساب" value={planForm.guarantee_account_number} onChange={(v) => setPlanForm((p) => ({ ...p, guarantee_account_number: v }))} dir="ltr" />
+              </div>
+              <Input label="شناسه صیاد (اختیاری)" value={planForm.guarantee_sayad_id} onChange={(v) => setPlanForm((p) => ({ ...p, guarantee_sayad_id: v }))} placeholder="۱۶ رقمی، از روی چک" dir="ltr" />
+              <Input label="در وجه" value={planForm.guarantee_payee_name} onChange={(v) => setPlanForm((p) => ({ ...p, guarantee_payee_name: v }))} />
+              <div className="grid grid-cols-2 gap-3">
+                <PersianDateInput label="تاریخ صدور" value={planForm.guarantee_issue_date} onChange={(v) => setPlanForm((p) => ({ ...p, guarantee_issue_date: v }))} />
+                <PersianDateInput label="تاریخ سررسید" value={planForm.guarantee_due_date} onChange={(v) => setPlanForm((p) => ({ ...p, guarantee_due_date: v }))} />
+              </div>
             </>
           ),
         },

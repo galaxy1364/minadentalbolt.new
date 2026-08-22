@@ -148,6 +148,12 @@ class MinadentDB extends Dexie {
     this.version(6).stores({
       inventory_items: 'id, clinic_id, category_id, name, brand, quantity, min_quantity, barcode',
     })
+    // v7: guarantee cheques for installment payment plans — link cheques
+    // to the plan they secure via payment_plan_id (purpose itself doesn't
+    // need indexing, payment_plan_id does for the plan-detail lookup).
+    this.version(7).stores({
+      cheques: 'id, clinic_id, patient_id, status, due_date, payment_plan_id',
+    })
   }
 }
 
