@@ -4,7 +4,7 @@ import { useNavigate, useLocation } from 'react-router-dom'
 import { CreditCard, Plus, Search, DollarSign, TrendingUp, Wallet, Calendar, CalendarClock, CheckCircle2, AlertCircle, Edit2, Filter, Receipt, Banknote, Clock, Trash2, Printer } from 'lucide-react'
 import { BarChart, Bar, XAxis, YAxis, Tooltip as RTooltip, ResponsiveContainer, PieChart, Pie, Cell as RCell } from 'recharts'
 import { fetchPayments, createPayment, updatePayment, deletePayment, fetchEncounters, fetchCheques, createCheque, updateCheque, deleteCheque, fetchPaymentPlans, createPaymentPlan, updatePaymentPlan, deletePaymentPlan, updateInstallment, fetchPatients, fetchExpenses, createExpense, updateExpense, deleteExpense, fetchTreatments, fetchImplantCases } from '../lib/api'
-import { toJalaliString, toJalaliStringPretty, formatCurrency, formatNumber, toPersianDigits } from '../lib/persianDate'
+import { toJalaliString, toJalaliStringPretty, formatCurrency, formatNumber, toPersianDigits, toEnglishDigits } from '../lib/persianDate'
 import { h } from '../lib/haptics'
 import { useConfirmAction } from '../components/ConfirmAction'
 import { Payment, Encounter, Cheque, PaymentPlan, PaymentPlanWithRelations, Patient, Expense, Treatment, ImplantCase, Installment } from '../types'
@@ -369,7 +369,7 @@ export default function Billing() {
             bank_name: chequeForm.bank_name || null, branch: chequeForm.branch || null,
             cheque_number: chequeForm.cheque_number || null, account_number: chequeForm.account_number || null,
             issue_date: chequeForm.issue_date, due_date: chequeForm.due_date,
-            payee_name: chequeForm.payee_name || null, sayad_id: chequeForm.sayad_id || null, notes: chequeForm.notes || null,
+            payee_name: chequeForm.payee_name || null, sayad_id: toEnglishDigits(chequeForm.sayad_id || '').trim() || null, notes: chequeForm.notes || null,
             status: chequeForm.status, created_by: null,
           } as any)
           showToast('success', 'چک ثبت شد'); setChequeModalOpen(false); await loadData()
@@ -1081,7 +1081,11 @@ export default function Billing() {
   }
 
   const renderExpensesTab = () => {
-    const totalExpenses = expenses.reduce((sum, e) => sum + (e.amount || 0), 0)
+    // Reuse the single already-memoized totalExpenses from `stats` instead of
+    // recomputing it from scratch on every render — keeps this number
+    // provably identical to the one shown elsewhere and avoids drift if the
+    // stats calculation ever gains filtering logic that this copy wouldn't.
+    const { totalExpenses } = stats
 
     return (
       <div className="space-y-4">
@@ -1325,6 +1329,13 @@ export default function Billing() {
         },
         {
           label: 'مشخصات بانکی',
+          validate: () => {
+            const digits = toEnglishDigits(chequeForm.sayad_id || '').trim()
+            if (digits && (digits.length !== 16 || !/^[0-9]+$/.test(digits))) {
+              return 'شناسه صیاد باید ۱۶ رقم باشد'
+            }
+            return null
+          },
           content: (
             <>
               <div className="grid grid-cols-2 gap-3">

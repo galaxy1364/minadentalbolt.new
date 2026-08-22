@@ -262,6 +262,19 @@ export function toPersianDigits(s: string | number): string {
   return String(s).replace(/[0-9]/g, (d) => persianDigits[parseInt(d)])
 }
 
+/** Reverse of toPersianDigits — normalizes Persian/Arabic-Indic digits typed
+ * on a Persian keyboard back to plain ASCII digits, for validating or storing
+ * user-entered numeric codes (e.g. sayad cheque IDs, national IDs). */
+export function toEnglishDigits(s: string | number): string {
+  const persianDigits = '۰۱۲۳۴۵۶۷۸۹'
+  const arabicDigits = '٠١٢٣٤٥٦٧٨٩'
+  return String(s).replace(/[۰-۹٠-٩]/g, (d) => {
+    const pIdx = persianDigits.indexOf(d)
+    if (pIdx !== -1) return String(pIdx)
+    return String(arabicDigits.indexOf(d))
+  })
+}
+
 export function getTodayJalali(): string {
   return toJalaliString(new Date().toISOString())
 }
