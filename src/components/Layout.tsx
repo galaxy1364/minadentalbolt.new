@@ -269,10 +269,7 @@ function BottomTabBar() {
                 }`}
                 style={active ? { color: item.color } : undefined}
               >
-                <div
-                  className="relative p-1.5 rounded-xl transition-all-smooth"
-                  style={active ? { background: item.colorLight } : undefined}
-                >
+                <div className="relative p-1.5 transition-all-smooth">
                   <Icon size={active ? 22 : 20} strokeWidth={active ? 2.5 : 1.8} />
                   {item.path === '/billing' && debtorCount > 0 && (
                     <span className="absolute -top-1 -left-1 min-w-[16px] h-4 px-1 rounded-full bg-error-500 text-white text-[9px] font-bold flex items-center justify-center border border-white dark:border-slate-900">
@@ -295,9 +292,7 @@ function BottomTabBar() {
             }`}
             style={isMoreActive && currentMod ? { color: currentMod.color } : undefined}
           >
-            <div className="p-1.5 rounded-xl transition-all-smooth"
-              style={isMoreActive && currentMod ? { background: currentMod.colorLight } : undefined}
-            >
+            <div className="p-1.5 transition-all-smooth">
               <MoreHorizontal size={isMoreActive ? 22 : 20} strokeWidth={isMoreActive ? 2.5 : 1.8} />
             </div>
             <span className={`text-[10px] font-medium leading-none ${isMoreActive ? '' : 'text-slate-400 dark:text-slate-500'}`}
