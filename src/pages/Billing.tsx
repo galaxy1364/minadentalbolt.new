@@ -762,7 +762,7 @@ export default function Billing() {
           showToast('success', 'صندوق باز شد')
           setOpeningBalanceInput('')
           await loadData()
-        } catch { showToast('error', 'خطا در باز کردن صندوق') }
+        } catch (err) { showToast('error', err instanceof Error ? err.message : 'خطا در باز کردن صندوق') }
         finally { setSavingRegister(false) }
       },
     })
@@ -771,10 +771,19 @@ export default function Billing() {
   // Expected cash = opening balance + every completed CASH payment
   // recorded since the register opened — the real-world number that
   // should be sitting in the physical drawer right now.
+  //
+  // Uses created_at (the real moment the payment was entered into the
+  // system), not payment_date (a date-only field staff can backdate to
+  // "when the money was actually received"). Comparing against
+  // payment_date caused false discrepancies: a cash payment recorded
+  // this morning with today's payment_date would count toward a
+  // register opened this afternoon, even though that cash was never in
+  // *this* session's drawer — and the same bug would silently pull in
+  // payments from an earlier, already-closed session on the same day.
   const expectedCashInDrawer = useMemo(() => {
     if (!openSession) return 0
     const cashSincOpen = payments
-      .filter((p) => p.status === 'completed' && p.payment_method === 'cash' && p.payment_date >= openSession.opened_at.slice(0, 10))
+      .filter((p) => p.status === 'completed' && p.payment_method === 'cash' && p.created_at >= openSession.opened_at)
       .reduce((s, p) => s + p.amount, 0)
     return openSession.opening_balance + cashSincOpen
   }, [openSession, payments])

@@ -1343,6 +1343,15 @@ export async function getOpenCashRegisterSession(): Promise<CashRegisterSession 
 }
 
 export async function openCashRegisterSession(openingBalance: number): Promise<CashRegisterSession> {
+  // Defense in depth: the UI already hides the "open" form while a
+  // session is open, but that alone doesn't stop it — e.g. two browser
+  // tabs open at once, or a stale UI state after a slow sync. Two
+  // concurrently open sessions would corrupt expectedCashInDrawer (which
+  // assumes a single open session) and make the physical reconciliation
+  // meaningless, so the API layer refuses this regardless of what the UI
+  // currently shows.
+  const alreadyOpen = await getOpenCashRegisterSession()
+  if (alreadyOpen) throw new Error('یک صندوق از قبل باز است — ابتدا آن را ببندید')
   const id = uid()
   const session: CashRegisterSession = {
     id, clinic_id: CLINIC_ID, opened_at: nowISO(), closed_at: null,
