@@ -404,7 +404,19 @@ export default function Laboratory() {
     if (idx === -1 || idx >= LAB_STAGES.length - 1) return
     h.select()
     try {
-      await updateLabOrder(order.id, { stage: LAB_STAGES[idx + 1].key } as any)
+      const updates: Record<string, unknown> = { stage: LAB_STAGES[idx + 1].key }
+      // Keep the coarse `status` field (which Dashboard's active/overdue
+      // count reads) from silently drifting behind the pipeline stage.
+      // Advancing past the first stage means work has genuinely started,
+      // so a still-'ordered' order should read as 'in_progress' — without
+      // this, Dashboard could show an order stuck at 'سفارش داده‌شده'
+      // even after it's most of the way through production.
+      // Deliberately NOT auto-setting 'delivered' at the final stage:
+      // that status represents the physical handoff to the clinic/patient,
+      // a real-world event distinct from the lab finishing its work, and
+      // should stay a manual action.
+      if (order.status === 'ordered') updates.status = 'in_progress'
+      await updateLabOrder(order.id, updates as any)
       await loadData()
     } catch { showToast('error', 'خطا در به‌روزرسانی مرحله') }
   }
