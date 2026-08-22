@@ -217,8 +217,8 @@ function StatTile({
     >
       <div className={`absolute -top-6 -left-6 w-24 h-24 rounded-full bg-gradient-to-br ${theme.blob} to-transparent blur-xl pointer-events-none breathe-slow`} />
       <div className="relative flex items-center gap-2 mb-1.5">
-        <ModuleIconBadge color={theme.solidColor} gradient={theme.gradient} size={28} rounded="28%">
-          {isValidElement(icon) ? cloneElement(icon as React.ReactElement<any>, { size: 14 }) : icon}
+        <ModuleIconBadge color={theme.solidColor} size={22}>
+          {isValidElement(icon) ? cloneElement(icon as React.ReactElement<any>, { size: 20 }) : icon}
         </ModuleIconBadge>
         <p className="text-[11px] font-semibold text-slate-500 dark:text-slate-400 truncate">{label}</p>
       </div>
@@ -263,9 +263,9 @@ function QuickAction({ icon, label, color, onClick, delay }: { icon: React.React
       className={`tile-in card-lift relative overflow-hidden flex flex-col items-center gap-1.5 p-3 rounded-2xl bg-gradient-to-br ${theme.bg} border border-slate-100 dark:border-slate-700 shadow-sm min-w-[76px] flex-1 focus:outline-none focus:ring-4 ${theme.ring}`}
     >
       <div className={`absolute -bottom-6 -left-6 w-20 h-20 rounded-full bg-gradient-to-br ${theme.blob} to-transparent blur-xl pointer-events-none breathe-slow`} />
-      <ModuleIconBadge color={theme.solidColor} gradient={theme.gradient} size={36} rounded="26%">
+      <ModuleIconBadge color={theme.solidColor} size={30}>
         <div className="float-bounce">
-          {isValidElement(icon) ? cloneElement(icon as React.ReactElement<any>, { size: 17 }) : icon}
+          {isValidElement(icon) ? cloneElement(icon as React.ReactElement<any>, { size: 27 }) : icon}
         </div>
       </ModuleIconBadge>
       <span className={`relative text-[11px] font-bold ${theme.text}`}>{label}</span>

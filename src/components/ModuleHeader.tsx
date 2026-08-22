@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import type { ReactNode } from 'react'
+import { isValidElement, cloneElement } from 'react'
 import { ChevronLeft, Settings2 } from 'lucide-react'
 import { modules } from '../theme/modules'
 import { h } from '../lib/haptics'
@@ -24,8 +25,8 @@ export function ModuleHeader({ moduleKey, title, subtitle, action }: {
         style={{ background: `radial-gradient(circle, ${mod.color}66, transparent 70%)` }}
       />
       <div className="relative flex items-center gap-3">
-        <ModuleIconBadge color={mod.color} gradient={mod.gradient} size={48} rounded="26%">
-          <Icon size={26} strokeWidth={2} />
+        <ModuleIconBadge color={mod.color} size={44}>
+          <Icon size={40} strokeWidth={1.8} />
         </ModuleIconBadge>
         <div>
           <h1 className="text-lg font-extrabold text-slate-800 dark:text-slate-100 leading-tight">{title}</h1>
@@ -55,8 +56,8 @@ export function ModuleStatCard({ moduleKey, icon, label, value }: {
         style={{ background: `radial-gradient(circle, ${mod.color}55, transparent 70%)` }}
       />
       <div className="relative flex items-center gap-2.5">
-        <ModuleIconBadge color={mod.color} gradient={mod.gradient} size={40} rounded="28%">
-          {icon}
+        <ModuleIconBadge color={mod.color} size={34}>
+          {isValidElement(icon) ? cloneElement(icon as React.ReactElement<any>, { size: 30 }) : icon}
         </ModuleIconBadge>
         <div className="min-w-0">
           <p className="text-[11px] text-slate-500 dark:text-slate-400 truncate">{label}</p>

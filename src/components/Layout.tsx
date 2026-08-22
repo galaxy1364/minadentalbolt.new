@@ -212,8 +212,8 @@ function MoreDrawer({ open, onClose }: { open: boolean; onClose: () => void }) {
                   active ? 'text-slate-700 dark:text-slate-200' : 'text-slate-500 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-700/50'
                 }`}
               >
-                <ModuleIconBadge color={item.color} gradient={item.gradient} size={44} rounded="30%">
-                  <Icon size={22} />
+                <ModuleIconBadge color={item.color} size={38}>
+                  <Icon size={34} />
                 </ModuleIconBadge>
                 <span className={`text-[11px] font-medium text-center leading-tight ${active ? 'font-bold' : ''}`}>{item.label}</span>
               </button>
@@ -350,7 +350,7 @@ function LayoutInner({ children }: { children: React.ReactNode }) {
             onClick={() => { h.tap(); navigate('/') }}
             className="flex items-center gap-2.5 active:opacity-80 transition-opacity press-scale"
           >
-            <MinadentLogo size={36} className="shrink-0" />
+            <MinadentLogo size={42} className="shrink-0" />
             <div>
               <p className="text-[15px] font-extrabold text-slate-800 dark:text-slate-100 leading-none">مینادنت <span className="text-[9px] font-normal text-slate-300 dark:text-slate-600 align-middle">v{APP_VERSION}</span></p>
               {currentItem && (
