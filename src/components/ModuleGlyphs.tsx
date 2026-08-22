@@ -1,255 +1,281 @@
-// ModuleGlyphs.tsx — real custom icon marks, hand-drawn in SVG, one
-// per primary module. Not a recolored generic lucide-react shape: each
-// glyph fuses a small tooth silhouette (the brand's own motif, matching
-// the logo) with an element specific to that module's job, so
-// نوبت‌دهی actually looks different in SILHOUETTE from درمان, not just
-// in color. Rendered at 24x24 viewBox so they drop into ModuleIconBadge
-// exactly like a lucide icon would (same size prop, same currentColor
-// fill via `fill="currentColor"` throughout).
+// ModuleGlyphs.tsx — v2: each module's own real-world symbol (calendar,
+// person, stethoscope, wallet, flask, etc.) is now the DOMINANT, full-
+// size shape — not a shared tooth outline with a tiny corner badge.
+// The earlier design made every icon read as "a tooth" from a normal
+// glance, with the actually-distinguishing element too small to
+// register — exactly the complaint: "they all look the same." Flipped
+// the emphasis: the job-specific symbol carries the silhouette, a
+// small tooth mark (bottom-right) is the only shared brand accent.
 
 type GlyphProps = { size?: number | string; strokeWidth?: number | string }
 
-const toothPath = 'M12 3.4c-1.5 0-2.7.5-3.3 1.6-.6 1-.7 2.3-.5 3.7.2 1.5.6 3.2 1 4.9.2.8.4 1.5.5 1.9.1.3.4.5.7.3.3-.2.4-.7.6-1.3.1-.4.2-.8.2-1.1 0 .3.1.7.2 1.1.2.6.3 1.1.6 1.3.3.2.6 0 .7-.3.1-.4.3-1.1.5-1.9.4-1.7.8-3.4 1-4.9.2-1.4.1-2.7-.5-3.7-.6-1.1-1.8-1.6-3.3-1.6z'
+// Small consistent brand accent — a simplified tooth mark, used at
+// reduced size in the corner of every glyph below.
+const toothAccent = (
+  <path
+    d="M19.5 15.2c-.6 0-1.1.2-1.4.7-.3.4-.3 1-.2 1.6.1.6.2 1.3.4 2 .1.3.2.6.2.8.1.2.2.2.3.1.1-.1.2-.3.2-.5 0-.2.1-.3.1-.5 0 .1 0 .3.1.5 0 .2.1.4.2.5.1.1.2.1.3-.1.1-.2.2-.5.2-.8.2-.7.3-1.4.4-2 .1-.6.1-1.2-.2-1.6-.3-.5-.8-.7-1.4-.7z"
+    fill="white"
+    fillOpacity="0.95"
+  />
+)
 
-// نوبت‌دهی — a tooth wearing a small calendar-page fold on its
-// shoulder, with a dot marking "today".
+// نوبت‌دهی — a bold calendar page IS the icon; tooth mark bottom-right.
 export function GlyphAppointments({ size = 24 }: GlyphProps) {
   return (
     <svg width={size} height={size} viewBox="0 0 24 24" fill="none">
-      <path d={toothPath} fill="currentColor" fillOpacity="0.95" />
-      <rect x="13.5" y="2.5" width="7" height="6" rx="1.4" fill="currentColor" stroke="currentColor" strokeOpacity="0.35" />
-      <path d="M15 2.5v1.6M19 2.5v1.6" stroke="white" strokeOpacity="0.7" strokeWidth="1" strokeLinecap="round" />
-      <circle cx="17" cy="6.2" r="1" fill="white" />
+      <rect x="2.5" y="4" width="16" height="15" rx="2.6" fill="currentColor" />
+      <rect x="2.5" y="4" width="16" height="4.6" rx="2.6" fill="currentColor" fillOpacity="0.6" />
+      <path d="M6.3 2.2v3.6M14.7 2.2v3.6" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" />
+      <circle cx="6.7" cy="12.4" r="1.15" fill="white" fillOpacity="0.9" />
+      <circle cx="10.5" cy="12.4" r="1.15" fill="white" fillOpacity="0.9" />
+      <circle cx="6.7" cy="16" r="1.15" fill="white" fillOpacity="0.9" />
+      <circle cx="14.3" cy="12.4" r="1.15" fill="white" fillOpacity="0.55" />
+      {toothAccent}
     </svg>
   )
 }
 
-// بیماران — a tooth with a small person silhouette nested at its base,
-// like the tooth is "holding" the patient it represents.
+// بیماران — a warm, rounded person silhouette as the main shape.
 export function GlyphPatients({ size = 24 }: GlyphProps) {
   return (
     <svg width={size} height={size} viewBox="0 0 24 24" fill="none">
-      <path d={toothPath} fill="currentColor" fillOpacity="0.95" />
-      <circle cx="17.3" cy="4.3" r="2" fill="currentColor" />
-      <path d="M14 9.5c0-2 1.5-3 3.3-3s3.3 1 3.3 3" stroke="currentColor" strokeWidth="2" strokeLinecap="round" fill="none" />
+      <circle cx="10.5" cy="7.2" r="4" fill="currentColor" />
+      <path d="M3.5 20c0-4.6 3.1-7.2 7-7.2s7 2.6 7 7.2" fill="currentColor" />
+      {toothAccent}
     </svg>
   )
 }
 
-// درمان — a tooth with a stethoscope head resting against it.
+// درمان — a full stethoscope shape, the actual instrument, not a hint of one.
 export function GlyphTreatments({ size = 24 }: GlyphProps) {
   return (
     <svg width={size} height={size} viewBox="0 0 24 24" fill="none">
-      <path d={toothPath} fill="currentColor" fillOpacity="0.95" />
-      <path d="M15 2.2v2.6c0 1.4 1 2.4 2.3 2.4s2.3-1 2.3-2.4V2.2" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" fill="none" />
-      <circle cx="19.6" cy="8.6" r="1.5" fill="currentColor" />
-      <circle cx="15" cy="1.9" r="0.9" fill="currentColor" />
+      <path
+        d="M6 2.5v5.3c0 2.6 2 4.6 4.6 4.6s4.6-2 4.6-4.6V2.5"
+        stroke="currentColor"
+        strokeWidth="2.1"
+        strokeLinecap="round"
+        fill="none"
+      />
+      <path d="M10.6 12.4v2.4c0 2.7 2.2 4.6 4.9 4.6 2.5 0 4.6-1.9 4.8-4.4" stroke="currentColor" strokeWidth="2.1" strokeLinecap="round" fill="none" />
+      <circle cx="20.2" cy="14.6" r="2.3" fill="currentColor" />
+      <circle cx="5" cy="2.3" r="1.5" fill="currentColor" />
+      <circle cx="11" cy="2.3" r="1.5" fill="currentColor" />
+      {toothAccent}
     </svg>
   )
 }
 
-// مالی — a tooth with a coin/wallet-slot mark, using the classic
-// currency-slot notch as the distinguishing shape.
+// مالی — a full wallet shape with a coin, currency the dominant read.
 export function GlyphBilling({ size = 24 }: GlyphProps) {
   return (
     <svg width={size} height={size} viewBox="0 0 24 24" fill="none">
-      <path d={toothPath} fill="currentColor" fillOpacity="0.95" />
-      <circle cx="17.5" cy="4.5" r="3.1" fill="currentColor" />
-      <path d="M17.5 2.9v3.2M16.6 3.5c0-.5.4-.8 1-.8.7 0 1.1.4 1.1.9 0 1.1-2.1.7-2.1 1.9 0 .5.5.9 1.1.9.6 0 1-.3 1-.8" stroke="white" strokeOpacity="0.85" strokeWidth="0.7" strokeLinecap="round" fill="none" />
+      <rect x="2" y="6" width="18" height="13.5" rx="2.8" fill="currentColor" />
+      <rect x="5" y="3" width="13" height="4.6" rx="2" fill="currentColor" fillOpacity="0.65" />
+      <circle cx="15.6" cy="12.9" r="3" fill="white" fillOpacity="0.92" />
+      <path d="M15.6 11.3v3.2M14.7 12v-.1c0-.5.4-.8 1-.8.6 0 1 .3 1 .8 0 1.1-2 .7-2 1.8 0 .5.4.8 1 .8.6 0 1-.3 1-.8" stroke="currentColor" strokeWidth="0.6" strokeLinecap="round" fill="none" />
+      {toothAccent}
     </svg>
   )
 }
 
-// لابراتوار — a tooth beside a small flask/beaker shape.
+// لابراتوار — a large erlenmeyer flask with liquid & bubbles.
 export function GlyphLaboratory({ size = 24 }: GlyphProps) {
   return (
     <svg width={size} height={size} viewBox="0 0 24 24" fill="none">
-      <path d={toothPath} fill="currentColor" fillOpacity="0.95" />
-      <path d="M16 1.6h3v1l1.6 3.4c.4.8-.2 1.8-1.1 1.8h-3c-.9 0-1.5-1-1.1-1.8L16 2.6z" fill="currentColor" />
-      <path d="M16.3 5.3h2.4" stroke="white" strokeOpacity="0.6" strokeWidth="0.8" strokeLinecap="round" />
-      <circle cx="17.9" cy="7" r="0.5" fill="white" fillOpacity="0.8" />
+      <path d="M9.5 2.2h5v5.6l4.6 8.6c.9 1.7-.4 3.6-2.3 3.6H7.2c-1.9 0-3.2-1.9-2.3-3.6l4.6-8.6V2.2Z" fill="currentColor" />
+      <rect x="8.8" y="1.8" width="6.4" height="1.8" rx="0.9" fill="currentColor" />
+      <path d="M6.7 15.3h10.6" stroke="white" strokeOpacity="0.5" strokeWidth="1.3" />
+      <circle cx="10" cy="17.6" r="0.9" fill="white" fillOpacity="0.6" />
+      <circle cx="14.2" cy="18.4" r="1.2" fill="white" fillOpacity="0.6" />
+      <circle cx="12" cy="16.2" r="0.7" fill="white" fillOpacity="0.5" />
+      {toothAccent}
     </svg>
   )
 }
 
-// داشبورد — a tooth centered inside a speedometer/gauge arc.
+// داشبورد — a real speedometer dial with needle, full-size.
 export function GlyphDashboard({ size = 24 }: GlyphProps) {
   return (
     <svg width={size} height={size} viewBox="0 0 24 24" fill="none">
-      <path d="M4 15.5a8.5 8.5 0 0 1 16 0" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" fill="none" opacity="0.55" />
-      <path d="M12 15.5 15 10.5" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
-      <circle cx="12" cy="15.5" r="1.3" fill="currentColor" />
-      <g transform="translate(6.2 -5.5) scale(0.55)">
-        <path d={toothPath} fill="currentColor" fillOpacity="0.95" />
-      </g>
+      <path d="M2.2 16A9.8 9.8 0 0 1 21.8 16" stroke="currentColor" strokeWidth="3.2" strokeLinecap="round" fill="none" opacity="0.32" />
+      <path d="M2.2 16A9.8 9.8 0 0 1 16.6 4" stroke="currentColor" strokeWidth="3.2" strokeLinecap="round" fill="none" />
+      <circle cx="12" cy="16" r="2" fill="currentColor" />
+      <path d="M12 16 17 9.8" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+      {toothAccent}
     </svg>
   )
 }
 
-// ایمپلنت — a tooth with a small implant screw/fixture beside it.
+// ایمپلنت — a large implant screw/fixture with thread detail, the dominant shape.
 export function GlyphImplants({ size = 24 }: GlyphProps) {
   return (
     <svg width={size} height={size} viewBox="0 0 24 24" fill="none">
-      <path d={toothPath} fill="currentColor" fillOpacity="0.95" />
-      <path d="M17.5 1.6v3.2" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
-      <path d="M15.6 3.4h3.8M15.9 4.7h3.2M16.2 6h2.6" stroke="currentColor" strokeWidth="1" strokeLinecap="round" />
-      <circle cx="17.5" cy="1.6" r="1.3" fill="currentColor" />
+      <path d="M8.5 2h7l1.2 2.2-1.2 13.8a2 2 0 0 1-2 1.8h-1.8a2 2 0 0 1-2-1.8L8.5 4.2 8.5 2Z" fill="currentColor" />
+      <path d="M7.6 6h8.8M7.9 8.3h8.2M8.2 10.6h7.6M8.5 12.9h7M8.8 15.2h6.4" stroke="white" strokeOpacity="0.55" strokeWidth="1" strokeLinecap="round" />
+      {toothAccent}
     </svg>
   )
 }
 
-// بیمه — a tooth guarded by a small shield-check mark.
+// بیمه — a full shield with a checkmark, the dominant shape.
 export function GlyphInsurance({ size = 24 }: GlyphProps) {
   return (
     <svg width={size} height={size} viewBox="0 0 24 24" fill="none">
-      <path d={toothPath} fill="currentColor" fillOpacity="0.95" />
-      <path d="M17.5 1.4 20 2.3v2c0 1.6-1 2.9-2.5 3.4-1.5-.5-2.5-1.8-2.5-3.4v-2z" fill="currentColor" />
-      <path d="M16.3 4.1l.9.9 1.5-1.7" stroke="white" strokeWidth="0.8" strokeLinecap="round" strokeLinejoin="round" fill="none" />
+      <path d="M12 2 20 5v6c0 5-3.4 8.4-8 9.6C7.4 19.4 4 16 4 11V5l8-3Z" fill="currentColor" />
+      <path d="M8.4 11.4l2.4 2.4 4.8-5" stroke="white" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" fill="none" />
+      {toothAccent}
     </svg>
   )
 }
 
-// مالی شخصی — a tooth beside a small piggy-bank silhouette.
-export function GlyphPersonalFinance({ size = 24 }: GlyphProps) {
-  return (
-    <svg width={size} height={size} viewBox="0 0 24 24" fill="none">
-      <path d={toothPath} fill="currentColor" fillOpacity="0.95" />
-      <ellipse cx="17.5" cy="4.6" rx="3" ry="2.3" fill="currentColor" />
-      <circle cx="20" cy="3.2" r="0.9" fill="currentColor" />
-      <path d="M15.5 4.6h.01" stroke="white" strokeWidth="1.4" strokeLinecap="round" />
-      <path d="M16.5 6.6v1M18.5 6.6v1" stroke="currentColor" strokeWidth="1.1" strokeLinecap="round" />
-    </svg>
-  )
-}
-
-// پیامک — a tooth with a small speech/message bubble.
-export function GlyphSms({ size = 24 }: GlyphProps) {
-  return (
-    <svg width={size} height={size} viewBox="0 0 24 24" fill="none">
-      <path d={toothPath} fill="currentColor" fillOpacity="0.95" />
-      <path d="M14.3 1.8h5.4c.7 0 1.3.6 1.3 1.3v2.4c0 .7-.6 1.3-1.3 1.3h-3.4l-1.7 1.5V6.8h-.3c-.7 0-1.3-.6-1.3-1.3V3.1c0-.7.6-1.3 1.3-1.3z" fill="currentColor" />
-      <circle cx="16" cy="4.1" r="0.5" fill="white" />
-      <circle cx="17.5" cy="4.1" r="0.5" fill="white" />
-      <circle cx="19" cy="4.1" r="0.5" fill="white" />
-    </svg>
-  )
-}
-
-// یادآوری‌ها — a tooth with a small alarm-bell mark.
-export function GlyphReminders({ size = 24 }: GlyphProps) {
-  return (
-    <svg width={size} height={size} viewBox="0 0 24 24" fill="none">
-      <path d={toothPath} fill="currentColor" fillOpacity="0.95" />
-      <path d="M17.5 1.9c-1.4 0-2.4 1-2.4 2.4 0 1.6-.4 2-.9 2.5h6.6c-.5-.5-.9-.9-.9-2.5 0-1.4-1-2.4-2.4-2.4z" fill="currentColor" />
-      <path d="M16.5 7.2a1 1 0 002 0" stroke="currentColor" strokeWidth="0.9" strokeLinecap="round" fill="none" />
-      <circle cx="17.5" cy="1.6" r="0.6" fill="currentColor" />
-    </svg>
-  )
-}
-
-// انبار — a tooth with a small stacked-boxes mark.
+// انبار — three bold stacked boxes, the dominant shape.
 export function GlyphInventory({ size = 24 }: GlyphProps) {
   return (
     <svg width={size} height={size} viewBox="0 0 24 24" fill="none">
-      <path d={toothPath} fill="currentColor" fillOpacity="0.95" />
-      <rect x="14.4" y="1.6" width="2.6" height="2.6" rx="0.5" fill="currentColor" />
-      <rect x="17.4" y="1.6" width="2.6" height="2.6" rx="0.5" fill="currentColor" opacity="0.7" />
-      <rect x="15.9" y="4.5" width="2.6" height="2.6" rx="0.5" fill="currentColor" opacity="0.85" />
+      <rect x="2.5" y="3" width="8.4" height="8.4" rx="1.4" fill="currentColor" />
+      <rect x="12.1" y="3" width="8.4" height="8.4" rx="1.4" fill="currentColor" fillOpacity="0.65" />
+      <rect x="7.3" y="12.3" width="8.4" height="8.4" rx="1.4" fill="currentColor" fillOpacity="0.85" />
+      {toothAccent}
     </svg>
   )
 }
 
-// نسخه — a tooth with a small pill/capsule mark.
+// نسخه — a large pill/capsule, the dominant shape.
 export function GlyphPrescriptions({ size = 24 }: GlyphProps) {
   return (
     <svg width={size} height={size} viewBox="0 0 24 24" fill="none">
-      <path d={toothPath} fill="currentColor" fillOpacity="0.95" />
-      <rect x="14.4" y="3.6" width="6.2" height="2.8" rx="1.4" fill="currentColor" transform="rotate(-35 17.5 5)" />
-      <path d="M15.6 4.9l3.8-2.6" stroke="white" strokeOpacity="0.7" strokeWidth="0.7" strokeLinecap="round" />
+      <rect x="1.5" y="8.3" width="19" height="7.4" rx="3.7" fill="currentColor" transform="rotate(-30 11 12)" />
+      <path d="M8.2 8.6l5.6 6.8" stroke="white" strokeOpacity="0.75" strokeWidth="1.1" strokeLinecap="round" />
+      {toothAccent}
     </svg>
   )
 }
 
-// رادیولوژی — a tooth with a small X-ray scan-frame mark.
+// رادیولوژی — a bold X-ray scan frame with corner brackets.
 export function GlyphRadiology({ size = 24 }: GlyphProps) {
   return (
     <svg width={size} height={size} viewBox="0 0 24 24" fill="none">
-      <path d={toothPath} fill="currentColor" fillOpacity="0.95" />
-      <path d="M14.6 2h1.6M20.4 2h-1.6M14.6 7h1.6M20.4 7h-1.6M14.6 2v1.6M14.6 5.4V7M20.4 2v1.6M20.4 5.4V7" stroke="currentColor" strokeWidth="1" strokeLinecap="round" />
-      <path d="M15.4 4.5h4.2" stroke="currentColor" strokeWidth="0.9" strokeLinecap="round" opacity="0.7" />
+      <path d="M3 7V3.5h4M17 3.5h4V7M3 13v3.5h4M21 13v3.5h-4" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" fill="none" />
+      <circle cx="12" cy="10.2" r="3.4" fill="currentColor" />
+      <path d="M10.4 10.2l1.2 1.2 2.2-2.5" stroke="white" strokeWidth="1" strokeLinecap="round" strokeLinejoin="round" fill="none" />
+      {toothAccent}
     </svg>
   )
 }
 
-// پرسنل — a tooth with a small ID-badge/lanyard mark.
+// پرسنل — a large ID badge on a lanyard, the dominant shape.
 export function GlyphStaff({ size = 24 }: GlyphProps) {
   return (
     <svg width={size} height={size} viewBox="0 0 24 24" fill="none">
-      <path d={toothPath} fill="currentColor" fillOpacity="0.95" />
-      <rect x="15.3" y="2.2" width="4.4" height="5.2" rx="1" fill="currentColor" />
-      <circle cx="17.5" cy="4" r="0.9" fill="white" fillOpacity="0.85" />
-      <path d="M16 6.4c0-.7.6-1.1 1.5-1.1s1.5.4 1.5 1.1" stroke="white" strokeOpacity="0.85" strokeWidth="0.6" strokeLinecap="round" fill="none" />
-      <path d="M16.7 1v1.4M18.3 1v1.4" stroke="currentColor" strokeWidth="0.8" strokeLinecap="round" />
+      <path d="M9.5 1.5l2.5 3 2.5-3" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" fill="none" />
+      <rect x="5" y="4.5" width="14" height="15" rx="2.6" fill="currentColor" />
+      <circle cx="12" cy="9.6" r="2.5" fill="white" fillOpacity="0.9" />
+      <path d="M8 16.2c0-1.9 1.7-3 4-3s4 1.1 4 3" stroke="white" strokeOpacity="0.9" strokeWidth="1.4" strokeLinecap="round" fill="none" />
+      {toothAccent}
     </svg>
   )
 }
 
-// گزارش‌ها — a tooth with a small bar/pie chart mark.
+// گزارش‌ها — bold ascending bar chart, the dominant shape.
 export function GlyphReports({ size = 24 }: GlyphProps) {
   return (
     <svg width={size} height={size} viewBox="0 0 24 24" fill="none">
-      <path d={toothPath} fill="currentColor" fillOpacity="0.95" />
-      <rect x="14.6" y="4.6" width="1.5" height="2.6" rx="0.5" fill="currentColor" opacity="0.6" />
-      <rect x="16.7" y="3.2" width="1.5" height="4" rx="0.5" fill="currentColor" opacity="0.8" />
-      <rect x="18.8" y="1.6" width="1.5" height="5.6" rx="0.5" fill="currentColor" />
+      <rect x="2.5" y="12.5" width="4.4" height="7.5" rx="1.2" fill="currentColor" fillOpacity="0.55" />
+      <rect x="9.8" y="8" width="4.4" height="12" rx="1.2" fill="currentColor" fillOpacity="0.8" />
+      <rect x="17.1" y="2.5" width="4.4" height="17.5" rx="1.2" fill="currentColor" />
+      {toothAccent}
     </svg>
   )
 }
 
-// انتظار — a tooth with a small hourglass mark.
+// انتظار — a large hourglass, the dominant shape.
 export function GlyphWaitingList({ size = 24 }: GlyphProps) {
   return (
     <svg width={size} height={size} viewBox="0 0 24 24" fill="none">
-      <path d={toothPath} fill="currentColor" fillOpacity="0.95" />
-      <path d="M15.3 1.8h4.4M15.3 7h4.4M15.5 1.9c0 1.7 1 2.5 2 2.5s2-.8 2-2.5M15.5 6.9c0-1.7 1-2.5 2-2.5s2 .8 2 2.5" fill="currentColor" stroke="currentColor" strokeWidth="0.5" strokeLinejoin="round" />
+      <path d="M4.5 2.5h13M4.5 19.5h13" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+      <path d="M5.5 2.8c0 4.3 2.7 6.2 5.3 6.2s5.3-1.9 5.3-6.2M5.5 19.2c0-4.3 2.7-6.2 5.3-6.2s5.3 1.9 5.3 6.2" fill="currentColor" stroke="currentColor" strokeWidth="0.8" strokeLinejoin="round" />
+      {toothAccent}
     </svg>
   )
 }
 
-// تنظیمات — a tooth with a small gear mark.
+// تنظیمات — a large gear, the dominant shape.
 export function GlyphSettings({ size = 24 }: GlyphProps) {
   return (
     <svg width={size} height={size} viewBox="0 0 24 24" fill="none">
-      <path d={toothPath} fill="currentColor" fillOpacity="0.95" />
-      <circle cx="17.5" cy="4.3" r="1.6" fill="none" stroke="currentColor" strokeWidth="1.3" />
-      <circle cx="17.5" cy="4.3" r="0.5" fill="currentColor" />
-      <path d="M17.5 1.4v1M17.5 6.2v1M20.4 4.3h-1M15.6 4.3h-1M19.6 2.2l-.7.7M16.1 6.4l-.7.7M19.6 6.4l-.7-.7M16.1 2.2l-.7-.7" stroke="currentColor" strokeWidth="1" strokeLinecap="round" />
+      <circle cx="11" cy="11" r="3.6" fill="none" stroke="currentColor" strokeWidth="2.3" />
+      <circle cx="11" cy="11" r="1.1" fill="currentColor" />
+      <path
+        d="M11 3.5v2.2M11 16.3v2.2M18.5 11h-2.2M5.7 11H3.5M16.2 5.8l-1.5 1.5M7.3 14.7l-1.5 1.5M16.2 16.2l-1.5-1.5M7.3 7.3L5.8 5.8"
+        stroke="currentColor"
+        strokeWidth="2"
+        strokeLinecap="round"
+      />
+      {toothAccent}
     </svg>
   )
 }
 
-// بایگانی — a tooth with a small archive-box mark.
+// بایگانی — a large archive box with lid, the dominant shape.
 export function GlyphArchive({ size = 24 }: GlyphProps) {
   return (
     <svg width={size} height={size} viewBox="0 0 24 24" fill="none">
-      <path d={toothPath} fill="currentColor" fillOpacity="0.95" />
-      <rect x="14.5" y="1.8" width="6" height="2" rx="0.6" fill="currentColor" />
-      <path d="M15 3.8h5v2.8a1 1 0 01-1 1h-3a1 1 0 01-1-1V3.8z" fill="currentColor" opacity="0.85" />
-      <path d="M16.5 5h2" stroke="white" strokeOpacity="0.7" strokeWidth="0.8" strokeLinecap="round" />
+      <rect x="2.5" y="3" width="16" height="4.6" rx="1.3" fill="currentColor" />
+      <path d="M3.4 8.4h14.2v7.2a2.2 2.2 0 0 1-2.2 2.2H5.6a2.2 2.2 0 0 1-2.2-2.2V8.4Z" fill="currentColor" fillOpacity="0.85" />
+      <path d="M7.5 11.4h5" stroke="white" strokeOpacity="0.75" strokeWidth="1.4" strokeLinecap="round" />
+      {toothAccent}
     </svg>
   )
 }
 
-// تقویم — a tooth with a small full-month calendar grid mark.
+// تقویم — a large month-grid calendar with date dots, the dominant shape.
 export function GlyphCalendar({ size = 24 }: GlyphProps) {
   return (
     <svg width={size} height={size} viewBox="0 0 24 24" fill="none">
-      <path d={toothPath} fill="currentColor" fillOpacity="0.95" />
-      <rect x="14.6" y="1.8" width="5.8" height="5.2" rx="1" fill="currentColor" />
-      <path d="M14.6 3.4h5.8" stroke="white" strokeOpacity="0.6" strokeWidth="0.6" />
-      <circle cx="15.9" cy="4.9" r="0.5" fill="white" fillOpacity="0.8" />
-      <circle cx="17.5" cy="4.9" r="0.5" fill="white" fillOpacity="0.8" />
-      <circle cx="15.9" cy="6.2" r="0.5" fill="white" fillOpacity="0.8" />
+      <rect x="2.5" y="4" width="16.5" height="15" rx="2.6" fill="currentColor" />
+      <path d="M6 2v3.6M15.5 2v3.6" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" />
+      <path d="M2.5 8.6h16.5" stroke="white" strokeOpacity="0.55" strokeWidth="1" />
+      <circle cx="6.2" cy="12" r="1" fill="white" fillOpacity="0.85" /><circle cx="10.7" cy="12" r="1" fill="white" fillOpacity="0.85" /><circle cx="15.2" cy="12" r="1" fill="white" fillOpacity="0.5" />
+      <circle cx="6.2" cy="15.6" r="1" fill="white" fillOpacity="0.85" /><circle cx="10.7" cy="15.6" r="1" fill="white" fillOpacity="0.5" />
+      {toothAccent}
+    </svg>
+  )
+}
+
+// مالی شخصی — a large piggy bank, the dominant shape.
+export function GlyphPersonalFinance({ size = 24 }: GlyphProps) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+      <ellipse cx="10.5" cy="12" rx="8" ry="6" fill="currentColor" />
+      <circle cx="18.3" cy="8.6" r="2.3" fill="currentColor" />
+      <path d="M6.5 12h.01" stroke="white" strokeWidth="2" strokeLinecap="round" />
+      <path d="M8 17v2M13.5 17v2" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+      <path d="M2 11.5c0 1.6 1 2.5 2.2 2.5" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" fill="none" />
+      {toothAccent}
+    </svg>
+  )
+}
+
+// پیامک — a large speech/message bubble, the dominant shape.
+export function GlyphSms({ size = 24 }: GlyphProps) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+      <path d="M2.5 4.8A2.3 2.3 0 0 1 4.8 2.5h14.4a2.3 2.3 0 0 1 2.3 2.3v8.4a2.3 2.3 0 0 1-2.3 2.3H9l-4.6 3.9v-3.9H4.8a2.3 2.3 0 0 1-2.3-2.3V4.8Z" fill="currentColor" />
+      <circle cx="7.5" cy="9" r="1.1" fill="white" /><circle cx="12" cy="9" r="1.1" fill="white" /><circle cx="16.5" cy="9" r="1.1" fill="white" />
+      {toothAccent}
+    </svg>
+  )
+}
+
+// یادآوری‌ها — a large alarm bell, the dominant shape.
+export function GlyphReminders({ size = 24 }: GlyphProps) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+      <path d="M12 2.2c-3.1 0-5.2 2.2-5.2 5.2 0 4.2-1.2 5.6-2.1 6.5-.4.4-.1 1.1.5 1.1h13.6c.6 0 .9-.7.5-1.1-.9-.9-2.1-2.3-2.1-6.5 0-3-2.1-5.2-5.2-5.2z" fill="currentColor" />
+      <path d="M9.6 17.4a2.4 2.4 0 0 0 4.8 0" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" fill="none" />
+      <circle cx="12" cy="1.7" r="1.3" fill="currentColor" />
+      {toothAccent}
     </svg>
   )
 }
