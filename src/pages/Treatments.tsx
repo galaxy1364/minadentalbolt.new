@@ -891,9 +891,18 @@ export default function Treatments() {
               </div>
             )}
 
-            {/* Billing + Lab referral buttons */}
+            {/* Billing + Lab referral buttons.
+                'ارجاع به مالی' (generic, no context) is now only shown when
+                there's no treatment recorded on this encounter yet — the
+                moment there IS a treatment, the smart 'ارسال به مالی' button
+                above (which pre-fills the amount and links back to this
+                encounter) covers the same destination but does strictly
+                more, so showing both was a plain duplicate that just made
+                staff guess which one to tap. */}
             <div className="flex gap-2 pt-2 border-t border-slate-100">
-              <Button variant="secondary" onClick={() => navigate(`/billing`)} className="flex items-center gap-1.5"><DollarSign size={16} /> ارجاع به مالی</Button>
+              {encounterTreatments.length === 0 && (
+                <Button variant="secondary" onClick={() => navigate(`/billing`)} className="flex items-center gap-1.5"><DollarSign size={16} /> ارجاع به مالی</Button>
+              )}
               <Button variant="secondary" onClick={() => navigate(`/laboratory`)} className="flex items-center gap-1.5"><FlaskConical size={16} /> ارجاع به لابراتوار</Button>
               <Button variant="ghost" onClick={() => navigate(`/patients/${detailEnc.patient_id}`)} className="flex items-center gap-1.5 mr-auto"><Eye size={16} /> پرونده بیمار</Button>
             </div>
