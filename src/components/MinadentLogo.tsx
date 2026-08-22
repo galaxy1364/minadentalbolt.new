@@ -1,8 +1,14 @@
 // MinadentLogo — uses the real branded artwork the user provided
-// (public/logo-256.png), not a hand-drawn approximation. Rounded
-// corners applied via CSS so it scales correctly at any `size`,
-// matching the same rounding used for the generated PWA/home-screen
-// icons built from the same source image.
+// (public/logo-256.png), not a hand-drawn approximation.
+//
+// Two variants: the original full-detail image for large contexts
+// (login screen, public booking page), and logo-256-crisp.png — a
+// sharpened + saturation-boosted variant — for small contexts like
+// the 36-44px header icon, where the original's fine gloss/swoosh
+// gradients genuinely wash out to near-flat at that pixel size
+// (verified directly by rendering both at actual display size before
+// making this change). Below ~64px, the crisp variant is used
+// automatically.
 //
 // Cache-busted with the app version: this file's static filename
 // (unlike the hashed JS bundle filenames) meant CDN/browser caching
@@ -12,9 +18,10 @@
 import { APP_VERSION } from '../lib/appVersion'
 
 export function MinadentLogo({ size = 36, className = '' }: { size?: number; className?: string }) {
+  const src = size < 64 ? '/logo-256-crisp.png' : '/logo-256.png'
   return (
     <img
-      src={`/logo-256.png?v=${APP_VERSION}`}
+      src={`${src}?v=${APP_VERSION}`}
       width={size}
       height={size}
       alt="مینادنت"
