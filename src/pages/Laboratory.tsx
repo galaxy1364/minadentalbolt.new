@@ -127,7 +127,7 @@ export default function Laboratory() {
     lab_id: '',
     patient_id: '',
     doctor_id: '',
-    work_type: 'crown',
+    work_type: 'crown', custom_work_type: '',
     tooth_number: '',
     shade: '',
     material: 'zirconia',
@@ -289,7 +289,7 @@ export default function Laboratory() {
       lab_id: labs.length > 0 ? labs[0].id : '',
       patient_id: '',
       doctor_id: '',
-      work_type: 'crown',
+      work_type: 'crown', custom_work_type: '',
       tooth_number: '',
       shade: '',
       material: 'zirconia',
@@ -305,11 +305,13 @@ export default function Laboratory() {
     h.tap()
     setEditingOrder(order)
     setOrderWizardStep(0)
+    const isKnownWorkType = workTypes.some((w) => w.value === order.work_type)
     setOrderForm({
       lab_id: order.lab_id,
       patient_id: order.patient_id,
       doctor_id: order.doctor_id || '',
-      work_type: order.work_type || 'crown',
+      work_type: isKnownWorkType ? (order.work_type || 'crown') : 'other',
+      custom_work_type: isKnownWorkType ? '' : (order.work_type || ''),
       tooth_number: order.tooth_number || '',
       shade: order.shade || '',
       material: order.material || 'zirconia',
@@ -328,7 +330,7 @@ export default function Laboratory() {
       lab_id: orderForm.lab_id,
       patient_id: orderForm.patient_id,
       doctor_id: orderForm.doctor_id || null,
-      work_type: orderForm.work_type,
+      work_type: orderForm.work_type === 'other' ? (orderForm.custom_work_type.trim() || 'سایر') : orderForm.work_type,
       tooth_number: orderForm.tooth_number || null,
       shade: orderForm.shade || null,
       material: orderForm.material || null,
@@ -889,6 +891,9 @@ export default function Laboratory() {
             content: (
               <>
                 <Select label="نوع کار" value={orderForm.work_type} onChange={(v) => setOrderForm((p) => ({ ...p, work_type: v }))} options={workTypes} />
+                {orderForm.work_type === 'other' && (
+                  <Input label="نام نوع کار (دستی)" value={orderForm.custom_work_type} onChange={(v) => setOrderForm((p) => ({ ...p, custom_work_type: v }))} placeholder="مثلاً: کاری که در لیست نیست" />
+                )}
                 {(() => {
                   // Smart lab-mismatch check: for clinics running separate
                   // fixed vs removable-prosthetics labs, warn immediately

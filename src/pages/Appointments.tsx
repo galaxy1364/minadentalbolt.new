@@ -23,7 +23,7 @@ const typeMeta: Record<string, { label: string; color: string; bg: string; dot: 
   checkup:       { label: 'معاینه',       color: 'text-success-700',  bg: 'bg-success-50',  dot: 'bg-success-500' },
   emergency:     { label: 'اورژانس',      color: 'text-error-700',    bg: 'bg-error-50',    dot: 'bg-error-500' },
   cleaning:      { label: 'جرم‌گیری',     color: 'text-success-700',  bg: 'bg-success-50',  dot: 'bg-success-500' },
-  extraction:    { label: 'کشندادن',     color: 'text-error-700',    bg: 'bg-error-50',    dot: 'bg-error-500' },
+  extraction:    { label: 'کشیدن دندان',  color: 'text-error-700',    bg: 'bg-error-50',    dot: 'bg-error-500' },
   root_canal:    { label: 'عصب‌کشی',      color: 'text-warning-700',  bg: 'bg-warning-50',  dot: 'bg-warning-500' },
   other:         { label: 'سایر',         color: 'text-slate-600',    bg: 'bg-slate-50',    dot: 'bg-slate-400' },
 }
@@ -77,7 +77,7 @@ export default function Appointments() {
     patient_id: '', doctor_id: '', unit_id: '',
     date: new Date().toISOString().slice(0, 10),
     start_time: '09:00', end_time: '09:30',
-    type: 'consultation', status: 'scheduled',
+    type: 'consultation', custom_type: '', status: 'scheduled',
     notes: '', estimated_fee: '',
     recurrence: 'none' as 'none' | 'weekly' | 'biweekly' | 'monthly',
     recurrenceCount: '4',
@@ -151,10 +151,16 @@ export default function Appointments() {
   const openWizard = (appt?: AppointmentWithRelations) => {
     if (appt) {
       setEditingAppt(appt)
+      // If the stored type isn't one of the predefined values, it was
+      // entered as free text via 'سایر' — re-select 'other' and restore
+      // the actual text into custom_type so editing shows it correctly.
+      const isKnownType = appt.type ? appt.type in typeMeta && appt.type !== 'other' : false
       setWizardData({
         patient_id: appt.patient_id, doctor_id: appt.doctor_id || '', unit_id: appt.unit_id || '',
         date: appt.date, start_time: appt.start_time, end_time: appt.end_time,
-        type: appt.type || 'consultation', status: appt.status,
+        type: isKnownType ? (appt.type || 'consultation') : (appt.type ? 'other' : 'consultation'),
+        custom_type: isKnownType ? '' : (appt.type || ''),
+        status: appt.status,
         notes: appt.notes || '', estimated_fee: appt.estimated_fee ? String(appt.estimated_fee) : '',
         recurrence: 'none', recurrenceCount: '4',
       })
@@ -164,7 +170,7 @@ export default function Appointments() {
         patient_id: '', doctor_id: '', unit_id: '',
         date: activeFilter === 'tomorrow' ? tomorrowStr : todayStr,
         start_time: '09:00', end_time: '09:30',
-        type: 'consultation', status: 'scheduled',
+        type: 'consultation', custom_type: '', status: 'scheduled',
         notes: '', estimated_fee: '',
         recurrence: 'none', recurrenceCount: '4',
       })
@@ -188,7 +194,7 @@ export default function Appointments() {
       patient_id: '', doctor_id: '', unit_id: '',
       date: req.preferred_date || todayStr,
       start_time: '09:00', end_time: '09:30',
-      type: 'consultation', status: 'scheduled',
+      type: 'consultation', custom_type: '', status: 'scheduled',
       notes: req.reason ? `از نوبت‌دهی آنلاین: ${req.reason}` : 'از نوبت‌دهی آنلاین',
       estimated_fee: '', recurrence: 'none', recurrenceCount: '4',
     })
@@ -282,7 +288,7 @@ export default function Appointments() {
         const basePayload = {
           patient_id: wizardData.patient_id, doctor_id: wizardData.doctor_id || null, unit_id: wizardData.unit_id || null,
           start_time: wizardData.start_time, end_time: wizardData.end_time,
-          type: wizardData.type, status: wizardData.status,
+          type: wizardData.type === 'other' ? (wizardData.custom_type.trim() || 'سایر') : wizardData.type, status: wizardData.status,
           notes: wizardData.notes || null,
           estimated_fee: wizardData.estimated_fee ? Number(wizardData.estimated_fee) : null,
           duration_minutes: null, reminder_sent: false, created_by: null,
@@ -918,6 +924,9 @@ export default function Appointments() {
                 {/* Editable details */}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                   <Select label="نوع نوبت" value={wizardData.type} onChange={(v) => { h.select(); setWizardData((p) => ({ ...p, type: v })) }} options={typeOptions} />
+                  {wizardData.type === 'other' && (
+                    <Input label="نوع نوبت (دستی)" value={wizardData.custom_type} onChange={(v) => setWizardData((p) => ({ ...p, custom_type: v }))} placeholder="مثلاً: ادامه‌ی کار قبلی، مشاوره‌ی خاص..." />
+                  )}
                   <Select label="وضعیت" value={wizardData.status} onChange={(v) => { h.select(); setWizardData((p) => ({ ...p, status: v })) }} options={statusOptions} />
                 </div>
                 <CurrencyInput label="هزینه برآوردی (تومان)" value={wizardData.estimated_fee} onChange={(v) => setWizardData((p) => ({ ...p, estimated_fee: v }))} />

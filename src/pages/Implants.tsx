@@ -35,7 +35,7 @@ const implantBrands = [
   { value: 'nobel_biocare', label: 'نوبل بیوکر (Nobel Biocare)', models: ['Replace', 'NobelActive', 'Branemark', 'NobelReplace Tapered', 'Speedy Groovy'] },
   { value: 'osstem', label: 'اسستم (Osstem)', models: ['GS-II', 'GS-III', 'SS-II', 'MS-II', 'TS-II', 'TS-III', 'SA', 'CA'] },
   { value: 'dentium', label: 'دنتیوم (Dentium)', models: ['SuperLine', 'SimpleLine', 'Implantium', 'Nuvia', 'Dio'] },
-  { value: 'mega_gen', label: 'مگا جن (MegaGen)', models: ['AnyRidge', 'XPEED', 'Rescue', 'MegaGen ER', 'MegaGen Bio-Tem'] },
+  { value: 'mega_gen', label: 'مگا جن (MegaGen)', models: ['AnyRidge', 'AnyOne', 'XPEED', 'Rescue', 'MegaGen ER', 'MegaGen Bio-Tem'] },
   { value: 'neobiotech', label: 'نئوبایوتک (NeoBiotech)', models: ['NB', 'Spline', 'IS-II Active', 'IS-III Active'] },
   { value: 'biohorizons', label: 'بیوهورایزن (BioHorizons)', models: ['Tapered Internal', 'Tapered External', 'Laser-Lok', 'MiniLok'] },
   { value: 'zimmer', label: 'زیمر (Zimmer)', models: ['Tapered Screw-Vent', 'SVT', 'AdVent', 'SwissPlus'] },
@@ -46,7 +46,8 @@ const implantBrands = [
   { value: 'dentis', label: 'دنتیس (Dentis)', models: ['Dentis OneQ', 'Dentis Q-Implant', 'Dentis S-Line'] },
   { value: 'kavo', label: 'کاوو (KaVo)', models: ['KaVo Imp', 'KaVo AB'] },
   { value: 'thermax', label: 'ترمکس (Thermax)', models: ['Thermax Bio', 'Thermax Standard'] },
-  { value: 'other', label: 'سایر', models: [] },
+  { value: 'sic', label: 'اس‌آی‌سی (SIC Invent)', models: ['SIC max', 'SIC ace', 'SIC vantage'] },
+  { value: 'other', label: 'سایر (وارد کردن دستی نام)', models: [] },
 ]
 
 const componentTypes: { value: string; label: string }[] = [
@@ -140,7 +141,7 @@ export default function Implants() {
     patient_id: '',
     doctor_id: '',
     tooth_number: '',
-    brand: '',
+    brand: '', custom_brand: '',
     model: '',
     diameter: '',
     length: '',
@@ -215,7 +216,7 @@ export default function Implants() {
     setEditingCase(null)
     setCaseWizardStep(0)
     setCaseForm({
-      patient_id: state.quickStartPatientId, doctor_id: state.quickStartDoctorId || '', tooth_number: '', brand: '', model: '', diameter: '', length: '',
+      patient_id: state.quickStartPatientId, doctor_id: state.quickStartDoctorId || '', tooth_number: '', brand: '', custom_brand: '', model: '', diameter: '', length: '',
       surgery_date: '', bone_graft: false, bone_graft_cost: '', gbr: false, membrane_used: false, extraction_needed: false,
       sinus_lift: false, sinus_lift_cost: '', immediate_loading: false,
       total_cost: '', paid_amount: '', warranty_years: '', notes: '',
@@ -285,7 +286,7 @@ export default function Implants() {
     setEditingCase(null)
     setCaseWizardStep(0)
     setCaseForm({
-      patient_id: '', doctor_id: '', tooth_number: '', brand: '', model: '', diameter: '', length: '',
+      patient_id: '', doctor_id: '', tooth_number: '', brand: '', custom_brand: '', model: '', diameter: '', length: '',
       surgery_date: '', bone_graft: false, bone_graft_cost: '', gbr: false, membrane_used: false, extraction_needed: false,
       sinus_lift: false, sinus_lift_cost: '', immediate_loading: false,
       total_cost: '', paid_amount: '', warranty_years: '', notes: '',
@@ -297,11 +298,17 @@ export default function Implants() {
   const openEditCaseModal = (c: ImplantCaseWithRelations) => {
     h.tap()
     setEditingCase(c)
+    // If the stored brand isn't one of the predefined values, it was
+    // entered as free text via 'سایر' — re-select 'other' and restore
+    // the actual name into custom_brand so editing shows it correctly
+    // instead of silently falling back to a blank/unselected dropdown.
+    const isKnownBrand = implantBrands.some((b) => b.value === c.brand)
     setCaseForm({
       patient_id: c.patient_id,
       doctor_id: c.doctor_id || '',
       tooth_number: c.tooth_number || '',
-      brand: c.brand || '',
+      brand: isKnownBrand ? (c.brand || '') : (c.brand ? 'other' : ''),
+      custom_brand: isKnownBrand ? '' : (c.brand || ''),
       model: c.model || '',
       diameter: c.diameter || '',
       length: c.length || '',
@@ -420,7 +427,7 @@ export default function Implants() {
     if (!caseForm.tooth_number.trim()) { showToast('error', 'شماره دندان الزامی است'); return }
     const payload = {
       patient_id: caseForm.patient_id, doctor_id: caseForm.doctor_id || null,
-      tooth_number: caseForm.tooth_number, brand: caseForm.brand || null,
+      tooth_number: caseForm.tooth_number, brand: caseForm.brand === 'other' ? (caseForm.custom_brand.trim() || 'سایر') : (caseForm.brand || null),
       model: caseForm.model || null, diameter: caseForm.diameter || null, length: caseForm.length || null,
       surgery_date: caseForm.surgery_date || null, bone_graft: caseForm.bone_graft,
       bone_graft_cost: caseForm.bone_graft && caseForm.bone_graft_cost ? Number(caseForm.bone_graft_cost) : null,
@@ -968,6 +975,14 @@ export default function Implants() {
                   <Input label="طول (mm)" value={caseForm.length} onChange={(v) => setCaseForm({ ...caseForm, length: v })} placeholder="10" dir="ltr" />
                 </div>
                 <Select label="برند" value={caseForm.brand} onChange={(v) => setCaseForm({ ...caseForm, brand: v, model: '' })} options={implantBrands} placeholder="انتخاب برند" />
+                {caseForm.brand === 'other' && (
+                  <Input
+                    label="نام برند (دستی)"
+                    value={caseForm.custom_brand}
+                    onChange={(v) => setCaseForm({ ...caseForm, custom_brand: v })}
+                    placeholder="مثلاً: برند محلی یا برندی که در لیست نیست"
+                  />
+                )}
                 <div>
                   <label className="block text-sm font-medium text-slate-700 dark:text-slate-200 mb-1.5">مدل</label>
                   <input
