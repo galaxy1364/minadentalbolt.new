@@ -634,9 +634,13 @@ export default function DentalChart({ toothRecords, treatments, onUpdateTooth, o
 
   return (
     <div className="space-y-4">
-      {/* Legend */}
+      {/* Legend — maps over every key in conditionMeta rather than a
+          hardcoded list, so a newly added condition (like پست/پین just
+          now) can never again silently go missing here the way this
+          list previously excluded them, along with bridge/veneer/sealant
+          which had been missing from it long before that. */}
       <div className="flex items-center gap-3 flex-wrap text-xs">
-        {(['healthy', 'caries', 'restored', 'rct', 'crown', 'implant', 'extraction', 'missing'] as ToothCondition[]).map((c) => {
+        {(Object.keys(conditionMeta) as ToothCondition[]).map((c) => {
           const meta = conditionMeta[c]
           return (
             <span key={c} className="flex items-center gap-1">
