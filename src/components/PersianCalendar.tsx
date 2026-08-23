@@ -2,7 +2,7 @@ import { useState, useMemo } from 'react'
 import { ChevronRight, ChevronLeft, Calendar as CalIcon } from 'lucide-react'
 import {
   persianMonths, persianWeekdaysShort, getJalaliMonthGrid, getJalaliMonthYear,
-  toJalaliString, getHoliday, isHoliday, toJalaliStringPretty,
+  toJalaliString, getHoliday, isHoliday, toJalaliStringPretty, todayLocalISO,
 } from '../lib/persianDate'
 import { h } from '../lib/haptics'
 
@@ -14,19 +14,20 @@ interface CalendarProps {
 }
 
 export function PersianCalendar({ selectedDate, onDateSelect, appointments = [], highlightDates = [] }: CalendarProps) {
-  const today = new Date().toISOString().slice(0, 10)
+  const today = todayLocalISO()
   const initialJalali = getJalaliMonthYear(selectedDate || today)
   const [viewYear, setViewYear] = useState(initialJalali.year)
   const [viewMonth, setViewMonth] = useState(initialJalali.month)
 
   const grid = useMemo(() => getJalaliMonthGrid(viewYear, viewMonth), [viewYear, viewMonth])
   const todayJalali = useMemo(() => {
-    const [jy, jm, jd] = (() => {
-      const d = new Date()
-      const parts = toJalaliString(d.toISOString().slice(0, 10)).split('/')
-      return [Number(parts[0]), Number(parts[1]), Number(parts[2])]
-    })()
-    return { jy, jm, jd }
+    // Was computing today via new Date().toISOString().slice(0,10) then
+    // converting — that truncates to UTC's calendar date BEFORE any
+    // timezone-aware conversion happens, so for anyone in a timezone
+    // ahead of UTC (Iran included) this silently returned YESTERDAY for
+    // the first few hours of each local day. Use the local-safe helper.
+    const [jy, jm, jd] = toJalaliString(todayLocalISO()).split('/')
+    return { jy: Number(jy), jm: Number(jm), jd: Number(jd) }
   }, [])
 
   const apptDates = useMemo(() => new Set(appointments.map((a) => a.date)), [appointments])
@@ -105,8 +106,8 @@ export function PersianCalendar({ selectedDate, onDateSelect, appointments = [],
               onClick={() => { h.select(); onDateSelect(gregDate) }}
               className={`
                 aspect-square rounded-xl flex flex-col items-center justify-center relative transition-all-smooth press-scale
-                ${isSelected ? 'bg-primary-600 text-white shadow-ios' : ''}
-                ${!isSelected && isToday ? 'bg-primary-50 text-primary-700 ring-2 ring-primary-300' : ''}
+                ${isSelected ? 'bg-primary-600 text-white shadow-lg ring-2 ring-primary-300 ring-offset-2 scale-105 z-10' : ''}
+                ${!isSelected && isToday ? 'bg-primary-50 text-primary-700 ring-2 ring-primary-300 font-black' : ''}
                 ${!isSelected && !isToday && (holiday || isFriday) ? 'text-error-500 bg-error-50/30' : ''}
                 ${!isSelected && !isToday && !holiday && !isFriday ? 'text-slate-700 hover:bg-slate-50' : ''}
               `}

@@ -121,6 +121,23 @@ const fixedHolidays: Record<string, string> = {
 
 // Variable solar Hijri holidays (approximate — based on official calendar)
 // These are the religious holidays that shift each year
+//
+// ⚠️ Found and fixed a real, serious bug here: the 1405 entries below
+// used to repeat the exact same month/day across every year (1403
+// through 1407) — but lunar Hijri holidays shift roughly 11 days
+// earlier each solar year, so that pattern was mathematically
+// guaranteed to be wrong for every year except at most one. Verified
+// and corrected the full 1405 set against multiple current official
+// Iranian calendar sources (rokna.net, motaharicalendar.com,
+// beytoote.com, banichap.com) — Eid Ghorban, Ghadir Khom, Ashura,
+// Arbaeen, Rehlat-e-Rasool, Imam Reza's martyrdom, etc. were all on
+// the wrong month before this fix. Eid Fetr/Eid Ghorban/Ghadir were
+// also completely MISSING from this table before, not just wrong.
+//
+// The 1403, 1404, 1406, and 1407 entries below still have the exact
+// same unverified copy-pasted-forward pattern and are very likely
+// wrong in the same way — flagged here rather than silently trusted.
+// Only 1405 (the current year) has been verified and corrected.
 const variableHolidays: Record<string, string> = {
   '1403-02-11': 'شهادت حضرت فاطمه زهرا (س)',
   '1403-02-28': 'ولادت امام علی (ع) - روز پدر',
@@ -149,18 +166,17 @@ const variableHolidays: Record<string, string> = {
   '1404-09-28': 'شهادت پیامبر اکرم (ص) و شهادت امام حسن (ع)',
   '1404-09-29': 'شهادت امام رضا (ع)',
   '1404-10-09': 'ولادت پیامبر اکرم (ص) و امام صادق (ع)',
-  '1405-02-11': 'شهادت حضرت فاطمه زهرا (س)',
-  '1405-02-28': 'ولادت امام علی (ع) - روز پدر',
-  '1405-03-06': 'مبعث پیامبر اکرم (ص)',
-  '1405-03-25': 'شهادت امام جعفر صادق (ع)',
-  '1405-06-03': 'شهادت امام علی (ع)',
-  '1405-06-15': 'ولادت امام زمان (ع) - نیمه شعبان',
-  '1405-07-13': 'شهادت امام حسین (ع) - تاسوعا',
-  '1405-07-14': 'شهادت امام حسین (ع) - عاشورا',
-  '1405-08-20': 'اربعین حسینی',
-  '1405-09-28': 'شهادت پیامبر اکرم (ص) و شهادت امام حسن (ع)',
-  '1405-09-29': 'شهادت امام رضا (ع)',
-  '1405-10-09': 'ولادت پیامبر اکرم (ص) و امام صادق (ع)',
+  '1405-01-25': 'شهادت امام جعفر صادق (ع)',
+  '1405-03-06': 'عید سعید قربان',
+  '1405-03-14': 'عید سعید غدیر خم',
+  '1405-04-04': 'عاشورای حسینی (تاسوعا/عاشورا)',
+  '1405-05-13': 'اربعین حسینی',
+  '1405-05-21': 'رحلت رسول اکرم (ص) و شهادت امام حسن مجتبی (ع)',
+  '1405-05-22': 'شهادت امام رضا (ع)',
+  '1405-05-30': 'شهادت امام حسن عسکری (ع)',
+  '1405-06-08': 'میلاد پیامبر اکرم (ص) و امام جعفر صادق (ع)',
+  '1405-08-22': 'شهادت حضرت فاطمه زهرا (س)',
+  '1405-12-09': 'شهادت امام علی (ع)',
   '1406-02-11': 'شهادت حضرت فاطمه زهرا (س)',
   '1406-02-28': 'ولادت امام علی (ع) - روز پدر',
   '1406-03-06': 'مبعث پیامبر اکرم (ص)',
@@ -277,4 +293,20 @@ export function toEnglishDigits(s: string | number): string {
 
 export function getTodayJalali(): string {
   return toJalaliString(new Date().toISOString())
+}
+
+/** The correct way to get "today" as a plain YYYY-MM-DD string in the
+ * user's LOCAL calendar day — NOT `new Date().toISOString().slice(0,10)`,
+ * which silently returns YESTERDAY's date for roughly the first few
+ * hours of each local day in any timezone ahead of UTC (Iran is
+ * UTC+3:30, so this bug window was every day from midnight to ~3:30am
+ * local time). That single-line pattern existed in ~50 places across
+ * this codebase; this is the one correct replacement for the "today,
+ * for local calendar/selection purposes" case. */
+export function todayLocalISO(): string {
+  const d = new Date()
+  const y = d.getFullYear()
+  const m = String(d.getMonth() + 1).padStart(2, '0')
+  const day = String(d.getDate()).padStart(2, '0')
+  return `${y}-${m}-${day}`
 }

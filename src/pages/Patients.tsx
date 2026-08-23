@@ -193,6 +193,12 @@ export default function Patients() {
   // ── Preview + Confirm for create/edit ──
   const handleSave = () => {
     if (!formData.first_name.trim() || !formData.last_name.trim()) { h.error(); showToast('error', 'نام و نام خانوادگی الزامی است'); return }
+    // Phone is used everywhere downstream — SMS reminders, appointment
+    // confirmations, the whole notification system assumes every
+    // patient has one. Letting it be skipped meant some patients could
+    // silently never receive any reminder/alarm the rest of the app
+    // promises, with no visible sign anything was missing.
+    if (!formData.phone.trim()) { h.error(); showToast('error', 'شماره تلفن الزامی است — پایه‌ی یادآوری‌ها و پیامک‌هاست'); return }
 
     const vipMeta = getVipMeta(Number(formData.vip_level) || 0)
     const genderLabel = formData.gender ? (formData.gender === 'male' ? 'آقا' : 'خانم') : '—'
@@ -538,7 +544,7 @@ export default function Patients() {
                 <Input label="نام" value={formData.first_name} onChange={(v) => setFormData((p) => ({ ...p, first_name: v }))} placeholder="نام" />
                 <Input label="نام خانوادگی" value={formData.last_name} onChange={(v) => setFormData((p) => ({ ...p, last_name: v }))} placeholder="نام خانوادگی" />
                 <Input label="کد ملی" value={formData.national_id} onChange={(v) => setFormData((p) => ({ ...p, national_id: v }))} placeholder="کد ملی" dir="ltr" />
-                <Input label="تلفن" value={formData.phone} onChange={(v) => setFormData((p) => ({ ...p, phone: v }))} placeholder="09xxxxxxxxx" dir="ltr" />
+                <Input label="تلفن *" value={formData.phone} onChange={(v) => setFormData((p) => ({ ...p, phone: v }))} placeholder="09xxxxxxxxx" dir="ltr" />
                 <Input label="تلفن دوم" value={formData.phone2} onChange={(v) => setFormData((p) => ({ ...p, phone2: v }))} placeholder="تلفن ثانویه" dir="ltr" />
                 <Input label="ایمیل" type="email" value={formData.email} onChange={(v) => setFormData((p) => ({ ...p, email: v }))} placeholder="email@example.com" dir="ltr" />
                 <PersianDateInput label="تاریخ تولد" value={formData.birth_date} onChange={(v) => setFormData((p) => ({ ...p, birth_date: v }))} />

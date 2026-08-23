@@ -6,7 +6,7 @@ import { useState, useEffect, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Calendar as CalIcon, Clock, FlaskConical, Layers, Bone, User, Users, CalendarPlus, DollarSign, BellRing } from 'lucide-react'
 import { fetchAppointments, fetchLabOrders, fetchTreatmentPhases, fetchImplantCases, fetchPatients } from '../lib/api'
-import { toJalaliStringPretty, toPersianDigits, toJalaliString, getHoliday } from '../lib/persianDate'
+import { toJalaliStringPretty, toPersianDigits, toJalaliString, getHoliday, todayLocalISO } from '../lib/persianDate'
 import { PersianCalendar } from '../components/PersianCalendar'
 import { Card, Spinner, EmptyState, Badge } from '../components/ui'
 import { ModuleHeader } from '../components/ModuleHeader'
@@ -32,7 +32,7 @@ export default function CalendarPage() {
   const [phases, setPhases] = useState<TreatmentPhase[]>([])
   const [implantCases, setImplantCases] = useState<ImplantCaseWithRelations[]>([])
   const [patients, setPatients] = useState<Patient[]>([])
-  const [selectedDate, setSelectedDate] = useState(new Date().toISOString().slice(0, 10))
+  const [selectedDate, setSelectedDate] = useState(todayLocalISO())
 
   useEffect(() => {
     const load = async () => {
