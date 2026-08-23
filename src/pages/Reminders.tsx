@@ -75,8 +75,23 @@ export default function Reminders() {
           list.push({ id: `lab-${l.id}`, category: 'lab', title: 'موعد تحویل لابراتوار', patientName: patientName(l.patient_id), dueDate: l.deadline, daysLeft: daysLeft(l.deadline) })
         }
         for (const im of implantCases as any[]) {
-          if (!im.surgery_date || im.surgery_date < today) continue
-          list.push({ id: `implant-${im.id}`, category: 'implant', title: 'جراحی ایمپلنت', patientName: patientName(im.patient_id), dueDate: im.surgery_date, daysLeft: daysLeft(im.surgery_date) })
+          if (im.surgery_date && im.surgery_date >= today) {
+            list.push({ id: `implant-surgery-${im.id}`, category: 'implant', title: 'جراحی ایمپلنت', patientName: patientName(im.patient_id), dueDate: im.surgery_date, daysLeft: daysLeft(im.surgery_date) })
+          }
+          // The other three implant milestones (هیلینگ‌آباتمنت, قالب‌گیری,
+          // تحویل روکش) were being tracked in the form but never fed into
+          // Reminders at all — only surgery_date was. A missed follow-up
+          // appointment mid-treatment is exactly the kind of thing that
+          // should never quietly fall through the cracks.
+          if (im.healing_abutment_date && im.healing_abutment_date >= today) {
+            list.push({ id: `implant-healing-${im.id}`, category: 'implant', title: 'نصب هیلینگ آباتمنت', patientName: patientName(im.patient_id), dueDate: im.healing_abutment_date, daysLeft: daysLeft(im.healing_abutment_date) })
+          }
+          if (im.impression_date && im.impression_date >= today) {
+            list.push({ id: `implant-impression-${im.id}`, category: 'implant', title: 'قالب‌گیری ایمپلنت', patientName: patientName(im.patient_id), dueDate: im.impression_date, daysLeft: daysLeft(im.impression_date) })
+          }
+          if (im.crown_delivery_date && im.crown_delivery_date >= today) {
+            list.push({ id: `implant-crown-${im.id}`, category: 'implant', title: 'تحویل روکش ایمپلنت', patientName: patientName(im.patient_id), dueDate: im.crown_delivery_date, daysLeft: daysLeft(im.crown_delivery_date) })
+          }
         }
         // Manual reminders — free-form, patient-optional, fully editable.
         // Exactly for cases like "patient said they'd bring 50M on the

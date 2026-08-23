@@ -1,8 +1,8 @@
 // Staff.tsx - Persian RTL Dental Clinic Staff Management with Doctor Revenue Sharing
 import { useState, useEffect, useCallback, useMemo } from 'react'
-import { Users, Search, Plus, Phone, Mail, Calendar, DollarSign, Smile, Briefcase, Edit2, Trash2, Stethoscope, Calculator, Award, TrendingUp, Percent, UserCheck, ChevronDown, ChevronUp, Shield, Lock, Unlock } from 'lucide-react'
+import { Users, Search, Plus, Phone, Mail, Calendar, DollarSign, Smile, Briefcase, Edit2, Trash2, Stethoscope, Calculator, Award, TrendingUp, Percent, UserCheck, ChevronDown, ChevronUp, Shield, Lock, Unlock, RotateCcw } from 'lucide-react'
 import { PieChart, Pie, Cell, Tooltip as RTooltip, ResponsiveContainer } from 'recharts'
-import { fetchStaff, createStaff, updateStaff, deleteStaff, fetchEncounters, fetchLabOrders, fetchTreatments, createExpense, fetchDoctors, fetchStaffLoginStatuses, setStaffLoginActive } from '../lib/api'
+import { fetchStaff, createStaff, updateStaff, fetchEncounters, fetchLabOrders, fetchTreatments, createExpense, fetchDoctors, fetchStaffLoginStatuses, setStaffLoginActive } from '../lib/api'
 import { CLINIC_ID, supabase } from '../lib/supabase'
 import { toJalaliString, toJalaliStringPretty, formatCurrency, formatNumber, toPersianDigits } from '../lib/persianDate'
 import type { Staff as StaffType, StaffInput, EncounterWithRelations, LabOrderWithRelations, Treatment } from '../types'
@@ -442,50 +442,25 @@ export default function Staff() {
 
   const handleDelete = (s: StaffType) => {
     h.tap()
-    const hasHistory = encounters.some((e) => e.doctor_id === s.id) || labOrders.some((l) => l.doctor_id === s.id)
-
-    if (hasHistory) {
-      // Anyone (doctor or otherwise) with treatment/encounter/lab history
-      // must never be hard-deleted — that would either corrupt every
-      // record referencing them or get permanently stuck in the failed
-      // sync queue against a database foreign-key constraint. Deactivate
-      // instead, which keeps every historical record intact and correct.
-      confirmAction({
-        type: 'status',
-        title: 'این پرسنل قابل حذف نیست',
-        warning: 'این شخص سابقه‌ی ویزیت یا سفارش لابراتوار دارد — برای حفظ صحت سوابق درمانی، حذف کامل امکان‌پذیر نیست.',
-        fields: [
-          { label: 'نام', value: s.full_name, highlight: true },
-          { label: 'پیشنهاد', value: 'غیرفعال کردن به‌جای حذف', icon: <Shield size={16} /> },
-        ],
-        confirmLabel: 'غیرفعال کردن پرسنل',
-        onConfirm: async () => {
-          await updateStaff(s.id, { is_active: false })
-          showToast('success', 'پرسنل غیرفعال شد — سوابق حفظ شد')
-          loadData()
-        },
-      })
-      return
-    }
-
+    // Per clinic policy: staff are never permanently deleted, regardless
+    // of history — even someone with zero encounters/lab orders yet
+    // could still be mid-onboarding, and a hard delete of a doctor_id
+    // referenced anywhere (even indirectly, later) risks corrupting
+    // records or getting stuck in the sync queue against a foreign-key
+    // constraint. Deactivate is the only path, same as patients/labs.
     confirmAction({
-      type: 'delete',
-      title: 'حذف پرسنل',
-      warning: 'این عملیات قابل بازگشت نیست',
+      type: 'status',
+      title: 'غیرفعال کردن پرسنل',
+      warning: 'این شخص از لیست فعال مخفی می‌شود، ولی هیچ داده‌ای پاک نمی‌شود — از بخش «بایگانی» قابل بازگردانی است.',
       fields: [
         { label: 'نام', value: s.full_name, highlight: true },
         { label: 'نقش', value: staffRoles.find((r) => r.value === s.role)?.label || s.role || '-' },
       ],
-      confirmLabel: 'تایید حذف',
+      confirmLabel: 'غیرفعال کردن',
       onConfirm: async () => {
-        try {
-          await deleteStaff(s.id)
-          showToast('success', 'پرسنل حذف شد')
-          loadData()
-        } catch (err) {
-          console.error('Error deleting staff:', err)
-          showToast('error', 'خطا در حذف پرسنل')
-        }
+        await updateStaff(s.id, { is_active: false })
+        showToast('success', 'پرسنل غیرفعال شد — سوابق حفظ شد')
+        loadData()
       },
     })
   }
@@ -682,7 +657,7 @@ export default function Staff() {
                 const meta = getRoleMeta(s.role)
                 const isDoctor = s.is_doctor || s.role === 'doctor'
                 return (
-                  <Card key={s.id} className="p-5 hover:card-shadow-lg transition-all-smooth">
+                  <Card key={s.id} className={`p-5 hover:card-shadow-lg transition-all-smooth ${!s.is_active ? 'opacity-60' : ''}`}>
                     <div className="flex items-start gap-3 mb-3">
                       <div className={`w-12 h-12 rounded-full flex items-center justify-center text-base font-bold flex-shrink-0 ${isDoctor ? 'bg-primary-100 text-primary-700' : 'bg-slate-100 text-slate-600'}`}>
                         {isDoctor ? <Stethoscope size={20} /> : toPersianDigits(s.full_name?.charAt(0) || '؟')}
@@ -691,6 +666,7 @@ export default function Staff() {
                         <h3 className="font-bold text-slate-800 truncate">{s.full_name}</h3>
                         <div className="flex items-center gap-1.5 flex-wrap mt-1">
                           <Badge color={meta.color}>{meta.label}</Badge>
+                          {!s.is_active && <Badge color="slate">غیرفعال</Badge>}
                           {s.is_clinic_owner && <Badge color="warning"><Award size={10} className="inline ml-1" />مالک</Badge>}
                           {isDoctor && s.share_percentage != null && (
                             <Badge color="primary"><Percent size={10} className="inline ml-1" />{toPersianDigits(s.share_percentage)}٪</Badge>
@@ -710,9 +686,19 @@ export default function Staff() {
                         <button onClick={() => openEditModal(s)} className="p-1.5 rounded-lg text-slate-400 hover:text-primary-600 hover:bg-primary-50 transition-colors">
                           <Edit2 size={15} />
                         </button>
-                        <button onClick={() => handleDelete(s)} className="p-1.5 rounded-lg text-slate-400 hover:text-error-600 hover:bg-error-50 transition-colors">
-                          <Trash2 size={15} />
-                        </button>
+                        {s.is_active ? (
+                          <button onClick={() => handleDelete(s)} title="غیرفعال کردن" className="p-1.5 rounded-lg text-slate-400 hover:text-error-600 hover:bg-error-50 transition-colors">
+                            <Trash2 size={15} />
+                          </button>
+                        ) : (
+                          <button
+                            onClick={async () => { await updateStaff(s.id, { is_active: true }); showToast('success', 'پرسنل فعال شد'); loadData() }}
+                            title="فعال‌سازی مجدد"
+                            className="p-1.5 rounded-lg text-success-500 hover:text-success-700 hover:bg-success-50 transition-colors"
+                          >
+                            <RotateCcw size={15} />
+                          </button>
+                        )}
                       </div>
                     </div>
 

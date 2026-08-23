@@ -1,6 +1,6 @@
 // Laboratory.tsx - Persian RTL Dental Clinic Laboratory Management
 import { useState, useEffect, useCallback, useMemo } from 'react'
-import { FlaskConical, Plus, Search, Clock, CheckCircle2, AlertCircle, Edit2, Trash2, Phone, Filter, TrendingUp, Package, CalendarClock, ChevronLeft } from 'lucide-react'
+import { FlaskConical, Plus, Search, Clock, CheckCircle2, AlertCircle, Edit2, Trash2, Phone, Filter, TrendingUp, Package, CalendarClock, ChevronLeft, RotateCcw } from 'lucide-react'
 import { downloadICSReminder } from '../lib/icsReminder'
 import { fetchLabOrders, createLabOrder, updateLabOrder, fetchLabs, createLab, updateLab, fetchPatients, fetchDoctors, fetchTreatments, updateTreatment } from '../lib/api'
 import { toJalaliString, toJalaliStringPretty, formatCurrency, toPersianDigits } from '../lib/persianDate'
@@ -152,9 +152,11 @@ export default function Laboratory() {
         fetchTreatments(),
       ])
       setLabOrders(orders as unknown as LabOrder[])
-      // Deactivated labs stay out of this active list — fully preserved,
-      // restorable from Archive, exactly like archived patients/implants.
-      setLabs(l.filter((lab) => lab.is_active !== false))
+      // Show every lab (active + deactivated) with an inline badge and
+      // reactivate action, matching the same pattern used for staff —
+      // consistent parity across every 'people/vendors you manage' list,
+      // rather than hiding deactivated ones entirely behind Archive.
+      setLabs(l)
       setPatients(pats)
       setDoctors(docs)
       setTreatments(trts)
@@ -467,24 +469,6 @@ export default function Laboratory() {
     setLabModalOpen(true)
   }
 
-  const handleDeleteLab = (lab: Laboratory) => {
-    h.warning()
-    // Per clinic policy: a lab vendor is never permanently deleted —
-    // existing lab_orders reference it by id with no cascading FK, so a
-    // hard delete would silently orphan every past order's 'sent to
-    // which lab' history. Deactivating keeps that link intact forever.
-    confirmAction({
-      type: 'status',
-      title: 'غیرفعال کردن لابراتوار',
-      warning: 'این لابراتوار هیچ‌وقت پاک نمی‌شود — فقط از لیست فعال مخفی می‌شود، سوابق سفارش‌های قبلی دست‌نخورده می‌ماند.',
-      fields: [{ label: 'نام', value: lab.name, highlight: true }],
-      confirmLabel: 'تایید غیرفعال‌سازی',
-      onConfirm: async () => {
-        try { await updateLab(lab.id, { is_active: false } as any); showToast('success', 'لابراتوار غیرفعال شد — سوابق حفظ شد'); await loadData() }
-        catch { showToast('error', 'خطا در غیرفعال‌سازی') }
-      },
-    })
-  }
 
   const handleSaveLab = () => {
     if (!labForm.name.trim()) { showToast('error', 'نام لابراتوار الزامی است'); return }
@@ -833,16 +817,18 @@ export default function Laboratory() {
 
                 {lab.notes && <p className="text-xs text-slate-400 mt-2">{lab.notes}</p>}
 
-                {/* Actions */}
+                {/* Actions — one toggle handles both directions (activate/
+                    deactivate); a separate 'حذف' button here would just be
+                    a second path to the exact same action, the same
+                    duplication pattern found earlier in Treatments/Billing. */}
                 <div className="flex gap-1 mt-2 pt-2 border-t border-slate-100">
                   <button onClick={() => openEditLab(lab)} className="flex-1 flex items-center justify-center gap-1 py-1.5 rounded-lg text-xs text-slate-500 hover:text-primary-600 hover:bg-primary-50 transition-colors"><Edit2 size={12} /> ویرایش</button>
                   <button
                     onClick={async () => { try { await updateLab(lab.id, { is_active: !lab.is_active } as any); showToast('success', lab.is_active ? 'لابراتوار غیرفعال شد' : 'لابراتوار فعال شد'); await loadData() } catch { showToast('error', 'خطا در تغییر وضعیت') } }}
                     className={`flex-1 flex items-center justify-center gap-1 py-1.5 rounded-lg text-xs transition-colors ${lab.is_active ? 'text-warning-600 hover:bg-warning-50' : 'text-success-600 hover:bg-success-50'}`}
                   >
-                    {lab.is_active ? 'غیرفعال' : 'فعال‌سازی'}
+                    {lab.is_active ? <><Trash2 size={12} /> غیرفعال</> : <><RotateCcw size={12} /> فعال‌سازی</>}
                   </button>
-                  <button onClick={() => handleDeleteLab(lab)} className="flex-1 flex items-center justify-center gap-1 py-1.5 rounded-lg text-xs text-slate-500 hover:text-error-600 hover:bg-error-50 transition-colors"><Trash2 size={12} /> حذف</button>
                 </div>
               </Card>
             )
@@ -858,7 +844,9 @@ export default function Laboratory() {
 
   const renderOrderModal = () => {
     const patientOptions = patients.map((p) => ({ value: p.id, label: `${p.first_name} ${p.last_name}${p.file_number ? ` - ${p.file_number}` : ''}` }))
-    const labOptions = labs.map((l) => ({
+    // Only active labs are offered for a NEW order — an inactive lab
+    // shouldn't receive new work, though its past orders stay visible.
+    const labOptions = labs.filter((l) => l.is_active).map((l) => ({
       value: l.id,
       label: (l as any).default_for === 'fixed' ? `${l.name} — ثابت` : (l as any).default_for === 'removable' ? `${l.name} — متحرک` : l.name,
     }))

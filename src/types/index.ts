@@ -556,10 +556,17 @@ export interface ImplantCase {
   crown_delivery_date: string | null
   stage: string | null
   bone_graft: boolean | null
+  /** Itemized cost for the bone graft procedure specifically — total_cost
+   * is the overall case price staff enters (which should include this),
+   * but this lets the breakdown be shown/documented separately instead
+   * of everything being one opaque lump sum. */
+  bone_graft_cost: number | null
   gbr: boolean | null
   membrane_used: boolean | null
   extraction_needed: boolean | null
   sinus_lift: boolean | null
+  /** Same itemization as bone_graft_cost, for the sinus lift procedure. */
+  sinus_lift_cost: number | null
   immediate_loading: boolean | null
   total_cost: number | null
   paid_amount: number | null

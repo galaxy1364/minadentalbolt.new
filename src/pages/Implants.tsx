@@ -146,10 +146,12 @@ export default function Implants() {
     length: '',
     surgery_date: '',
     bone_graft: false,
+    bone_graft_cost: '',
     gbr: false,
     membrane_used: false,
     extraction_needed: false,
     sinus_lift: false,
+    sinus_lift_cost: '',
     immediate_loading: false,
     total_cost: '',
     paid_amount: '',
@@ -214,8 +216,8 @@ export default function Implants() {
     setCaseWizardStep(0)
     setCaseForm({
       patient_id: state.quickStartPatientId, doctor_id: state.quickStartDoctorId || '', tooth_number: '', brand: '', model: '', diameter: '', length: '',
-      surgery_date: '', bone_graft: false, gbr: false, membrane_used: false, extraction_needed: false,
-      sinus_lift: false, immediate_loading: false,
+      surgery_date: '', bone_graft: false, bone_graft_cost: '', gbr: false, membrane_used: false, extraction_needed: false,
+      sinus_lift: false, sinus_lift_cost: '', immediate_loading: false,
       total_cost: '', paid_amount: '', warranty_years: '', notes: '',
       surgery_fee_mode: 'formula', surgery_fee_amount: '', prosthesis_doctor_id: '', prosthesis_fee_amount: '',
     })
@@ -284,8 +286,8 @@ export default function Implants() {
     setCaseWizardStep(0)
     setCaseForm({
       patient_id: '', doctor_id: '', tooth_number: '', brand: '', model: '', diameter: '', length: '',
-      surgery_date: '', bone_graft: false, gbr: false, membrane_used: false, extraction_needed: false,
-      sinus_lift: false, immediate_loading: false,
+      surgery_date: '', bone_graft: false, bone_graft_cost: '', gbr: false, membrane_used: false, extraction_needed: false,
+      sinus_lift: false, sinus_lift_cost: '', immediate_loading: false,
       total_cost: '', paid_amount: '', warranty_years: '', notes: '',
       surgery_fee_mode: 'formula', surgery_fee_amount: '', prosthesis_doctor_id: '', prosthesis_fee_amount: '',
     })
@@ -305,10 +307,12 @@ export default function Implants() {
       length: c.length || '',
       surgery_date: c.surgery_date || '',
       bone_graft: c.bone_graft || false,
+      bone_graft_cost: (c as any).bone_graft_cost != null ? String((c as any).bone_graft_cost) : '',
       gbr: c.gbr || false,
       membrane_used: c.membrane_used || false,
       extraction_needed: c.extraction_needed || false,
       sinus_lift: c.sinus_lift || false,
+      sinus_lift_cost: (c as any).sinus_lift_cost != null ? String((c as any).sinus_lift_cost) : '',
       immediate_loading: c.immediate_loading || false,
       total_cost: c.total_cost != null ? String(c.total_cost) : '',
       paid_amount: c.paid_amount != null ? String(c.paid_amount) : '',
@@ -419,8 +423,10 @@ export default function Implants() {
       tooth_number: caseForm.tooth_number, brand: caseForm.brand || null,
       model: caseForm.model || null, diameter: caseForm.diameter || null, length: caseForm.length || null,
       surgery_date: caseForm.surgery_date || null, bone_graft: caseForm.bone_graft,
+      bone_graft_cost: caseForm.bone_graft && caseForm.bone_graft_cost ? Number(caseForm.bone_graft_cost) : null,
       gbr: caseForm.gbr, membrane_used: caseForm.membrane_used, extraction_needed: caseForm.extraction_needed,
       sinus_lift: caseForm.sinus_lift, immediate_loading: caseForm.immediate_loading,
+      sinus_lift_cost: caseForm.sinus_lift && caseForm.sinus_lift_cost ? Number(caseForm.sinus_lift_cost) : null,
       total_cost: caseForm.total_cost ? Number(caseForm.total_cost) : null,
       paid_amount: caseForm.paid_amount ? Number(caseForm.paid_amount) : null,
       warranty_years: caseForm.warranty_years ? Number(caseForm.warranty_years) : null,
@@ -768,10 +774,10 @@ export default function Implants() {
                     </span>
                   )}
                   {c.extraction_needed && <Badge color="slate">کشیدن دندان</Badge>}
-                  {c.bone_graft && <Badge color="warning">پونده استخوانی</Badge>}
+                  {c.bone_graft && <Badge color="warning">پودر استخوانی{(c as any).bone_graft_cost ? ` — ${formatCurrency((c as any).bone_graft_cost)} ت` : ''}</Badge>}
                   {c.gbr && <Badge color="warning">GBR</Badge>}
                   {c.membrane_used && <Badge color="warning">ممبران</Badge>}
-                  {c.sinus_lift && <Badge color="accent">سینوس لیفت</Badge>}
+                  {c.sinus_lift && <Badge color="accent">سینوس لیفت{(c as any).sinus_lift_cost ? ` — ${formatCurrency((c as any).sinus_lift_cost)} ت` : ''}</Badge>}
                   {c.immediate_loading && <Badge color="success">بارگذاری فوری</Badge>}
                   {c.prosthesis_doctor_id && c.prosthesis_doctor_id !== c.doctor_id && (
                     <Badge color="secondary">پروتز: دکتر {doctors.find((d) => d.id === c.prosthesis_doctor_id)?.name || '؟'}</Badge>
@@ -996,8 +1002,11 @@ export default function Implants() {
                   </label>
                   <label className="flex items-center gap-2 cursor-pointer">
                     <input type="checkbox" checked={caseForm.bone_graft} onChange={(e) => setCaseForm({ ...caseForm, bone_graft: e.target.checked })} className="rounded text-primary-600 focus:ring-primary-400" />
-                    <span className="text-sm text-slate-700 dark:text-slate-200">پوند استخوانی (Bone Graft)</span>
+                    <span className="text-sm text-slate-700 dark:text-slate-200">پودر استخوانی (Bone Graft)</span>
                   </label>
+                  {caseForm.bone_graft && (
+                    <CurrencyInput label="هزینه‌ی پودر استخوانی (ت)" value={caseForm.bone_graft_cost} onChange={(v) => setCaseForm({ ...caseForm, bone_graft_cost: v })} />
+                  )}
                   <label className="flex items-center gap-2 cursor-pointer">
                     <input type="checkbox" checked={caseForm.gbr} onChange={(e) => setCaseForm({ ...caseForm, gbr: e.target.checked })} className="rounded text-primary-600 focus:ring-primary-400" />
                     <span className="text-sm text-slate-700 dark:text-slate-200">بازسازی استخوان هدایت‌شده (GBR)</span>
@@ -1010,6 +1019,9 @@ export default function Implants() {
                     <input type="checkbox" checked={caseForm.sinus_lift} onChange={(e) => setCaseForm({ ...caseForm, sinus_lift: e.target.checked })} className="rounded text-primary-600 focus:ring-primary-400" />
                     <span className="text-sm text-slate-700 dark:text-slate-200">سینوس لیفت (Sinus Lift)</span>
                   </label>
+                  {caseForm.sinus_lift && (
+                    <CurrencyInput label="هزینه‌ی سینوس لیفت (ت)" value={caseForm.sinus_lift_cost} onChange={(v) => setCaseForm({ ...caseForm, sinus_lift_cost: v })} />
+                  )}
                   <label className="flex items-center gap-2 cursor-pointer">
                     <input type="checkbox" checked={caseForm.immediate_loading} onChange={(e) => setCaseForm({ ...caseForm, immediate_loading: e.target.checked })} className="rounded text-primary-600 focus:ring-primary-400" />
                     <span className="text-sm text-slate-700 dark:text-slate-200">بارگذاری فوری (Immediate Loading)</span>
