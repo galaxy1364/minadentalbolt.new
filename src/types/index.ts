@@ -901,6 +901,30 @@ export interface PersonalFinanceItem {
 
 export type PersonalFinanceItemInput = Omit<PersonalFinanceItem, 'id' | 'created_at' | 'updated_at'> & { clinic_id?: string }
 
+// ── Editable RBAC (role_permissions + custom_roles) ────────────────────
+export interface RolePermission {
+  id: string
+  clinic_id: string
+  role_key: string
+  module_path: string
+  allowed: boolean
+  created_at: string
+  updated_at: string
+  sync_version: number
+}
+export type RolePermissionInput = Omit<RolePermission, 'id' | 'created_at' | 'updated_at' | 'sync_version'> & { clinic_id?: string }
+
+export interface CustomRole {
+  id: string
+  clinic_id: string
+  role_key: string
+  label: string
+  created_at: string
+  updated_at: string
+  sync_version: number
+}
+export type CustomRoleInput = Omit<CustomRole, 'id' | 'created_at' | 'updated_at' | 'sync_version'> & { clinic_id?: string }
+
 export interface CashRegisterSession {
   id: string
   clinic_id: string

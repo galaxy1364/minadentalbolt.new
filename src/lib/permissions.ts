@@ -39,8 +39,9 @@ const ROLE_ACCESS: Record<Role, string[]> = {
 
 export function canAccess(role: string | null | undefined, path: string): boolean {
   if (!REQUIRE_LOGIN) return true
-  if (!role || !(role in ROLE_ACCESS)) return path === '/' // unknown/missing role: dashboard only
-  const allowed = ROLE_ACCESS[role as Role]
+  if (!role) return path === '/'
+  const allowed = permissionOverrides?.[role] ?? (role in ROLE_ACCESS ? ROLE_ACCESS[role as Role] : null)
+  if (!allowed) return path === '/' // unknown role (no override loaded yet, not a built-in): dashboard only
   if (path === '/') return true
   // patient detail route
   if (path.startsWith('/patients/')) return allowed.includes('/patients')
@@ -48,11 +49,31 @@ export function canAccess(role: string | null | undefined, path: string): boolea
 }
 
 export function allowedPaths(role: string | null | undefined): string[] {
-  if (!role || !(role in ROLE_ACCESS)) return ['/']
-  return ROLE_ACCESS[role as Role]
+  if (!role) return ['/']
+  return permissionOverrides?.[role] ?? (role in ROLE_ACCESS ? ROLE_ACCESS[role as Role] : ['/'])
 }
 
 export function roleLabel(role: string | null | undefined): string {
   if (!role || !(role in ROLES)) return 'کاربر'
   return ROLES[role as Role]
 }
+
+// ── Database-backed permission overrides ────────────────────────────────
+// canAccess() stays synchronous (it's called during render, on every
+// route/nav-item check) by reading from an in-memory map that's populated
+// once — via loadRolePermissionOverrides() in api.ts — from the
+// role_permissions table. Until that map is loaded (first paint, or
+// offline before the initial sync), or for a role it has no entry for,
+// canAccess() falls straight back to the hardcoded ROLE_ACCESS/ALL_PATHS
+// above. This is the safety net that makes it impossible for a half-loaded
+// permissions table to lock a real role out of the whole app.
+let permissionOverrides: Record<string, string[]> | null = null
+
+export function setPermissionOverrides(overrides: Record<string, string[]> | null): void {
+  permissionOverrides = overrides
+}
+
+export function getAllModulePaths(): string[] {
+  return ALL_PATHS
+}
+

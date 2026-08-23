@@ -4,6 +4,7 @@ import { supabase, CLINIC_ID } from './supabase'
 import { db } from './db'
 import { DOCTOR_COLOR_PALETTE } from './doctorColors'
 import { queueOperation } from './sync'
+import { setPermissionOverrides } from './permissions'
 import {
   Patient, PatientInput, Doctor, Unit, Appointment, AppointmentInput,
   AppointmentWithRelations, Encounter, EncounterInput, EncounterWithRelations,
@@ -23,6 +24,7 @@ import {
   DoctorScheduleInput, TreatmentPackage, TreatmentPackageInput, ConsentForm,
   PersonalFinanceItem, PersonalFinanceItemInput, CashRegisterSession,
   ConsentFormInput, DashboardStats, DoctorInput, UnitInput,
+  RolePermission, RolePermissionInput, CustomRole, CustomRoleInput,
 } from '../types'
 
 function uid(): string {
@@ -1464,4 +1466,87 @@ export async function convertBookingRequestToAppointment(
     .eq('id', request.id)
   if (error) throw new Error(error.message)
   return appt
+}
+
+// ── Editable RBAC (role_permissions + custom_roles) ─────────────────────
+export async function fetchRolePermissions(): Promise<RolePermission[]> {
+  return db.role_permissions.where('clinic_id').equals(CLINIC_ID).toArray()
+}
+
+export async function fetchCustomRoles(): Promise<CustomRole[]> {
+  return db.custom_roles.where('clinic_id').equals(CLINIC_ID).toArray()
+}
+
+/** Toggles (or creates, if this role/module pair has never been saved
+ * before — e.g. a brand-new custom role) a single permission cell. */
+export async function setRolePermission(roleKey: string, modulePath: string, allowed: boolean): Promise<void> {
+  const all = await db.role_permissions.where('clinic_id').equals(CLINIC_ID).toArray()
+  const existing = all.find((r) => r.role_key === roleKey && r.module_path === modulePath)
+  if (existing) {
+    const updated: RolePermission = { ...existing, allowed, updated_at: nowISO() }
+    await db.role_permissions.put(updated)
+    await queueOperation('role_permissions', 'update', existing.id, { allowed, updated_at: updated.updated_at })
+  } else {
+    const id = uid()
+    const row: RolePermission = {
+      id, clinic_id: CLINIC_ID, role_key: roleKey, module_path: modulePath, allowed,
+      created_at: nowISO(), updated_at: nowISO(), sync_version: 1,
+    }
+    await db.role_permissions.put(row)
+    await queueOperation('role_permissions', 'insert', id, row)
+  }
+}
+
+/** Creates a new custom role plus one role_permissions row per known
+ * module, all defaulting to false ('/' is intentionally NOT force-allowed
+ * here — a brand-new role starts fully locked down; the admin opts modules
+ * in explicitly, which is the safer default for a just-created role). */
+export async function createCustomRole(roleKey: string, label: string, modulePaths: string[]): Promise<CustomRole> {
+  const id = uid()
+  const role: CustomRole = { id, clinic_id: CLINIC_ID, role_key: roleKey, label, created_at: nowISO(), updated_at: nowISO(), sync_version: 1 }
+  await db.custom_roles.put(role)
+  await queueOperation('custom_roles', 'insert', id, role)
+  for (const modulePath of modulePaths) {
+    const permId = uid()
+    const perm: RolePermission = {
+      id: permId, clinic_id: CLINIC_ID, role_key: roleKey, module_path: modulePath, allowed: false,
+      created_at: nowISO(), updated_at: nowISO(), sync_version: 1,
+    }
+    await db.role_permissions.put(perm)
+    await queueOperation('role_permissions', 'insert', permId, perm)
+  }
+  return role
+}
+
+/** Deletes a custom role and every permission row it owns. Built-in
+ * (system) roles aren't rows in custom_roles at all, so they can never be
+ * passed to this function by construction — the UI only offers delete on
+ * roles that came from fetchCustomRoles(). */
+export async function deleteCustomRole(roleKey: string): Promise<void> {
+  const role = (await db.custom_roles.where('clinic_id').equals(CLINIC_ID).toArray()).find((r) => r.role_key === roleKey)
+  if (role) {
+    await db.custom_roles.delete(role.id)
+    await queueOperation('custom_roles', 'delete', role.id)
+  }
+  const perms = (await db.role_permissions.where('clinic_id').equals(CLINIC_ID).toArray()).filter((p) => p.role_key === roleKey)
+  for (const p of perms) {
+    await db.role_permissions.delete(p.id)
+    await queueOperation('role_permissions', 'delete', p.id)
+  }
+}
+
+/** Builds the { role_key: allowedPaths[] } map that permissions.ts'
+ * canAccess() reads synchronously, and installs it via
+ * setPermissionOverrides(). Call once on app boot (Layout.tsx) and again
+ * after any RBAC edit in Settings so the change takes effect immediately
+ * without a full reload. */
+export async function loadRolePermissionOverrides(): Promise<void> {
+  const rows = await fetchRolePermissions()
+  const map: Record<string, string[]> = {}
+  for (const row of rows) {
+    if (!row.allowed) continue
+    if (!map[row.role_key]) map[row.role_key] = []
+    map[row.role_key].push(row.module_path)
+  }
+  setPermissionOverrides(map)
 }

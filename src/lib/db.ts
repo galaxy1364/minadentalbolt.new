@@ -6,6 +6,7 @@ import type {
   WaitingListEntry, Staff, Expense, TreatmentPackage, ConsentForm,
   ToothRecord, InventoryItem, InventoryCategory, PaymentPlan, Installment,
   Cheque, DoctorSchedule, ImplantCase, ImplantComponent, SmsTemplate, PersonalFinanceItem, CashRegisterSession,
+  RolePermission, CustomRole,
 } from '../types'
 
 export interface SyncQueueEntry {
@@ -84,6 +85,8 @@ class MinadentDB extends Dexie {
   backup_snapshots!: Table<BackupSnapshot, number>
   personal_finance_items!: Table<PersonalFinanceItem, string>
   cash_register_sessions!: Table<CashRegisterSession, string>
+  role_permissions!: Table<RolePermission, string>
+  custom_roles!: Table<CustomRole, string>
 
   constructor() {
     super('minadent')
@@ -161,6 +164,12 @@ class MinadentDB extends Dexie {
     this.version(8).stores({
       payments: 'id, clinic_id, patient_id, encounter_id, implant_case_id, payment_date, status, payment_method',
     })
+    // v9: editable RBAC — role_permissions (per role×module toggle) and
+    // custom_roles (admin-defined roles beyond the 6 built-ins).
+    this.version(9).stores({
+      role_permissions: 'id, clinic_id, role_key, module_path',
+      custom_roles: 'id, clinic_id, role_key',
+    })
   }
 }
 
@@ -193,6 +202,7 @@ export const TABLE_NAMES = [
   'consent_forms', 'tooth_records', 'inventory_items', 'inventory_categories',
   'payment_plans', 'installments', 'cheques', 'doctor_schedules',
   'implant_cases', 'implant_components', 'sms_templates', 'personal_finance_items', 'cash_register_sessions',
+  'role_permissions', 'custom_roles',
 ] as const
 
 export type TableName = typeof TABLE_NAMES[number]

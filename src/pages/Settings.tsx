@@ -17,6 +17,7 @@ import {
   createTreatmentPackage, updateTreatmentPackage, deleteTreatmentPackage,
   createInventoryCategory, updateInventoryCategory, deleteInventoryCategory,
   fetchDoctorSchedules, createDoctorSchedule, deleteDoctorSchedule,
+  fetchRolePermissions, fetchCustomRoles, setRolePermission, createCustomRole, deleteCustomRole, loadRolePermissionOverrides,
 } from '../lib/api'
 import { db, TABLE_NAMES } from '../lib/db'
 import { syncNow, subscribeSync, SyncStatus, getFailedSyncEntries, retryFailedEntry, retryAllFailedEntries, discardFailedEntry } from '../lib/sync'
@@ -25,6 +26,7 @@ import { supabase } from '../lib/supabase'
 import {
   SmsTemplate, TreatmentPackage, Doctor, Unit, Procedure, InventoryCategory, DoctorSchedule,
   DoctorInput, UnitInput, ProcedureInput, SmsTemplateInput, TreatmentPackageInput, InventoryCategoryInput, Patient,
+  RolePermission, CustomRole,
 } from '../types'
 import { Card, Button, Input, Select, Textarea, Badge, Spinner, EmptyState, StatCard, Tabs, Modal, showToast } from '../components/ui'
 import { useConfirmAction } from '../components/ConfirmAction'
@@ -34,7 +36,7 @@ import { DOCTOR_COLOR_PALETTE } from '../lib/doctorColors'
 import { getErrorLog, clearErrorLog, LoggedError } from '../lib/errorLog'
 import { fetchAuditLog, clearAuditLog } from '../lib/auditLog'
 import { allModules } from '../theme/modules'
-import { canAccess, ROLES } from '../lib/permissions'
+import { canAccess, ROLES, getAllModulePaths } from '../lib/permissions'
 import { listBackupSnapshots, restoreFromSnapshot } from '../lib/autoBackup'
 import { checkForUpdate, applyUpdate } from '../lib/updateCheck'
 import { APP_VERSION, BUILD_DATE } from '../lib/appVersion'
@@ -977,54 +979,188 @@ const AUDIT_CATEGORIES: { key: string; label: string; tables: string[] }[] = [
 ]
 
 // ============================================================================
-// RBAC Matrix Tab — read-only display of which modules each role can
-// access, sourced from the same permissions.ts config the app actually
-// enforces (not a separate/fake list). Basic foundation for a future
-// per-role, per-module toggle EDITOR with custom roles — that's a
-// bigger architecture change (storing custom roles + permission sets
-// in the database) intentionally not attempted here.
+// RBAC Matrix Tab — real, database-backed, editable permission matrix.
+// Built-in roles (owner/doctor/receptionist/assistant/lab/accountant) plus
+// any admin-defined custom roles, each with a per-module allow/deny toggle
+// that writes to role_permissions and takes effect immediately (via
+// loadRolePermissionOverrides refreshing permissions.ts' in-memory map —
+// no reload needed). Was previously a read-only display of the hardcoded
+// ROLE_ACCESS map; that map now only serves as the safety-net fallback
+// used before this table has loaded, or if it's ever unreachable.
 // ============================================================================
 
 function RbacMatrixTab() {
+  const { confirmAction } = useConfirmAction()
   const [activeRole, setActiveRole] = useState<string>('owner')
-  const roleModuleAccess = allModules.filter((m) => canAccess(activeRole, m.path))
+  const [permissions, setPermissions] = useState<RolePermission[]>([])
+  const [customRoles, setCustomRoles] = useState<CustomRole[]>([])
+  const [loading, setLoading] = useState(true)
+  const [savingKey, setSavingKey] = useState<string | null>(null)
+  const [newRoleModalOpen, setNewRoleModalOpen] = useState(false)
+  const [newRoleLabel, setNewRoleLabel] = useState('')
+  const [savingNewRole, setSavingNewRole] = useState(false)
+
+  const load = useCallback(async () => {
+    const [perms, roles] = await Promise.all([fetchRolePermissions(), fetchCustomRoles()])
+    setPermissions(perms)
+    setCustomRoles(roles)
+    setLoading(false)
+  }, [])
+
+  useEffect(() => { load() }, [load])
+
+  const builtInRoleEntries = Object.entries(ROLES) // [key, label][]
+  const allRoleEntries: { key: string; label: string; isCustom: boolean }[] = [
+    ...builtInRoleEntries.map(([key, label]) => ({ key, label, isCustom: false })),
+    ...customRoles.map((r) => ({ key: r.role_key, label: r.label, isCustom: true })),
+  ]
+
+  const isAllowed = (roleKey: string, modulePath: string) =>
+    permissions.find((p) => p.role_key === roleKey && p.module_path === modulePath)?.allowed ?? false
+
+  const moduleCountForRole = (roleKey: string) => permissions.filter((p) => p.role_key === roleKey && p.allowed).length
+
+  const handleToggle = async (modulePath: string) => {
+    // Safety net: the owner role must always be able to reach Settings —
+    // otherwise turning this off is a one-way trip to permanently locking
+    // every admin out of the only screen that could turn it back on.
+    if (activeRole === 'owner' && modulePath === '/settings' && isAllowed(activeRole, modulePath)) {
+      showToast('error', 'دسترسی مدیر کلینیک به تنظیمات را نمی‌توان غیرفعال کرد')
+      return
+    }
+    const cellKey = `${activeRole}|${modulePath}`
+    const next = !isAllowed(activeRole, modulePath)
+    setSavingKey(cellKey)
+    h.tap()
+    // Optimistic update so the toggle feels instant.
+    setPermissions((prev) => {
+      const existing = prev.find((p) => p.role_key === activeRole && p.module_path === modulePath)
+      if (existing) return prev.map((p) => (p === existing ? { ...p, allowed: next } : p))
+      return [...prev, { id: cellKey, clinic_id: CLINIC_ID, role_key: activeRole, module_path: modulePath, allowed: next, created_at: '', updated_at: '', sync_version: 1 }]
+    })
+    try {
+      await setRolePermission(activeRole, modulePath, next)
+      await loadRolePermissionOverrides() // live-refresh canAccess() everywhere, no reload needed
+    } catch {
+      showToast('error', 'خطا در ذخیره — بازگردانده شد')
+      await load() // roll back to real state on failure
+    } finally {
+      setSavingKey(null)
+    }
+  }
+
+  const handleCreateRole = async () => {
+    const label = newRoleLabel.trim()
+    if (!label) { showToast('error', 'نام نقش را وارد کنید'); return }
+    // Slugify to a stable key: Persian/Arabic labels keep their letters
+    // (no reason to force English), just strip whitespace/punctuation that
+    // would be awkward as an identifier and guarantee uniqueness.
+    let roleKey = label.trim().replace(/\s+/g, '_').replace(/[^\p{L}\p{N}_]/gu, '')
+    if (!roleKey) roleKey = `role_${Date.now()}`
+    const existingKeys = new Set([...builtInRoleEntries.map(([k]) => k), ...customRoles.map((r) => r.role_key)])
+    if (existingKeys.has(roleKey)) roleKey = `${roleKey}_${Date.now().toString().slice(-4)}`
+    setSavingNewRole(true)
+    try {
+      await createCustomRole(roleKey, label, getAllModulePaths())
+      await load()
+      await loadRolePermissionOverrides()
+      setActiveRole(roleKey)
+      setNewRoleModalOpen(false)
+      setNewRoleLabel('')
+      showToast('success', 'نقش جدید ایجاد شد — همه‌ی ماژول‌ها غیرفعال شروع می‌شوند')
+    } catch { showToast('error', 'خطا در ایجاد نقش') }
+    finally { setSavingNewRole(false) }
+  }
+
+  const handleDeleteRole = (role: { key: string; label: string }) => {
+    h.warning()
+    confirmAction({
+      type: 'delete',
+      title: 'حذف نقش سفارشی',
+      warning: 'این عملیات قابل بازگشت نیست. کارکنانی که این نقش به آن‌ها اختصاص داده شده، تا تغییر نقش‌شان فقط به داشبورد دسترسی خواهند داشت.',
+      fields: [{ label: 'نقش', value: role.label, highlight: true }],
+      confirmLabel: 'تایید حذف',
+      onConfirm: async () => {
+        try {
+          await deleteCustomRole(role.key)
+          if (activeRole === role.key) setActiveRole('owner')
+          await load()
+          await loadRolePermissionOverrides()
+          showToast('success', 'نقش حذف شد')
+        } catch { showToast('error', 'خطا در حذف نقش') }
+      },
+    })
+  }
+
+  const activeRoleMeta = allRoleEntries.find((r) => r.key === activeRole)
+
+  if (loading) {
+    return <Card className="p-6 flex items-center justify-center"><Spinner /></Card>
+  }
 
   return (
     <div className="space-y-4">
       <Card className="p-5">
-        <h2 className="text-base font-bold text-slate-800 dark:text-slate-100 flex items-center gap-2 mb-1">
-          <Shield size={18} className="text-primary-600" /> دسترسی نقش‌ها (RBAC)
-        </h2>
+        <div className="flex items-center justify-between gap-2 mb-1">
+          <h2 className="text-base font-bold text-slate-800 dark:text-slate-100 flex items-center gap-2">
+            <Shield size={18} className="text-primary-600" /> دسترسی نقش‌ها (RBAC)
+          </h2>
+          <Button variant="secondary" size="sm" onClick={() => setNewRoleModalOpen(true)}>+ نقش سفارشی</Button>
+        </div>
         <p className="text-xs text-slate-500 dark:text-slate-400 mb-4">
-          نمایش دسترسی هر نقش به ماژول‌های سیستم — همان تنظیماتی که واقعاً اعمال می‌شود. تعریف نقش سفارشی و تغییر دسترسی هر ماژول به‌صورت جداگانه، قابلیت آینده است.
+          دسترسی هر نقش را به هر ماژول جداگانه روشن یا خاموش کنید. تغییرات فوراً روی کارکنانی که آن نقش را دارند اعمال می‌شود.
         </p>
         <div className="flex items-center gap-1.5 flex-wrap mb-4">
-          {Object.entries(ROLES).map(([key, label]) => (
+          {allRoleEntries.map(({ key, label, isCustom }) => (
             <button
               key={key}
               onClick={() => setActiveRole(key)}
-              className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all-smooth ${activeRole === key ? 'bg-primary-600 text-white' : 'bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300'}`}
+              className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all-smooth flex items-center gap-1 ${activeRole === key ? 'bg-primary-600 text-white' : isCustom ? 'bg-primary-50 dark:bg-primary-900/20 text-primary-700 dark:text-primary-400' : 'bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300'}`}
             >
-              {label} <span className="opacity-70">({toPersianDigits(allModules.filter((m) => canAccess(key, m.path)).length)} ماژول)</span>
+              {label} <span className="opacity-70">({toPersianDigits(moduleCountForRole(key))} ماژول)</span>
             </button>
           ))}
         </div>
-        <div className="p-3 rounded-2xl bg-primary-50 dark:bg-primary-900/20 mb-3">
-          <p className="text-sm font-bold text-primary-700 dark:text-primary-400">نقش انتخابی: {ROLES[activeRole as keyof typeof ROLES]}</p>
-          <p className="text-xs text-primary-600 dark:text-primary-500">دسترسی به {toPersianDigits(roleModuleAccess.length)} ماژول از {toPersianDigits(allModules.length)} ماژول</p>
+        <div className="p-3 rounded-2xl bg-primary-50 dark:bg-primary-900/20 mb-3 flex items-center justify-between gap-2">
+          <div>
+            <p className="text-sm font-bold text-primary-700 dark:text-primary-400">نقش انتخابی: {activeRoleMeta?.label}</p>
+            <p className="text-xs text-primary-600 dark:text-primary-500">دسترسی به {toPersianDigits(moduleCountForRole(activeRole))} ماژول از {toPersianDigits(allModules.length)} ماژول</p>
+          </div>
+          {activeRoleMeta?.isCustom && (
+            <button onClick={() => handleDeleteRole(activeRoleMeta)} className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs text-error-600 hover:bg-error-50 transition-colors"><Trash2 size={12} /> حذف نقش</button>
+          )}
         </div>
         <div className="grid grid-cols-2 gap-2">
           {allModules.map((m) => {
-            const allowed = canAccess(activeRole, m.path)
+            const allowed = isAllowed(activeRole, m.path)
+            const cellKey = `${activeRole}|${m.path}`
+            const isSaving = savingKey === cellKey
+            const isLockedOwnerSettings = activeRole === 'owner' && m.path === '/settings'
             return (
-              <div key={m.path} className={`flex items-center gap-2 p-2.5 rounded-xl ${allowed ? 'bg-success-50 dark:bg-success-900/20' : 'bg-slate-50 dark:bg-slate-800/60'}`}>
-                {allowed ? <CheckCircle2 size={14} className="text-success-600 shrink-0" /> : <div className="w-3.5 h-3.5 rounded-full border border-slate-300 shrink-0" />}
+              <button
+                key={m.path}
+                onClick={() => handleToggle(m.path)}
+                disabled={isSaving || isLockedOwnerSettings}
+                className={`flex items-center gap-2 p-2.5 rounded-xl transition-all-smooth text-right ${allowed ? 'bg-success-50 dark:bg-success-900/20' : 'bg-slate-50 dark:bg-slate-800/60'} ${isLockedOwnerSettings ? 'opacity-70 cursor-not-allowed' : 'active:scale-[0.98]'}`}
+              >
+                {isSaving ? <Spinner size={14} /> : allowed ? <CheckCircle2 size={14} className="text-success-600 shrink-0" /> : <div className="w-3.5 h-3.5 rounded-full border border-slate-300 shrink-0" />}
                 <span className={`text-xs font-medium ${allowed ? 'text-success-700 dark:text-success-400' : 'text-slate-400'}`}>{m.label}</span>
-              </div>
+                {isLockedOwnerSettings && <span className="text-[9px] text-slate-400 mr-auto">قفل</span>}
+              </button>
             )
           })}
         </div>
       </Card>
+
+      <Modal open={newRoleModalOpen} onClose={() => setNewRoleModalOpen(false)} title="نقش سفارشی جدید">
+        <div className="space-y-3 p-1">
+          <Input label="نام نقش" value={newRoleLabel} onChange={setNewRoleLabel} placeholder="مثلاً: بهداشتکار دهان و دندان" />
+          <p className="text-xs text-slate-500">نقش جدید با همه‌ی ماژول‌ها غیرفعال ایجاد می‌شود — بعد از ساخت، دسترسی‌های لازم را روشن کنید.</p>
+          <Button onClick={handleCreateRole} disabled={savingNewRole || !newRoleLabel.trim()} className="w-full">
+            {savingNewRole ? <Spinner size={16} /> : 'ایجاد نقش'}
+          </Button>
+        </div>
+      </Modal>
     </div>
   )
 }

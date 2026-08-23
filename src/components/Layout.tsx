@@ -21,7 +21,7 @@ import {
   getModuleByPath, setModuleTheme, type ModuleIdentity,
 } from '../theme/modules'
 import { subscribeSync, initSyncEngine, syncNow, SyncStatus } from '../lib/sync'
-import { fetchPayments, fetchTreatments, fetchImplantCases } from '../lib/api'
+import { fetchPayments, fetchTreatments, fetchImplantCases, loadRolePermissionOverrides } from '../lib/api'
 import { calcAllPatientBalances } from '../lib/finance'
 import { h } from '../lib/haptics'
 import { CheckCircle2, CloudOff } from 'lucide-react'
@@ -336,6 +336,14 @@ function LayoutInner({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     const cleanup = initSyncEngine()
     return cleanup
+  }, [])
+
+  // Load DB-backed RBAC overrides once on mount so canAccess() (used just
+  // below, and in the nav-item filtering above) reflects any admin edits
+  // instead of only the hardcoded ROLE_ACCESS fallback. Safe even before
+  // this resolves — canAccess() falls back to the hardcoded map until then.
+  useEffect(() => {
+    loadRolePermissionOverrides().catch(() => {})
   }, [])
 
   return (
