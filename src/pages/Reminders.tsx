@@ -10,7 +10,7 @@ import { ModuleHeader } from '../components/ModuleHeader'
 import { Card, Button, Badge, Spinner, EmptyState, Select, Modal, Input, Textarea, showToast } from '../components/ui'
 import { CurrencyInput } from '../components/CurrencyInput'
 import { PersianDateInput } from '../components/PersianDateInput'
-import { fetchCheques, fetchAllInstallments, fetchLabOrders, fetchImplantCases, fetchPatients, fetchManualReminders, createManualReminder, updateManualReminder } from '../lib/api'
+import { fetchCheques, fetchAllInstallments, fetchLabOrders, fetchImplantCases, fetchPatients, fetchManualReminders, createManualReminder, updateManualReminder, fetchAppointments } from '../lib/api'
 import { toJalaliStringPretty, toPersianDigits, formatCurrency } from '../lib/persianDate'
 import { downloadICSReminder } from '../lib/icsReminder'
 import { requestNotificationPermission, getNotificationPermission, notifyOnceForReminder } from '../lib/notifications'
@@ -21,7 +21,7 @@ const LEAD_DAYS_KEY = 'minadent-reminder-lead-days'
 
 interface ReminderItem {
   id: string
-  category: 'cheque' | 'installment' | 'lab' | 'implant' | 'manual'
+  category: 'cheque' | 'installment' | 'lab' | 'implant' | 'manual' | 'appointment'
   title: string
   patientName: string
   dueDate: string
@@ -50,15 +50,15 @@ export default function Reminders() {
 
   const loadData = () => {
     setLoading(true)
-    return Promise.all([fetchCheques(), fetchAllInstallments(), fetchLabOrders(), fetchImplantCases(), fetchPatients(), fetchManualReminders()])
-      .then(([cheques, installments, labOrders, implantCases, pats, manualReminders]) => {
+    const today = new Date().toISOString().slice(0, 10)
+    return Promise.all([fetchCheques(), fetchAllInstallments(), fetchLabOrders(), fetchImplantCases(), fetchPatients(), fetchManualReminders(), fetchAppointments(today)])
+      .then(([cheques, installments, labOrders, implantCases, pats, manualReminders, appointments]) => {
         setPatients(pats)
         const patientName = (id: string | null) => {
           if (!id) return 'بدون بیمار'
           const p = pats.find((pp) => pp.id === id)
           return p ? `${p.first_name} ${p.last_name}` : 'بیمار'
         }
-        const today = new Date().toISOString().slice(0, 10)
         const daysLeft = (d: string) => Math.floor((new Date(d).getTime() - new Date(today).getTime()) / 86400000)
 
         const list: ReminderItem[] = []
@@ -85,6 +85,22 @@ export default function Reminders() {
           if (mr.status !== 'pending') continue
           list.push({ id: `manual-${mr.id}`, category: 'manual', title: mr.title, patientName: patientName(mr.patient_id), dueDate: mr.due_date, amount: mr.amount || undefined, daysLeft: daysLeft(mr.due_date), manualSource: mr })
         }
+        // Upcoming appointments — including long-range recall/follow-up
+        // bookings (e.g. 'come back in 1/3/4 months') that were
+        // previously invisible here entirely; staff had to remember to
+        // check Appointments/Calendar separately for anything far out.
+        // Only surfaced within 14 days of their date — a follow-up
+        // booked 3 months out isn't 'urgent' yet and would otherwise
+        // flood this list with routine day-to-day bookings; it appears
+        // here (and starts sending the escalating notifications below)
+        // automatically once it enters that window, so nothing far out
+        // needs manual tracking in the meantime.
+        for (const a of appointments as any[]) {
+          if (a.status === 'cancelled' || a.status === 'completed' || a.status === 'no_show') continue
+          const dl = daysLeft(a.date)
+          if (dl > 14) continue
+          list.push({ id: `appt-${a.id}`, category: 'appointment', title: 'نوبت', patientName: patientName(a.patient_id), dueDate: a.date, daysLeft: dl })
+        }
         list.sort((a, b) => a.daysLeft - b.daysLeft)
         setItems(list)
       })
@@ -98,19 +114,33 @@ export default function Reminders() {
   const filteredItems = useMemo(() => items.filter((it) => filter === 'all' || it.category === filter), [items, filter])
   const urgentCount = items.filter((it) => it.daysLeft <= Number(leadDays)).length
 
-  // Real OS notifications for urgent items — fires once per item per
-  // day (see notifyOnceForReminder), only while the app is open, since
-  // true background push needs a server this client-only app doesn't
-  // have. Still a genuine notification the phone shows outside the
-  // browser, not a fake in-app toast.
+  // Real OS notifications — escalating tiers per item, not a single flat
+  // threshold: 3 days before, 1 day before, the due day itself, and a
+  // distinct daily 'overdue' alert that keeps firing every day it stays
+  // unresolved (never just once) so a slipped payment can't quietly fall
+  // through the cracks. Each tier uses its own notification id (see
+  // notifyOnceForReminder's per-day dedup), so all four can fire
+  // independently as an item crosses each threshold — this is separate
+  // from the 'leadDays' setting below, which only controls the visual
+  // 'urgent' highlight in the list, not which alerts actually fire.
   useEffect(() => {
     if (notifPermission !== 'granted') return
+    const categoryLabel = { cheque: 'چک', installment: 'قسط', lab: 'لابراتوار', implant: 'ایمپلنت', manual: 'یادآوری', appointment: 'نوبت' }
     for (const it of items) {
-      if (it.daysLeft > Number(leadDays)) continue
-      const meta = { cheque: 'چک', installment: 'قسط', lab: 'لابراتوار', implant: 'ایمپلنت', manual: 'یادآوری' }[it.category]
-      notifyOnceForReminder(it.id, `یادآوری ${meta}`, `${it.title} — ${it.patientName} — ${it.daysLeft < 0 ? 'گذشته' : it.daysLeft === 0 ? 'امروز' : `${it.daysLeft} روز مانده`}`)
+      const label = categoryLabel[it.category]
+      const when = it.daysLeft === 0 ? 'امروز' : it.daysLeft < 0 ? `${Math.abs(it.daysLeft)} روز پیش` : `${it.daysLeft} روز دیگر`
+      const body = `${it.title} — ${it.patientName} — سررسید: ${when}`
+      if (it.daysLeft === 3) {
+        notifyOnceForReminder(`${it.id}-3day`, `⏰ ۳ روز تا سررسید ${label}`, body)
+      } else if (it.daysLeft === 1) {
+        notifyOnceForReminder(`${it.id}-1day`, `⏰ فردا سررسید ${label}`, body)
+      } else if (it.daysLeft === 0) {
+        notifyOnceForReminder(`${it.id}-dueday`, `🔔 امروز سررسید ${label}`, body)
+      } else if (it.daysLeft < 0) {
+        notifyOnceForReminder(`${it.id}-overdue`, `🚨 گذشته از موعد — ${label}`, `${it.title} — ${it.patientName} — ${Math.abs(it.daysLeft)} روز تاخیر`)
+      }
     }
-  }, [items, leadDays, notifPermission])
+  }, [items, notifPermission])
 
   const handleEnableNotifications = async () => {
     h.tap()
@@ -124,6 +154,7 @@ export default function Reminders() {
     lab: { label: 'لابراتوار', icon: <FlaskConical size={14} />, color: 'text-cyan-600 bg-cyan-50' },
     implant: { label: 'ایمپلنت', icon: <Bone size={14} />, color: 'text-indigo-600 bg-indigo-50' },
     manual: { label: 'یادآوری دستی', icon: <StickyNote size={14} />, color: 'text-amber-600 bg-amber-50' },
+    appointment: { label: 'نوبت', icon: <CalendarClock size={14} />, color: 'text-teal-600 bg-teal-50' },
   }
 
   const openCreateModal = () => {
@@ -233,7 +264,7 @@ export default function Reminders() {
       </div>
 
       <div className="flex items-center gap-1.5 flex-wrap">
-        {(['all', 'cheque', 'installment', 'lab', 'implant', 'manual'] as const).map((f) => (
+        {(['all', 'cheque', 'installment', 'lab', 'implant', 'manual', 'appointment'] as const).map((f) => (
           <button key={f} onClick={() => { h.select(); setFilter(f) }} className={`px-3 py-1.5 rounded-xl text-xs font-bold ${filter === f ? 'bg-primary-600 text-white' : 'bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300'}`}>
             {f === 'all' ? 'همه' : categoryMeta[f].label}
           </button>

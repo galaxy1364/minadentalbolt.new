@@ -12,7 +12,7 @@ import { calcAllPatientBalances } from '../lib/finance'
 import { downloadICSReminder } from '../lib/icsReminder'
 import { fetchCashRegisterSessions, openCashRegisterSession, closeCashRegisterSession } from '../lib/api'
 import type { CashRegisterSession } from '../types'
-import { Wizard, Card, Button, Input, Select, Textarea, Badge, Spinner, EmptyState, Tabs, showToast } from '../components/ui'
+import { Wizard, Card, Button, Input, Select, Textarea, Badge, Spinner, EmptyState, Tabs, showToast, Modal } from '../components/ui'
 import { PersianDateInput } from '../components/PersianDateInput'
 import { CurrencyInput } from '../components/CurrencyInput'
 import { ModuleHeader, ModuleStatCard, ReorderableStatGrid } from '../components/ModuleHeader'
@@ -127,6 +127,9 @@ export default function Billing() {
 
   // Payment plan modal
   const [planModalOpen, setPlanModalOpen] = useState(false)
+  const [rescheduleInstallment, setRescheduleInstallment] = useState<any>(null)
+  const [rescheduleDate, setRescheduleDate] = useState('')
+  const [savingReschedule, setSavingReschedule] = useState(false)
   const [planWizardStep, setPlanWizardStep] = useState(0)
   const [savingPlan, setSavingPlan] = useState(false)
   const [planForm, setPlanForm] = useState({
@@ -1070,6 +1073,14 @@ export default function Billing() {
                               <Badge color="warning">در انتظار</Badge>
                               <Button size="sm" variant="success" onClick={() => markInstallmentPaid(inst, plan)}>پرداخت</Button>
                               <button
+                                onClick={() => { h.tap(); setRescheduleInstallment(inst); setRescheduleDate(inst.due_date) }}
+                                aria-label="تغییر موعد قسط"
+                                title="تغییر موعد قسط — مثلاً وقتی بیمار می‌گوید دیرتر پرداخت می‌کند"
+                                className="p-1.5 rounded-lg text-slate-400 hover:text-warning-600 hover:bg-warning-50 transition-colors"
+                              >
+                                <Edit2 size={14} />
+                              </button>
+                              <button
                                 onClick={() => downloadICSReminder({
                                   title: `سررسید قسط — ${getPatientName(plan.patient_id)}`,
                                   description: `قسط ${inst.installment_number} — مبلغ ${formatCurrency(inst.amount)} تومان`,
@@ -1573,6 +1584,36 @@ export default function Billing() {
       {renderChequeModal()}
       {renderPlanModal()}
       {renderExpenseModal()}
+
+      <Modal open={!!rescheduleInstallment} onClose={() => setRescheduleInstallment(null)} title="تغییر موعد قسط">
+        <div className="space-y-3 p-1">
+          {rescheduleInstallment && (
+            <p className="text-xs text-slate-500">
+              قسط {toPersianDigits(rescheduleInstallment.installment_number)} — {formatCurrency(rescheduleInstallment.amount)} تومان.
+              موعد فعلی: {toJalaliStringPretty(rescheduleInstallment.due_date)}. یادآوری‌ها خودکار با موعد جدید هماهنگ می‌شوند.
+            </p>
+          )}
+          <PersianDateInput label="موعد جدید" value={rescheduleDate} onChange={setRescheduleDate} />
+          <Button
+            onClick={async () => {
+              if (!rescheduleInstallment) return
+              setSavingReschedule(true)
+              try {
+                await updateInstallment(rescheduleInstallment.id, { due_date: rescheduleDate })
+                showToast('success', 'موعد قسط تغییر کرد')
+                setRescheduleInstallment(null)
+                await loadData()
+              } catch { showToast('error', 'خطا در تغییر موعد') }
+              finally { setSavingReschedule(false) }
+            }}
+            disabled={savingReschedule || !rescheduleDate}
+            className="w-full"
+          >
+            {savingReschedule ? <Spinner size={16} /> : 'ذخیره‌ی موعد جدید'}
+          </Button>
+        </div>
+      </Modal>
+
       {ConfirmActionModal}
     </div>
   )
