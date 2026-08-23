@@ -84,10 +84,17 @@ export function PersianCalendar({ selectedDate, onDateSelect, appointments = [],
         {grid.flat().map((day, i) => {
           if (day === null) return <div key={i} className="aspect-square" />
           const gregDate = getGregorianForDay(day)
+          // Defensive guard: if the Jalali->Gregorian conversion ever
+          // produces something malformed (e.g. NaN-NaN-NaN from a bad
+          // input), gregDate could coincidentally equal an equally
+          // malformed selectedDate for EVERY day in the grid, making
+          // every cell render as 'selected' at once. A real date is
+          // always exactly YYYY-MM-DD with numeric parts.
+          const isValidDate = /^\d{4}-\d{2}-\d{2}$/.test(gregDate)
           const jalaliStr = `${viewYear}/${String(viewMonth).padStart(2, '0')}/${String(day).padStart(2, '0')}`
           const holiday = getHoliday(jalaliStr)
           const isToday = todayJalali.jy === viewYear && todayJalali.jm === viewMonth && todayJalali.jd === day
-          const isSelected = gregDate === selectedDate
+          const isSelected = isValidDate && gregDate === selectedDate
           const hasAppt = apptDates.has(gregDate)
           const isHighlighted = highlightSet.has(gregDate)
           const isFriday = i % 7 === 6
