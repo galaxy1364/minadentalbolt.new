@@ -4,7 +4,7 @@ import { createPortal } from 'react-dom'
 import { useNavigate } from 'react-router-dom'
 import { Image, Search, Filter, Eye, XCircle, Smile, Camera, Calendar, User, FileText, Download, ZoomIn, Plus, Edit2, Trash2 } from 'lucide-react'
 import { PieChart, Pie, Cell, XAxis, YAxis, Tooltip as RTooltip, ResponsiveContainer, Legend } from 'recharts'
-import { fetchRadiologyImages, fetchPatients, createRadiologyImage, deleteRadiologyImage } from '../lib/api'
+import { fetchRadiologyImages, fetchPatients, createRadiologyImage, updateRadiologyImage } from '../lib/api'
 import { toJalaliString, toJalaliStringPretty, formatNumber, toPersianDigits } from '../lib/persianDate'
 import { RadiologyImage, Patient } from '../types'
 import { Card, Button, Badge, Spinner, EmptyState, Modal, Wizard, Input, Select, Textarea, showToast } from '../components/ui'
@@ -108,18 +108,21 @@ export default function Radiology() {
 
   const handleDeleteImage = (img: RadiologyImage) => {
     setSelectedImage(null)
+    // Per clinic policy — and legal record-retention requirements for
+    // medical imaging — a radiology image is never permanently deleted,
+    // only archived (restorable, hidden from the active gallery).
     confirmAction({
-      type: 'delete',
-      title: 'حذف تصویر رادیولوژی',
-      warning: 'این عملیات قابل بازگشت نیست',
+      type: 'status',
+      title: 'آرشیو تصویر رادیولوژی',
+      warning: 'این تصویر هیچ‌وقت پاک نمی‌شود — فقط از گالری فعال مخفی می‌شود و همیشه قابل بازگردانی است.',
       fields: [{ label: 'بیمار', value: patientName(img), highlight: true }],
-      confirmLabel: 'تایید حذف',
+      confirmLabel: 'تایید آرشیو',
       onConfirm: async () => {
         try {
-          await deleteRadiologyImage(img.id)
-          showToast('success', 'تصویر حذف شد')
+          await updateRadiologyImage(img.id, { is_active: false } as any)
+          showToast('success', 'تصویر آرشیو شد')
           loadData()
-        } catch { showToast('error', 'خطا در حذف') }
+        } catch { showToast('error', 'خطا در آرشیو کردن') }
       },
     })
   }
@@ -135,7 +138,9 @@ export default function Radiology() {
         fetchRadiologyImages(),
         fetchPatients(),
       ])
-      setImages(imgs)
+      // Archived images stay out of the active gallery — fully
+      // preserved, restorable, exactly like archived patients/implants.
+      setImages(imgs.filter((i) => i.is_active !== false))
       setPatients(pats)
     } catch (err) {
       console.error('Error loading radiology:', err)

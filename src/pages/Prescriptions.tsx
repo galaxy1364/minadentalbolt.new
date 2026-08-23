@@ -3,7 +3,7 @@ import { useState, useEffect, useCallback, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Pill, FileText, Search, Plus, Eye, Trash2, Edit2, TrendingUp, Smile, Printer } from 'lucide-react'
 import { AreaChart, Area, XAxis, YAxis, Tooltip as RTooltip, ResponsiveContainer } from 'recharts'
-import { fetchPrescriptions, createPrescription, updatePrescription, deletePrescription, fetchPatients, fetchDoctors } from '../lib/api'
+import { fetchPrescriptions, createPrescription, updatePrescription, fetchPatients, fetchDoctors } from '../lib/api'
 import { toJalaliString, toJalaliStringPretty, getJalaliMonthYear, formatCurrency, formatNumber, toPersianDigits, persianMonths } from '../lib/persianDate'
 import { h } from '../lib/haptics'
 import { useConfirmAction } from '../components/ConfirmAction'
@@ -280,17 +280,17 @@ export default function Prescriptions() {
   const handleDelete = (p: PrescriptionWithRelations) => {
     h.warning()
     confirmAction({
-      type: 'delete',
-      title: 'حذف نسخه',
-      warning: 'این عملیات قابل بازگشت نیست',
+      type: 'status',
+      title: 'لغو نسخه',
+      warning: 'این نسخه هیچ‌وقت پاک نمی‌شود — سوابق دارویی جزو مدارک پزشکی است. فقط به‌عنوان لغو‌شده علامت می‌خورد.',
       fields: [
         { label: 'بیمار', value: patientName(p), highlight: true },
         { label: 'تعداد داروها', value: toPersianDigits(medicationsCount(p)) },
       ],
-      confirmLabel: 'حذف قطعی',
+      confirmLabel: 'تایید لغو',
       onConfirm: async () => {
-        try { await deletePrescription(p.id); showToast('success', 'نسخه حذف شد'); await loadData() }
-        catch { showToast('error', 'خطا در حذف') }
+        try { await updatePrescription(p.id, { status: 'cancelled' } as any); showToast('success', 'نسخه لغو شد — در سوابق باقی ماند'); await loadData() }
+        catch { showToast('error', 'خطا در لغو') }
       },
     })
   }

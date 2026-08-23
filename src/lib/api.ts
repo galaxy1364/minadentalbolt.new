@@ -1164,7 +1164,7 @@ export async function deleteInsuranceClaim(id: string): Promise<void> {
 export async function createRadiologyImage(r: RadiologyImageInput): Promise<RadiologyImage> {
   const { clinic_id, ...rest } = r
   const id = uid()
-  const img: RadiologyImage = { ...rest, id, clinic_id: CLINIC_ID, created_at: nowISO(), updated_at: nowISO() }
+  const img: RadiologyImage = { ...rest, is_active: rest.is_active ?? true, id, clinic_id: CLINIC_ID, created_at: nowISO(), updated_at: nowISO() }
   await db.radiology_images.put(img)
   await queueOperation('radiology_images', 'insert', id, img)
   return img

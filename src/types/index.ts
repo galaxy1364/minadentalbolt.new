@@ -292,6 +292,10 @@ export interface RadiologyImage {
   description: string | null
   taken_at: string | null
   notes: string | null
+  /** Soft-delete flag — X-rays are real medical records most
+   * jurisdictions legally require retaining; 'delete' archives instead
+   * of destroying, same pattern as patients/staff/implant_cases. */
+  is_active: boolean
   created_at: string
   updated_at: string
 }
@@ -843,9 +847,10 @@ export type InsuranceClaimInput = Omit<
 
 export type RadiologyImageInput = Omit<
   RadiologyImage,
-  'id' | 'created_at' | 'updated_at' | 'clinic_id'
+  'id' | 'created_at' | 'updated_at' | 'clinic_id' | 'is_active'
 > & {
   clinic_id?: string
+  is_active?: boolean
 }
 
 export type TreatmentPhaseInput = Omit<
