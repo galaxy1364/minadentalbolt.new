@@ -1,9 +1,10 @@
 // Implants.tsx - Persian RTL Dental Clinic Implant Cases Management
 import { useState, useEffect, useCallback, useMemo } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
-import { Smile, Plus, Search, Edit2, Eye, Filter, Package, Calendar, DollarSign, ShieldCheck, AlertTriangle, CheckCircle2, Clock, Activity, Layers, Trash2, CalendarClock } from 'lucide-react'
+import { Smile, Plus, Search, Edit2, Eye, Filter, Package, Calendar, DollarSign, ShieldCheck, AlertTriangle, CheckCircle2, Clock, Activity, Layers, Trash2, CalendarClock, ScanLine } from 'lucide-react'
 import { downloadICSReminder } from '../lib/icsReminder'
 import { fetchImplantCases, createImplantCase, updateImplantCase, createImplantComponent, deleteImplantComponent, fetchPatients, fetchDoctors, createExpense, fetchInventoryItems } from '../lib/api'
+import { BarcodeScanner } from '../components/BarcodeScanner'
 import { CLINIC_ID } from '../lib/supabase'
 import { toJalaliString, toJalaliStringPretty, formatCurrency, formatNumber, toPersianDigits } from '../lib/persianDate'
 import { h } from '../lib/haptics'
@@ -133,6 +134,7 @@ export default function Implants() {
 
   // Component modal
   const [componentModalOpen, setComponentModalOpen] = useState(false)
+  const [componentScannerOpen, setComponentScannerOpen] = useState(false)
   const [componentWizardStep, setComponentWizardStep] = useState(0)
   const [componentCaseId, setComponentCaseId] = useState<string | null>(null)
   const [savingComponent, setSavingComponent] = useState(false)
@@ -1135,21 +1137,36 @@ export default function Implants() {
               <>
                 <Select label="نوع کامپوننت" value={componentForm.component_type} onChange={(v) => setComponentForm({ ...componentForm, component_type: v })} options={componentTypes} />
                 {inventoryItems.length > 0 && (
-                  <Select
-                    label="کسر از موجودی انبار (اختیاری)"
-                    value={componentForm.inventory_item_id}
-                    onChange={(v) => {
-                      const item = inventoryItems.find((i) => i.id === v)
-                      setComponentForm({
-                        ...componentForm, inventory_item_id: v,
-                        // Auto-fill brand from the picked stock item —
-                        // staff can still edit it after, but this saves
-                        // retyping what's usually the same text.
-                        brand: item ? (item.brand || item.name) : componentForm.brand,
-                      })
-                    }}
-                    options={[{ value: '', label: 'بدون اتصال به انبار' }, ...inventoryItems.map((i) => ({ value: i.id, label: `${i.name}${i.brand ? ` — ${i.brand}` : ''} (موجودی: ${i.quantity})` }))]}
-                  />
+                  <div className="flex items-end gap-2">
+                    <div className="flex-1">
+                      <Select
+                        label="کسر از موجودی انبار (اختیاری)"
+                        value={componentForm.inventory_item_id}
+                        onChange={(v) => {
+                          const item = inventoryItems.find((i) => i.id === v)
+                          setComponentForm({
+                            ...componentForm, inventory_item_id: v,
+                            brand: item ? (item.brand || item.name) : componentForm.brand,
+                          })
+                        }}
+                        options={[{ value: '', label: 'بدون اتصال به انبار' }, ...inventoryItems.map((i) => ({ value: i.id, label: `${i.name}${i.brand ? ` — ${i.brand}` : ''} (موجودی: ${i.quantity})` }))]}
+                      />
+                    </div>
+                    {/* Scanning the fixture packaging's real barcode is
+                        the fast path: if it matches a tracked inventory
+                        item's barcode, that item is found and selected
+                        instantly — no manual searching through a
+                        dropdown for the exact right stock line. */}
+                    <button
+                      type="button"
+                      onClick={() => { h.tap(); setComponentScannerOpen(true) }}
+                      className="shrink-0 h-[46px] w-[46px] rounded-xl bg-primary-50 dark:bg-primary-900/30 text-primary-600 flex items-center justify-center hover:bg-primary-100 transition-colors"
+                      aria-label="اسکن بارکد فیکسچر"
+                      title="اسکن بارکد فیکسچر"
+                    >
+                      <ScanLine size={18} />
+                    </button>
+                  </div>
                 )}
                 <div>
                   <label className="block text-sm font-medium text-slate-700 dark:text-slate-200 mb-1.5">برند کامپوننت</label>
@@ -1198,6 +1215,28 @@ export default function Implants() {
           },
         ]}
       />
+
+      {componentScannerOpen && (
+        <BarcodeScanner
+          onClose={() => setComponentScannerOpen(false)}
+          onScan={(code) => {
+            setComponentScannerOpen(false)
+            // The fast path: if this barcode matches a tracked inventory
+            // item, select it immediately (same effect as picking it from
+            // the dropdown — auto-fills brand, will decrement stock on
+            // save). If not, at least record the scanned code as the
+            // serial number so it's not lost.
+            const match = inventoryItems.find((i) => i.barcode === code)
+            if (match) {
+              setComponentForm((p) => ({ ...p, inventory_item_id: match.id, brand: match.brand || match.name, serial_number: code }))
+              showToast('success', `«${match.name}» از انبار پیدا و انتخاب شد`)
+            } else {
+              setComponentForm((p) => ({ ...p, serial_number: code }))
+              showToast('success', 'بارکد به‌عنوان شماره سریال ثبت شد — در انبار پیدا نشد')
+            }
+          }}
+        />
+      )}
 
       {ConfirmActionModal}
     </div>

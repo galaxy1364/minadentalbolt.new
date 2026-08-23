@@ -74,7 +74,7 @@ export function ModuleStatCard({ moduleKey, icon, label, value }: {
  * card row can use it instead of a fixed grid. Order persists per
  * module in localStorage under its own storageKey.
  */
-export function ReorderableStatGrid({ storageKey, items, className = 'grid grid-cols-2 lg:grid-cols-4 gap-3' }: {
+export function ReorderableStatGrid({ storageKey, items, className = 'flex items-stretch gap-3 overflow-x-auto dock-scroll -mx-1 px-1 pb-1' }: {
   storageKey: string
   items: { key: string; node: ReactNode }[]
   className?: string
@@ -120,7 +120,7 @@ export function ReorderableStatGrid({ storageKey, items, className = 'grid grid-
       </div>
       <div className={className}>
         {sorted.map((item, i) => (
-          <div key={item.key} className="relative">
+          <div key={item.key} className="relative shrink-0 w-[168px]">
             {item.node}
             {editing && (
               <div className="absolute inset-0 flex items-center justify-between px-1 pointer-events-none z-10">
