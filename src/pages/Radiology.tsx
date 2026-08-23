@@ -488,9 +488,12 @@ export default function Radiology() {
           },
           {
             label: 'تصویر و تاریخ',
+            // A radiology "image" record with no actual image_url is a
+            // completely blank, useless entry — nothing to view, ever.
+            validate: () => (!uploadForm.image_url.trim() ? 'آدرس تصویر الزامی است' : null),
             content: (
               <>
-                <Input label="آدرس تصویر (URL)" value={uploadForm.image_url} onChange={(v) => setUploadForm((p) => ({ ...p, image_url: v }))} placeholder="https://..." dir="ltr" />
+                <Input label="آدرس تصویر (URL) *" value={uploadForm.image_url} onChange={(v) => setUploadForm((p) => ({ ...p, image_url: v }))} placeholder="https://..." dir="ltr" />
                 <PersianDateInput label="تاریخ تصویربرداری" value={uploadForm.taken_at} onChange={(v) => setUploadForm((p) => ({ ...p, taken_at: v }))} />
               </>
             ),

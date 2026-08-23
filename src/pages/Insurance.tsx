@@ -585,6 +585,7 @@ export default function Insurance() {
         steps={[
           {
             label: 'بیمار و شرکت',
+            validate: () => (!claimForm.patient_id ? 'انتخاب بیمار الزامی است' : !claimForm.company_id ? 'انتخاب شرکت بیمه الزامی است' : null),
             content: (
               <>
                 <Select label="بیمار" value={claimForm.patient_id} onChange={(v) => setClaimForm((p) => ({ ...p, patient_id: v }))} options={patients.map((p) => ({ value: p.id, label: `${p.first_name} ${p.last_name}` }))} placeholder="انتخاب بیمار" />
@@ -594,6 +595,7 @@ export default function Insurance() {
           },
           {
             label: 'مبلغ و وضعیت',
+            validate: () => (!claimForm.amount || Number(claimForm.amount) <= 0 ? 'مبلغ ادعا الزامی است' : null),
             content: (
               <>
                 <div className="grid grid-cols-2 gap-3">

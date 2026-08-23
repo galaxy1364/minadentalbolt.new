@@ -561,6 +561,7 @@ export default function WaitingList() {
           },
           {
             label: 'دلیل و یادداشت',
+            validate: () => (!formData.reason.trim() ? 'دلیل ویزیت الزامی است' : null),
             content: (
               <>
                 <Textarea label="دلیل ویزیت" value={formData.reason} onChange={(v) => setFormData({ ...formData, reason: v })} placeholder="علت مراجعه بیمار" />

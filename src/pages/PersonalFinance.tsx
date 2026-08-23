@@ -284,6 +284,7 @@ export default function PersonalFinance() {
         steps={[
           {
             label: 'اطلاعات پایه',
+            validate: () => (!form.title.trim() ? 'عنوان الزامی است' : null),
             content: (
               <>
                 <Input label="عنوان" value={form.title} onChange={(v) => setForm({ ...form, title: v })} placeholder={tab === 'loan' ? 'مثلاً: وام بانک ملت' : tab === 'rent' ? 'اجاره مطب' : tab === 'cheque' ? 'چک شماره ۱۲۳' : 'بدهی به فلانی'} />
@@ -299,6 +300,7 @@ export default function PersonalFinance() {
           },
           {
             label: 'مبلغ',
+            validate: () => (!form.total_amount || Number(form.total_amount) <= 0 ? 'مبلغ کل الزامی است' : null),
             content: (
               <>
                 <div className="grid grid-cols-2 gap-3">
@@ -319,6 +321,7 @@ export default function PersonalFinance() {
           },
           {
             label: 'سررسید و وضعیت',
+            validate: () => (!form.due_date ? 'تاریخ سررسید الزامی است' : null),
             content: (
               <>
                 <PersianDateInput label="تاریخ سررسید" value={form.due_date} onChange={(v) => setForm({ ...form, due_date: v })} />

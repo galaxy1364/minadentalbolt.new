@@ -1620,6 +1620,7 @@ export default function PatientDetail() {
         steps={[
           {
             label: 'عنوان و پزشک',
+            validate: () => (!phaseForm.title.trim() ? 'عنوان فاز الزامی است' : null),
             content: (
               <>
                 <Input label="عنوان فاز" value={phaseForm.title} onChange={(v) => setPhaseForm({ ...phaseForm, title: v })} placeholder="مثلاً: کشیدن دندان‌های آسیب‌دیده" />
@@ -1630,6 +1631,7 @@ export default function PatientDetail() {
           },
           {
             label: 'رویه‌ها و هزینه',
+            validate: () => (!phaseForm.procedures.trim() ? 'رویه‌های این فاز الزامی است' : null),
             content: (
               <>
                 <Textarea label="رویه‌های این فاز" value={phaseForm.procedures} onChange={(v) => setPhaseForm({ ...phaseForm, procedures: v })} placeholder="مثلاً: کشیدن دندان ۱۶، ۱۷" rows={2} />

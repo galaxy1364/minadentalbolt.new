@@ -866,6 +866,7 @@ export default function Staff() {
           }] : []),
           {
             label: 'تماس',
+            validate: () => (!formData.phone.trim() ? 'شماره تلفن الزامی است' : null),
             content: (
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <Input label="تلفن" value={formData.phone} onChange={(v) => setFormData({ ...formData, phone: v })} placeholder="شماره تماس" dir="ltr" />
