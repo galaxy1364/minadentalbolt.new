@@ -15,7 +15,7 @@ export class ErrorBoundary extends React.Component<{ children: React.ReactNode }
   }
 
   componentDidCatch(error: Error, info: React.ErrorInfo) {
-    console.error('Dashboard ErrorBoundary caught:', error, info)
+    console.error('ErrorBoundary caught:', error, info)
     logError(error, 'react', info.componentStack ?? undefined)
   }
 
@@ -27,17 +27,33 @@ export class ErrorBoundary extends React.Component<{ children: React.ReactNode }
             <Activity size={28} className="text-error-500" />
           </div>
           <div>
-            <h2 className="text-lg font-bold text-slate-800 dark:text-slate-100 mb-1">خطا در بارگذاری داشبورد</h2>
+            {/* This boundary wraps every page's content in Layout.tsx, not
+                just the Dashboard — the old hardcoded 'داشبورد' label was
+                actively misleading whenever a crash happened on any other
+                page (confirmed from a user screenshot: bottom-nav showed
+                'مالی' active while this said 'Dashboard'). */}
+            <h2 className="text-lg font-bold text-slate-800 dark:text-slate-100 mb-1">خطا در بارگذاری این بخش</h2>
             <p className="text-sm text-slate-500 dark:text-slate-400 max-w-sm">
-              یک خطای غیرمنتظره رخ داد. لطفاً صفحه را مجدداً بارگذاری کنید.
+              یک خطای غیرمنتظره رخ داد. جزئیات دقیق این خطا در «تنظیمات ← گزارش خطاها» ثبت شده است.
             </p>
+            {this.state.error?.message && (
+              <p className="text-xs text-slate-400 dark:text-slate-500 max-w-sm mt-2 font-mono break-words">{this.state.error.message}</p>
+            )}
           </div>
-          <button
-            onClick={() => { this.setState({ hasError: false, error: null }); window.location.reload() }}
-            className="px-5 py-2.5 rounded-xl bg-primary-500 text-white font-bold text-sm hover:bg-primary-600 transition-colors"
-          >
-            بارگذاری مجدد
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => { window.location.hash = '#/settings'; this.setState({ hasError: false, error: null }) }}
+              className="px-5 py-2.5 rounded-xl bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-200 font-bold text-sm hover:bg-slate-200 transition-colors"
+            >
+              مشاهده‌ی گزارش خطا
+            </button>
+            <button
+              onClick={() => { this.setState({ hasError: false, error: null }); window.location.reload() }}
+              className="px-5 py-2.5 rounded-xl bg-primary-500 text-white font-bold text-sm hover:bg-primary-600 transition-colors"
+            >
+              بارگذاری مجدد
+            </button>
+          </div>
         </div>
       )
     }
