@@ -793,6 +793,18 @@ export async function createImplantComponent(c: ImplantComponentInput): Promise<
   const comp: ImplantComponent = { ...rest, id, clinic_id: CLINIC_ID, created_at: nowISO(), updated_at: nowISO() }
   await db.implant_components.put(comp)
   await queueOperation('implant_components', 'insert', id, comp)
+  // Placing a component drawn from tracked inventory decrements that
+  // item's stock by 1 — this is the connection that was previously
+  // completely missing, letting inventory counts silently drift from
+  // reality the moment implant work actually consumed real stock.
+  if ((comp as any).inventory_item_id) {
+    const item = await db.inventory_items.get((comp as any).inventory_item_id)
+    if (item) {
+      const updated = { ...item, quantity: Math.max(0, (item.quantity ?? 0) - 1), updated_at: nowISO() }
+      await db.inventory_items.put(updated)
+      await queueOperation('inventory_items', 'update', item.id, { quantity: updated.quantity })
+    }
+  }
   return comp
 }
 
@@ -851,6 +863,18 @@ export async function deleteImplantCase(id: string): Promise<void> {
   await queueOperation('implant_cases', 'delete', id)
 }
 export async function deleteImplantComponent(id: string): Promise<void> {
+  // Reverse the inventory deduction — removing a mistakenly-added
+  // component (or one entered by mistake) shouldn't leave stock
+  // permanently short.
+  const comp = await db.implant_components.get(id)
+  if ((comp as any)?.inventory_item_id) {
+    const item = await db.inventory_items.get((comp as any).inventory_item_id)
+    if (item) {
+      const updated = { ...item, quantity: (item.quantity ?? 0) + 1, updated_at: nowISO() }
+      await db.inventory_items.put(updated)
+      await queueOperation('inventory_items', 'update', item.id, { quantity: updated.quantity })
+    }
+  }
   await db.implant_components.delete(id)
   await queueOperation('implant_components', 'delete', id)
 }

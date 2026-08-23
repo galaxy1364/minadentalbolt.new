@@ -3,7 +3,7 @@ import { useState, useEffect, useCallback, useMemo } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
 import { Smile, Plus, Search, Edit2, Eye, Filter, Package, Calendar, DollarSign, ShieldCheck, AlertTriangle, CheckCircle2, Clock, Activity, Layers, Trash2, CalendarClock } from 'lucide-react'
 import { downloadICSReminder } from '../lib/icsReminder'
-import { fetchImplantCases, createImplantCase, updateImplantCase, createImplantComponent, deleteImplantComponent, fetchPatients, fetchDoctors, createExpense } from '../lib/api'
+import { fetchImplantCases, createImplantCase, updateImplantCase, createImplantComponent, deleteImplantComponent, fetchPatients, fetchDoctors, createExpense, fetchInventoryItems } from '../lib/api'
 import { CLINIC_ID } from '../lib/supabase'
 import { toJalaliString, toJalaliStringPretty, formatCurrency, formatNumber, toPersianDigits } from '../lib/persianDate'
 import { h } from '../lib/haptics'
@@ -116,6 +116,7 @@ export default function Implants() {
   const [cases, setCases] = useState<ImplantCaseWithRelations[]>([])
   const [patients, setPatients] = useState<Patient[]>([])
   const [doctors, setDoctors] = useState<Doctor[]>([])
+  const [inventoryItems, setInventoryItems] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
 
   // Filters
@@ -174,6 +175,9 @@ export default function Implants() {
     placed_date: '',
     notes: '',
     include_in_doctor_share: true,
+    // Optional link to a tracked inventory item — placing it decrements
+    // that item's stock by 1 automatically.
+    inventory_item_id: '',
   })
 
   // ===========================================================================
@@ -183,10 +187,11 @@ export default function Implants() {
   const loadData = useCallback(async () => {
     setLoading(true)
     try {
-      const [cs, pats, docs] = await Promise.all([
+      const [cs, pats, docs, invItems] = await Promise.all([
         fetchImplantCases(),
         fetchPatients(),
         fetchDoctors(),
+        fetchInventoryItems(),
       ])
       // Archived (is_active === false) cases are intentionally kept out of
       // this page's list — they're fully preserved and only reachable
@@ -194,6 +199,7 @@ export default function Implants() {
       setCases(cs.filter((c) => c.is_active !== false))
       setPatients(pats)
       setDoctors(docs)
+      setInventoryItems(invItems.filter((i: any) => i.quantity > 0))
     } catch (err) {
       console.error('Error loading implant cases:', err)
       showToast('error', 'خطا در بارگذاری موارد ایمپلنت')
@@ -507,7 +513,7 @@ export default function Implants() {
     setComponentCaseId(caseId)
     setComponentWizardStep(0)
     setComponentForm({
-      component_type: 'fixture', brand: '', model: '', serial_number: '', cost: '', placed_date: '', notes: '', include_in_doctor_share: true,
+      component_type: 'fixture', brand: '', model: '', serial_number: '', cost: '', placed_date: '', notes: '', include_in_doctor_share: true, inventory_item_id: '',
     })
     setComponentModalOpen(true)
   }
@@ -533,8 +539,9 @@ export default function Implants() {
             serial_number: componentForm.serial_number || null, cost: componentForm.cost ? Number(componentForm.cost) : null,
             placed_date: componentForm.placed_date || null, notes: componentForm.notes || null,
             include_in_doctor_share: componentForm.component_type === 'fixture' ? false : componentForm.include_in_doctor_share,
+            inventory_item_id: componentForm.inventory_item_id || null,
           } as any)
-          showToast('success', 'کامپوننت اضافه شد'); setComponentModalOpen(false); await loadData()
+          showToast('success', componentForm.inventory_item_id ? 'کامپوننت اضافه شد و از موجودی انبار کسر شد' : 'کامپوننت اضافه شد'); setComponentModalOpen(false); await loadData()
         } catch { showToast('error', 'خطا') }
         finally { setSavingComponent(false) }
       },
@@ -1127,6 +1134,23 @@ export default function Implants() {
             content: (
               <>
                 <Select label="نوع کامپوننت" value={componentForm.component_type} onChange={(v) => setComponentForm({ ...componentForm, component_type: v })} options={componentTypes} />
+                {inventoryItems.length > 0 && (
+                  <Select
+                    label="کسر از موجودی انبار (اختیاری)"
+                    value={componentForm.inventory_item_id}
+                    onChange={(v) => {
+                      const item = inventoryItems.find((i) => i.id === v)
+                      setComponentForm({
+                        ...componentForm, inventory_item_id: v,
+                        // Auto-fill brand from the picked stock item —
+                        // staff can still edit it after, but this saves
+                        // retyping what's usually the same text.
+                        brand: item ? (item.brand || item.name) : componentForm.brand,
+                      })
+                    }}
+                    options={[{ value: '', label: 'بدون اتصال به انبار' }, ...inventoryItems.map((i) => ({ value: i.id, label: `${i.name}${i.brand ? ` — ${i.brand}` : ''} (موجودی: ${i.quantity})` }))]}
+                  />
+                )}
                 <div>
                   <label className="block text-sm font-medium text-slate-700 dark:text-slate-200 mb-1.5">برند کامپوننت</label>
                   <input

@@ -610,6 +610,11 @@ export interface ImplantComponent {
   cost: number | null
   placed_date: string | null
   notes: string | null
+  /** Links this component to the specific inventory item it was drawn
+   * from — placing it decrements that item's stock by 1, removing it
+   * restores it. Optional: not every component (e.g. a negotiated
+   * custom part) has a matching tracked inventory item. */
+  inventory_item_id: string | null
   /** Whether this component's cost counts toward the deduction before
    * computing the surgeon's share. Fixture is always excluded
    * regardless of this flag (its cost is billed separately) — other
