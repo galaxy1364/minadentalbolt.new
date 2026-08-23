@@ -412,7 +412,23 @@ export default function PatientDetail() {
     // forever once saved, since Postgres's `date` column type rejects
     // it — but the local save "succeeds" with no visible error. Catch
     // it here, before it ever reaches that state again.
-    const isValidDate = (s: string) => /^\d{4}-\d{2}-\d{2}$/.test(s) && !isNaN(new Date(s).getTime())
+    //
+    // The previous version of this check (regex format + `new
+    // Date(s).getTime()`) wasn't actually reliable — JS's Date parser
+    // can silently accept an out-of-range month like "00" and still
+    // return a valid (non-NaN) timestamp by rolling over to the prior
+    // year, while the STRING itself (what actually gets sent to
+    // Postgres) still literally says month "00" and gets rejected
+    // there regardless of what JS thought. Validating the numeric
+    // month/day ranges directly from the string is the only check
+    // that can't be fooled by that leniency.
+    const isValidDate = (s: string) => {
+      const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(s)
+      if (!m) return false
+      const [, , mm, dd] = m
+      const month = Number(mm), day = Number(dd)
+      return month >= 1 && month <= 12 && day >= 1 && day <= 31
+    }
     if (phaseForm.start_date && !isValidDate(phaseForm.start_date)) { showToast('error', 'تاریخ شروع نامعتبر است — دوباره از تقویم انتخاب کنید'); return }
     if (phaseForm.end_date && !isValidDate(phaseForm.end_date)) { showToast('error', 'تاریخ پایان نامعتبر است — دوباره از تقویم انتخاب کنید'); return }
     const nextNumber = editingPhase ? editingPhase.phase_number : (phases.length > 0 ? Math.max(...phases.map((p) => p.phase_number)) + 1 : 1)
