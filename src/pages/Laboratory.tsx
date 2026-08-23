@@ -38,23 +38,24 @@ const labOrderStatuses: { value: string; label: string; color: string }[] = [
   { value: 'cancelled', label: 'لغو شده', color: 'error' },
 ]
 
-const workTypes: { value: string; label: string }[] = [
-  { value: 'crown', label: 'روکش' },
-  { value: 'bridge', label: 'پل' },
-  { value: 'post', label: 'پست' },
-  { value: 'post_and_core', label: 'پست و کور' },
-  { value: 'denture', label: 'دنچر' },
-  { value: 'partial_denture', label: 'دنچر پارسیل' },
-  { value: 'implant_crown', label: 'روکش ایمپلنت' },
-  { value: 'implant_abutment', label: 'آباتمنت ایمپلنت' },
-  { value: 'veneer', label: 'ونیر' },
-  { value: 'inlay', label: 'اینله' },
-  { value: 'onlay', label: 'اونله' },
-  { value: 'night_guard', label: 'محافظ شب' },
-  { value: 'orthodontic_appliance', label: 'اپلایانس ارتودنسی' },
-  { value: 'flipper', label: 'فلیپر' },
-  { value: 'retainer', label: 'ریتینر' },
-  { value: 'other', label: 'سایر' },
+const workTypes: { value: string; label: string; category: 'fixed' | 'removable' }[] = [
+  { value: 'crown', label: 'روکش', category: 'fixed' },
+  { value: 'bridge', label: 'پل', category: 'fixed' },
+  { value: 'post', label: 'پست', category: 'fixed' },
+  { value: 'post_and_core', label: 'پست و کور', category: 'fixed' },
+  { value: 'denture', label: 'دنچر کامل', category: 'removable' },
+  { value: 'partial_denture', label: 'دنچر پارسیل', category: 'removable' },
+  { value: 'overdenture', label: 'اووردنچر', category: 'removable' },
+  { value: 'implant_crown', label: 'روکش ایمپلنت', category: 'fixed' },
+  { value: 'implant_abutment', label: 'آباتمنت ایمپلنت', category: 'fixed' },
+  { value: 'veneer', label: 'ونیر', category: 'fixed' },
+  { value: 'inlay', label: 'اینله', category: 'fixed' },
+  { value: 'onlay', label: 'اونله', category: 'fixed' },
+  { value: 'night_guard', label: 'محافظ شب', category: 'removable' },
+  { value: 'orthodontic_appliance', label: 'اپلایانس ارتودنسی', category: 'removable' },
+  { value: 'flipper', label: 'فلیپر', category: 'removable' },
+  { value: 'retainer', label: 'ریتینر', category: 'removable' },
+  { value: 'other', label: 'سایر', category: 'fixed' },
 ]
 
 const materials: { value: string; label: string }[] = [
@@ -114,6 +115,11 @@ export default function Laboratory() {
     email: '',
     address: '',
     notes: '',
+    // Which category of lab work this lab handles — used to auto-suggest
+    // the right lab when staff picks a work type on a new order, so
+    // (for clinics running separate fixed vs removable-prosthetics labs)
+    // a denture never accidentally gets routed to the crown/bridge lab.
+    default_for: '',
   })
 
   // Order form state
@@ -226,7 +232,7 @@ export default function Laboratory() {
   }
 
   const filteredOrders = useMemo(() => {
-    return labOrders.filter((o) => {
+    const filtered = labOrders.filter((o) => {
       // Search
       if (searchQuery) {
         const patientName = getPatientName(o.patient_id).toLowerCase()
@@ -241,6 +247,23 @@ export default function Laboratory() {
       // Overdue filter
       if (filterOverdue && !isOverdue(o)) return false
       return true
+    })
+    // Priority order, not just newest-first: an order due tomorrow
+    // shouldn't be buried under one just created but due next month.
+    // 1) already overdue (most overdue first) 2) has a deadline, soonest
+    // first 3) no deadline at all 4) delivered/cancelled sink to the
+    // bottom regardless — that work is done, it's not what needs eyes.
+    const priority = (o: LabOrder) => {
+      if (o.status === 'delivered' || o.status === 'cancelled') return 3
+      if (isOverdue(o)) return 0
+      if (o.deadline) return 1
+      return 2
+    }
+    return [...filtered].sort((a, b) => {
+      const pa = priority(a), pb = priority(b)
+      if (pa !== pb) return pa - pb
+      if (pa === 0 || pa === 1) return (a.deadline || '').localeCompare(b.deadline || '')
+      return (b.created_at || '').localeCompare(a.created_at || '')
     })
   }, [labOrders, searchQuery, filterStatus, filterLab, filterOverdue, patientMap, labMap])
 
@@ -432,7 +455,7 @@ export default function Laboratory() {
     h.tap()
     setEditingLab(lab)
     setLabWizardStep(0)
-    setLabForm({ name: lab.name, type: lab.type || '', contact_person: lab.contact_person || '', phone: lab.phone || '', email: lab.email || '', address: lab.address || '', notes: lab.notes || '' })
+    setLabForm({ name: lab.name, type: lab.type || '', contact_person: lab.contact_person || '', phone: lab.phone || '', email: lab.email || '', address: lab.address || '', notes: lab.notes || '', default_for: (lab as any).default_for || '' })
     setLabModalOpen(true)
   }
 
@@ -440,7 +463,7 @@ export default function Laboratory() {
     h.tap()
     setEditingLab(null)
     setLabWizardStep(0)
-    setLabForm({ name: '', type: '', contact_person: '', phone: '', email: '', address: '', notes: '' })
+    setLabForm({ name: '', type: '', contact_person: '', phone: '', email: '', address: '', notes: '', default_for: '' })
     setLabModalOpen(true)
   }
 
@@ -478,18 +501,18 @@ export default function Laboratory() {
         setSavingLab(true)
         try {
           if (editingLab) {
-            await updateLab(editingLab.id, { name: labForm.name.trim(), type: labForm.type || null, contact_person: labForm.contact_person || null, phone: labForm.phone || null, email: labForm.email || null, address: labForm.address || null, notes: labForm.notes || null } as any)
+            await updateLab(editingLab.id, { name: labForm.name.trim(), type: labForm.type || null, contact_person: labForm.contact_person || null, phone: labForm.phone || null, email: labForm.email || null, address: labForm.address || null, notes: labForm.notes || null, default_for: labForm.default_for || null } as any)
             showToast('success', 'لابراتوار ویرایش شد')
           } else {
             await createLab({
               name: labForm.name.trim(), type: labForm.type || null, contact_person: labForm.contact_person || null,
               phone: labForm.phone || null, email: labForm.email || null, address: labForm.address || null,
-              notes: labForm.notes || null, is_active: true, default_for: null,
+              notes: labForm.notes || null, is_active: true, default_for: labForm.default_for || null,
             } as any)
             showToast('success', 'لابراتوار ثبت شد')
           }
           setLabModalOpen(false)
-          setLabForm({ name: '', type: '', contact_person: '', phone: '', email: '', address: '', notes: '' })
+          setLabForm({ name: '', type: '', contact_person: '', phone: '', email: '', address: '', notes: '', default_for: '' })
           await loadData()
         } catch { showToast('error', 'خطا در ثبت') }
         finally { setSavingLab(false) }
@@ -835,7 +858,10 @@ export default function Laboratory() {
 
   const renderOrderModal = () => {
     const patientOptions = patients.map((p) => ({ value: p.id, label: `${p.first_name} ${p.last_name}${p.file_number ? ` - ${p.file_number}` : ''}` }))
-    const labOptions = labs.map((l) => ({ value: l.id, label: l.name }))
+    const labOptions = labs.map((l) => ({
+      value: l.id,
+      label: (l as any).default_for === 'fixed' ? `${l.name} — ثابت` : (l as any).default_for === 'removable' ? `${l.name} — متحرک` : l.name,
+    }))
     const doctorOptions = doctors.map((d) => ({ value: d.id, label: `دکتر ${d.name || d.specialty || 'پزشک'}` }))
     const selectedPatient = patientMap.get(orderForm.patient_id)
     const selectedLab = labMap.get(orderForm.lab_id)
@@ -875,6 +901,28 @@ export default function Laboratory() {
             content: (
               <>
                 <Select label="نوع کار" value={orderForm.work_type} onChange={(v) => setOrderForm((p) => ({ ...p, work_type: v }))} options={workTypes} />
+                {(() => {
+                  // Smart lab-mismatch check: for clinics running separate
+                  // fixed vs removable-prosthetics labs, warn immediately
+                  // if the selected work type doesn't match the already-
+                  // chosen lab's declared specialty (default_for), and
+                  // offer the correct lab in one tap — catching a mistake
+                  // right when it happens instead of after the impression
+                  // is already sent to the wrong place.
+                  const wt = workTypes.find((w) => w.value === orderForm.work_type)
+                  if (!wt || !selectedLab) return null
+                  const labSpecialty = (selectedLab as any).default_for as 'fixed' | 'removable' | null
+                  if (!labSpecialty || labSpecialty === wt.category) return null
+                  const betterLab = labs.find((l) => (l as any).default_for === wt.category)
+                  return (
+                    <div className="p-3 rounded-xl bg-warning-50 border border-warning-200 text-warning-700 text-xs flex items-center justify-between gap-2">
+                      <span>«{wt.label}» جزو کارهای {wt.category === 'fixed' ? 'ثابت' : 'متحرک'} است، ولی لابراتوار انتخابی برای {labSpecialty === 'fixed' ? 'ثابت' : 'متحرک'} ثبت شده.</span>
+                      {betterLab && (
+                        <button onClick={() => setOrderForm((p) => ({ ...p, lab_id: betterLab.id }))} className="shrink-0 font-bold underline">تغییر به {betterLab.name}</button>
+                      )}
+                    </div>
+                  )
+                })()}
                 <div className="grid grid-cols-2 gap-3">
                   <PalmerToothPicker value={orderForm.tooth_number} onChange={(v) => setOrderForm((p) => ({ ...p, tooth_number: v }))} allowPrimary={false} />
                   <Input label="رنگ" value={orderForm.shade} onChange={(v) => setOrderForm((p) => ({ ...p, shade: v }))} placeholder="مثال: A2" dir="ltr" />
@@ -938,6 +986,16 @@ export default function Laboratory() {
             <>
               <Input label="نام لابراتوار" value={labForm.name} onChange={(v) => setLabForm((p) => ({ ...p, name: v }))} placeholder="نام لابراتوار" />
               <Input label="نوع" value={labForm.type} onChange={(v) => setLabForm((p) => ({ ...p, type: v }))} placeholder="مثال: دیجیتال، سنتی" />
+              <Select
+                label="تخصص لابراتوار"
+                value={labForm.default_for}
+                onChange={(v) => setLabForm((p) => ({ ...p, default_for: v }))}
+                options={[
+                  { value: '', label: 'مشخص نیست / هر دو' },
+                  { value: 'fixed', label: 'پروتز ثابت (روکش، پل، ونیر...)' },
+                  { value: 'removable', label: 'پروتز متحرک (دنچر، اووردنچر...)' },
+                ]}
+              />
               <Input label="مسئول" value={labForm.contact_person} onChange={(v) => setLabForm((p) => ({ ...p, contact_person: v }))} placeholder="نام مسئول" />
             </>
           ),
