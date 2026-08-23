@@ -1,7 +1,7 @@
 // Insurance.tsx - Persian RTL Dental Clinic Insurance Management
 import { useState, useEffect, useCallback, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Shield, FileText, Search, Building2, Percent, Eye, Plus, Edit2, Trash2, Phone, MapPin, Wallet } from 'lucide-react'
+import { Shield, FileText, Search, Building2, Percent, Eye, Plus, Edit2, Trash2, Phone, MapPin, Wallet, CheckCircle2 } from 'lucide-react'
 import { PieChart, Pie, Cell, XAxis, YAxis, Tooltip as RTooltip, ResponsiveContainer, Legend } from 'recharts'
 import {
   fetchInsuranceCompanies, fetchInsuranceClaims,
@@ -314,6 +314,13 @@ export default function Insurance() {
   // exact same ledger every other balance calculation already reads
   // from, instead of a separate flag that would need its own logic.
   const handleRecordClaimAsPayment = (c: InsuranceClaimWithRelations) => {
+    // Guard: this claim's approved_amount has already been recorded as a
+    // Payment once — recording it again would reduce the patient's
+    // balance twice for the same insurance settlement.
+    if (c.payment_recorded_at) {
+      showToast('error', `این مبلغ قبلاً در ${toJalaliStringPretty(c.payment_recorded_at)} ثبت شده است`)
+      return
+    }
     h.tap()
     confirmAction({
       type: 'create',
@@ -335,7 +342,9 @@ export default function Insurance() {
             status: 'completed', payment_date: new Date().toISOString().slice(0, 10),
             created_by: null,
           } as any)
+          await updateInsuranceClaim(c.id, { payment_recorded_at: new Date().toISOString() } as any)
           showToast('success', 'ثبت شد و مانده‌حساب بیمار به‌روز شد')
+          await loadData()
         } catch { showToast('error', 'خطا در ثبت پرداخت') }
       },
     })
@@ -483,7 +492,11 @@ export default function Insurance() {
                           <td className="px-4 py-3">
                             <div className="flex gap-1">
                               {c.approved_amount != null && c.approved_amount > 0 && (
-                                <button onClick={() => handleRecordClaimAsPayment(c)} title="ثبت به‌عنوان پرداخت (کاهش مانده‌حساب بیمار)" className="text-success-500 hover:text-success-700 hover:bg-success-50 p-1 rounded-lg transition-colors"><Wallet size={15} /></button>
+                                c.payment_recorded_at ? (
+                                  <span title={`ثبت‌شده در ${toJalaliStringPretty(c.payment_recorded_at)}`} className="text-success-600 p-1"><CheckCircle2 size={15} /></span>
+                                ) : (
+                                  <button onClick={() => handleRecordClaimAsPayment(c)} title="ثبت به‌عنوان پرداخت (کاهش مانده‌حساب بیمار)" className="text-success-500 hover:text-success-700 hover:bg-success-50 p-1 rounded-lg transition-colors"><Wallet size={15} /></button>
+                                )
                               )}
                               <button onClick={() => openEditClaim(c)} className="text-slate-400 hover:text-primary-600 hover:bg-primary-50 p-1 rounded-lg transition-colors"><Edit2 size={15} /></button>
                               <button onClick={() => handleDeleteClaim(c)} className="text-slate-400 hover:text-error-600 hover:bg-error-50 p-1 rounded-lg transition-colors"><Trash2 size={15} /></button>

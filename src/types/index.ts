@@ -253,6 +253,11 @@ export interface InsuranceClaim {
   submitted_at: string | null
   response_at: string | null
   notes: string | null
+  /** Set the moment 'ثبت به‌عنوان پرداخت' is used — guards against
+   * double-recording the same claim's approved_amount as a second
+   * completed Payment, which would incorrectly reduce the patient's
+   * balance twice for the same insurance settlement. */
+  payment_recorded_at: string | null
   created_at: string
   updated_at: string
 }
