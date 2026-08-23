@@ -514,6 +514,11 @@ export interface Cheque {
   purpose: 'payment' | 'guarantee'
   /** Set only when purpose is 'guarantee' — the plan this cheque secures. */
   payment_plan_id: string | null
+  /** Set when this cheque secures ONE SPECIFIC installment (the "monthly
+   * post-dated cheque instead of cash" pattern) rather than the whole
+   * plan — when this cheque clears, that exact installment auto-marks
+   * paid too. purpose stays 'payment' for these, not 'guarantee'. */
+  installment_id: string | null
   status: string
   notes: string | null
   created_by: string | null

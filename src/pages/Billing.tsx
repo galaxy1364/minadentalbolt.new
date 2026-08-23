@@ -130,6 +130,14 @@ export default function Billing() {
   const [rescheduleInstallment, setRescheduleInstallment] = useState<any>(null)
   const [rescheduleDate, setRescheduleDate] = useState('')
   const [savingReschedule, setSavingReschedule] = useState(false)
+  // Real gap found from a walkthrough: an installment could only be
+  // marked paid instantly in cash — no way to record "patient gave a
+  // post-dated cheque for THIS installment" (the common monthly-cheque
+  // pattern). This modal captures that cheque's details; the installment
+  // itself only becomes 'paid' later, when that specific cheque clears.
+  const [chequeInstallment, setChequeInstallment] = useState<{ inst: any; plan: any } | null>(null)
+  const [instChequeForm, setInstChequeForm] = useState({ bank_name: '', cheque_number: '', account_number: '', sayad_id: '', due_date: '', payee_name: '' })
+  const [savingInstCheque, setSavingInstCheque] = useState(false)
   const [planWizardStep, setPlanWizardStep] = useState(0)
   const [savingPlan, setSavingPlan] = useState(false)
   const [planForm, setPlanForm] = useState({
@@ -540,6 +548,14 @@ export default function Billing() {
               status: 'completed', payment_date: new Date().toISOString().slice(0, 10),
               created_by: null,
             } as any)
+            // If this cheque was securing one specific installment (the
+            // "monthly post-dated cheque instead of cash" pattern), that
+            // installment is now genuinely paid too — without this it
+            // would sit forever marked 'pending' even though the money
+            // just landed, showing as a false overdue/upcoming reminder.
+            if ((cheque as any).installment_id) {
+              await updateInstallment((cheque as any).installment_id, { status: 'paid', payment_date: new Date().toISOString().slice(0, 10) })
+            }
           }
           showToast('success', willClear ? 'چک وصول شد و مانده‌حساب به‌روز شد' : 'وضعیت تغییر کرد')
           await loadData()
@@ -957,6 +973,9 @@ export default function Billing() {
                         {c.purpose === 'guarantee' && (
                           <span className="text-[10px] px-1.5 py-0.5 rounded-md bg-amber-100 text-amber-700 font-bold">ضمانت طرح قسطی</span>
                         )}
+                        {(c as any).installment_id && (
+                          <span className="text-[10px] px-1.5 py-0.5 rounded-md bg-primary-100 text-primary-700 font-bold">چک قسط</span>
+                        )}
                       </div>
                       <p className="text-xs text-slate-500">
                         {getPatientName(c.patient_id)} - سررسید: {toJalaliStringPretty(c.due_date)}
@@ -1071,7 +1090,8 @@ export default function Billing() {
                           ) : (
                             <>
                               <Badge color="warning">در انتظار</Badge>
-                              <Button size="sm" variant="success" onClick={() => markInstallmentPaid(inst, plan)}>پرداخت</Button>
+                              <Button size="sm" variant="success" onClick={() => markInstallmentPaid(inst, plan)}>نقدی</Button>
+                              <Button size="sm" variant="secondary" onClick={() => { h.tap(); setChequeInstallment({ inst, plan }); setInstChequeForm({ bank_name: '', cheque_number: '', account_number: '', sayad_id: '', due_date: inst.due_date, payee_name: '' }) }}>با چک</Button>
                               <button
                                 onClick={() => { h.tap(); setRescheduleInstallment(inst); setRescheduleDate(inst.due_date) }}
                                 aria-label="تغییر موعد قسط"
@@ -1610,6 +1630,59 @@ export default function Billing() {
             className="w-full"
           >
             {savingReschedule ? <Spinner size={16} /> : 'ذخیره‌ی موعد جدید'}
+          </Button>
+        </div>
+      </Modal>
+
+      <Modal open={!!chequeInstallment} onClose={() => setChequeInstallment(null)} title="ثبت قسط با چک">
+        <div className="space-y-3 p-1">
+          {chequeInstallment && (
+            <p className="text-xs text-slate-500">
+              قسط {toPersianDigits(chequeInstallment.inst.installment_number)} — {formatCurrency(chequeInstallment.inst.amount)} تومان.
+              این قسط تا وصول واقعی چک، «در انتظار» می‌ماند — به محض پاس‌شدن چک (از تب «چک‌ها»)، هم مانده‌حساب کم می‌شود و هم این قسط خودکار «پرداخت‌شده» علامت می‌خورد.
+            </p>
+          )}
+          <div className="grid grid-cols-2 gap-3">
+            <Input label="نام بانک" value={instChequeForm.bank_name} onChange={(v) => setInstChequeForm((p) => ({ ...p, bank_name: v }))} />
+            <Input label="شماره چک" value={instChequeForm.cheque_number} onChange={(v) => setInstChequeForm((p) => ({ ...p, cheque_number: v }))} dir="ltr" />
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <Input label="شماره حساب" value={instChequeForm.account_number} onChange={(v) => setInstChequeForm((p) => ({ ...p, account_number: v }))} dir="ltr" />
+            <Input label="شناسه صیاد (اختیاری)" value={instChequeForm.sayad_id} onChange={(v) => setInstChequeForm((p) => ({ ...p, sayad_id: v }))} dir="ltr" />
+          </div>
+          <Input label="در وجه" value={instChequeForm.payee_name} onChange={(v) => setInstChequeForm((p) => ({ ...p, payee_name: v }))} />
+          <PersianDateInput label="تاریخ سررسید چک" value={instChequeForm.due_date} onChange={(v) => setInstChequeForm((p) => ({ ...p, due_date: v }))} />
+          <Button
+            onClick={async () => {
+              if (!chequeInstallment) return
+              if (!instChequeForm.cheque_number.trim()) { showToast('error', 'شماره چک الزامی است'); return }
+              setSavingInstCheque(true)
+              try {
+                await createCheque({
+                  patient_id: chequeInstallment.plan.patient_id,
+                  amount: chequeInstallment.inst.amount,
+                  bank_name: instChequeForm.bank_name || null,
+                  branch: null,
+                  cheque_number: instChequeForm.cheque_number,
+                  account_number: instChequeForm.account_number || null,
+                  sayad_id: toEnglishDigits(instChequeForm.sayad_id || '').trim() || null,
+                  issue_date: new Date().toISOString().slice(0, 10),
+                  due_date: instChequeForm.due_date,
+                  payee_name: instChequeForm.payee_name || null,
+                  status: 'pending', notes: `چک قسط شماره ${chequeInstallment.inst.installment_number}`, created_by: null,
+                  purpose: 'payment', payment_plan_id: chequeInstallment.plan.id,
+                  installment_id: chequeInstallment.inst.id,
+                } as any)
+                showToast('success', 'چک قسط ثبت شد — تا وصول، «در انتظار» می‌ماند')
+                setChequeInstallment(null)
+                await loadData()
+              } catch { showToast('error', 'خطا در ثبت چک') }
+              finally { setSavingInstCheque(false) }
+            }}
+            disabled={savingInstCheque || !instChequeForm.cheque_number.trim() || !instChequeForm.due_date}
+            className="w-full"
+          >
+            {savingInstCheque ? <Spinner size={16} /> : 'ثبت چک قسط'}
           </Button>
         </div>
       </Modal>
