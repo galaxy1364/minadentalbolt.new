@@ -25,6 +25,7 @@ import {
   PersonalFinanceItem, PersonalFinanceItemInput, CashRegisterSession,
   ConsentFormInput, DashboardStats, DoctorInput, UnitInput,
   RolePermission, RolePermissionInput, CustomRole, CustomRoleInput,
+  ManualReminder, ManualReminderInput,
 } from '../types'
 
 function uid(): string {
@@ -1549,4 +1550,29 @@ export async function loadRolePermissionOverrides(): Promise<void> {
     map[row.role_key].push(row.module_path)
   }
   setPermissionOverrides(map)
+}
+
+// ── Manual (editable, patient-linked) reminders ─────────────────────────
+export async function fetchManualReminders(): Promise<ManualReminder[]> {
+  const items = await db.manual_reminders.where('clinic_id').equals(CLINIC_ID).toArray()
+  return items.sort((a, b) => (a.due_date || '').localeCompare(b.due_date || ''))
+}
+
+export async function createManualReminder(r: ManualReminderInput): Promise<ManualReminder> {
+  const { clinic_id, ...rest } = r
+  const id = uid()
+  const reminder: ManualReminder = { ...rest, id, clinic_id: CLINIC_ID, created_at: nowISO(), updated_at: nowISO(), sync_version: 1 }
+  await db.manual_reminders.put(reminder)
+  await queueOperation('manual_reminders', 'insert', id, reminder)
+  return reminder
+}
+
+export async function updateManualReminder(id: string, updates: Partial<ManualReminderInput>): Promise<ManualReminder> {
+  const existing = await db.manual_reminders.get(id)
+  if (!existing) throw new Error('یادآوری یافت نشد')
+  const { clinic_id, ...rest } = updates
+  const updated: ManualReminder = { ...existing, ...rest, updated_at: nowISO() }
+  await db.manual_reminders.put(updated)
+  await queueOperation('manual_reminders', 'update', id, rest)
+  return updated
 }

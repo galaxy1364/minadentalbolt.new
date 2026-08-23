@@ -5,40 +5,57 @@
 // each module only surfacing its own reminders separately.
 import { useState, useEffect, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { CalendarClock, Banknote, CreditCard, FlaskConical, Bone, Settings2, Bell, BellOff } from 'lucide-react'
+import { CalendarClock, Banknote, CreditCard, FlaskConical, Bone, Settings2, Bell, BellOff, Plus, StickyNote, Check, X as XIcon } from 'lucide-react'
 import { ModuleHeader } from '../components/ModuleHeader'
-import { Card, Button, Badge, Spinner, EmptyState, Select } from '../components/ui'
-import { fetchCheques, fetchAllInstallments, fetchLabOrders, fetchImplantCases, fetchPatients } from '../lib/api'
+import { Card, Button, Badge, Spinner, EmptyState, Select, Modal, Input, Textarea, showToast } from '../components/ui'
+import { CurrencyInput } from '../components/CurrencyInput'
+import { PersianDateInput } from '../components/PersianDateInput'
+import { fetchCheques, fetchAllInstallments, fetchLabOrders, fetchImplantCases, fetchPatients, fetchManualReminders, createManualReminder, updateManualReminder } from '../lib/api'
 import { toJalaliStringPretty, toPersianDigits, formatCurrency } from '../lib/persianDate'
 import { downloadICSReminder } from '../lib/icsReminder'
 import { requestNotificationPermission, getNotificationPermission, notifyOnceForReminder } from '../lib/notifications'
 import { h } from '../lib/haptics'
+import type { Patient, ManualReminder } from '../types'
 
 const LEAD_DAYS_KEY = 'minadent-reminder-lead-days'
 
 interface ReminderItem {
   id: string
-  category: 'cheque' | 'installment' | 'lab' | 'implant'
+  category: 'cheque' | 'installment' | 'lab' | 'implant' | 'manual'
   title: string
   patientName: string
   dueDate: string
   amount?: number
   daysLeft: number
+  /** Set only for category==='manual' — lets tapping the card open it for
+   * editing (formal records like cheques/installments are edited from
+   * their own module, not from here). */
+  manualSource?: ManualReminder
 }
 
 export default function Reminders() {
   const navigate = useNavigate()
   const [loading, setLoading] = useState(true)
   const [items, setItems] = useState<ReminderItem[]>([])
+  const [patients, setPatients] = useState<Patient[]>([])
   const [leadDays, setLeadDays] = useState(() => localStorage.getItem(LEAD_DAYS_KEY) || '3')
   const [filter, setFilter] = useState<'all' | ReminderItem['category']>('all')
   const [notifPermission, setNotifPermission] = useState(getNotificationPermission())
 
-  useEffect(() => {
-    Promise.all([fetchCheques(), fetchAllInstallments(), fetchLabOrders(), fetchImplantCases(), fetchPatients()])
-      .then(([cheques, installments, labOrders, implantCases, patients]) => {
-        const patientName = (id: string) => {
-          const p = patients.find((pp) => pp.id === id)
+  // Manual reminder create/edit modal
+  const [modalOpen, setModalOpen] = useState(false)
+  const [editingReminder, setEditingReminder] = useState<ManualReminder | null>(null)
+  const [saving, setSaving] = useState(false)
+  const [form, setForm] = useState({ patient_id: '', title: '', amount: '', due_date: '', notes: '' })
+
+  const loadData = () => {
+    setLoading(true)
+    return Promise.all([fetchCheques(), fetchAllInstallments(), fetchLabOrders(), fetchImplantCases(), fetchPatients(), fetchManualReminders()])
+      .then(([cheques, installments, labOrders, implantCases, pats, manualReminders]) => {
+        setPatients(pats)
+        const patientName = (id: string | null) => {
+          if (!id) return 'بدون بیمار'
+          const p = pats.find((pp) => pp.id === id)
           return p ? `${p.first_name} ${p.last_name}` : 'بیمار'
         }
         const today = new Date().toISOString().slice(0, 10)
@@ -61,11 +78,20 @@ export default function Reminders() {
           if (!im.surgery_date || im.surgery_date < today) continue
           list.push({ id: `implant-${im.id}`, category: 'implant', title: 'جراحی ایمپلنت', patientName: patientName(im.patient_id), dueDate: im.surgery_date, daysLeft: daysLeft(im.surgery_date) })
         }
+        // Manual reminders — free-form, patient-optional, fully editable.
+        // Exactly for cases like "patient said they'd bring 50M on the
+        // 20th of next month" that aren't a formal cheque/installment yet.
+        for (const mr of manualReminders) {
+          if (mr.status !== 'pending') continue
+          list.push({ id: `manual-${mr.id}`, category: 'manual', title: mr.title, patientName: patientName(mr.patient_id), dueDate: mr.due_date, amount: mr.amount || undefined, daysLeft: daysLeft(mr.due_date), manualSource: mr })
+        }
         list.sort((a, b) => a.daysLeft - b.daysLeft)
         setItems(list)
       })
       .finally(() => setLoading(false))
-  }, [])
+  }
+
+  useEffect(() => { loadData() }, [])
 
   const updateLeadDays = (v: string) => { setLeadDays(v); localStorage.setItem(LEAD_DAYS_KEY, v) }
 
@@ -81,7 +107,7 @@ export default function Reminders() {
     if (notifPermission !== 'granted') return
     for (const it of items) {
       if (it.daysLeft > Number(leadDays)) continue
-      const meta = { cheque: 'چک', installment: 'قسط', lab: 'لابراتوار', implant: 'ایمپلنت' }[it.category]
+      const meta = { cheque: 'چک', installment: 'قسط', lab: 'لابراتوار', implant: 'ایمپلنت', manual: 'یادآوری' }[it.category]
       notifyOnceForReminder(it.id, `یادآوری ${meta}`, `${it.title} — ${it.patientName} — ${it.daysLeft < 0 ? 'گذشته' : it.daysLeft === 0 ? 'امروز' : `${it.daysLeft} روز مانده`}`)
     }
   }, [items, leadDays, notifPermission])
@@ -97,11 +123,70 @@ export default function Reminders() {
     installment: { label: 'قسط', icon: <CreditCard size={14} />, color: 'text-blue-600 bg-blue-50' },
     lab: { label: 'لابراتوار', icon: <FlaskConical size={14} />, color: 'text-cyan-600 bg-cyan-50' },
     implant: { label: 'ایمپلنت', icon: <Bone size={14} />, color: 'text-indigo-600 bg-indigo-50' },
+    manual: { label: 'یادآوری دستی', icon: <StickyNote size={14} />, color: 'text-amber-600 bg-amber-50' },
   }
+
+  const openCreateModal = () => {
+    h.tap()
+    setEditingReminder(null)
+    setForm({ patient_id: '', title: '', amount: '', due_date: new Date().toISOString().slice(0, 10), notes: '' })
+    setModalOpen(true)
+  }
+
+  const openEditModal = (mr: ManualReminder) => {
+    h.tap()
+    setEditingReminder(mr)
+    setForm({ patient_id: mr.patient_id || '', title: mr.title, amount: mr.amount != null ? String(mr.amount) : '', due_date: mr.due_date, notes: mr.notes || '' })
+    setModalOpen(true)
+  }
+
+  const handleSave = async () => {
+    if (!form.title.trim()) { showToast('error', 'عنوان یادآوری الزامی است'); return }
+    if (!form.due_date) { showToast('error', 'تاریخ سررسید الزامی است'); return }
+    setSaving(true)
+    try {
+      const payload = {
+        patient_id: form.patient_id || null,
+        title: form.title.trim(),
+        amount: form.amount ? Number(form.amount) : null,
+        due_date: form.due_date,
+        notes: form.notes || null,
+        status: 'pending' as const,
+      }
+      if (editingReminder) {
+        await updateManualReminder(editingReminder.id, payload)
+        showToast('success', 'یادآوری ویرایش شد')
+      } else {
+        await createManualReminder(payload)
+        showToast('success', 'یادآوری ثبت شد')
+      }
+      setModalOpen(false)
+      await loadData()
+    } catch { showToast('error', 'خطا در ذخیره') }
+    finally { setSaving(false) }
+  }
+
+  // Marking done/cancelled keeps the record forever (clinic policy: never
+  // delete) — it just leaves the active reminders list.
+  const handleResolve = async (mr: ManualReminder, status: 'completed' | 'cancelled') => {
+    h.tap()
+    try {
+      await updateManualReminder(mr.id, { status })
+      showToast('success', status === 'completed' ? 'انجام‌شده علامت خورد' : 'لغو شد')
+      await loadData()
+    } catch { showToast('error', 'خطا') }
+  }
+
+  const patientOptions = [{ value: '', label: 'بدون بیمار مشخص' }, ...patients.map((p) => ({ value: p.id, label: `${p.first_name} ${p.last_name}` }))]
 
   return (
     <div className="space-y-4">
-      <ModuleHeader moduleKey="reminders" title="یادآوری‌ها" subtitle="همه‌ی سررسیدهای فعال، یک‌جا" />
+      <ModuleHeader
+        moduleKey="reminders"
+        title="یادآوری‌ها"
+        subtitle="همه‌ی سررسیدهای فعال، یک‌جا"
+        action={<Button onClick={openCreateModal} variant="primary" size="sm"><Plus size={16} className="inline ml-1" /> یادآوری دستی</Button>}
+      />
 
       {notifPermission !== 'unsupported' && notifPermission !== 'granted' && (
         <Card className="p-4 border-2 border-warning-200 bg-warning-50 dark:bg-warning-900/10">
@@ -148,7 +233,7 @@ export default function Reminders() {
       </div>
 
       <div className="flex items-center gap-1.5 flex-wrap">
-        {(['all', 'cheque', 'installment', 'lab', 'implant'] as const).map((f) => (
+        {(['all', 'cheque', 'installment', 'lab', 'implant', 'manual'] as const).map((f) => (
           <button key={f} onClick={() => { h.select(); setFilter(f) }} className={`px-3 py-1.5 rounded-xl text-xs font-bold ${filter === f ? 'bg-primary-600 text-white' : 'bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300'}`}>
             {f === 'all' ? 'همه' : categoryMeta[f].label}
           </button>
@@ -167,28 +252,55 @@ export default function Reminders() {
             return (
               <Card key={it.id} className={`p-3.5 ${isUrgent ? 'border-2 border-error-200' : ''}`}>
                 <div className="flex items-center gap-3">
-                  <div className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 ${meta.color}`}>{meta.icon}</div>
-                  <div className="flex-1 min-w-0">
+                  <div
+                    className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 ${meta.color} ${it.manualSource ? 'cursor-pointer' : ''}`}
+                    onClick={it.manualSource ? () => openEditModal(it.manualSource!) : undefined}
+                  >
+                    {meta.icon}
+                  </div>
+                  <div className={`flex-1 min-w-0 ${it.manualSource ? 'cursor-pointer' : ''}`} onClick={it.manualSource ? () => openEditModal(it.manualSource!) : undefined}>
                     <p className="text-sm font-bold text-slate-800 dark:text-slate-100 truncate">{it.title} — {it.patientName}</p>
                     <p className="text-[11px] text-slate-400">
                       {toJalaliStringPretty(it.dueDate)}
                       {it.amount ? ` — ${formatCurrency(it.amount)} ت` : ''}
                       {isUrgent && <span className="text-error-600 font-bold"> — {it.daysLeft < 0 ? `${toPersianDigits(Math.abs(it.daysLeft))} روز تاخیر` : it.daysLeft === 0 ? 'امروز' : `${toPersianDigits(it.daysLeft)} روز مانده`}</span>}
                     </p>
+                    {it.manualSource?.notes && <p className="text-[11px] text-slate-400 mt-0.5">{it.manualSource.notes}</p>}
                   </div>
-                  <button
-                    onClick={() => downloadICSReminder({ title: `${it.title} — ${it.patientName}`, description: it.amount ? `مبلغ: ${formatCurrency(it.amount)} تومان` : undefined, dueDate: it.dueDate, filename: `reminder-${it.id}.ics` })}
-                    className="p-2 rounded-lg bg-primary-50 dark:bg-primary-900/30 text-primary-600 shrink-0"
-                    title="افزودن به تقویم گوشی"
-                  >
-                    <CalendarClock size={16} />
-                  </button>
+                  {it.manualSource ? (
+                    <div className="flex items-center gap-1 shrink-0">
+                      <button onClick={() => handleResolve(it.manualSource!, 'completed')} title="انجام شد" className="p-2 rounded-lg bg-success-50 dark:bg-success-900/30 text-success-600"><Check size={16} /></button>
+                      <button onClick={() => handleResolve(it.manualSource!, 'cancelled')} title="لغو" className="p-2 rounded-lg bg-slate-100 dark:bg-slate-700 text-slate-500"><XIcon size={16} /></button>
+                    </div>
+                  ) : (
+                    <button
+                      onClick={() => downloadICSReminder({ title: `${it.title} — ${it.patientName}`, description: it.amount ? `مبلغ: ${formatCurrency(it.amount)} تومان` : undefined, dueDate: it.dueDate, filename: `reminder-${it.id}.ics` })}
+                      className="p-2 rounded-lg bg-primary-50 dark:bg-primary-900/30 text-primary-600 shrink-0"
+                      title="افزودن به تقویم گوشی"
+                    >
+                      <CalendarClock size={16} />
+                    </button>
+                  )}
                 </div>
               </Card>
             )
           })}
         </div>
       )}
+
+      <Modal open={modalOpen} onClose={() => setModalOpen(false)} title={editingReminder ? 'ویرایش یادآوری' : 'یادآوری دستی جدید'}>
+        <div className="space-y-3 p-1">
+          <p className="text-xs text-slate-500">مثلاً: «بیمار گفت بیستم ماه بعد ۵۰ میلیون تومان می‌آورد» — بدون نیاز به ثبت چک یا قسط رسمی.</p>
+          <Select label="بیمار (اختیاری)" value={form.patient_id} onChange={(v) => setForm((p) => ({ ...p, patient_id: v }))} options={patientOptions} />
+          <Input label="عنوان یادآوری" value={form.title} onChange={(v) => setForm((p) => ({ ...p, title: v }))} placeholder="مثلاً: قول پرداخت نقدی" />
+          <CurrencyInput label="مبلغ (تومان، اختیاری)" value={form.amount} onChange={(v) => setForm((p) => ({ ...p, amount: v }))} />
+          <PersianDateInput label="تاریخ سررسید" value={form.due_date} onChange={(v) => setForm((p) => ({ ...p, due_date: v }))} />
+          <Textarea label="یادداشت (اختیاری)" value={form.notes} onChange={(v) => setForm((p) => ({ ...p, notes: v }))} rows={3} />
+          <Button onClick={handleSave} disabled={saving} className="w-full">
+            {saving ? <Spinner size={16} /> : editingReminder ? 'ذخیره‌ی تغییرات' : 'ثبت یادآوری'}
+          </Button>
+        </div>
+      </Modal>
     </div>
   )
 }

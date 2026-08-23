@@ -934,6 +934,22 @@ export interface CustomRole {
 }
 export type CustomRoleInput = Omit<CustomRole, 'id' | 'created_at' | 'updated_at' | 'sync_version'> & { clinic_id?: string }
 
+// ── Manual (editable, patient-linked) reminders ─────────────────────────
+export interface ManualReminder {
+  id: string
+  clinic_id: string
+  patient_id: string | null
+  title: string
+  amount: number | null
+  due_date: string
+  notes: string | null
+  status: 'pending' | 'completed' | 'cancelled'
+  created_at: string
+  updated_at: string
+  sync_version: number
+}
+export type ManualReminderInput = Omit<ManualReminder, 'id' | 'clinic_id' | 'created_at' | 'updated_at' | 'sync_version'> & { clinic_id?: string }
+
 export interface CashRegisterSession {
   id: string
   clinic_id: string
