@@ -2,7 +2,7 @@
 import { useState, useEffect, useCallback, useMemo } from 'react'
 import { FlaskConical, Plus, Search, Clock, CheckCircle2, AlertCircle, Edit2, Trash2, Phone, Filter, TrendingUp, Package, CalendarClock, ChevronLeft } from 'lucide-react'
 import { downloadICSReminder } from '../lib/icsReminder'
-import { fetchLabOrders, createLabOrder, updateLabOrder, fetchLabs, createLab, updateLab, deleteLab, fetchPatients, fetchDoctors, fetchTreatments, updateTreatment } from '../lib/api'
+import { fetchLabOrders, createLabOrder, updateLabOrder, fetchLabs, createLab, updateLab, fetchPatients, fetchDoctors, fetchTreatments, updateTreatment } from '../lib/api'
 import { toJalaliString, toJalaliStringPretty, formatCurrency, toPersianDigits } from '../lib/persianDate'
 import { h } from '../lib/haptics'
 import { useConfirmAction } from '../components/ConfirmAction'
@@ -146,7 +146,9 @@ export default function Laboratory() {
         fetchTreatments(),
       ])
       setLabOrders(orders as unknown as LabOrder[])
-      setLabs(l)
+      // Deactivated labs stay out of this active list — fully preserved,
+      // restorable from Archive, exactly like archived patients/implants.
+      setLabs(l.filter((lab) => lab.is_active !== false))
       setPatients(pats)
       setDoctors(docs)
       setTreatments(trts)
@@ -439,15 +441,19 @@ export default function Laboratory() {
 
   const handleDeleteLab = (lab: Laboratory) => {
     h.warning()
+    // Per clinic policy: a lab vendor is never permanently deleted —
+    // existing lab_orders reference it by id with no cascading FK, so a
+    // hard delete would silently orphan every past order's 'sent to
+    // which lab' history. Deactivating keeps that link intact forever.
     confirmAction({
-      type: 'delete',
-      title: 'حذف لابراتوار',
-      warning: 'این عملیات قابل بازگشت نیست',
+      type: 'status',
+      title: 'غیرفعال کردن لابراتوار',
+      warning: 'این لابراتوار هیچ‌وقت پاک نمی‌شود — فقط از لیست فعال مخفی می‌شود، سوابق سفارش‌های قبلی دست‌نخورده می‌ماند.',
       fields: [{ label: 'نام', value: lab.name, highlight: true }],
-      confirmLabel: 'تایید حذف',
+      confirmLabel: 'تایید غیرفعال‌سازی',
       onConfirm: async () => {
-        try { await deleteLab(lab.id); showToast('success', 'لابراتوار حذف شد'); await loadData() }
-        catch { showToast('error', 'خطا در حذف') }
+        try { await updateLab(lab.id, { is_active: false } as any); showToast('success', 'لابراتوار غیرفعال شد — سوابق حفظ شد'); await loadData() }
+        catch { showToast('error', 'خطا در غیرفعال‌سازی') }
       },
     })
   }

@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Plus, Search, Edit2, Phone, Filter, Users, Award, AlertCircle, Smile, FileText, User, Trash2, Heart, Shield, MapPin } from 'lucide-react'
-import { fetchPatients, createPatient, updatePatient, deletePatient, fetchDoctors, fetchPayments, fetchTreatments, fetchImplantCases, peekNextFileNumber } from '../lib/api'
+import { fetchPatients, createPatient, updatePatient, fetchDoctors, fetchPayments, fetchTreatments, fetchImplantCases, peekNextFileNumber } from '../lib/api'
 import { toJalaliStringPretty, formatCurrency, toPersianDigits } from '../lib/persianDate'
 import { Patient, Doctor, Payment, Treatment, ImplantCase } from '../types'
 import { Modal, Card, Button, Input, Select, Textarea, Spinner, EmptyState, showToast, HighlightText, SkeletonList } from '../components/ui'
@@ -261,43 +261,26 @@ export default function Patients() {
 
   // ── Preview + Confirm for delete ──
   const handleDelete = (patient: Patient) => {
-    const fin = patientFinances.get(patient.id) || { balance: 0, paid: 0, totalCost: 0 }
-    const hasHistory = fin.totalCost > 0 || fin.paid > 0
-
-    if (hasHistory) {
-      // A patient with any financial/treatment history must never be
-      // permanently deleted — that would destroy accounting/legal
-      // records with no way back. Deactivating (hiding from active
-      // lists, keeping all history intact) is the only safe option here.
-      confirmAction({
-        type: 'status',
-        title: 'این بیمار قابل حذف نیست',
-        warning: `این بیمار ${formatCurrency(fin.totalCost)} هزینه‌ی درمان و ${formatCurrency(fin.paid)} پرداخت ثبت‌شده دارد. برای حفظ سوابق مالی/قانونی، حذف کامل امکان‌پذیر نیست.`,
-        fields: [
-          { label: 'نام', value: `${patient.first_name} ${patient.last_name}`, icon: <User size={16} />, highlight: true },
-          { label: 'پیشنهاد', value: 'غیرفعال کردن به‌جای حذف', icon: <Shield size={16} /> },
-        ],
-        confirmLabel: 'غیرفعال کردن بیمار',
-        onConfirm: async () => {
-          await updatePatient(patient.id, { is_active: false })
-          showToast('success', 'بیمار غیرفعال شد — سوابق حفظ شد')
-          await loadData()
-        },
-      })
-      return
-    }
-
+    // Per clinic policy: patient records are NEVER permanently deleted,
+    // regardless of history. Deactivating (hidden from active lists,
+    // fully restorable from Archive, every linked record untouched) is
+    // the only path — even for a patient with zero recorded history yet,
+    // since staff could still be mid-entry on their file.
+    h.tap()
     confirmAction({
-      type: 'delete',
-      title: 'حذف بیمار',
-      warning: 'این بیمار هیچ سابقه‌ی مالی/درمانی ندارد — این عملیات قابل بازگشت نیست',
+      type: 'status',
+      title: 'غیرفعال کردن بیمار',
+      warning: 'بیمار از لیست‌های فعال مخفی می‌شود، ولی هیچ داده‌ای پاک نمی‌شود — از بخش «بایگانی» قابل بازگردانی است.',
       fields: [
         { label: 'نام', value: `${patient.first_name} ${patient.last_name}`, icon: <User size={16} />, highlight: true },
         { label: 'شماره پرونده', value: patient.file_number || '—', icon: <FileText size={16} /> },
-        { label: 'تلفن', value: patient.phone ? toPersianDigits(patient.phone) : '—', icon: <Phone size={16} /> },
       ],
-      confirmLabel: 'تایید حذف',
-      onConfirm: async () => { await deletePatient(patient.id); await loadData() },
+      confirmLabel: 'غیرفعال کردن',
+      onConfirm: async () => {
+        await updatePatient(patient.id, { is_active: false })
+        showToast('success', 'بیمار غیرفعال شد — سوابق حفظ شد')
+        await loadData()
+      },
     })
   }
 

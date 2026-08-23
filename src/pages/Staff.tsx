@@ -184,7 +184,7 @@ export default function Staff() {
         // is useless for actually running monthly payroll (you can't
         // tell how much is owed for this month specifically).
         const inPeriod = (dateStr: string) => dateStr >= sharePeriodStart && dateStr <= `${sharePeriodEnd}T23:59:59`
-        const docTreatments = treatments.filter((t) => t.doctor_id === doc.id && inPeriod(t.created_at))
+        const docTreatments = treatments.filter((t) => t.doctor_id === doc.id && inPeriod(t.created_at) && t.status !== 'cancelled')
         const totalProduction = docTreatments.reduce((sum, t) => sum + (t.total_price || 0), 0)
 
         const docLabOrders = labOrders.filter((l) => (l.doctor_id === doc.id || l.doctor?.id === doc.id) && inPeriod(l.created_at))

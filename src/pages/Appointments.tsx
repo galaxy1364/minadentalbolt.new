@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Calendar, Clock, CheckCircle2, User, ChevronRight, ChevronLeft, Plus, Search, Trash2, AlertCircle, Edit2, Stethoscope, DollarSign, FileText, Activity, List, Grid, X, UserPlus, Globe } from 'lucide-react'
-import { fetchAppointments, createAppointment, updateAppointment, deleteAppointment, checkConflict, fetchPatients, fetchDoctors, fetchUnits, peekNextFileNumber, createPatient, createEncounter, fetchDoctorSchedules, fetchOnlineBookingRequests, rejectBookingRequest } from '../lib/api'
+import { fetchAppointments, createAppointment, updateAppointment, checkConflict, fetchPatients, fetchDoctors, fetchUnits, peekNextFileNumber, createPatient, createEncounter, fetchDoctorSchedules, fetchOnlineBookingRequests, rejectBookingRequest } from '../lib/api'
 import { toJalaliString, toJalaliStringPretty, getJalaliDateInfo, formatTime, formatCurrency, toPersianDigits, persianWeekdaysShort, getHoliday, jsDateToPersianWeekday } from '../lib/persianDate'
 import { doctorColor } from '../lib/doctorColors'
 import { Appointment, AppointmentWithRelations, Patient, Doctor, Unit } from '../types'
@@ -362,18 +362,22 @@ export default function Appointments() {
 
   // ── Preview + Confirm for delete ──
   const handleDelete = (appt: AppointmentWithRelations) => {
+    // Per clinic policy: appointment history is never permanently
+    // deleted — 'لغو شد' (cancelled) already exists as a real status and
+    // keeps the record (and the fact that this slot happened/was booked)
+    // fully intact, instead of erasing it.
     confirmAction({
-      type: 'delete',
-      title: 'حذف نوبت',
-      warning: 'این عملیات قابل بازگشت نیست',
+      type: 'status',
+      title: 'لغو نوبت',
+      warning: 'این نوبت هیچ‌وقت پاک نمی‌شود — فقط به‌عنوان لغو‌شده علامت می‌خورد.',
       fields: [
         { label: 'بیمار', value: patientName(appt), icon: <User size={16} />, highlight: true },
         { label: 'تاریخ', value: toJalaliStringPretty(appt.date), icon: <Calendar size={16} /> },
         { label: 'ساعت', value: toPersianDigits(appt.start_time), icon: <Clock size={16} /> },
         { label: 'نوع', value: getType(appt.type).label },
       ],
-      confirmLabel: 'تایید حذف',
-      onConfirm: async () => { await deleteAppointment(appt.id); await loadData() },
+      confirmLabel: 'تایید لغو',
+      onConfirm: async () => { await updateAppointment(appt.id, { status: 'cancelled' }); await loadData() },
     })
   }
 

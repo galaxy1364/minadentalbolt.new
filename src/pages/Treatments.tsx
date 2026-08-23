@@ -9,7 +9,7 @@ import { BarChart, Bar, XAxis, YAxis, Tooltip as RTooltip, ResponsiveContainer, 
 import {
   fetchEncounters, fetchTreatments, fetchProcedures, fetchPatients, fetchDoctors,
   fetchLabs, fetchToothRecords, createEncounter, updateEncounter, createTreatment,
-  updateTreatment, deleteTreatment, deleteEncounter, createLabOrder, fetchLabOrders, updateLabOrder,
+  updateTreatment, createLabOrder, fetchLabOrders, updateLabOrder,
   createToothRecord, updateToothRecord,
 } from '../lib/api'
 import { toJalaliString, toJalaliStringPretty, formatCurrency, formatNumber, toPersianDigits } from '../lib/persianDate'
@@ -346,16 +346,21 @@ export default function Treatments() {
 
   const handleDeleteEncounter = (e: EncounterWithRelations) => {
     h.warning()
+    // Per clinic policy: an encounter (a real visit, part of the patient's
+    // permanent clinical timeline) is never permanently deleted — 'لغو
+    // شده' already exists as a real status and keeps the fact that this
+    // visit happened fully intact, instead of erasing it from history.
     confirmAction({
-      type: 'delete', title: 'حذف ویزیت', warning: 'این عملیات قابل بازگشت نیست',
+      type: 'status', title: 'لغو ویزیت',
+      warning: 'این ویزیت هیچ‌وقت پاک نمی‌شود — فقط به‌عنوان لغو‌شده علامت می‌خورد و در تایم‌لاین بیمار باقی می‌ماند.',
       fields: [
         { label: 'بیمار', value: encounterPatientName(e), highlight: true },
         { label: 'تاریخ', value: toJalaliString(e.encounter_date) },
       ],
-      confirmLabel: 'حذف قطعی',
+      confirmLabel: 'تایید لغو',
       onConfirm: async () => {
-        try { await deleteEncounter(e.id); showToast('success', 'ویزیت حذف شد'); await loadData() }
-        catch { showToast('error', 'خطا در حذف') }
+        try { await updateEncounter(e.id, { status: 'cancelled' }); showToast('success', 'ویزیت لغو شد — در تایم‌لاین باقی ماند'); await loadData() }
+        catch { showToast('error', 'خطا در لغو') }
       },
     })
   }
@@ -484,7 +489,7 @@ export default function Treatments() {
             // calcPatientBalance() — no separate record needed until
             // the patient actually pays through Billing → ثبت پرداخت.
             // Update encounter total
-            const encTreatments = treatments.filter((t) => t.encounter_id === treatEncounterId)
+            const encTreatments = treatments.filter((t) => t.encounter_id === treatEncounterId && t.status !== 'cancelled')
             const newTotal = encTreatments.reduce((s, t) => s + (t.total_price || 0), 0) + total
             await updateEncounter(treatEncounterId, { total_amount: newTotal } as any)
           }
@@ -502,31 +507,34 @@ export default function Treatments() {
 
   const handleDeleteTreatment = (t: Treatment) => {
     h.warning()
-    // A treatment with has_lab created a real lab order — deleting the
-    // treatment without touching that order leaves it orphaned: the lab
-    // could keep working on (and billing for) physical work for a
-    // treatment that no longer exists in the clinical record. Offer to
-    // cancel it in the same step rather than leaving a ghost order.
+    // Per clinic policy: a treatment (real clinical + billing history,
+    // part of the patient's permanent record) is never permanently
+    // deleted — 'لغو شده' already exists as a real status. A treatment
+    // with has_lab created a real lab order — cancelling without
+    // touching that order leaves it orphaned: the lab could keep working
+    // on (and billing for) physical work for a treatment that's no
+    // longer active, so cancel it in the same step too.
     const linkedOrder = t.lab_id
       ? labOrders.find((o) => o.encounter_id === t.encounter_id && o.lab_id === t.lab_id && o.status !== 'cancelled' && o.status !== 'delivered')
       : null
 
     confirmAction({
-      type: 'delete', title: 'حذف درمان', warning: 'این عملیات قابل بازگشت نیست',
+      type: 'status', title: 'لغو درمان',
+      warning: 'این درمان هیچ‌وقت پاک نمی‌شود — فقط به‌عنوان لغو‌شده علامت می‌خورد و در پرونده‌ی بیمار باقی می‌ماند.',
       fields: [
         { label: 'رویه', value: t.procedure_name || '-', highlight: true },
         { label: 'دندان', value: t.tooth_number ? toPersianDigits(t.tooth_number) : '-' },
         ...(linkedOrder ? [{ label: 'سفارش لابراتوار مرتبط', value: 'همزمان لغو می‌شود تا کار روی آن ادامه پیدا نکند' }] : []),
       ],
-      confirmLabel: 'حذف قطعی',
+      confirmLabel: 'تایید لغو',
       onConfirm: async () => {
         try {
-          await deleteTreatment(t.id)
+          await updateTreatment(t.id, { status: 'cancelled' })
           if (linkedOrder) await updateLabOrder(linkedOrder.id, { status: 'cancelled' })
-          showToast('success', linkedOrder ? 'درمان حذف و سفارش لابراتوار مرتبط لغو شد' : 'درمان حذف شد')
+          showToast('success', linkedOrder ? 'درمان لغو و سفارش لابراتوار مرتبط لغو شد' : 'درمان لغو شد — در پرونده باقی ماند')
           await loadData()
         }
-        catch { showToast('error', 'خطا در حذف') }
+        catch { showToast('error', 'خطا در لغو') }
       },
     })
   }
@@ -867,7 +875,7 @@ export default function Treatments() {
                 <div className="flex flex-wrap gap-2">
                   <button
                     onClick={() => {
-                      const totalCost = encounterTreatments.reduce((s, t) => s + (t.total_price || 0), 0)
+                      const totalCost = encounterTreatments.filter((t) => t.status !== 'cancelled').reduce((s, t) => s + (t.total_price || 0), 0)
                       navigate('/billing', { state: { openPaymentForPatientId: detailEnc.patient_id, suggestedAmount: totalCost, fromEncounterId: detailEnc.id } })
                     }}
                     className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-emerald-50 text-emerald-700 text-xs font-bold hover:bg-emerald-100 transition-all-smooth press-scale"

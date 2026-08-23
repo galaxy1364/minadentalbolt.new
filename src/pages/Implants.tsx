@@ -3,7 +3,7 @@ import { useState, useEffect, useCallback, useMemo } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
 import { Smile, Plus, Search, Edit2, Eye, Filter, Package, Calendar, DollarSign, ShieldCheck, AlertTriangle, CheckCircle2, Clock, Activity, Layers, Trash2, CalendarClock } from 'lucide-react'
 import { downloadICSReminder } from '../lib/icsReminder'
-import { fetchImplantCases, createImplantCase, updateImplantCase, deleteImplantCase, createImplantComponent, deleteImplantComponent, fetchPatients, fetchDoctors, createExpense } from '../lib/api'
+import { fetchImplantCases, createImplantCase, updateImplantCase, createImplantComponent, deleteImplantComponent, fetchPatients, fetchDoctors, createExpense } from '../lib/api'
 import { CLINIC_ID } from '../lib/supabase'
 import { toJalaliString, toJalaliStringPretty, formatCurrency, formatNumber, toPersianDigits } from '../lib/persianDate'
 import { h } from '../lib/haptics'
@@ -185,7 +185,10 @@ export default function Implants() {
         fetchPatients(),
         fetchDoctors(),
       ])
-      setCases(cs)
+      // Archived (is_active === false) cases are intentionally kept out of
+      // this page's list — they're fully preserved and only reachable
+      // from Archive, exactly like archived patients/staff.
+      setCases(cs.filter((c) => c.is_active !== false))
       setPatients(pats)
       setDoctors(docs)
     } catch (err) {
@@ -882,14 +885,19 @@ export default function Implants() {
                   <button
                     onClick={() => {
                       h.warning()
+                      // Per clinic policy: an implant case (real clinical +
+                      // financial history, now linked to actual payments)
+                      // is never permanently deleted — archiving hides it
+                      // from the active list while keeping everything
+                      // fully intact and restorable from Archive.
                       confirmAction({
-                        type: 'delete', title: 'حذف مورد ایمپلنت',
-                        warning: 'تمام اطلاعات این مورد ایمپلنت حذف خواهد شد.',
+                        type: 'status', title: 'آرشیو مورد ایمپلنت',
+                        warning: 'این مورد هیچ‌وقت پاک نمی‌شود — فقط از لیست فعال مخفی می‌شود و از بخش «بایگانی» قابل بازگردانی است.',
                         fields: [{ label: 'بیمار', value: patientName(c), highlight: true }, { label: 'دندان', value: toPersianDigits(c.tooth_number || '-') }],
-                        confirmLabel: 'تایید حذف',
+                        confirmLabel: 'تایید آرشیو',
                         onConfirm: async () => {
-                          try { await deleteImplantCase(c.id); showToast('success', 'مورد ایمپلنت حذف شد'); await loadData() }
-                          catch { showToast('error', 'خطا در حذف') }
+                          try { await updateImplantCase(c.id, { is_active: false } as any); showToast('success', 'آرشیو شد — سوابق حفظ شد'); await loadData() }
+                          catch { showToast('error', 'خطا در آرشیو کردن') }
                         },
                       })
                     }}

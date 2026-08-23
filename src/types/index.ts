@@ -567,6 +567,10 @@ export interface ImplantCase {
   notes: string | null
   success_status: string | null
   failure_reason: string | null
+  /** Soft-delete flag, same pattern as Patient/Staff/InsuranceCompany —
+   * archiving hides a case from active lists (restorable from Archive)
+   * instead of permanently destroying its financial/clinical history. */
+  is_active: boolean
   created_at: string
   updated_at: string
 }

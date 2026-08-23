@@ -3,7 +3,7 @@ import { useState, useEffect, useCallback, useMemo } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
 import { CreditCard, Plus, Search, DollarSign, TrendingUp, Wallet, Calendar, CalendarClock, CheckCircle2, AlertCircle, Edit2, Filter, Receipt, Banknote, Clock, Trash2, Printer } from 'lucide-react'
 import { BarChart, Bar, XAxis, YAxis, Tooltip as RTooltip, ResponsiveContainer, PieChart, Pie, Cell as RCell } from 'recharts'
-import { fetchPayments, createPayment, updatePayment, deletePayment, fetchEncounters, fetchCheques, createCheque, updateCheque, deleteCheque, fetchPaymentPlans, createPaymentPlan, updatePaymentPlan, deletePaymentPlan, updateInstallment, fetchPatients, fetchExpenses, createExpense, updateExpense, deleteExpense, fetchTreatments, fetchImplantCases } from '../lib/api'
+import { fetchPayments, createPayment, updatePayment, fetchEncounters, fetchCheques, createCheque, updateCheque, fetchPaymentPlans, createPaymentPlan, updatePaymentPlan, updateInstallment, fetchPatients, fetchExpenses, createExpense, updateExpense, deleteExpense, fetchTreatments, fetchImplantCases } from '../lib/api'
 import { toJalaliString, toJalaliStringPretty, formatCurrency, formatNumber, toPersianDigits, toEnglishDigits } from '../lib/persianDate'
 import { h } from '../lib/haptics'
 import { useConfirmAction } from '../components/ConfirmAction'
@@ -40,12 +40,14 @@ const chequeStatuses: { value: string; label: string; color: string }[] = [
   { value: 'deposited', label: 'وصول شده در بانک', color: 'primary' },
   { value: 'cleared', label: 'پاس شد', color: 'success' },
   { value: 'bounced', label: 'برگشت خورده', color: 'error' },
+  { value: 'cancelled', label: 'لغو شده', color: 'error' },
 ]
 
 const planStatuses: { value: string; label: string; color: string }[] = [
   { value: 'active', label: 'فعال', color: 'success' },
   { value: 'completed', label: 'تکمیل شده', color: 'primary' },
   { value: 'defaulted', label: 'نکول', color: 'error' },
+  { value: 'cancelled', label: 'لغو شده', color: 'error' },
 ]
 
 const pieColors = ['#6366f1', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6']
@@ -461,36 +463,43 @@ export default function Billing() {
 
   const handleDeleteCheque = (cheque: Cheque) => {
     h.tap()
+    // Per clinic policy: a cheque (a real financial/legal instrument) is
+    // never permanently deleted. Marking it 'لغو شده' (cancelled) keeps
+    // it fully visible in every list forever — it's the honest record
+    // of "this cheque was voided", not an erased one.
     confirmAction({
-      type: 'delete',
-      title: 'حذف چک',
-      warning: 'این عملیات قابل بازگشت نیست',
+      type: 'status',
+      title: 'لغو چک',
+      warning: 'این چک هیچ‌وقت پاک نمی‌شود — فقط به‌عنوان لغو‌شده علامت می‌خورد و در سوابق باقی می‌ماند.',
       fields: [
         { label: 'بیمار', value: getPatientName(cheque.patient_id), highlight: true },
         { label: 'مبلغ', value: `${formatCurrency(cheque.amount)} ت` },
       ],
-      confirmLabel: 'تایید حذف',
+      confirmLabel: 'تایید لغو',
       onConfirm: async () => {
-        try { await deleteCheque(cheque.id); showToast('success', 'چک حذف شد'); await loadData() }
-        catch { showToast('error', 'خطا در حذف') }
+        try { await updateCheque(cheque.id, { status: 'cancelled' } as any); showToast('success', 'چک لغو شد — در سوابق باقی ماند'); await loadData() }
+        catch { showToast('error', 'خطا در لغو') }
       },
     })
   }
 
   const handleDeletePlan = (plan: PaymentPlanWithRelations) => {
     h.tap()
+    // Same policy as cheques/payments above — a payment plan (and the
+    // guarantee cheque + installments it's tied to) is never permanently
+    // deleted, only marked cancelled.
     confirmAction({
-      type: 'delete',
-      title: 'حذف طرح قسطی',
-      warning: 'این طرح هیچ قسط پرداخت‌شده‌ای ندارد — حذفش امن است',
+      type: 'status',
+      title: 'لغو طرح قسطی',
+      warning: 'این طرح هیچ‌وقت پاک نمی‌شود — فقط به‌عنوان لغو‌شده علامت می‌خورد و در سوابق باقی می‌ماند.',
       fields: [
         { label: 'بیمار', value: getPatientName(plan.patient_id), highlight: true },
         { label: 'مبلغ کل', value: `${formatCurrency(plan.total_amount)} ت` },
       ],
-      confirmLabel: 'تایید حذف',
+      confirmLabel: 'تایید لغو',
       onConfirm: async () => {
-        try { await deletePaymentPlan(plan.id); showToast('success', 'طرح قسطی حذف شد'); await loadData() }
-        catch { showToast('error', 'خطا در حذف') }
+        try { await updatePaymentPlan(plan.id, { status: 'cancelled' } as any); showToast('success', 'طرح قسطی لغو شد — در سوابق باقی ماند'); await loadData() }
+        catch { showToast('error', 'خطا در لغو') }
       },
     })
   }
@@ -730,13 +739,23 @@ export default function Billing() {
                   <button onClick={() => handlePrintReceipt(p)} className="flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs text-primary-600 hover:bg-primary-50 transition-colors"><Printer size={12} /> چاپ رسید</button>
                   <button onClick={() => {
                     h.warning()
+                    // Per clinic policy: a recorded payment is never
+                    // permanently deleted — that would erase an
+                    // accounting/legal record with no way back. Marking
+                    // it 'failed' instead reuses updatePayment's existing,
+                    // already-correct recalculation of the linked
+                    // encounter/implant-case paid_amount (it recomputes
+                    // from all still-'completed' payments), so the
+                    // balance corrects itself exactly as a real reversal
+                    // would — the record itself just stays, permanently.
                     confirmAction({
-                      type: 'delete', title: 'حذف پرداخت',
+                      type: 'status', title: 'لغو پرداخت',
+                      warning: 'این پرداخت هیچ‌وقت پاک نمی‌شود — فقط لغو می‌شود و از مانده‌حساب کسر می‌گردد، سابقه‌اش برای همیشه باقی می‌ماند.',
                       fields: [{ label: 'مبلغ', value: `${formatCurrency(p.amount)} ت`, highlight: true }, { label: 'بیمار', value: getPatientName(p.patient_id) }],
-                      confirmLabel: 'تایید حذف',
-                      onConfirm: async () => { try { await deletePayment(p.id); showToast('success', 'پرداخت حذف شد'); loadData() } catch { showToast('error', 'خطا در حذف') } },
+                      confirmLabel: 'تایید لغو',
+                      onConfirm: async () => { try { await updatePayment(p.id, { status: 'failed' } as any); showToast('success', 'پرداخت لغو شد — مانده‌حساب اصلاح شد'); loadData() } catch { showToast('error', 'خطا در لغو') } },
                     })
-                  }} className="flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs text-slate-500 hover:text-error-600 hover:bg-error-50 transition-colors"><Trash2 size={12} /> حذف</button>
+                  }} className="flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs text-slate-500 hover:text-error-600 hover:bg-error-50 transition-colors"><Trash2 size={12} /> لغو پرداخت</button>
                 </div>
               </Card>
             )
@@ -956,7 +975,7 @@ export default function Billing() {
                       {chequeStatuses.map((s) => <option key={s.value} value={s.value}>{s.label}</option>)}
                     </select>
                     {c.status !== 'cleared' && (
-                      <button onClick={() => handleDeleteCheque(c)} aria-label="حذف چک" className="p-1.5 rounded-lg text-slate-400 hover:text-error-600 hover:bg-error-50 transition-colors"><Trash2 size={14} /></button>
+                      <button onClick={() => handleDeleteCheque(c)} aria-label="لغو چک" className="p-1.5 rounded-lg text-slate-400 hover:text-error-600 hover:bg-error-50 transition-colors"><Trash2 size={14} /></button>
                     )}
                     {c.status === 'pending' && (
                       <button
@@ -1015,7 +1034,7 @@ export default function Billing() {
                   <div className="flex items-center gap-2">
                     <Badge color={statusMeta.color}>{statusMeta.label}</Badge>
                     {paidCount === 0 && (
-                      <button onClick={() => handleDeletePlan(plan)} aria-label="حذف طرح قسطی" className="p-1.5 rounded-lg text-slate-400 hover:text-error-600 hover:bg-error-50 transition-colors"><Trash2 size={14} /></button>
+                      <button onClick={() => handleDeletePlan(plan)} aria-label="لغو طرح قسطی" className="p-1.5 rounded-lg text-slate-400 hover:text-error-600 hover:bg-error-50 transition-colors"><Trash2 size={14} /></button>
                     )}
                   </div>
                 </div>

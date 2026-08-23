@@ -228,7 +228,10 @@ export default function Reports() {
     const total = treatments.length
     const completed = treatments.filter((t) => t.status === 'completed').length
     const inProgress = treatments.filter((t) => t.status === 'in_progress' || t.status === 'planned').length
-    const totalValue = treatments.reduce((sum, t) => sum + (t.total_price || 0), 0)
+    // Cancelled treatments never counted toward revenue value before
+    // (deleting one removed the row entirely); now that cancelling keeps
+    // the row, it has to be excluded explicitly here too.
+    const totalValue = treatments.filter((t) => t.status !== 'cancelled').reduce((sum, t) => sum + (t.total_price || 0), 0)
     return { total, completed, inProgress, totalValue }
   }, [treatments])
 

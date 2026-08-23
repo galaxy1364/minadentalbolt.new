@@ -38,7 +38,14 @@ export function calcPatientBalance(
   treatments: Treatment[],
   implantCases: ImplantCaseLike[] = [],
 ): PatientBalance {
-  const treatmentCost = treatments.reduce((s, t) => s + (t.total_price || 0), 0)
+  // Cancelled treatments must never count toward what a patient owes —
+  // this used to be automatic because "delete" meant the row was gone
+  // entirely; now that cancelling a treatment keeps the row (clinic
+  // policy: nothing is ever permanently deleted), it has to be filtered
+  // out explicitly or a cancelled treatment would inflate the balance
+  // forever with no way to correct it.
+  const billableTreatments = treatments.filter((t) => t.status !== 'cancelled')
+  const treatmentCost = billableTreatments.reduce((s, t) => s + (t.total_price || 0), 0)
   const paid = payments.filter((p) => p.status === 'completed').reduce((s, p) => s + (p.amount || 0), 0)
   const implantCost = implantCases.reduce((s, c) => s + (c.total_cost || 0), 0)
   const implantPaid = implantCases.reduce((s, c) => s + (c.paid_amount || 0), 0)

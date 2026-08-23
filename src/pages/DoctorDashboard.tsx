@@ -39,11 +39,14 @@ export default function DoctorDashboard({ doctorId, doctorName }: { doctorId: st
   )
 
   const monthProduction = useMemo(
-    () => treatments.filter((t) => t.created_at >= monthStart).reduce((s, t) => s + (t.total_price || 0), 0),
+    () => treatments.filter((t) => t.created_at >= monthStart && t.status !== 'cancelled').reduce((s, t) => s + (t.total_price || 0), 0),
     [treatments, monthStart],
   )
 
-  const pendingTreatments = useMemo(() => treatments.filter((t) => t.status !== 'completed').length, [treatments])
+  // 'pendingTreatments' means work not yet done — a cancelled treatment
+  // isn't pending work, it's simply not happening, so it must be
+  // excluded here too or it would sit in this count forever.
+  const pendingTreatments = useMemo(() => treatments.filter((t) => t.status !== 'completed' && t.status !== 'cancelled').length, [treatments])
 
   if (loading) {
     return (
