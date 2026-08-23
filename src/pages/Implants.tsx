@@ -984,7 +984,29 @@ export default function Implants() {
                   <Input label="قطر (mm)" value={caseForm.diameter} onChange={(v) => setCaseForm({ ...caseForm, diameter: v })} placeholder="3.5" dir="ltr" />
                   <Input label="طول (mm)" value={caseForm.length} onChange={(v) => setCaseForm({ ...caseForm, length: v })} placeholder="10" dir="ltr" />
                 </div>
-                <Select label="برند" value={caseForm.brand} onChange={(v) => setCaseForm({ ...caseForm, brand: v, model: '' })} options={implantBrands} placeholder="انتخاب برند" />
+                <Select
+                  label="برند"
+                  value={caseForm.brand}
+                  onChange={(v) => {
+                    // Smart suggestion: pre-fill the (now required) total
+                    // cost from this clinic's own average for the same
+                    // brand, so staff have a real, clinic-specific
+                    // starting point instead of guessing blind — only
+                    // when cost is still empty, never overwrites a value
+                    // already entered.
+                    let suggestedCost = caseForm.total_cost
+                    if (!editingCase && !caseForm.total_cost && v && v !== 'other') {
+                      const sameBrand = cases.filter((c) => c.brand === v && c.total_cost)
+                      if (sameBrand.length > 0) {
+                        const avg = Math.round(sameBrand.reduce((s, c) => s + (c.total_cost || 0), 0) / sameBrand.length / 100000) * 100000
+                        suggestedCost = String(avg)
+                      }
+                    }
+                    setCaseForm({ ...caseForm, brand: v, model: '', total_cost: suggestedCost })
+                  }}
+                  options={implantBrands}
+                  placeholder="انتخاب برند"
+                />
                 {caseForm.brand === 'other' && (
                   <Input
                     label="نام برند (دستی)"
@@ -1025,6 +1047,9 @@ export default function Implants() {
                   <CurrencyInput label="پرداختی (ت)" value={caseForm.paid_amount} onChange={(v) => setCaseForm({ ...caseForm, paid_amount: v })} />
                   <Input label="گارانتی (سال)" type="number" value={caseForm.warranty_years} onChange={(v) => setCaseForm({ ...caseForm, warranty_years: v })} placeholder="5" />
                 </div>
+                {!editingCase && caseForm.total_cost && cases.some((c) => c.brand === caseForm.brand && c.total_cost) && (
+                  <p className="text-[11px] text-slate-400 -mt-2">پیشنهاد خودکار بر اساس میانگین موارد قبلی همین برند در همین کلینیک — قابل تغییر است</p>
+                )}
                 <div className="flex flex-col gap-3 p-3 bg-slate-50 dark:bg-slate-700/50 rounded-xl">
                   <label className="flex items-center gap-2 cursor-pointer">
                     <input type="checkbox" checked={caseForm.extraction_needed} onChange={(e) => setCaseForm({ ...caseForm, extraction_needed: e.target.checked })} className="rounded text-primary-600 focus:ring-primary-400" />

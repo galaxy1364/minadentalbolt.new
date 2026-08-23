@@ -67,7 +67,15 @@ export default function PersonalFinance() {
   const openCreate = () => {
     h.tap()
     setEditing(null)
-    setForm({ ...emptyForm })
+    // Smart default: loan/rent installments are almost always monthly,
+    // so pre-suggest next month's date instead of leaving the (now
+    // required) due-date field blank — still freely editable. Cheque
+    // and informal debt due dates are real fixed dates on paper with no
+    // sensible pattern to guess, so those stay blank.
+    const suggestedDue = tab === 'loan' || tab === 'rent'
+      ? (() => { const d = new Date(); d.setMonth(d.getMonth() + 1); return d.toISOString().slice(0, 10) })()
+      : ''
+    setForm({ ...emptyForm, due_date: suggestedDue })
     setWizardStep(0)
     setModalOpen(true)
   }

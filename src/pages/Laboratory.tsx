@@ -38,6 +38,19 @@ const labOrderStatuses: { value: string; label: string; color: string }[] = [
   { value: 'cancelled', label: 'لغو شده', color: 'error' },
 ]
 
+// Typical real-world turnaround time per work type (business-ish days) —
+// used to auto-suggest a sensible deadline the moment staff picks a work
+// type, instead of leaving the now-required field as a blank obstacle
+// they have to think about from scratch. Always freely editable after.
+const typicalTurnaroundDays: Record<string, number> = {
+  crown: 6, bridge: 7, veneer: 6, inlay: 5, onlay: 5,
+  post: 4, post_and_core: 4,
+  implant_crown: 6, implant_abutment: 6,
+  denture: 12, partial_denture: 10, overdenture: 12,
+  night_guard: 4, retainer: 4, orthodontic_appliance: 5, flipper: 4,
+  other: 7,
+}
+
 const workTypes: { value: string; label: string; category: 'fixed' | 'removable' }[] = [
   { value: 'crown', label: 'روکش', category: 'fixed' },
   { value: 'bridge', label: 'پل', category: 'fixed' },
@@ -890,7 +903,21 @@ export default function Laboratory() {
             label: 'نوع کار',
             content: (
               <>
-                <Select label="نوع کار" value={orderForm.work_type} onChange={(v) => setOrderForm((p) => ({ ...p, work_type: v }))} options={workTypes} />
+                <Select
+                  label="نوع کار"
+                  value={orderForm.work_type}
+                  onChange={(v) => {
+                    // Smart default: suggest a deadline based on this
+                    // work type's typical turnaround — only when the
+                    // field is still empty, so it never overwrites a
+                    // date staff already deliberately chose or edited.
+                    const suggested = !orderForm.deadline && !editingOrder
+                      ? new Date(Date.now() + (typicalTurnaroundDays[v] ?? 7) * 86400000).toISOString().slice(0, 10)
+                      : orderForm.deadline
+                    setOrderForm((p) => ({ ...p, work_type: v, deadline: suggested }))
+                  }}
+                  options={workTypes}
+                />
                 {orderForm.work_type === 'other' && (
                   <Input label="نام نوع کار (دستی)" value={orderForm.custom_work_type} onChange={(v) => setOrderForm((p) => ({ ...p, custom_work_type: v }))} placeholder="مثلاً: کاری که در لیست نیست" />
                 )}
@@ -936,6 +963,11 @@ export default function Laboratory() {
             content: (
               <>
                 <PersianDateInput label="موعد تحویل *" value={orderForm.deadline} onChange={(v) => setOrderForm((p) => ({ ...p, deadline: v }))} />
+                {!editingOrder && typicalTurnaroundDays[orderForm.work_type] && (
+                  <p className="text-[11px] text-slate-400 -mt-2">
+                    پیشنهاد خودکار بر اساس زمان معمول «{workTypes.find((w) => w.value === orderForm.work_type)?.label}» — قابل تغییر است
+                  </p>
+                )}
                 <CurrencyInput label="هزینه (تومان)" value={orderForm.cost} onChange={(v) => setOrderForm((p) => ({ ...p, cost: v }))} />
                 <Select label="وضعیت" value={orderForm.status} onChange={(v) => setOrderForm((p) => ({ ...p, status: v }))} options={labOrderStatuses.map((s) => ({ value: s.value, label: s.label }))} />
               </>
