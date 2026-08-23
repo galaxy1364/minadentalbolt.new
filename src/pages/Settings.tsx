@@ -13,7 +13,6 @@ import {
   createDoctor, updateDoctor, deleteDoctor,
   createUnit, updateUnit, deleteUnit,
   createProcedure, updateProcedure, deleteProcedure,
-  createSmsTemplate, updateSmsTemplate, deleteSmsTemplate,
   createTreatmentPackage, updateTreatmentPackage, deleteTreatmentPackage,
   createInventoryCategory, updateInventoryCategory, deleteInventoryCategory,
   fetchDoctorSchedules, createDoctorSchedule, deleteDoctorSchedule,
@@ -25,7 +24,7 @@ import { toJalaliString, toJalaliStringPretty, formatCurrency, formatNumber, toP
 import { supabase } from '../lib/supabase'
 import {
   SmsTemplate, TreatmentPackage, Doctor, Unit, Procedure, InventoryCategory, DoctorSchedule,
-  DoctorInput, UnitInput, ProcedureInput, SmsTemplateInput, TreatmentPackageInput, InventoryCategoryInput, Patient,
+  DoctorInput, UnitInput, ProcedureInput, TreatmentPackageInput, InventoryCategoryInput, Patient,
   RolePermission, CustomRole,
 } from '../types'
 import { Card, Button, Input, Select, Textarea, Badge, Spinner, EmptyState, StatCard, Tabs, Modal, showToast } from '../components/ui'
@@ -43,20 +42,6 @@ import { APP_VERSION, BUILD_DATE } from '../lib/appVersion'
 import type { AuditLogEntry, BackupSnapshot } from '../lib/db'
 import type { SyncQueueEntry } from '../lib/db'
 
-const smsTemplateTypes: { value: string; label: string }[] = [
-  { value: 'appointment_reminder', label: 'یادآوری نوبت' },
-  { value: 'appointment_confirmation', label: 'تایید نوبت' },
-  { value: 'birthday', label: 'تولد' },
-  { value: 'follow_up', label: 'پیگیری' },
-  { value: 'welcome', label: 'خوش‌آمد' },
-  { value: 'payment_receipt', label: 'رسید پرداخت' },
-  { value: 'appointment_cancelled', label: 'لغو نوبت' },
-  { value: 'custom', label: 'سفارشی' },
-]
-
-function getTemplateTypeLabel(type: string) {
-  return smsTemplateTypes.find((t) => t.value === type)?.label || type
-}
 
 const procedureCategories: { value: string; label: string }[] = [
   { value: 'diagnostic', label: 'تشخیصی' },
@@ -89,7 +74,6 @@ export default function Settings() {
 
   const [generalForm, setGeneralForm] = useState({ clinic_name: 'کلینیک دندانپزشکی مینادنت', address: '', phone: '', email: '' })
   const [fileNumberForm, setFileNumberForm] = useState({ prefix: 'MIN', next_number: '1001', format: 'PREFIX-NUMBER' })
-  const [selectedTemplate, setSelectedTemplate] = useState<SmsTemplate | null>(null)
 
   const [hapticsOn, setHapticsOn] = useState(getHapticsEnabled())
   const [soundOn, setSoundOn] = useState(getSoundEnabled())
@@ -122,11 +106,6 @@ export default function Settings() {
   const [editingProc, setEditingProc] = useState<Procedure | null>(null)
   const [procForm, setProcForm] = useState({ code: '', name: '', category: 'restorative', default_price: '', description: '', is_active: 'true' })
   const [savingProc, setSavingProc] = useState(false)
-
-  const [tplModal, setTplModal] = useState(false)
-  const [editingTpl, setEditingTpl] = useState<SmsTemplate | null>(null)
-  const [tplForm, setTplForm] = useState({ name: '', type: 'appointment_reminder', template: '', is_active: 'true' })
-  const [savingTpl, setSavingTpl] = useState(false)
 
   const [pkgModal, setPkgModal] = useState(false)
   const [editingPkg, setEditingPkg] = useState<TreatmentPackage | null>(null)
@@ -356,23 +335,6 @@ export default function Settings() {
   }
   const handleDeleteProc = (p: Procedure) => {
     confirmAction({ type: 'delete', title: 'حذف رویه', fields: [{ label: 'نام', value: p.name, highlight: true }, { label: 'کد', value: p.code }], confirmLabel: 'تایید حذف', onConfirm: async () => { await deleteProcedure(p.id); showToast('success', 'حذف شد'); loadData() } })
-  }
-
-  // ── SMS Template handlers ──
-  const openCreateTpl = () => { setEditingTpl(null); setTplForm({ name: '', type: 'appointment_reminder', template: '', is_active: 'true' }); setTplModal(true) }
-  const openEditTpl = (t: SmsTemplate) => { setEditingTpl(t); setTplForm({ name: t.name, type: t.type, template: t.template, is_active: t.is_active ? 'true' : 'false' }); setTplModal(true) }
-  const handleSaveTpl = async () => {
-    if (!tplForm.name.trim() || !tplForm.template.trim()) { showToast('error', 'نام و محتوای قالب الزامی است'); return }
-    setSavingTpl(true)
-    try {
-      const payload: SmsTemplateInput = { clinic_id: CLINIC_ID, name: tplForm.name.trim(), type: tplForm.type, template: tplForm.template.trim(), is_active: tplForm.is_active === 'true' }
-      if (editingTpl) { await updateSmsTemplate(editingTpl.id, payload); showToast('success', 'قالب ویرایش شد') }
-      else { await createSmsTemplate(payload); showToast('success', 'قالب اضافه شد') }
-      setTplModal(false); loadData()
-    } catch { showToast('error', 'خطا در ذخیره') } finally { setSavingTpl(false) }
-  }
-  const handleDeleteTpl = (t: SmsTemplate) => {
-    confirmAction({ type: 'delete', title: 'حذف قالب پیامک', fields: [{ label: 'نام', value: t.name, highlight: true }], confirmLabel: 'تایید حذف', onConfirm: async () => { await deleteSmsTemplate(t.id); showToast('success', 'حذف شد'); loadData() } })
   }
 
   // ── Package handlers ──
@@ -808,16 +770,6 @@ export default function Settings() {
           <Textarea label="توضیحات" value={procForm.description} onChange={(v) => setProcForm({ ...procForm, description: v })} placeholder="توضیحات..." rows={2} />
           <Select label="وضعیت" value={procForm.is_active} onChange={(v) => setProcForm({ ...procForm, is_active: v })} options={[{ value: 'true', label: 'فعال' }, { value: 'false', label: 'غیرفعال' }]} />
           <div className="flex justify-end gap-2 pt-2 border-t border-slate-100"><Button variant="secondary" onClick={() => setProcModal(false)}>انصراف</Button><Button variant="primary" onClick={handleSaveProc} disabled={savingProc}>{savingProc ? <Spinner size={16} /> : editingProc ? 'ذخیره' : 'افزودن'}</Button></div>
-        </div>
-      </Modal>
-
-      <Modal open={tplModal} onClose={() => setTplModal(false)} title={editingTpl ? 'ویرایش قالب پیامک' : 'قالب پیامک جدید'} size="full">
-        <div className="space-y-3">
-          <Input label="نام قالب" value={tplForm.name} onChange={(v) => setTplForm({ ...tplForm, name: v })} placeholder="نام قالب" />
-          <Select label="نوع" value={tplForm.type} onChange={(v) => setTplForm({ ...tplForm, type: v })} options={smsTemplateTypes} />
-          <Textarea label="محتوای قالب" value={tplForm.template} onChange={(v) => setTplForm({ ...tplForm, template: v })} placeholder="متن پیامک... از {name} و {date} استفاده کنید" rows={4} />
-          <Select label="وضعیت" value={tplForm.is_active} onChange={(v) => setTplForm({ ...tplForm, is_active: v })} options={[{ value: 'true', label: 'فعال' }, { value: 'false', label: 'غیرفعال' }]} />
-          <div className="flex justify-end gap-2 pt-2 border-t border-slate-100"><Button variant="secondary" onClick={() => setTplModal(false)}>انصراف</Button><Button variant="primary" onClick={handleSaveTpl} disabled={savingTpl}>{savingTpl ? <Spinner size={16} /> : editingTpl ? 'ذخیره' : 'افزودن'}</Button></div>
         </div>
       </Modal>
 
