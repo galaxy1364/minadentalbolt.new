@@ -14,6 +14,8 @@ export type ToothCondition =
   | 'caries'
   | 'restored'
   | 'rct'
+  | 'post'
+  | 'pin'
   | 'crown'
   | 'implant'
   | 'extraction'
@@ -96,6 +98,8 @@ const conditionMeta: Record<ToothCondition, { label: string; color: string; bg: 
   caries: { label: 'پوسیدگی', color: 'text-error-700', bg: 'bg-error-50', border: 'border-error-300', dot: 'bg-error-500' },
   restored: { label: 'ترمیم شده', color: 'text-primary-700', bg: 'bg-primary-50', border: 'border-primary-300', dot: 'bg-primary-500' },
   rct: { label: 'عصب‌کشی', color: 'text-warning-700', bg: 'bg-warning-50', border: 'border-warning-400', dot: 'bg-warning-500' },
+  post: { label: 'پست', color: 'text-orange-700', bg: 'bg-orange-50', border: 'border-orange-400', dot: 'bg-orange-500' },
+  pin: { label: 'پین', color: 'text-orange-600', bg: 'bg-orange-50', border: 'border-orange-300', dot: 'bg-orange-400' },
   crown: { label: 'روکش', color: 'text-accent-700', bg: 'bg-accent-50', border: 'border-accent-400', dot: 'bg-accent-500' },
   implant: { label: 'ایمپلنت', color: 'text-secondary-700', bg: 'bg-secondary-50', border: 'border-secondary-400', dot: 'bg-secondary-500' },
   extraction: { label: 'کشیده شده', color: 'text-slate-500', bg: 'bg-slate-200', border: 'border-slate-400', dot: 'bg-slate-500' },
@@ -118,6 +122,8 @@ const conditionOptions: { value: ToothCondition; label: string }[] = [
   { value: 'caries', label: 'پوسیدگی' },
   { value: 'restored', label: 'ترمیم شده' },
   { value: 'rct', label: 'عصب‌کشی' },
+  { value: 'post', label: 'پست' },
+  { value: 'pin', label: 'پین' },
   { value: 'crown', label: 'روکش' },
   { value: 'implant', label: 'ایمپلنت' },
   { value: 'extraction', label: 'کشیده شده' },
@@ -157,6 +163,8 @@ function ToothSVG({
     caries: '#fef2f2',
     restored: '#eff6ff',
     rct: '#fffbeb',
+    post: '#fff7ed',
+    pin: '#fff7ed',
     crown: '#f0fdfa',
     implant: '#f5f3ff',
     extraction: '#e2e8f0',
@@ -171,6 +179,8 @@ function ToothSVG({
     caries: '#f87171',
     restored: '#3b82f6',
     rct: '#f59e0b',
+    post: '#ea580c',
+    pin: '#ea580c',
     crown: '#06b6d4',
     implant: '#8b5cf6',
     extraction: '#64748b',
