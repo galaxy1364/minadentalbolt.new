@@ -10,7 +10,7 @@ import { ModuleHeader } from '../components/ModuleHeader'
 import { Card, Button, Badge, Spinner, EmptyState, Select, Modal, Input, Textarea, showToast } from '../components/ui'
 import { CurrencyInput } from '../components/CurrencyInput'
 import { PersianDateInput } from '../components/PersianDateInput'
-import { fetchCheques, fetchAllInstallments, fetchLabOrders, fetchImplantCases, fetchPatients, fetchManualReminders, createManualReminder, updateManualReminder, fetchAppointments } from '../lib/api'
+import { fetchCheques, fetchAllInstallments, fetchLabOrders, fetchImplantCases, fetchPatients, fetchManualReminders, createManualReminder, updateManualReminder, fetchAppointments, fetchPersonalFinanceItems } from '../lib/api'
 import { toJalaliStringPretty, toPersianDigits, formatCurrency } from '../lib/persianDate'
 import { downloadICSReminder } from '../lib/icsReminder'
 import { requestNotificationPermission, getNotificationPermission, notifyOnceForReminder } from '../lib/notifications'
@@ -21,7 +21,7 @@ const LEAD_DAYS_KEY = 'minadent-reminder-lead-days'
 
 interface ReminderItem {
   id: string
-  category: 'cheque' | 'installment' | 'lab' | 'implant' | 'manual' | 'appointment'
+  category: 'cheque' | 'installment' | 'lab' | 'implant' | 'manual' | 'appointment' | 'personal'
   title: string
   patientName: string
   dueDate: string
@@ -51,8 +51,8 @@ export default function Reminders() {
   const loadData = () => {
     setLoading(true)
     const today = new Date().toISOString().slice(0, 10)
-    return Promise.all([fetchCheques(), fetchAllInstallments(), fetchLabOrders(), fetchImplantCases(), fetchPatients(), fetchManualReminders(), fetchAppointments(today)])
-      .then(([cheques, installments, labOrders, implantCases, pats, manualReminders, appointments]) => {
+    return Promise.all([fetchCheques(), fetchAllInstallments(), fetchLabOrders(), fetchImplantCases(), fetchPatients(), fetchManualReminders(), fetchAppointments(today), fetchPersonalFinanceItems()])
+      .then(([cheques, installments, labOrders, implantCases, pats, manualReminders, appointments, personalItems]) => {
         setPatients(pats)
         const patientName = (id: string | null) => {
           if (!id) return 'بدون بیمار'
@@ -101,6 +101,15 @@ export default function Reminders() {
           if (dl > 14) continue
           list.push({ id: `appt-${a.id}`, category: 'appointment', title: 'نوبت', patientName: patientName(a.patient_id), dueDate: a.date, daysLeft: dl })
         }
+        // Personal finance (owner's own loans/rent/cheques/debts) had
+        // zero connection to the notification system before — only a
+        // one-off .ics export, no escalating alerts. Same treatment as
+        // every other due-date-bearing record now.
+        for (const pf of personalItems as any[]) {
+          if (pf.status !== 'active' || !pf.due_date) continue
+          const typeLabel = { loan: 'وام', rent: 'اجاره', cheque: 'چک شخصی', debt: 'بدهی', other: 'مالی شخصی' }[pf.item_type as string] || 'مالی شخصی'
+          list.push({ id: `personal-${pf.id}`, category: 'personal', title: `${typeLabel} — ${pf.title}`, patientName: pf.counterparty || '-', dueDate: pf.due_date, amount: pf.monthly_amount || (pf.total_amount - pf.paid_amount) || undefined, daysLeft: daysLeft(pf.due_date) })
+        }
         list.sort((a, b) => a.daysLeft - b.daysLeft)
         setItems(list)
       })
@@ -125,7 +134,7 @@ export default function Reminders() {
   // 'urgent' highlight in the list, not which alerts actually fire.
   useEffect(() => {
     if (notifPermission !== 'granted') return
-    const categoryLabel = { cheque: 'چک', installment: 'قسط', lab: 'لابراتوار', implant: 'ایمپلنت', manual: 'یادآوری', appointment: 'نوبت' }
+    const categoryLabel = { cheque: 'چک', installment: 'قسط', lab: 'لابراتوار', implant: 'ایمپلنت', manual: 'یادآوری', appointment: 'نوبت', personal: 'مالی شخصی' }
     for (const it of items) {
       const label = categoryLabel[it.category]
       const when = it.daysLeft === 0 ? 'امروز' : it.daysLeft < 0 ? `${Math.abs(it.daysLeft)} روز پیش` : `${it.daysLeft} روز دیگر`
@@ -155,6 +164,7 @@ export default function Reminders() {
     implant: { label: 'ایمپلنت', icon: <Bone size={14} />, color: 'text-indigo-600 bg-indigo-50' },
     manual: { label: 'یادآوری دستی', icon: <StickyNote size={14} />, color: 'text-amber-600 bg-amber-50' },
     appointment: { label: 'نوبت', icon: <CalendarClock size={14} />, color: 'text-teal-600 bg-teal-50' },
+    personal: { label: 'مالی شخصی', icon: <Banknote size={14} />, color: 'text-rose-600 bg-rose-50' },
   }
 
   const openCreateModal = () => {
@@ -264,7 +274,7 @@ export default function Reminders() {
       </div>
 
       <div className="flex items-center gap-1.5 flex-wrap">
-        {(['all', 'cheque', 'installment', 'lab', 'implant', 'manual', 'appointment'] as const).map((f) => (
+        {(['all', 'cheque', 'installment', 'lab', 'implant', 'manual', 'appointment', 'personal'] as const).map((f) => (
           <button key={f} onClick={() => { h.select(); setFilter(f) }} className={`px-3 py-1.5 rounded-xl text-xs font-bold ${filter === f ? 'bg-primary-600 text-white' : 'bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300'}`}>
             {f === 'all' ? 'همه' : categoryMeta[f].label}
           </button>

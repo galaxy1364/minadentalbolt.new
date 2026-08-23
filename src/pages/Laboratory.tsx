@@ -312,6 +312,7 @@ export default function Laboratory() {
       notes: orderForm.notes || null,
       status: orderForm.status,
       encounter_id: null,
+      sent_at: null,
       received_at: null,
     } as any
     const patient = patientMap.get(orderForm.patient_id)
@@ -407,6 +408,10 @@ export default function Laboratory() {
     h.select()
     try {
       const updates: Record<string, unknown> = { stage: LAB_STAGES[idx + 1].key }
+      // Real 'sent to lab' timestamp — set once, the first time the case
+      // leaves the initial scan/impression stage (i.e. it's actually
+      // gone out), never overwritten on later stage advances.
+      if (idx === 0 && !order.sent_at) updates.sent_at = new Date().toISOString()
       // Keep the coarse `status` field (which Dashboard's active/overdue
       // count reads) from silently drifting behind the pipeline stage.
       // Advancing past the first stage means work has genuinely started,
@@ -621,6 +626,15 @@ export default function Laboratory() {
             >
               <CalendarClock size={13} />
             </button>
+          </div>
+        )}
+
+        {/* Real sent/received dates — the actual pipeline history, not
+            just the deadline target. */}
+        {(order.sent_at || order.received_at) && (
+          <div className="flex items-center gap-3 text-[11px] text-slate-400 mb-2">
+            {order.sent_at && <span>ارسال: {toJalaliStringPretty(order.sent_at.slice(0, 10))}</span>}
+            {order.received_at && <span className="text-success-600 font-medium">دریافت: {toJalaliStringPretty(order.received_at.slice(0, 10))}</span>}
           </div>
         )}
 

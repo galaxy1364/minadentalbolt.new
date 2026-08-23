@@ -152,6 +152,39 @@ export default function PersonalFinance() {
     })
   }
 
+  // For recurring items (loan installments, rent — anything with a
+  // monthly_amount): recording this period's payment should roll the
+  // due date forward a month automatically, the way any real recurring-
+  // bill tracker works — instead of staff having to manually retype next
+  // month's date by hand every single time.
+  const quickMarkMonthPaid = (item: PersonalFinanceItem) => {
+    h.tap()
+    const nextDue = item.due_date ? new Date(item.due_date) : new Date()
+    nextDue.setMonth(nextDue.getMonth() + 1)
+    const nextDueStr = nextDue.toISOString().slice(0, 10)
+    const newPaid = item.paid_amount + (item.monthly_amount || 0)
+    const isNowComplete = newPaid >= item.total_amount
+    confirmAction({
+      type: 'status',
+      title: 'ثبت پرداخت این ماه',
+      fields: [
+        { label: 'عنوان', value: item.title, highlight: true },
+        { label: 'مبلغ این ماه', value: `${formatCurrency(item.monthly_amount || 0)} ت` },
+        ...(isNowComplete ? [] : [{ label: 'موعد بعدی', value: toJalaliStringPretty(nextDueStr) }]),
+      ],
+      confirmLabel: 'تایید پرداخت',
+      onConfirm: async () => {
+        await updatePersonalFinanceItem(item.id, {
+          paid_amount: Math.min(newPaid, item.total_amount),
+          due_date: isNowComplete ? item.due_date : nextDueStr,
+          status: isNowComplete ? 'completed' : 'active',
+        })
+        showToast('success', isNowComplete ? 'تسویه کامل شد' : `ثبت شد — موعد بعدی: ${toJalaliStringPretty(nextDueStr)}`)
+        await loadData()
+      },
+    })
+  }
+
   if (loading) {
     return (
       <div className="space-y-4" aria-busy="true">
@@ -214,6 +247,9 @@ export default function PersonalFinance() {
                 <div className="flex gap-2 mt-2.5 pt-2.5 border-t border-slate-100 dark:border-slate-700">
                   {remaining > 0 && item.status === 'active' && (
                     <button onClick={() => quickMarkPaid(item)} className="text-xs text-success-600 hover:underline">تسویه کامل</button>
+                  )}
+                  {remaining > 0 && item.status === 'active' && item.monthly_amount != null && item.monthly_amount > 0 && (
+                    <button onClick={() => quickMarkMonthPaid(item)} className="text-xs text-primary-600 hover:underline">ثبت پرداخت این ماه</button>
                   )}
                   {item.due_date && item.status === 'active' && (
                     <button

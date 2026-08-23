@@ -220,6 +220,11 @@ export interface LabOrder {
    * -> firing -> QC -> ready). Defaults to the first stage. */
   stage: 'scan_impression' | 'sent_to_courier' | 'cad_cam_design' | 'firing_layering' | 'quality_control' | 'ready_delivery'
   cost: number | null
+  /** Real timestamp the case was actually sent out — set automatically
+   * the first time it leaves the initial 'scan_impression' stage.
+   * Distinct from created_at (when the digital record was made, which
+   * may be before the physical send) and received_at (final delivery). */
+  sent_at: string | null
   received_at: string | null
   notes: string | null
   created_at: string
