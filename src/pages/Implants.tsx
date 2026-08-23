@@ -1003,6 +1003,11 @@ export default function Implants() {
           },
           {
             label: 'هزینه و شرایط',
+            // A high-value clinical/financial record with no recorded
+            // cost at all (shown as '-' in the preview, per the exact
+            // screenshot that flagged this) was previously fully
+            // save-able — nothing on this step blocked continuing.
+            validate: () => (!caseForm.total_cost || Number(caseForm.total_cost) <= 0 ? 'کل هزینه الزامی است' : null),
             content: (
               <>
                 <div className="grid grid-cols-3 gap-2">
@@ -1047,6 +1052,11 @@ export default function Implants() {
           },
           {
             label: 'دستمزد جراحی و پروتز',
+            // If 'توافقی' (negotiated) is chosen, leaving the actual
+            // agreed amount empty silently saved a real doctor-commission
+            // record as zero — a genuine payroll accuracy issue, not
+            // just a cosmetic gap.
+            validate: () => (caseForm.surgery_fee_mode === 'negotiated' && (!caseForm.surgery_fee_amount || Number(caseForm.surgery_fee_amount) <= 0) ? 'مبلغ توافقی دستمزد جراح الزامی است' : null),
             content: (
               <>
                 <div className="p-3 bg-slate-50 dark:bg-slate-700/50 rounded-xl space-y-3">

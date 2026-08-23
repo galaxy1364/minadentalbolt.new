@@ -926,9 +926,16 @@ export default function Laboratory() {
           },
           {
             label: 'موعد و هزینه',
+            // deadline being skippable meant an order could exist with
+            // NO due date at all — and the entire 'lab running late'
+            // alarm system (Reminders' escalating 3-day/1-day/day-of/
+            // overdue tiers) explicitly requires deadline to be set to
+            // generate any reminder whatsoever for that order. An order
+            // with no deadline was invisibly exempt from ever alarming.
+            validate: () => (!orderForm.deadline ? 'موعد تحویل الزامی است — بدون آن هشدار تأخیر ساخته نمی‌شود' : null),
             content: (
               <>
-                <PersianDateInput label="موعد تحویل" value={orderForm.deadline} onChange={(v) => setOrderForm((p) => ({ ...p, deadline: v }))} />
+                <PersianDateInput label="موعد تحویل *" value={orderForm.deadline} onChange={(v) => setOrderForm((p) => ({ ...p, deadline: v }))} />
                 <CurrencyInput label="هزینه (تومان)" value={orderForm.cost} onChange={(v) => setOrderForm((p) => ({ ...p, cost: v }))} />
                 <Select label="وضعیت" value={orderForm.status} onChange={(v) => setOrderForm((p) => ({ ...p, status: v }))} options={labOrderStatuses.map((s) => ({ value: s.value, label: s.label }))} />
               </>
