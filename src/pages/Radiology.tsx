@@ -63,9 +63,26 @@ export default function Radiology() {
   const [uploadWizardStep, setUploadWizardStep] = useState(0)
   const [uploadForm, setUploadForm] = useState({ patient_id: '', image_type: 'panoramic', tooth_number: '', image_url: '', description: '', taken_at: '', notes: '' })
   const [savingImage, setSavingImage] = useState(false)
+  // Real gap found: this page could only ever create a new image record
+  // — a typo'd tooth number or wrong date had no fix except archiving
+  // and re-uploading from scratch. Editing an existing record uses the
+  // same modal/wizard, just pre-filled and routed to updateRadiologyImage.
+  const [editingImage, setEditingImage] = useState<RadiologyImage | null>(null)
 
   const openUploadModal = () => {
+    setEditingImage(null)
     setUploadForm({ patient_id: '', image_type: 'panoramic', tooth_number: '', image_url: '', description: '', taken_at: new Date().toISOString().split('T')[0], notes: '' })
+    setUploadWizardStep(0)
+    setUploadModalOpen(true)
+  }
+
+  const openEditImageModal = (img: RadiologyImage) => {
+    setSelectedImage(null)
+    setEditingImage(img)
+    setUploadForm({
+      patient_id: img.patient_id, image_type: img.image_type || 'panoramic', tooth_number: img.tooth_number || '',
+      image_url: img.image_url || '', description: img.description || '', taken_at: img.taken_at || '', notes: img.notes || '',
+    })
     setUploadWizardStep(0)
     setUploadModalOpen(true)
   }
@@ -74,18 +91,30 @@ export default function Radiology() {
     if (!uploadForm.patient_id) { showToast('error', 'انتخاب بیمار الزامی است'); return }
     const patientObj = patients.find((p) => p.id === uploadForm.patient_id)
     confirmAction({
-      type: 'create',
-      title: 'ثبت تصویر رادیولوژی',
+      type: editingImage ? 'edit' : 'create',
+      title: editingImage ? 'ویرایش تصویر رادیولوژی' : 'ثبت تصویر رادیولوژی',
       fields: [
         { label: 'بیمار', value: patientObj ? `${patientObj.first_name} ${patientObj.last_name}` : '-', highlight: true },
         { label: 'نوع تصویر', value: imageTypes.find((t) => t.value === uploadForm.image_type)?.label || uploadForm.image_type },
         { label: 'شماره دندان', value: uploadForm.tooth_number || '-' },
         { label: 'تاریخ تصویربرداری', value: uploadForm.taken_at ? toJalaliString(uploadForm.taken_at) : '-' },
       ],
-      confirmLabel: 'ثبت تصویر',
+      confirmLabel: editingImage ? 'ذخیره تغییرات' : 'ثبت تصویر',
       onConfirm: async () => {
         setSavingImage(true)
         try {
+          if (editingImage) {
+            await updateRadiologyImage(editingImage.id, {
+              patient_id: uploadForm.patient_id, image_type: uploadForm.image_type,
+              tooth_number: uploadForm.tooth_number || null, image_url: uploadForm.image_url || null,
+              description: uploadForm.description || null, taken_at: uploadForm.taken_at || null, notes: uploadForm.notes || null,
+            } as any)
+            showToast('success', 'تصویر ویرایش شد')
+            setUploadModalOpen(false)
+            await loadData()
+            setSavingImage(false)
+            return
+          }
           await createRadiologyImage({
             clinic_id: undefined as any,
             patient_id: uploadForm.patient_id,
@@ -451,6 +480,10 @@ export default function Radiology() {
                     دانلود
                   </a>
                 )}
+                <Button variant="secondary" size="sm" onClick={() => openEditImageModal(selectedImage)}>
+                  <Edit2 size={14} className="inline ml-1" />
+                  ویرایش
+                </Button>
                 <Button variant="danger" size="sm" onClick={() => handleDeleteImage(selectedImage)}>
                   <Trash2 size={14} className="inline ml-1" />
                   حذف
@@ -466,11 +499,11 @@ export default function Radiology() {
       <Wizard
         open={uploadModalOpen}
         onClose={() => setUploadModalOpen(false)}
-        title="ثبت تصویر رادیولوژی"
+        title={editingImage ? 'ویرایش تصویر رادیولوژی' : 'ثبت تصویر رادیولوژی'}
         step={uploadWizardStep}
         onStepChange={setUploadWizardStep}
         onFinish={handleSaveImage}
-        finishLabel="ثبت تصویر"
+        finishLabel={editingImage ? 'ذخیره تغییرات' : 'ثبت تصویر'}
         saving={savingImage}
         steps={[
           {
