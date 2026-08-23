@@ -494,8 +494,7 @@ export default function Staff() {
       />
 
       {/* Stats Cards */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-<ReorderableStatGrid
+      <ReorderableStatGrid
         storageKey="staff"
         items={[
           { key: 'total', node: <ModuleStatCard moduleKey="staff" icon={<Users size={20} />} label="کل پرسنل" value={formatNumber(stats.total)} /> },
@@ -504,7 +503,6 @@ export default function Staff() {
           { key: 'salary', node: <ModuleStatCard moduleKey="staff" icon={<DollarSign size={20} />} label="کل حقوق" value={`${formatCurrency(stats.totalSalary)} ت`} /> },
         ]}
       />
-      </div>
 
       {/* Revenue Share Panel */}
       <Card className="p-5">

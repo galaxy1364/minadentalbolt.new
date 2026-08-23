@@ -317,8 +317,7 @@ export default function Prescriptions() {
       />
 
       {/* Stats Cards */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-<ReorderableStatGrid
+      <ReorderableStatGrid
         storageKey="prescriptions"
         items={[
           { key: 'total', node: <ModuleStatCard moduleKey="prescriptions" icon={<FileText size={20} />} label="کل نسخه‌ها" value={formatNumber(stats.total)} /> },
@@ -327,7 +326,6 @@ export default function Prescriptions() {
           { key: 'month', node: <ModuleStatCard moduleKey="prescriptions" icon={<TrendingUp size={20} />} label="نسخه‌های این ماه" value={formatNumber(stats.thisMonth)} /> },
         ]}
       />
-      </div>
 
       {/* Trend Chart */}
       <Card className="p-5">

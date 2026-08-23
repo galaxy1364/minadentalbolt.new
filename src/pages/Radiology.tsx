@@ -240,8 +240,7 @@ export default function Radiology() {
       />
 
       {/* Stats Cards */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-<ReorderableStatGrid
+      <ReorderableStatGrid
         storageKey="radiology"
         items={[
           { key: 'total', node: <ModuleStatCard moduleKey="radiology" icon={<Image size={20} />} label="کل تصاویر" value={formatNumber(stats.total)} /> },
@@ -250,7 +249,6 @@ export default function Radiology() {
           { key: 'month', node: <ModuleStatCard moduleKey="radiology" icon={<Image size={20} />} label="تصاویر این ماه" value={formatNumber(stats.thisMonth)} /> },
         ]}
       />
-      </div>
 
       {/* Filters */}
       <Card className="p-4">

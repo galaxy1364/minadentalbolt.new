@@ -368,8 +368,7 @@ export default function Insurance() {
       />
 
       {/* Stats Cards */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-<ReorderableStatGrid
+      <ReorderableStatGrid
         storageKey="insurance"
         items={[
           { key: 'companies', node: <ModuleStatCard moduleKey="insurance" icon={<Building2 size={20} />} label="شرکت‌های بیمه" value={formatNumber(companies.length)} /> },
@@ -378,7 +377,6 @@ export default function Insurance() {
           { key: 'approved', node: <ModuleStatCard moduleKey="insurance" icon={<Percent size={20} />} label="مبلغ تایید شده" value={`${formatCurrency(stats.approvedAmount)} ت`} /> },
         ]}
       />
-      </div>
 
       {/* Tabs */}
       <Tabs

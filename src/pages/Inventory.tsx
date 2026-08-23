@@ -325,8 +325,7 @@ export default function Inventory() {
       />
 
       {/* Stats Cards */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-<ReorderableStatGrid
+      <ReorderableStatGrid
         storageKey="inventory"
         items={[
           { key: 'total', node: <ModuleStatCard moduleKey="inventory" icon={<Package size={20} />} label="کل اقلام" value={formatNumber(stats.totalItems)} /> },
@@ -335,7 +334,6 @@ export default function Inventory() {
           { key: 'value', node: <ModuleStatCard moduleKey="inventory" icon={<PackageCheck size={20} />} label="ارزش انبار" value={`${formatCurrency(stats.totalValue)} ت`} /> },
         ]}
       />
-      </div>
 
       {/* Tabs */}
       <Tabs

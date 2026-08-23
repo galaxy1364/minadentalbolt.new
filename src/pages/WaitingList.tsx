@@ -344,8 +344,7 @@ export default function WaitingList() {
       />
 
       {/* Stats Cards */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-<ReorderableStatGrid
+      <ReorderableStatGrid
         storageKey="waitingList"
         items={[
           { key: 'total', node: <ModuleStatCard moduleKey="waitingList" icon={<Clock size={20} />} label="کل لیست" value={formatNumber(stats.total)} /> },
@@ -354,7 +353,6 @@ export default function WaitingList() {
           { key: 'scheduled', node: <ModuleStatCard moduleKey="waitingList" icon={<CheckCircle2 size={20} />} label="زمان‌بندی شد" value={formatNumber(stats.scheduled)} /> },
         ]}
       />
-      </div>
 
       {/* Filters */}
       <Card className="p-4">
