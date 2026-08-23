@@ -1252,6 +1252,7 @@ export default function Billing() {
       steps={[
         {
           label: 'مبلغ و دسته',
+          validate: () => (!expenseForm.category.trim() ? 'دسته‌بندی الزامی است' : (!expenseForm.amount || Number(expenseForm.amount) <= 0) ? 'مبلغ الزامی است' : null),
           content: (
             <>
               <Input label="دسته‌بندی" value={expenseForm.category} onChange={(v) => setExpenseForm((p) => ({ ...p, category: v }))} placeholder="مثال: اجاره، حقوق، تجهیزات..." />

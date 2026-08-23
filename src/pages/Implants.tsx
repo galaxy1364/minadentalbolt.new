@@ -977,6 +977,7 @@ export default function Implants() {
           },
           {
             label: 'برند و مشخصات',
+            validate: () => (!caseForm.brand ? 'انتخاب برند الزامی است' : caseForm.brand === 'other' && !caseForm.custom_brand.trim() ? 'نام برند دستی الزامی است' : null),
             content: (
               <>
                 <div className="grid grid-cols-2 gap-3">
