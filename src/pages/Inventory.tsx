@@ -119,7 +119,14 @@ export default function Inventory() {
       if (lowStockOnly) {
         const qty = i.quantity ?? 0
         const min = i.min_quantity ?? 0
-        if (qty > min) return false
+        // Must match stats.lowStock's definition exactly (min > 0 && qty <=
+        // min && qty > 0) — this checkbox is labeled 'فقط رو به اتمام'
+        // (running low), a category the app treats as distinct from
+        // 'ناموجود' (out of stock, its own separate stat card). The old
+        // condition (qty > min) let qty <= 0 items through too, so
+        // checking this box could show more items than the 'رو به اتمام'
+        // stat card it's meant to filter down to.
+        if (!(min > 0 && qty <= min && qty > 0)) return false
       }
       if (filterCategory && i.category_id !== filterCategory) return false
       return true
@@ -202,6 +209,8 @@ export default function Inventory() {
 
   const handleSave = () => {
     if (!formData.name.trim()) { showToast('error', 'نام اقلام الزامی است'); return }
+    if (formData.quantity && Number(formData.quantity) < 0) { showToast('error', 'موجودی نمی‌تواند منفی باشد'); return }
+    if (formData.min_quantity && Number(formData.min_quantity) < 0) { showToast('error', 'حداقل موجودی نمی‌تواند منفی باشد'); return }
     const payload = {
       name: formData.name.trim(),
       brand: formData.brand || null, category_id: formData.category_id || null,
