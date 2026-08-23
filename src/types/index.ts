@@ -405,6 +405,9 @@ export interface ConsentForm {
   signed_at: string | null
   signed_by_patient: boolean | null
   notes: string | null
+  /** Soft-delete flag — a signed consent form is a legal/medical
+   * document (proof of informed consent), never permanently deleted. */
+  is_active: boolean
   created_at: string
 }
 

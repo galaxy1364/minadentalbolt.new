@@ -771,7 +771,7 @@ export async function fetchImplantCase(id: string): Promise<ImplantCaseWithRelat
 export async function createImplantCase(c: ImplantCaseInput): Promise<ImplantCase> {
   const { clinic_id, ...rest } = c
   const id = uid()
-  const ic: ImplantCase = { ...rest, id, clinic_id: CLINIC_ID, created_at: nowISO(), updated_at: nowISO() }
+  const ic: ImplantCase = { ...rest, is_active: (rest as any).is_active ?? true, id, clinic_id: CLINIC_ID, created_at: nowISO(), updated_at: nowISO() }
   await db.implant_cases.put(ic)
   await queueOperation('implant_cases', 'insert', id, ic)
   return ic
@@ -1289,7 +1289,7 @@ export async function deleteInventoryCategory(id: string): Promise<void> {
 export async function createConsentForm(c: ConsentFormInput): Promise<ConsentForm> {
   const { clinic_id, ...rest } = c
   const id = uid()
-  const form: ConsentForm = { ...rest, id, clinic_id: CLINIC_ID, created_at: nowISO() }
+  const form: ConsentForm = { ...rest, is_active: (rest as any).is_active ?? true, id, clinic_id: CLINIC_ID, created_at: nowISO() }
   await db.consent_forms.put(form)
   await queueOperation('consent_forms', 'insert', id, form)
   return form

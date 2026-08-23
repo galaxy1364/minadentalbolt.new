@@ -6,7 +6,7 @@ import { PieChart, Pie, Cell, XAxis, YAxis, Tooltip as RTooltip, ResponsiveConta
 import {
   fetchInsuranceCompanies, fetchInsuranceClaims,
   createInsuranceCompany, updateInsuranceCompany, deleteInsuranceCompany,
-  createInsuranceClaim, updateInsuranceClaim, deleteInsuranceClaim,
+  createInsuranceClaim, updateInsuranceClaim,
   fetchPatients, createPayment,
 } from '../lib/api'
 import { toJalaliString, toJalaliStringPretty, formatCurrency, formatNumber, toPersianDigits } from '../lib/persianDate'
@@ -28,6 +28,7 @@ const claimStatuses: { value: string; label: string; color: string }[] = [
   { value: 'partially_approved', label: 'تایید بخشی', color: 'accent' },
   { value: 'rejected', label: 'رد شده', color: 'error' },
   { value: 'paid', label: 'پرداخت شده', color: 'success' },
+  { value: 'cancelled', label: 'لغو شده', color: 'error' },
 ]
 
 const CHART_COLORS = ['#0ea5e9', '#8b5cf6', '#f59e0b', '#10b981', '#ef4444', '#6366f1', '#ec4899']
@@ -297,12 +298,15 @@ export default function Insurance() {
 
   const handleDeleteClaim = (c: InsuranceClaimWithRelations) => {
     h.tap()
+    // Per clinic policy: an insurance claim (a real financial record) is
+    // never permanently deleted, only marked cancelled.
     confirmAction({
-      type: 'delete',
-      title: 'حذف ادعا',
+      type: 'status',
+      title: 'لغو ادعای بیمه',
+      warning: 'این ادعا هیچ‌وقت پاک نمی‌شود — فقط به‌عنوان لغو‌شده علامت می‌خورد و در سوابق باقی می‌ماند.',
       fields: [{ label: 'بیمار', value: claimPatientName(c), highlight: true }],
-      confirmLabel: 'تایید حذف',
-      onConfirm: async () => { await deleteInsuranceClaim(c.id); showToast('success', 'حذف شد'); loadData() },
+      confirmLabel: 'تایید لغو',
+      onConfirm: async () => { await updateInsuranceClaim(c.id, { status: 'cancelled' } as any); showToast('success', 'ادعا لغو شد — در سوابق باقی ماند'); loadData() },
     })
   }
 

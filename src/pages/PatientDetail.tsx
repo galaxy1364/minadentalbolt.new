@@ -2,7 +2,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { ArrowRight, Edit2, Phone, Mail, MapPin, Calendar, CreditCard, Activity, FileText, Image as ImageIcon, Shield, Pill, Smile, Award, AlertCircle, Clock, CheckCircle2, Layers, Plus, Trash2, FileSignature, Printer } from 'lucide-react'
-import { fetchPatient, updatePatient, fetchTimeline, fetchTreatments, fetchAppointments, fetchPayments, fetchToothRecords, createToothRecord, updateToothRecord, fetchPrescriptions, fetchRadiologyImages, fetchEncounters, fetchDoctors, fetchImplantCases, fetchTreatmentPhases, createTreatmentPhase, updateTreatmentPhase, deleteTreatmentPhase, fetchConsentForms, createConsentForm, updateConsentForm, deleteConsentForm } from '../lib/api'
+import { fetchPatient, updatePatient, fetchTimeline, fetchTreatments, fetchAppointments, fetchPayments, fetchToothRecords, createToothRecord, updateToothRecord, fetchPrescriptions, fetchRadiologyImages, fetchEncounters, fetchDoctors, fetchImplantCases, fetchTreatmentPhases, createTreatmentPhase, updateTreatmentPhase, fetchConsentForms, createConsentForm, updateConsentForm } from '../lib/api'
 import { toJalaliString, toJalaliStringPretty, formatCurrency, toPersianDigits, formatTime } from '../lib/persianDate'
 import { calcPatientBalance } from '../lib/finance'
 import { Patient, Doctor, PatientTimeline, Treatment, Appointment, Payment, ToothRecord, Prescription, RadiologyImage, Encounter, ImplantCase, TreatmentPhase, ConsentForm } from '../types'
@@ -247,7 +247,9 @@ export default function PatientDetail() {
       setEncounters(enc)
       setImplantCases(implAll.filter((c) => c.patient_id === id))
       setPhases(ph.sort((a, b) => a.phase_number - b.phase_number))
-      setConsentForms(cf)
+      // Archived consent forms stay out of the active list — fully
+      // preserved, restorable, same pattern as radiology/implants/labs.
+      setConsentForms(cf.filter((c) => c.is_active !== false))
     } catch (err) {
       console.error('Error loading tab data:', err)
     }
@@ -365,6 +367,7 @@ export default function PatientDetail() {
     { value: 'in_progress', label: 'در حال انجام', color: 'warning' },
     { value: 'completed', label: 'تکمیل شده', color: 'success' },
     { value: 'on_hold', label: 'متوقف شده', color: 'error' },
+    { value: 'cancelled', label: 'لغو شده', color: 'error' },
   ]
   const [phaseForm, setPhaseForm] = useState({
     doctor_id: '', title: '', description: '', procedures: '',
@@ -445,14 +448,17 @@ export default function PatientDetail() {
 
   const handleDeletePhase = (p: TreatmentPhase) => {
     h.tap()
+    // Per clinic policy: a treatment phase (real clinical plan history)
+    // is never permanently deleted, only marked cancelled.
     confirmAction({
-      type: 'delete',
-      title: 'حذف فاز درمان',
+      type: 'status',
+      title: 'لغو فاز درمان',
+      warning: 'این فاز هیچ‌وقت پاک نمی‌شود — فقط به‌عنوان لغو‌شده علامت می‌خورد و در پرونده باقی می‌ماند.',
       fields: [{ label: 'فاز', value: `${toPersianDigits(p.phase_number)} — ${p.title}`, highlight: true }],
-      confirmLabel: 'تایید حذف',
+      confirmLabel: 'تایید لغو',
       onConfirm: async () => {
-        await deleteTreatmentPhase(p.id)
-        showToast('success', 'حذف شد')
+        await updateTreatmentPhase(p.id, { status: 'cancelled' } as any)
+        showToast('success', 'فاز لغو شد — در پرونده باقی ماند')
         if (id) { const updated = await fetchTreatmentPhases(id); setPhases(updated.sort((a, b) => a.phase_number - b.phase_number)) }
       },
     })
@@ -506,7 +512,7 @@ export default function PatientDetail() {
           else await createConsentForm(payload)
           showToast('success', editingConsent ? 'ویرایش شد' : 'ثبت شد')
           setConsentModalOpen(false)
-          if (id) setConsentForms(await fetchConsentForms(id))
+          if (id) setConsentForms((await fetchConsentForms(id)).filter((c) => c.is_active !== false))
         } catch { showToast('error', 'خطا در ذخیره') }
         finally { setSavingConsent(false) }
       },
@@ -515,16 +521,19 @@ export default function PatientDetail() {
 
   const handleDeleteConsent = (c: ConsentForm) => {
     h.tap()
+    // Per clinic policy: a signed consent form is a legal/medical
+    // document (proof of informed consent) — never permanently deleted,
+    // only archived (restorable, hidden from the active list).
     confirmAction({
-      type: 'delete',
-      title: 'حذف فرم رضایت‌نامه',
-      warning: 'این عملیات قابل بازگشت نیست',
+      type: 'status',
+      title: 'آرشیو فرم رضایت‌نامه',
+      warning: 'این فرم هیچ‌وقت پاک نمی‌شود — فقط از لیست فعال مخفی می‌شود و در سوابق قانونی/پزشکی باقی می‌ماند.',
       fields: [{ label: 'شرح درمان', value: c.treatment_description || '-', highlight: true }],
-      confirmLabel: 'تایید حذف',
+      confirmLabel: 'تایید آرشیو',
       onConfirm: async () => {
-        await deleteConsentForm(c.id)
-        showToast('success', 'حذف شد')
-        if (id) setConsentForms(await fetchConsentForms(id))
+        await updateConsentForm(c.id, { is_active: false } as any)
+        showToast('success', 'فرم آرشیو شد')
+        if (id) setConsentForms((await fetchConsentForms(id)).filter((cf) => cf.is_active !== false))
       },
     })
   }
