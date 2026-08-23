@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Calendar, Clock, CheckCircle2, User, ChevronRight, ChevronLeft, Plus, Search, Trash2, AlertCircle, Edit2, Stethoscope, DollarSign, FileText, Activity, List, Grid, X, UserPlus, Globe } from 'lucide-react'
-import { fetchAppointments, createAppointment, updateAppointment, checkConflict, fetchPatients, fetchDoctors, fetchUnits, peekNextFileNumber, createPatient, createEncounter, fetchDoctorSchedules, fetchOnlineBookingRequests, rejectBookingRequest } from '../lib/api'
+import { fetchAppointments, createAppointment, updateAppointment, checkConflict, fetchPatients, updatePatient, fetchDoctors, fetchUnits, peekNextFileNumber, createPatient, createEncounter, fetchDoctorSchedules, fetchOnlineBookingRequests, rejectBookingRequest } from '../lib/api'
 import { toJalaliString, toJalaliStringPretty, getJalaliDateInfo, formatTime, formatCurrency, toPersianDigits, persianWeekdaysShort, getHoliday, jsDateToPersianWeekday } from '../lib/persianDate'
 import { doctorColor } from '../lib/doctorColors'
 import { Appointment, AppointmentWithRelations, Patient, Doctor, Unit } from '../types'
@@ -129,13 +129,13 @@ export default function Appointments() {
   }, [appointments, todayStr])
 
   const patientSearchResults = useMemo(() => {
-    // Inactive (archived) patients shouldn't be selectable for a NEW
-    // appointment — being "in the archive" should actually mean
-    // they're out of normal flows, not just visually tucked away while
-    // still fully selectable everywhere else. The one already on an
-    // appointment being EDITED still shows, so editing doesn't break.
-    const pool = patients.filter((p) => p.is_active || p.id === wizardData.patient_id)
-    if (!patientSearch.trim()) return pool.slice(0, 8)
+    // Archived patients are now findable here too (with a badge marking
+    // them as such) — selecting one auto-reactivates them as part of
+    // booking, so a returning patient's old file doesn't require a
+    // detour through Archive first. The one already on an appointment
+    // being EDITED still always shows.
+    const pool = patients
+    if (!patientSearch.trim()) return pool.filter((p) => p.is_active).slice(0, 8)
     const q = patientSearch.toLowerCase().trim()
     return pool.filter((p) => {
       const name = `${p.first_name} ${p.last_name}`.toLowerCase()
@@ -724,14 +724,30 @@ export default function Appointments() {
                       patientSearchResults.map((p) => (
                         <button
                           key={p.id}
-                          onClick={() => { h.select(); setWizardData((d) => ({ ...d, patient_id: p.id })); setPatientSearch(`${p.first_name} ${p.last_name}`); setShowPatientResults(false) }}
+                          onClick={async () => {
+                            h.select()
+                            if (!p.is_active) {
+                              // Selecting an archived patient here brings
+                              // them back into the active flow immediately
+                              // — no separate trip through Archive needed.
+                              try {
+                                await updatePatient(p.id, { is_active: true })
+                                setPatients((prev) => prev.map((pp) => pp.id === p.id ? { ...pp, is_active: true } : pp))
+                                showToast('success', `${p.first_name} از بایگانی خارج و فعال شد`)
+                              } catch { showToast('error', 'خطا در فعال‌سازی بیمار') }
+                            }
+                            setWizardData((d) => ({ ...d, patient_id: p.id })); setPatientSearch(`${p.first_name} ${p.last_name}`); setShowPatientResults(false)
+                          }}
                           className="w-full flex items-center gap-3 p-3 hover:bg-primary-50 transition-all-smooth text-right"
                         >
                           <div className="w-9 h-9 rounded-full bg-slate-100 flex items-center justify-center text-slate-600 font-bold text-xs flex-shrink-0">
                             {p.first_name[0]}{p.last_name[0]}
                           </div>
                           <div className="flex-1 min-w-0">
-                            <p className="font-medium text-sm text-slate-800 truncate">{p.first_name} {p.last_name}</p>
+                            <p className="font-medium text-sm text-slate-800 truncate flex items-center gap-1.5">
+                              {p.first_name} {p.last_name}
+                              {!p.is_active && <span className="text-[10px] px-1.5 py-0.5 rounded-md bg-slate-100 text-slate-500 font-bold shrink-0">بایگانی</span>}
+                            </p>
                             <p className="text-xs text-slate-500">{p.file_number || 'بدون پرونده'}{p.phone ? ` • ${toPersianDigits(p.phone)}` : ''}</p>
                           </div>
                         </button>

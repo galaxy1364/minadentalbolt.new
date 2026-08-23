@@ -1093,6 +1093,40 @@ export default function PatientDetail() {
           </Card>
         </div>
 
+        {/* Settled-patient archive suggestion — only when there's real
+            billing history that's now fully paid off, not a brand-new
+            patient with zero activity. Archiving stays a deliberate
+            staff decision (they might still have upcoming treatment),
+            never automatic. */}
+        {patientBalance <= 0 && totalTreatmentCost > 0 && patient?.is_active && (
+          <Card className="p-3.5 bg-success-50 dark:bg-success-900/10 border border-success-200 flex items-center gap-3">
+            <CheckCircle2 size={18} className="text-success-600 shrink-0" />
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-bold text-success-700 dark:text-success-400">این بیمار تسویه‌حساب کامل دارد</p>
+              <p className="text-[11px] text-success-600 dark:text-success-500">اگر درمان تمام شده و فعلاً برنامه‌ی درمانی جدیدی ندارد، می‌توانید بایگانی‌اش کنید.</p>
+            </div>
+            <Button
+              size="sm" variant="secondary"
+              onClick={() => {
+                h.tap()
+                confirmAction({
+                  type: 'status', title: 'بایگانی بیمار',
+                  warning: 'بیمار از لیست‌های فعال مخفی می‌شود، ولی هیچ داده‌ای پاک نمی‌شود — همیشه از بخش «بایگانی» قابل بازگردانی است.',
+                  fields: [{ label: 'نام', value: `${patient.first_name} ${patient.last_name}`, highlight: true }],
+                  confirmLabel: 'بایگانی کردن',
+                  onConfirm: async () => {
+                    await updatePatient(patient.id, { is_active: false })
+                    setPatient((p) => p ? { ...p, is_active: false } : p)
+                    showToast('success', 'بیمار بایگانی شد')
+                  },
+                })
+              }}
+            >
+              بایگانی کردن
+            </Button>
+          </Card>
+        )}
+
         {/* Payment list */}
         <div className="space-y-2">
           {payments.map((p) => {
