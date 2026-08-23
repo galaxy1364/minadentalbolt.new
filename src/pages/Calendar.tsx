@@ -4,7 +4,7 @@
 // for this to be "مغز برنامه" (the brain of the app).
 import { useState, useEffect, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Calendar as CalIcon, Clock, FlaskConical, Layers, Bone, User } from 'lucide-react'
+import { Calendar as CalIcon, Clock, FlaskConical, Layers, Bone, User, Users, CalendarPlus, DollarSign, BellRing } from 'lucide-react'
 import { fetchAppointments, fetchLabOrders, fetchTreatmentPhases, fetchImplantCases, fetchPatients } from '../lib/api'
 import { toJalaliStringPretty, toPersianDigits, toJalaliString, getHoliday } from '../lib/persianDate'
 import { PersianCalendar } from '../components/PersianCalendar'
@@ -114,13 +114,15 @@ export default function CalendarPage() {
     implant_surgery: { icon: <Bone size={14} />, color: 'bg-blue-100 text-blue-700', label: 'جراحی ایمپلنت' },
   }
 
-  const eventTarget = (e: CalEvent): string => {
-    if (e.type === 'appointment') return '/appointments'
-    if (e.type === 'lab_deadline') return '/laboratory'
-    if (e.type === 'implant_surgery') return '/implants'
-    if (e.type === 'phase' && e.patientId) return `/patients/${e.patientId}`
-    return '/patients'
-  }
+  // Every event carries patientId — routing to that specific patient's
+  // file (where their appointments/lab work/implant cases are all
+  // visible in context) is a real destination, unlike dumping someone on
+  // the generic module list and making them search for the one record
+  // they tapped. True per-record deep-linking (e.g. straight into one
+  // specific lab order's edit view) would need each destination page to
+  // support opening a record by id from the URL, which none of them do
+  // yet — this is the meaningful improvement achievable without that.
+  const eventTarget = (e: CalEvent): string => e.patientId ? `/patients/${e.patientId}` : '/patients'
 
   if (loading) {
     return (
@@ -138,6 +140,27 @@ export default function CalendarPage() {
         title="تقویم"
         subtitle="همه‌ی نوبت‌ها، مهلت‌ها و رویدادهای درمانی در یک نگاه"
       />
+
+      {/* Quick access — the calendar as the system's hub: one tap to any
+          module, not just to the specific events already listed below. */}
+      <div className="flex items-center gap-2 overflow-x-auto dock-scroll pb-1 -mx-1 px-1">
+        {[
+          { path: '/patients', label: 'بیماران', icon: <Users size={15} /> },
+          { path: '/appointments', label: 'نوبت‌دهی', icon: <CalendarPlus size={15} /> },
+          { path: '/billing', label: 'مالی', icon: <DollarSign size={15} /> },
+          { path: '/laboratory', label: 'لابراتوار', icon: <FlaskConical size={15} /> },
+          { path: '/implants', label: 'ایمپلنت', icon: <Bone size={15} /> },
+          { path: '/reminders', label: 'یادآوری‌ها', icon: <BellRing size={15} /> },
+        ].map((m) => (
+          <button
+            key={m.path}
+            onClick={() => { h.tap(); navigate(m.path) }}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs font-bold text-slate-600 dark:text-slate-300 shrink-0 active:scale-95 transition-all-smooth"
+          >
+            {m.icon} {m.label}
+          </button>
+        ))}
+      </div>
 
       <PersianCalendar
         selectedDate={selectedDate}
