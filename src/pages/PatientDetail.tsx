@@ -2,10 +2,10 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { ArrowRight, Edit2, Phone, Mail, MapPin, Calendar, CreditCard, Activity, FileText, Image as ImageIcon, Shield, Pill, Smile, Award, AlertCircle, Clock, CheckCircle2, Layers, Plus, Trash2, FileSignature, Printer } from 'lucide-react'
-import { fetchPatient, updatePatient, fetchTimeline, fetchTreatments, fetchAppointments, fetchPayments, fetchToothRecords, createToothRecord, updateToothRecord, fetchPrescriptions, fetchRadiologyImages, fetchEncounters, fetchDoctors, fetchImplantCases, fetchTreatmentPhases, createTreatmentPhase, updateTreatmentPhase, fetchConsentForms, createConsentForm, updateConsentForm } from '../lib/api'
+import { fetchPatient, updatePatient, fetchTimeline, fetchTreatments, fetchAppointments, fetchPayments, fetchToothRecords, createToothRecord, updateToothRecord, fetchPrescriptions, fetchRadiologyImages, fetchEncounters, fetchDoctors, fetchImplantCases, fetchTreatmentPhases, createTreatmentPhase, updateTreatmentPhase, fetchConsentForms, createConsentForm, updateConsentForm, fetchLabOrders } from '../lib/api'
 import { toJalaliString, toJalaliStringPretty, formatCurrency, toPersianDigits, formatTime } from '../lib/persianDate'
 import { calcPatientBalance } from '../lib/finance'
-import { Patient, Doctor, PatientTimeline, Treatment, Appointment, Payment, ToothRecord, Prescription, RadiologyImage, Encounter, ImplantCase, TreatmentPhase, ConsentForm } from '../types'
+import { Patient, Doctor, PatientTimeline, Treatment, Appointment, Payment, ToothRecord, Prescription, RadiologyImage, Encounter, ImplantCase, TreatmentPhase, ConsentForm, LabOrder } from '../types'
 import { Modal, Card, Button, Input, Select, Textarea, Badge, Spinner, EmptyState, Tabs, showToast, Wizard } from '../components/ui'
 import { PersianDateInput } from '../components/PersianDateInput'
 import { useConfirmAction } from '../components/ConfirmAction'
@@ -135,6 +135,7 @@ export default function PatientDetail() {
   const [prescriptions, setPrescriptions] = useState<Prescription[]>([])
   const [radiologyImages, setRadiologyImages] = useState<RadiologyImage[]>([])
   const [encounters, setEncounters] = useState<Encounter[]>([])
+  const [labOrders, setLabOrders] = useState<LabOrder[]>([])
 
   // Edit modal
   const [editModalOpen, setEditModalOpen] = useState(false)
@@ -224,7 +225,7 @@ export default function PatientDetail() {
   const loadTabData = useCallback(async () => {
     if (!id) return
     try {
-      const [tl, tr, ap, pm, tr_records, pres, radio, enc, implAll, ph, cf] = await Promise.all([
+      const [tl, tr, ap, pm, tr_records, pres, radio, enc, implAll, ph, cf, labAll] = await Promise.all([
         fetchTimeline(id),
         fetchTreatments(undefined, id),
         fetchAppointments(),
@@ -236,6 +237,7 @@ export default function PatientDetail() {
         fetchImplantCases(),
         fetchTreatmentPhases(id),
         fetchConsentForms(id),
+        fetchLabOrders(),
       ])
       setTimeline(tl)
       setTreatments(tr)
@@ -245,6 +247,7 @@ export default function PatientDetail() {
       setPrescriptions(pres as unknown as Prescription[])
       setRadiologyImages(radio)
       setEncounters(enc)
+      setLabOrders(labAll.filter((o) => o.patient_id === id))
       setImplantCases(implAll.filter((c) => c.patient_id === id))
       setPhases(ph.sort((a, b) => a.phase_number - b.phase_number))
       // Archived consent forms stay out of the active list — fully
@@ -538,6 +541,96 @@ export default function PatientDetail() {
     })
   }
 
+  // Full patient-chart print — everything an insurance submission or a
+  // legal/records request needs in one document: demographics, every
+  // treatment with which doctor did it and when, every implant case
+  // (surgeon vs prosthesis doctor shown separately, since they can
+  // differ), lab work, and the full financial picture. Reuses the exact
+  // print-window pattern already established for consent forms.
+  const handlePrintFullChart = () => {
+    if (!patient) return
+    const doctorName = (id: string | null) => id ? (doctors.find((d) => d.id === id)?.name || '—') : '—'
+    const win = window.open('', '_blank', 'width=800,height=900')
+    if (!win) { showToast('error', 'اجازه‌ی باز کردن پنجره‌ی چاپ داده نشد'); return }
+
+    const sortedTreatments = [...treatments].sort((a, b) => (b.created_at || '').localeCompare(a.created_at || ''))
+    const sortedImplants = [...implantCases].sort((a, b) => (b.created_at || '').localeCompare(a.created_at || ''))
+    const sortedPayments = [...payments].filter((p) => p.status === 'completed').sort((a, b) => (b.payment_date || '').localeCompare(a.payment_date || ''))
+    const totalPaid = sortedPayments.reduce((s, p) => s + (p.amount || 0), 0)
+
+    const rows = (items: string) => items || `<tr><td colspan="5" style="text-align:center;color:#94a3b8;padding:10px;">موردی ثبت نشده</td></tr>`
+
+    win.document.write(`<!DOCTYPE html><html dir="rtl" lang="fa"><head><meta charset="utf-8"><title>پرونده‌ی کامل بیمار — ${patient.first_name} ${patient.last_name}</title>
+      <style>
+        body { font-family: Tahoma, Arial, sans-serif; padding: 28px; color: #1e293b; line-height: 1.7; font-size: 13px; }
+        .header { text-align: center; border-bottom: 2px solid #0d9488; padding-bottom: 14px; margin-bottom: 20px; }
+        .header h1 { color: #0d9488; margin: 0 0 4px; font-size: 20px; }
+        .header p { margin: 0; color: #64748b; font-size: 12px; }
+        .meta-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 4px 24px; margin-bottom: 20px; font-size: 12.5px; background: #f8fafc; padding: 12px 16px; border-radius: 8px; }
+        .section { margin-bottom: 22px; page-break-inside: avoid; }
+        .section h2 { font-size: 14px; color: #0d9488; border-bottom: 1px solid #cbd5e1; padding-bottom: 4px; margin-bottom: 8px; }
+        table { width: 100%; border-collapse: collapse; font-size: 12px; }
+        th { background: #f1f5f9; text-align: right; padding: 6px 8px; font-weight: bold; color: #475569; }
+        td { padding: 6px 8px; border-bottom: 1px solid #e2e8f0; }
+        .balance-box { display: flex; justify-content: space-between; background: #f0fdfa; border: 1px solid #99f6e4; border-radius: 8px; padding: 12px 16px; margin-top: 8px; font-size: 13px; }
+        .balance-box b { color: #0d9488; }
+        .footer { margin-top: 30px; text-align: center; color: #94a3b8; font-size: 11px; }
+        @media print { body { padding: 10px; } .section { page-break-inside: avoid; } }
+      </style>
+      </head><body>
+        <div class="header"><h1>کلینیک دندانپزشکی مینادنت</h1><p>پرونده‌ی کامل بیمار — تاریخ چاپ: ${toJalaliStringPretty(new Date().toISOString())}</p></div>
+
+        <div class="meta-grid">
+          <span><b>نام:</b> ${patient.first_name} ${patient.last_name}</span>
+          <span><b>شماره پرونده:</b> ${patient.file_number || '—'}</span>
+          <span><b>تلفن:</b> ${patient.phone || '—'}</span>
+          <span><b>کد ملی:</b> ${patient.national_id || '—'}</span>
+        </div>
+
+        <div class="section">
+          <h2>سوابق درمانی (${sortedTreatments.length} مورد)</h2>
+          <table>
+            <thead><tr><th>تاریخ</th><th>دندان</th><th>رویه</th><th>پزشک انجام‌دهنده</th><th>هزینه</th></tr></thead>
+            <tbody>${rows(sortedTreatments.map((t) => `<tr><td>${toJalaliStringPretty(t.created_at)}</td><td>${t.tooth_number ? toPersianDigits(t.tooth_number) : '—'}</td><td>${t.procedure_name || '—'}</td><td>دکتر ${doctorName(t.doctor_id)}</td><td>${formatCurrency(t.total_price || 0)} ت</td></tr>`).join(''))}</tbody>
+          </table>
+        </div>
+
+        <div class="section">
+          <h2>سفارش‌های لابراتوار (${labOrders.length} مورد)</h2>
+          <table>
+            <thead><tr><th>تاریخ ثبت</th><th>دندان</th><th>نوع کار</th><th>وضعیت</th></tr></thead>
+            <tbody>${rows([...labOrders].sort((a, b) => (b.created_at || '').localeCompare(a.created_at || '')).map((o) => `<tr><td>${toJalaliStringPretty(o.created_at)}</td><td>${o.tooth_number ? toPersianDigits(o.tooth_number) : '—'}</td><td>${o.work_type || '—'}</td><td>${o.status === 'delivered' ? 'تحویل شده' : o.status === 'cancelled' ? 'لغو شده' : 'در جریان'}</td></tr>`).join(''))}</tbody>
+          </table>
+        </div>
+
+        <div class="section">
+          <h2>موارد ایمپلنت (${sortedImplants.length} مورد)</h2>
+          <table>
+            <thead><tr><th>تاریخ جراحی</th><th>دندان</th><th>پزشک جراح</th><th>پزشک پروتز</th><th>هزینه</th></tr></thead>
+            <tbody>${rows(sortedImplants.map((c) => `<tr><td>${c.surgery_date ? toJalaliStringPretty(c.surgery_date) : '—'}</td><td>${c.tooth_number ? toPersianDigits(c.tooth_number) : '—'}</td><td>دکتر ${doctorName(c.doctor_id)}</td><td>دکتر ${doctorName(c.prosthesis_doctor_id)}</td><td>${formatCurrency(c.total_cost || 0)} ت</td></tr>`).join(''))}</tbody>
+          </table>
+        </div>
+
+        <div class="section">
+          <h2>سوابق پرداخت (${sortedPayments.length} مورد)</h2>
+          <table>
+            <thead><tr><th>تاریخ</th><th>روش</th><th>مبلغ</th></tr></thead>
+            <tbody>${rows(sortedPayments.map((p) => `<tr><td>${toJalaliStringPretty(p.payment_date)}</td><td>${p.payment_method}</td><td>${formatCurrency(p.amount)} ت</td></tr>`).join(''))}</tbody>
+          </table>
+          <div class="balance-box">
+            <span>مجموع هزینه‌ی درمان و ایمپلنت: <b>${formatCurrency(totalTreatmentCost)} ت</b></span>
+            <span>مجموع پرداختی: <b>${formatCurrency(totalPaid)} ت</b></span>
+            <span>مانده‌حساب: <b>${formatCurrency(patientBalance)} ت</b></span>
+          </div>
+        </div>
+
+        <div class="footer">این سند به‌صورت خودکار از سامانه‌ی مدیریت کلینیک مینادنت تولید شده است.</div>
+      </body></html>`)
+    win.document.close()
+    win.focus()
+    setTimeout(() => win.print(), 300)
+  }
+
   const handlePrintConsent = (c: ConsentForm) => {
     const doc = doctors.find((d) => d.id === c.doctor_id)
     const win = window.open('', '_blank', 'width=650,height=850')
@@ -656,9 +749,14 @@ export default function PatientDetail() {
           </div>
 
           {/* Edit button */}
-          <Button variant="secondary" onClick={() => setEditModalOpen(true)}>
-            <Edit2 size={16} /> ویرایش
-          </Button>
+          <div className="flex gap-2">
+            <Button variant="secondary" onClick={handlePrintFullChart}>
+              <Printer size={16} /> چاپ پرونده
+            </Button>
+            <Button variant="secondary" onClick={() => setEditModalOpen(true)}>
+              <Edit2 size={16} /> ویرایش
+            </Button>
+          </div>
         </div>
       </Card>
     )

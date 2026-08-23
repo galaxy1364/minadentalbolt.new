@@ -22,6 +22,7 @@ import {
 } from '../theme/modules'
 import { subscribeSync, initSyncEngine, syncNow, SyncStatus } from '../lib/sync'
 import { fetchPayments, fetchTreatments, fetchImplantCases, loadRolePermissionOverrides } from '../lib/api'
+import { runAutoBackupIfNeeded } from '../lib/autoBackup'
 import { calcAllPatientBalances } from '../lib/finance'
 import { h } from '../lib/haptics'
 import { CheckCircle2, CloudOff } from 'lucide-react'
@@ -344,6 +345,15 @@ function LayoutInner({ children }: { children: React.ReactNode }) {
   // this resolves — canAccess() falls back to the hardcoded map until then.
   useEffect(() => {
     loadRolePermissionOverrides().catch(() => {})
+  }, [])
+
+  // Run the once-daily local backup snapshot. This function was fully
+  // written (see autoBackup.ts) but never actually wired to anything —
+  // meaning zero backups had ever been taken in production despite the
+  // feature existing in the codebase. Runs on every app mount; the
+  // function itself no-ops if today's snapshot was already taken.
+  useEffect(() => {
+    runAutoBackupIfNeeded().catch(() => {})
   }, [])
 
   return (
