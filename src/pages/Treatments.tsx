@@ -142,7 +142,7 @@ export default function Treatments() {
     procedure_code: '', procedure_name: '', procedure_category: '',
     tooth_number: '', tooth_surface: '', quantity: '1', unit_price: '',
     discount: '', total_price: '', status: 'planned', notes: '',
-    has_lab: false, lab_id: '', lab_cost: '', lab_work_type: '', lab_material: '', lab_shade: '',
+    has_lab: false, lab_id: '', lab_cost: '', lab_work_type: '', lab_material: '', lab_shade: '', go_to_billing: false,
   })
 
   // Encounter detail modal (shows treatments + chart)
@@ -386,7 +386,7 @@ export default function Treatments() {
       procedure_code: '', procedure_name: '', procedure_category: '',
       tooth_number: '', tooth_surface: '', quantity: '1', unit_price: '',
       discount: '', total_price: '', status: 'planned', notes: '',
-      has_lab: false, lab_id: '', lab_cost: '', lab_work_type: '', lab_material: '', lab_shade: '',
+      has_lab: false, lab_id: '', lab_cost: '', lab_work_type: '', lab_material: '', lab_shade: '', go_to_billing: false,
     })
     setTreatModalOpen(true)
   }
@@ -404,7 +404,7 @@ export default function Treatments() {
       total_price: t.total_price ? String(t.total_price) : '', status: t.status || 'planned',
       notes: t.notes || '', has_lab: !!t.lab_id, lab_id: t.lab_id || '',
       lab_cost: t.lab_cost ? String(t.lab_cost) : '', lab_work_type: '',
-      lab_material: '', lab_shade: '',
+      lab_material: '', lab_shade: '', go_to_billing: false,
     })
     setTreatModalOpen(true)
   }
@@ -502,6 +502,10 @@ export default function Treatments() {
             const encTreatments = treatments.filter((t) => t.encounter_id === treatEncounterId && t.status !== 'cancelled')
             const newTotal = encTreatments.reduce((s, t) => s + (t.total_price || 0), 0) + total
             await updateEncounter(treatEncounterId, { total_amount: newTotal } as any)
+            if (treatForm.go_to_billing) {
+              navigate('/billing', { state: { openPaymentForPatientId: treatPatientId, suggestedAmount: newTotal, fromEncounterId: treatEncounterId } })
+              return
+            }
           }
           setTreatModalOpen(false); await loadData()
           if (detailEnc) {
@@ -835,7 +839,7 @@ export default function Treatments() {
             {/* Dental Chart */}
             <div>
               <h4 className="text-xs font-bold text-slate-500 mb-3 uppercase tracking-wider flex items-center gap-1.5"><Smile size={14} /> چارت دندانی (پالمر)</h4>
-              <DentalChart toothRecords={toothRecords} treatments={encounterTreatments} onUpdateTooth={handleUpdateTooth} onAddTreatment={(toothNum) => { if (!detailEnc) return; setTreatEncounterId(detailEnc.id); setTreatPatientId(detailEnc.patient_id); setEditingTreat(null); setTreatWizardStep(0); setTreatForm({ procedure_code: '', procedure_name: '', procedure_category: '', tooth_number: toothNum, tooth_surface: '', quantity: '1', unit_price: '', discount: '', total_price: '', status: 'planned', notes: '', has_lab: false, lab_id: '', lab_cost: '', lab_work_type: '', lab_material: '', lab_shade: '' }); setTreatModalOpen(true) }} />
+              <DentalChart toothRecords={toothRecords} treatments={encounterTreatments} onUpdateTooth={handleUpdateTooth} onAddTreatment={(toothNum) => { if (!detailEnc) return; setTreatEncounterId(detailEnc.id); setTreatPatientId(detailEnc.patient_id); setEditingTreat(null); setTreatWizardStep(0); setTreatForm({ procedure_code: '', procedure_name: '', procedure_category: '', tooth_number: toothNum, tooth_surface: '', quantity: '1', unit_price: '', discount: '', total_price: '', status: 'planned', notes: '', has_lab: false, lab_id: '', lab_cost: '', lab_work_type: '', lab_material: '', lab_shade: '', go_to_billing: false }); setTreatModalOpen(true) }} />
             </div>
 
             {/* Treatments list */}
@@ -909,18 +913,14 @@ export default function Treatments() {
               </div>
             )}
 
-            {/* Billing + Lab referral buttons.
-                'ارجاع به مالی' (generic, no context) is now only shown when
-                there's no treatment recorded on this encounter yet — the
-                moment there IS a treatment, the smart 'ارسال به مالی' button
-                above (which pre-fills the amount and links back to this
-                encounter) covers the same destination but does strictly
-                more, so showing both was a plain duplicate that just made
-                staff guess which one to tap. */}
+            {/* Billing + Lab referral buttons removed entirely per direct
+                feedback: Billing's own 'ثبت پرداخت جدید' wizard already
+                lets staff pick the patient AND the specific related
+                'ویزیت مرتبط' (encounter) from a dropdown — a dedicated
+                shortcut button here just duplicated a path already one
+                tap away in the normal Billing flow. Same reasoning
+                already applied to the lab referral button below. */}
             <div className="flex gap-2 pt-2 border-t border-slate-100">
-              {encounterTreatments.length === 0 && (
-                <Button variant="secondary" onClick={() => navigate(`/billing`, { state: { openPaymentForPatientId: detailEnc.patient_id } })} className="flex items-center gap-1.5"><DollarSign size={16} /> ارجاع به مالی</Button>
-              )}
               {/* Removed the standalone 'ارجاع به لابراتوار' button that
                   used to live here — genuinely redundant with the
                   'ارسال به لابراتوار + مالی' checkbox inside the treatment
@@ -1031,27 +1031,48 @@ export default function Treatments() {
             ),
           },
           {
-            label: 'لابراتوار',
+            label: 'لابراتوار و مالی',
             content: (
-              <div className="p-4 rounded-2xl border-2 border-dashed border-slate-200 dark:border-slate-600">
-                <label className="flex items-center gap-2 cursor-pointer mb-2">
-                  <input type="checkbox" checked={treatForm.has_lab} onChange={(e) => { h.toggle(); setTreatForm((p) => ({ ...p, has_lab: e.target.checked })) }} className="w-4 h-4 rounded text-accent-600 focus:ring-accent-400" />
-                  <span className="text-sm font-medium text-slate-700 dark:text-slate-200 flex items-center gap-1.5"><FlaskConical size={16} /> ارسال به لابراتوار + مالی</span>
-                </label>
-                {treatForm.has_lab && (
-                  <div className="space-y-2 mt-2">
-                    <Select label="لابراتوار" value={treatForm.lab_id} onChange={(v) => setTreatForm((p) => ({ ...p, lab_id: v }))} options={labs.filter((l) => l.is_active).map((l) => ({ value: l.id, label: l.name }))} placeholder="انتخاب لابراتوار..." />
-                    <div className="grid grid-cols-2 gap-2">
-                      <Select label="نوع کار لابراتوار" value={treatForm.lab_work_type} onChange={(v) => setTreatForm((p) => ({ ...p, lab_work_type: v }))} options={labWorkTypes} placeholder="انتخاب نوع کار..." />
-                      <Select label="جنس ماده" value={treatForm.lab_material} onChange={(v) => setTreatForm((p) => ({ ...p, lab_material: v }))} options={labMaterials} placeholder="انتخاب جنس..." />
+              <div className="space-y-3">
+                <div className="p-4 rounded-2xl border-2 border-dashed border-slate-200 dark:border-slate-600">
+                  {/* Label fixed — this checkbox only ever created a lab
+                      order (createLabOrder), never anything financial. The
+                      old '+ مالی' text was flatly inaccurate about what it
+                      actually did. */}
+                  <label className="flex items-center gap-2 cursor-pointer mb-2">
+                    <input type="checkbox" checked={treatForm.has_lab} onChange={(e) => { h.toggle(); setTreatForm((p) => ({ ...p, has_lab: e.target.checked })) }} className="w-4 h-4 rounded text-accent-600 focus:ring-accent-400" />
+                    <span className="text-sm font-medium text-slate-700 dark:text-slate-200 flex items-center gap-1.5"><FlaskConical size={16} /> ارسال به لابراتوار</span>
+                  </label>
+                  {treatForm.has_lab && (
+                    <div className="space-y-2 mt-2">
+                      <Select label="لابراتوار" value={treatForm.lab_id} onChange={(v) => setTreatForm((p) => ({ ...p, lab_id: v }))} options={labs.filter((l) => l.is_active).map((l) => ({ value: l.id, label: l.name }))} placeholder="انتخاب لابراتوار..." />
+                      <div className="grid grid-cols-2 gap-2">
+                        <Select label="نوع کار لابراتوار" value={treatForm.lab_work_type} onChange={(v) => setTreatForm((p) => ({ ...p, lab_work_type: v }))} options={labWorkTypes} placeholder="انتخاب نوع کار..." />
+                        <Select label="جنس ماده" value={treatForm.lab_material} onChange={(v) => setTreatForm((p) => ({ ...p, lab_material: v }))} options={labMaterials} placeholder="انتخاب جنس..." />
+                      </div>
+                      <div className="grid grid-cols-2 gap-2">
+                        <Input label="رنگ / شماره سایه" value={treatForm.lab_shade} onChange={(v) => setTreatForm((p) => ({ ...p, lab_shade: v }))} placeholder="مثال: A2 یا 3M2" dir="ltr" />
+                        <CurrencyInput label="هزینه لابراتوار (ت)" value={treatForm.lab_cost} onChange={(v) => setTreatForm((p) => ({ ...p, lab_cost: v }))} />
+                      </div>
+                      <p className="text-xs text-accent-600 flex items-center gap-1"><CheckCircle2 size={12} /> با تایید، سفارش لابراتوار (با جنس و رنگ) خودکار ثبت می‌شود؛ هزینه به مانده‌حساب بیمار اضافه می‌شود</p>
                     </div>
-                    <div className="grid grid-cols-2 gap-2">
-                      <Input label="رنگ / شماره سایه" value={treatForm.lab_shade} onChange={(v) => setTreatForm((p) => ({ ...p, lab_shade: v }))} placeholder="مثال: A2 یا 3M2" dir="ltr" />
-                      <CurrencyInput label="هزینه لابراتوار (ت)" value={treatForm.lab_cost} onChange={(v) => setTreatForm((p) => ({ ...p, lab_cost: v }))} />
-                    </div>
-                    <p className="text-xs text-accent-600 flex items-center gap-1"><CheckCircle2 size={12} /> با تایید، سفارش لابراتوار (با جنس و رنگ) خودکار ثبت می‌شود؛ هزینه به مانده‌حساب بیمار اضافه می‌شود</p>
-                  </div>
-                )}
+                  )}
+                </div>
+                <div className="p-4 rounded-2xl border-2 border-dashed border-slate-200 dark:border-slate-600">
+                  {/* This is the real, separate 'فقط مالی' option requested
+                      — genuinely independent of the lab checkbox above, so
+                      either or both can be checked. It intentionally does
+                      NOT create a Payment record directly (that would be
+                      charging for money not yet received, the same
+                      phantom-record problem already avoided elsewhere) —
+                      instead it opens Billing's real payment wizard,
+                      pre-filled with this patient and the treatment total,
+                      right after saving. */}
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input type="checkbox" checked={treatForm.go_to_billing} onChange={(e) => { h.toggle(); setTreatForm((p) => ({ ...p, go_to_billing: e.target.checked })) }} className="w-4 h-4 rounded text-emerald-600 focus:ring-emerald-400" />
+                    <span className="text-sm font-medium text-slate-700 dark:text-slate-200 flex items-center gap-1.5"><DollarSign size={16} /> پس از ثبت، برای دریافت پرداخت به مالی بروم</span>
+                  </label>
+                </div>
               </div>
             ),
           },

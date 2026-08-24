@@ -25,6 +25,7 @@ const paymentMethods: { value: string; label: string; color: string }[] = [
   { value: 'cash', label: 'نقدی', color: 'success' },
   { value: 'card', label: 'کارت', color: 'primary' },
   { value: 'transfer', label: 'انتقال بانکی', color: 'accent' },
+  { value: 'installment', label: 'اقساط', color: 'warning' },
   { value: 'cheque', label: 'چک', color: 'warning' },
   { value: 'insurance', label: 'بیمه', color: 'secondary' },
 ]
@@ -1396,7 +1397,46 @@ export default function Billing() {
           content: (
             <>
               <div className="grid grid-cols-2 gap-3">
-                <Select label="روش پرداخت *" value={paymentForm.payment_method} onChange={(v) => setPaymentForm((p) => ({ ...p, payment_method: v }))} options={paymentMethods.map((m) => ({ value: m.value, label: m.label }))} placeholder="انتخاب روش پرداخت..." />
+                <Select
+                  label="روش پرداخت *"
+                  value={paymentForm.payment_method}
+                  onChange={(v) => {
+                    // چک/اقساط/بیمه aren't really "how this one payment
+                    // was received" the way cash/card/transfer are — each
+                    // has its own real record type with fields a plain
+                    // Payment can't hold (cheque number+bank+due date,
+                    // a whole installment schedule + guarantee cheque,
+                    // an insurance claim + company). Recording them as a
+                    // bare 'payment' here would create a disconnected,
+                    // incomplete duplicate of the real tracked record —
+                    // so instead of continuing this wizard, jump straight
+                    // into the correct dedicated flow with the same
+                    // patient (and amount, where that carries over
+                    // meaningfully) already filled in.
+                    if (v === 'cheque') {
+                      setPaymentModalOpen(false)
+                      setChequeForm((p) => ({ ...p, patient_id: paymentForm.patient_id, amount: paymentForm.amount }))
+                      setChequeWizardStep(0)
+                      setChequeModalOpen(true)
+                      return
+                    }
+                    if (v === 'installment') {
+                      setPaymentModalOpen(false)
+                      setPlanForm((p) => ({ ...p, patient_id: paymentForm.patient_id, total_amount: paymentForm.amount }))
+                      setPlanWizardStep(0)
+                      setPlanModalOpen(true)
+                      return
+                    }
+                    if (v === 'insurance') {
+                      setPaymentModalOpen(false)
+                      navigate('/insurance', { state: { quickStartPatientId: paymentForm.patient_id, quickStartAmount: paymentForm.amount } })
+                      return
+                    }
+                    setPaymentForm((p) => ({ ...p, payment_method: v }))
+                  }}
+                  options={paymentMethods.map((m) => ({ value: m.value, label: m.label }))}
+                  placeholder="انتخاب روش پرداخت..."
+                />
                 <Select label="وضعیت" value={paymentForm.status} onChange={(v) => setPaymentForm((p) => ({ ...p, status: v }))} options={paymentStatuses.map((s) => ({ value: s.value, label: s.label }))} />
               </div>
               <PersianDateInput label="تاریخ پرداخت" value={paymentForm.payment_date} onChange={(v) => setPaymentForm((p) => ({ ...p, payment_date: v }))} />

@@ -1,6 +1,6 @@
 // Insurance.tsx - Persian RTL Dental Clinic Insurance Management
 import { useState, useEffect, useCallback, useMemo } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useLocation } from 'react-router-dom'
 import { Shield, FileText, Search, Building2, Percent, Eye, Plus, Edit2, Trash2, Phone, MapPin, Wallet, CheckCircle2 } from 'lucide-react'
 import { PieChart, Pie, Cell, XAxis, YAxis, Tooltip as RTooltip, ResponsiveContainer, Legend } from 'recharts'
 import {
@@ -39,6 +39,7 @@ function getClaimStatusMeta(status: string) {
 
 export default function Insurance() {
   const navigate = useNavigate()
+  const location = useLocation()
   const { confirmAction, ConfirmActionModal } = useConfirmAction()
 
   const [activeTab, setActiveTab] = useState('companies')
@@ -84,6 +85,20 @@ export default function Insurance() {
   }, [])
 
   useEffect(() => { loadData() }, [loadData])
+
+  // Arrived here from the quick-payment wizard's 'روش پرداخت: بیمه'
+  // selection — carries the patient (and suggested amount) straight
+  // into a new claim instead of leaving staff to re-find the patient
+  // and pick everything from scratch.
+  useEffect(() => {
+    const state = location.state as { quickStartPatientId?: string; quickStartAmount?: string } | null
+    if (!state?.quickStartPatientId) return
+    setClaimForm({ patient_id: state.quickStartPatientId, company_id: '', amount: state.quickStartAmount || '', approved_amount: '', status: 'draft', notes: '' })
+    setClaimWizardStep(0)
+    setClaimModalOpen(true)
+    window.history.replaceState({}, '')
+  }, [location.state])
+
 
   const filteredCompanies = useMemo(() => {
     if (!searchQuery) return companies
