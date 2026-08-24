@@ -276,19 +276,17 @@ export default function Treatments() {
   const getDoctorName = (id: string | null) => { if (!id) return '-'; const d = doctorMap.get(id); return d?.name || d?.specialty || 'پزشک' }
 
   // ── Encounter Modal ───────────────────────────────────────────
-
-  const openEncCreateModal = () => {
-    h.tap()
-    setEditingEnc(null)
-    setEncWizardStep(0)
-    setEncForm({
-      patient_id: '', doctor_id: '', encounter_date: new Date().toISOString().slice(0, 10),
-      chief_complaint: '', diagnosis: '', treatment_plan: '', notes: '',
-      status: 'open', total_amount: '', discount_amount: '',
-    })
-    setPatientSearch(''); setShowPatientResults(false)
-    setEncModalOpen(true)
-  }
+  // openEncCreateModal (a "ویزیت جدید" ceremony button — patient/doctor,
+  // then chief-complaint/diagnosis/treatment-plan free text, then
+  // amount/status, then notes) was removed entirely per direct feedback:
+  // "کلا ما دو مدل درمان نداریم... یک خط درمان باشد و پیوسته نه دوتا"
+  // (we don't have two treatment models at all — one continuous
+  // treatment line, not two). openQuickTreatModal below is now the only
+  // way to start. The encounter Wizard further down still exists and
+  // still needs its full 4 steps — but only for openEncEditModal, editing
+  // an already-existing encounter (real historical chief-complaint/
+  // diagnosis data already on file shouldn't lose its edit path), never
+  // for creating a new one from scratch anymore.
 
   // Real, repeated complaint: creating a "ویزیت" first (patient/doctor
   // step, then chief-complaint/diagnosis/treatment-plan free-text step,
@@ -315,6 +313,15 @@ export default function Treatments() {
     setQuickTreatModalOpen(true)
   }
 
+  // Per direct confirmation: one continuous flow only, no two-hop
+  // detour through the full visual chart before the actual treatment
+  // wizard opens. Creates the encounter silently (same as before), then
+  // jumps straight into the treatment wizard itself — which already has
+  // its own staged steps (procedure -> tooth+level+cost -> lab+billing
+  // -> notes), including a proper tooth picker as step 2. The big
+  // 32-tooth chart view (detailEnc) is no longer part of this path at
+  // all; it stays reachable afterward from the ویزیت‌ها list for anyone
+  // who wants to see everything recorded on that visit together.
   const handleQuickTreatStart = async () => {
     if (!quickTreatPatientId) { showToast('error', 'انتخاب بیمار الزامی است'); return }
     setSavingQuickTreat(true)
@@ -327,9 +334,16 @@ export default function Treatments() {
       } as any)
       setQuickTreatModalOpen(false)
       await loadData()
-      const p = patients.find((pt) => pt.id === quickTreatPatientId)
-      const d = doctors.find((dt) => dt.id === quickTreatDoctorId)
-      setDetailEnc({ ...newEnc, patient: p ?? null, doctor: d ?? null } as any)
+      setTreatEncounterId(newEnc.id)
+      setTreatPatientId(quickTreatPatientId)
+      setEditingTreat(null)
+      setTreatWizardStep(0)
+      setTreatForm({
+        procedure_code: '', procedure_name: '', procedure_category: '', tooth_number: '', tooth_surface: '',
+        quantity: '1', unit_price: '', discount: '', total_price: '', status: 'planned', notes: '',
+        has_lab: false, lab_id: '', lab_cost: '', lab_work_type: '', lab_material: '', lab_shade: '', go_to_billing: false,
+      })
+      setTreatModalOpen(true)
     } catch { showToast('error', 'خطا در شروع درمان') }
     finally { setSavingQuickTreat(false) }
   }
@@ -627,10 +641,7 @@ export default function Treatments() {
         title="درمان‌ها"
         subtitle="مدیریت ویزیت‌ها و رویه‌های درمانی"
         action={
-          <div className="flex flex-col gap-1.5 items-stretch">
-            <Button onClick={openQuickTreatModal} variant="primary" size="sm" className="flex items-center justify-center gap-1.5 whitespace-nowrap"><Stethoscope size={14} /> شروع درمان مستقیم</Button>
-            <Button onClick={openEncCreateModal} variant="secondary" size="sm" className="flex items-center justify-center gap-1.5 whitespace-nowrap"><Plus size={14} /> ویزیت جدید</Button>
-          </div>
+          <Button onClick={openQuickTreatModal} variant="primary" className="flex items-center gap-1.5"><Stethoscope size={16} /> شروع درمان</Button>
         }
       />
 
@@ -687,7 +698,7 @@ export default function Treatments() {
       {activeTab === 'encounters' && (
         <div className="space-y-4">
           {filteredEncounters.length === 0 ? (
-            <Card className="p-5"><EmptyState icon={<ClipboardList size={28} />} title="ویزیتی یافت نشد" description="با ثبت ویزیت جدید شروع کنید" action={<Button onClick={openEncCreateModal} className="flex items-center gap-1.5"><Plus size={16} /> ویزیت جدید</Button>} /></Card>
+            <Card className="p-5"><EmptyState icon={<ClipboardList size={28} />} title="ویزیتی یافت نشد" description="با شروع درمان، ویزیت خودکار ثبت می‌شود" action={<Button onClick={openQuickTreatModal} className="flex items-center gap-1.5"><Stethoscope size={16} /> شروع درمان</Button>} /></Card>
           ) : (
             <Card className="p-0 overflow-hidden">
               <div className="overflow-x-auto">
