@@ -18,7 +18,7 @@ export function ModuleHeader({ moduleKey, title, subtitle, action }: {
 
   return (
     <div
-      className="relative overflow-hidden rounded-2xl p-4 flex items-center justify-between gap-3 border border-slate-100 dark:border-slate-700 bg-white dark:bg-slate-800 shadow-sm"
+      className="relative overflow-hidden rounded-2xl p-4 flex flex-wrap items-center justify-between gap-3 border border-slate-100 dark:border-slate-700 bg-white dark:bg-slate-800 shadow-sm"
     >
       <div
         className="absolute -top-10 -left-10 w-40 h-40 rounded-full blur-2xl pointer-events-none breathe-slow"

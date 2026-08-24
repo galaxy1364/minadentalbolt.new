@@ -627,9 +627,9 @@ export default function Treatments() {
         title="درمان‌ها"
         subtitle="مدیریت ویزیت‌ها و رویه‌های درمانی"
         action={
-          <div className="flex gap-2">
-            <Button onClick={openQuickTreatModal} variant="primary" className="flex items-center gap-1.5"><Stethoscope size={16} /> شروع درمان مستقیم</Button>
-            <Button onClick={openEncCreateModal} variant="secondary" className="flex items-center gap-1.5"><Plus size={16} /> ویزیت جدید</Button>
+          <div className="flex flex-col gap-1.5 items-stretch">
+            <Button onClick={openQuickTreatModal} variant="primary" size="sm" className="flex items-center justify-center gap-1.5 whitespace-nowrap"><Stethoscope size={14} /> شروع درمان مستقیم</Button>
+            <Button onClick={openEncCreateModal} variant="secondary" size="sm" className="flex items-center justify-center gap-1.5 whitespace-nowrap"><Plus size={14} /> ویزیت جدید</Button>
           </div>
         }
       />
