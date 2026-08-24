@@ -903,7 +903,25 @@ export default function Laboratory() {
                 ) : (
                   <Select label="لابراتوار" value={orderForm.lab_id} onChange={(v) => setOrderForm((p) => ({ ...p, lab_id: v }))} options={labOptions} placeholder="انتخاب لابراتوار" />
                 )}
-                <Select label="بیمار" value={orderForm.patient_id} onChange={(v) => setOrderForm((p) => ({ ...p, patient_id: v }))} options={patientOptions} placeholder="انتخاب بیمار" />
+                <Select
+                  label="بیمار"
+                  value={orderForm.patient_id}
+                  onChange={(v) => {
+                    // Real complaint from a direct walkthrough: this
+                    // wizard asked for the tooth number from scratch
+                    // every time, even when the same patient already had
+                    // a very recent treatment recording exactly that. Now
+                    // it suggests (not forces — still fully editable) the
+                    // tooth from their most recent treatment automatically
+                    // when only tooth_number is still empty.
+                    const recentTreatment = !orderForm.tooth_number
+                      ? [...treatments].filter((t) => t.patient_id === v && t.tooth_number).sort((a, b) => (b.created_at || '').localeCompare(a.created_at || ''))[0]
+                      : null
+                    setOrderForm((p) => ({ ...p, patient_id: v, tooth_number: recentTreatment ? recentTreatment.tooth_number! : p.tooth_number }))
+                  }}
+                  options={patientOptions}
+                  placeholder="انتخاب بیمار"
+                />
                 <Select label="پزشک" value={orderForm.doctor_id} onChange={(v) => setOrderForm((p) => ({ ...p, doctor_id: v }))} options={doctorOptions} placeholder="انتخاب پزشک" />
               </>
             ),

@@ -101,12 +101,33 @@ export function PalmerToothPicker({ label = 'دندان (پالمر)', value, on
 
       <div className="p-3 rounded-2xl bg-slate-50 dark:bg-slate-800/60 border border-slate-100 dark:border-slate-700">
         <p className="text-center text-[10px] text-slate-400 mb-1.5">فک بالا</p>
-        <div className="flex items-center justify-center gap-0.5 flex-wrap">
-          {upper.map((t) => <ToothButton key={t.fdi} t={t} />)}
+        {/* Real, visible midline divider between the two mirrored halves
+            — from repeated feedback that the '1 1' pair (right-side tooth
+            1 and left-side tooth 1, both genuinely exist and sit next to
+            each other per real Palmer notation) reads as a confusing
+            duplicate on a small screen. A 4px margin alone wasn't enough
+            to register as "these are two different sides" — a visible
+            vertical line plus more spacing removes the ambiguity. */}
+        <div className="flex items-center justify-center flex-wrap">
+          {upper.map((t, i) => (
+            <div key={t.fdi} className="flex items-center">
+              {i > 0 && t.palmer === '1' && <div className="w-px h-7 bg-slate-300 dark:bg-slate-500 mx-2" />}
+              <div className={i > 0 && upper[i - 1]?.palmer !== '1' && t.palmer !== '1' ? 'mr-0.5' : ''}>
+                <ToothButton t={t} />
+              </div>
+            </div>
+          ))}
         </div>
         <div className="h-px bg-slate-200 dark:bg-slate-600 my-3" />
-        <div className="flex items-center justify-center gap-0.5 flex-wrap">
-          {lower.map((t) => <ToothButton key={t.fdi} t={t} />)}
+        <div className="flex items-center justify-center flex-wrap">
+          {lower.map((t, i) => (
+            <div key={t.fdi} className="flex items-center">
+              {i > 0 && t.palmer === '1' && <div className="w-px h-7 bg-slate-300 dark:bg-slate-500 mx-2" />}
+              <div className={i > 0 && lower[i - 1]?.palmer !== '1' && t.palmer !== '1' ? 'mr-0.5' : ''}>
+                <ToothButton t={t} />
+              </div>
+            </div>
+          ))}
         </div>
         <p className="text-center text-[10px] text-slate-400 mt-1.5">فک پایین</p>
       </div>
