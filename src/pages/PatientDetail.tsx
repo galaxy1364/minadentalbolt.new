@@ -1,7 +1,7 @@
 // PatientDetail.tsx - Persian RTL Dental Clinic Patient Detail Page
 import { useState, useEffect, useCallback } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { ArrowRight, Edit2, Phone, Mail, MapPin, Calendar, CreditCard, Activity, FileText, Image as ImageIcon, Shield, Pill, Smile, Award, AlertCircle, Clock, CheckCircle2, Layers, Plus, Trash2, FileSignature, Printer } from 'lucide-react'
+import { ArrowRight, Edit2, Phone, Mail, MapPin, Calendar, CreditCard, Activity, FileText, Image as ImageIcon, Shield, Pill, Smile, Award, AlertCircle, Clock, CheckCircle2, Layers, Plus, Trash2, FileSignature, Printer, Bone, FlaskConical } from 'lucide-react'
 import { fetchPatient, updatePatient, fetchTimeline, fetchTreatments, fetchAppointments, fetchPayments, fetchToothRecords, createToothRecord, updateToothRecord, fetchPrescriptions, fetchRadiologyImages, fetchEncounters, fetchDoctors, fetchImplantCases, fetchTreatmentPhases, createTreatmentPhase, updateTreatmentPhase, fetchConsentForms, createConsentForm, updateConsentForm, fetchLabOrders } from '../lib/api'
 import { toJalaliString, toJalaliStringPretty, formatCurrency, toPersianDigits, formatTime } from '../lib/persianDate'
 import { calcPatientBalance } from '../lib/finance'
@@ -786,6 +786,8 @@ export default function PatientDetail() {
     { key: 'overview', label: 'نمای کلی', icon: <FileText size={16} /> },
     { key: 'timeline', label: 'تایم‌لاین', icon: <Clock size={16} /> },
     { key: 'treatments', label: 'درمان‌ها', icon: <Activity size={16} /> },
+    { key: 'implants', label: 'ایمپلنت', icon: <Bone size={16} /> },
+    { key: 'labOrders', label: 'لابراتوار', icon: <FlaskConical size={16} /> },
     { key: 'phases', label: 'طرح درمان مرحله‌ای', icon: <Layers size={16} /> },
     { key: 'consent', label: 'فرم رضایت‌نامه', icon: <FileSignature size={16} /> },
     { key: 'appointments', label: 'نوبت‌ها', icon: <Calendar size={16} /> },
@@ -987,6 +989,101 @@ export default function PatientDetail() {
             </Card>
           )
         })}
+      </div>
+    )
+  }
+
+  // ===========================================================================
+  // Render: Implant Cases Tab — this data was already being loaded (used
+  // for balance calculation and the full-chart print feature) but had no
+  // actual tab to view it from inside the patient's own file, meaning
+  // staff had to leave this page and re-search for the patient over in
+  // the separate Implants module just to see their implant history.
+  // ===========================================================================
+
+  const renderImplants = () => {
+    if (implantCases.length === 0) {
+      return (
+        <Card className="p-6">
+          <EmptyState icon={<Bone size={32} />} title="موردی ثبت نشده" description="هنوز پرونده‌ی ایمپلنتی برای این بیمار ثبت نشده است" />
+        </Card>
+      )
+    }
+    return (
+      <div className="space-y-2">
+        {[...implantCases].sort((a, b) => (b.created_at || '').localeCompare(a.created_at || '')).map((c) => (
+          <Card key={c.id} className="p-4">
+            <div className="flex items-start justify-between gap-3 flex-wrap">
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-2 flex-wrap mb-1">
+                  <h4 className="text-sm font-medium text-slate-800">
+                    دندان {c.tooth_number ? toPersianDigits(c.tooth_number) : '—'} — {c.brand || 'برند نامشخص'}
+                  </h4>
+                  {!c.is_active && <Badge color="slate">بایگانی‌شده</Badge>}
+                </div>
+                <div className="flex items-center gap-3 flex-wrap text-xs text-slate-500">
+                  <span>جراح: {getDoctorName(c.doctor_id)}</span>
+                  {c.prosthesis_doctor_id && c.prosthesis_doctor_id !== c.doctor_id && (
+                    <span>پروتز: {getDoctorName(c.prosthesis_doctor_id)}</span>
+                  )}
+                  {c.surgery_date && <span>تاریخ جراحی: {toJalaliStringPretty(c.surgery_date)}</span>}
+                </div>
+                {(c.bone_graft || c.sinus_lift) && (
+                  <div className="flex gap-1.5 mt-1.5">
+                    {c.bone_graft && <Badge color="warning">پودر استخوانی</Badge>}
+                    {c.sinus_lift && <Badge color="accent">سینوس لیفت</Badge>}
+                  </div>
+                )}
+              </div>
+              <div className="text-left">
+                {c.total_cost != null && <p className="text-sm font-bold text-slate-700">{formatCurrency(c.total_cost)} تومان</p>}
+                {c.paid_amount != null && <p className="text-xs text-success-600">پرداخت‌شده: {formatCurrency(c.paid_amount)}</p>}
+              </div>
+            </div>
+          </Card>
+        ))}
+      </div>
+    )
+  }
+
+  // ===========================================================================
+  // Render: Lab Orders Tab — same gap as implants: loaded for the print
+  // feature already, but never viewable from inside the patient's own
+  // file otherwise.
+  // ===========================================================================
+
+  const renderLabOrders = () => {
+    if (labOrders.length === 0) {
+      return (
+        <Card className="p-6">
+          <EmptyState icon={<FlaskConical size={32} />} title="سفارشی ثبت نشده" description="هنوز سفارش لابراتوار برای این بیمار ثبت نشده است" />
+        </Card>
+      )
+    }
+    return (
+      <div className="space-y-2">
+        {[...labOrders].sort((a, b) => (b.created_at || '').localeCompare(a.created_at || '')).map((o) => (
+          <Card key={o.id} className="p-4">
+            <div className="flex items-start justify-between gap-3 flex-wrap">
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-2 flex-wrap mb-1">
+                  <h4 className="text-sm font-medium text-slate-800">{o.work_type || 'سفارش لابراتوار'}</h4>
+                  <Badge color={o.status === 'delivered' ? 'success' : o.status === 'cancelled' ? 'error' : 'primary'}>
+                    {o.status === 'delivered' ? 'تحویل شده' : o.status === 'cancelled' ? 'لغو شده' : 'در جریان'}
+                  </Badge>
+                </div>
+                <div className="flex items-center gap-3 flex-wrap text-xs text-slate-500">
+                  {o.tooth_number && <span>دندان: {toPersianDigits(o.tooth_number)}</span>}
+                  <span>{toJalaliStringPretty(o.created_at)}</span>
+                  {o.deadline && <span>موعد: {toJalaliStringPretty(o.deadline)}</span>}
+                </div>
+              </div>
+              <div className="text-left">
+                {o.cost != null && <p className="text-sm font-bold text-slate-700">{formatCurrency(o.cost)} تومان</p>}
+              </div>
+            </div>
+          </Card>
+        ))}
       </div>
     )
   }
@@ -1595,6 +1692,8 @@ export default function PatientDetail() {
       {activeTab === 'overview' && renderOverview()}
       {activeTab === 'timeline' && renderTimeline()}
       {activeTab === 'treatments' && renderTreatments()}
+      {activeTab === 'implants' && renderImplants()}
+      {activeTab === 'labOrders' && renderLabOrders()}
       {activeTab === 'phases' && renderPhases()}
       {activeTab === 'consent' && renderConsentForms()}
       {activeTab === 'appointments' && renderAppointments()}
