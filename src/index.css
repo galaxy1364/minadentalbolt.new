@@ -224,6 +224,13 @@ input, textarea, select { font-size: 16px !important; }
 }
 .page-in { animation: page-in 0.3s cubic-bezier(0.4,0,0.2,1) both; }
 
+/* ── Tooth-surface picker expand animation ──────────── */
+@keyframes scale-in-kf {
+  from { opacity: 0; transform: scaleY(0.85) translateY(-4px); }
+  to   { opacity: 1; transform: scaleY(1) translateY(0); }
+}
+.animate-scale-in { animation: scale-in-kf 0.18s cubic-bezier(0.4,0,0.2,1) both; transform-origin: top; }
+
 /* ── Toast animate-in ───────────────────────────────── */
 @keyframes animate-in-kf {
   from { opacity: 0; transform: translateX(20px); }

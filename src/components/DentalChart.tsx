@@ -422,42 +422,60 @@ function ToothDetailPanel({
             </div>
           </div>
 
-          {/* Surface Conditions */}
+          {/* Surface Conditions — redesigned: previously every one of the
+              5 surfaces repeated all 11 condition buttons (55 tiny
+              buttons total), which is exactly the "گیج‌کننده" clutter
+              reported. Now: tap a surface chip to select it (its current
+              condition color shows right there), then one shared
+              condition panel appears below for just that surface —
+              collapses to 5 chips + up to 11 options shown only when
+              actually needed, with a smooth expand/collapse instead of
+              everything visible and competing for attention at once.
+              Reuses `activeSurface` state that already existed but was
+              never wired to anything. */}
           {condition !== 'missing' && condition !== 'extraction' && (
             <div>
-              <h4 className="text-xs font-bold text-slate-500 mb-2">سطوح دندان</h4>
-              <div className="space-y-2">
+              <h4 className="text-xs font-bold text-slate-500 mb-2">سطوح دندان — روی هر سطح بزنید تا وضعیتش را تنظیم کنید</h4>
+              <div className="grid grid-cols-5 gap-1.5 mb-2">
                 {(Object.keys(surfaceLabels) as ToothSurface[]).map((surface) => {
                   const sc = getSurfaceCondition(surface)
                   const meta = conditionMeta[sc]
+                  const isActive = activeSurface === surface
                   return (
-                    <div key={surface} className={`p-3 rounded-xl border-2 ${meta.bg} ${meta.border}`}>
-                      <div className="flex items-center justify-between mb-2">
-                        <span className="text-sm font-medium text-slate-700">{surfaceLabels[surface]}</span>
-                        <Badge color={sc === 'healthy' ? 'slate' : sc === 'caries' ? 'error' : 'primary'}>
-                          {meta.label}
-                        </Badge>
-                      </div>
-                      <div className="flex flex-wrap gap-1">
-                        {conditionOptions.filter((o) => o.value !== 'missing' && o.value !== 'extraction').map((opt) => {
-                          const isActive = sc === opt.value
-                          return (
-                            <button
-                              key={opt.value}
-                              onClick={() => toggleSurfaceCondition(surface, opt.value)}
-                              className={`px-2 py-1 rounded-lg text-[10px] font-medium transition-all-smooth ${
-                                isActive ? `${conditionMeta[opt.value].bg} ${conditionMeta[opt.value].border} ${conditionMeta[opt.value].color}` : 'bg-white/60 text-slate-400 hover:bg-white'
-                              }`}
-                            >
-                              {opt.label}
-                            </button>
-                          )
-                        })}
-                      </div>
-                    </div>
+                    <button
+                      key={surface}
+                      onClick={() => setActiveSurface(isActive ? null : surface)}
+                      className={`flex flex-col items-center gap-1 py-2 rounded-xl border-2 transition-all-smooth ${isActive ? 'border-primary-400 bg-primary-50 scale-105' : `${meta.border} ${meta.bg}`}`}
+                    >
+                      <span className={`w-3 h-3 rounded-full ${meta.dot}`} />
+                      <span className="text-[10px] font-bold text-slate-600 leading-tight text-center">{surfaceLabels[surface]}</span>
+                    </button>
                   )
                 })}
               </div>
+              {activeSurface && (
+                <div className="p-3 rounded-xl bg-slate-50 border border-slate-200 animate-scale-in">
+                  <p className="text-[11px] text-slate-500 mb-2">وضعیت سطح «{surfaceLabels[activeSurface]}»:</p>
+                  <div className="flex flex-wrap gap-1.5">
+                    {conditionOptions.filter((o) => o.value !== 'missing' && o.value !== 'extraction').map((opt) => {
+                      const isSelected = getSurfaceCondition(activeSurface) === opt.value
+                      const optMeta = conditionMeta[opt.value]
+                      return (
+                        <button
+                          key={opt.value}
+                          onClick={() => { toggleSurfaceCondition(activeSurface, opt.value); setActiveSurface(null) }}
+                          className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium transition-all-smooth ${
+                            isSelected ? `${optMeta.bg} ${optMeta.border} border ${optMeta.color}` : 'bg-white text-slate-500 border border-slate-200 hover:bg-slate-100'
+                          }`}
+                        >
+                          <span className={`w-2 h-2 rounded-full ${optMeta.dot}`} />
+                          {opt.label}
+                        </button>
+                      )
+                    })}
+                  </div>
+                </div>
+              )}
             </div>
           )}
 

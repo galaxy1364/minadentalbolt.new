@@ -1,5 +1,6 @@
 // Laboratory.tsx - Persian RTL Dental Clinic Laboratory Management
 import { useState, useEffect, useCallback, useMemo } from 'react'
+import { useLocation } from 'react-router-dom'
 import { FlaskConical, Plus, Search, Clock, CheckCircle2, AlertCircle, Edit2, Trash2, Phone, Filter, TrendingUp, Package, CalendarClock, ChevronLeft, RotateCcw } from 'lucide-react'
 import { downloadICSReminder } from '../lib/icsReminder'
 import { fetchLabOrders, createLabOrder, updateLabOrder, fetchLabs, createLab, updateLab, fetchPatients, fetchDoctors, fetchTreatments, updateTreatment } from '../lib/api'
@@ -90,6 +91,7 @@ const materials: { value: string; label: string }[] = [
 // ============================================================================
 
 export default function Laboratory() {
+  const location = useLocation()
   const { confirmAction, ConfirmActionModal } = useConfirmAction()
   // Data
   const [labOrders, setLabOrders] = useState<LabOrder[]>([])
@@ -184,6 +186,33 @@ export default function Laboratory() {
   useEffect(() => {
     loadData()
   }, [loadData])
+
+  // Arrived here from a visit's 'ارجاع به لابراتوار' button — previously
+  // that button just navigated to this generic page with zero context,
+  // so staff had to re-search for the same patient and start a blank
+  // order from scratch. Now it carries the patient/doctor/tooth straight
+  // into a pre-filled new-order form instead.
+  useEffect(() => {
+    const state = location.state as { quickStartPatientId?: string; quickStartDoctorId?: string; quickStartToothNumber?: string } | null
+    if (!state?.quickStartPatientId) return
+    setEditingOrder(null)
+    setOrderWizardStep(0)
+    setOrderForm({
+      lab_id: labs.length > 0 ? labs[0].id : '',
+      patient_id: state.quickStartPatientId,
+      doctor_id: state.quickStartDoctorId || '',
+      work_type: 'crown', custom_work_type: '',
+      tooth_number: state.quickStartToothNumber || '',
+      shade: '',
+      material: 'zirconia',
+      deadline: '',
+      cost: '',
+      notes: '',
+      status: 'ordered',
+    })
+    setOrderModalOpen(true)
+    window.history.replaceState({}, '')
+  }, [location.state, labs])
 
   // ===========================================================================
   // Derived Data

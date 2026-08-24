@@ -919,9 +919,9 @@ export default function Treatments() {
                 staff guess which one to tap. */}
             <div className="flex gap-2 pt-2 border-t border-slate-100">
               {encounterTreatments.length === 0 && (
-                <Button variant="secondary" onClick={() => navigate(`/billing`)} className="flex items-center gap-1.5"><DollarSign size={16} /> ارجاع به مالی</Button>
+                <Button variant="secondary" onClick={() => navigate(`/billing`, { state: { openPaymentForPatientId: detailEnc.patient_id } })} className="flex items-center gap-1.5"><DollarSign size={16} /> ارجاع به مالی</Button>
               )}
-              <Button variant="secondary" onClick={() => navigate(`/laboratory`)} className="flex items-center gap-1.5"><FlaskConical size={16} /> ارجاع به لابراتوار</Button>
+              <Button variant="secondary" onClick={() => navigate(`/laboratory`, { state: { quickStartPatientId: detailEnc.patient_id, quickStartDoctorId: detailEnc.doctor_id || undefined } })} className="flex items-center gap-1.5"><FlaskConical size={16} /> ارجاع به لابراتوار</Button>
               <Button variant="ghost" onClick={() => navigate(`/patients/${detailEnc.patient_id}`)} className="flex items-center gap-1.5 mr-auto"><Eye size={16} /> پرونده بیمار</Button>
             </div>
           </div>
