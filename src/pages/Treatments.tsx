@@ -878,32 +878,24 @@ export default function Treatments() {
             {/* Transfer actions — sends this visit's full data downstream
                 to whichever module needs to pick it up next. Lab already
                 transfers automatically when a treatment's "لابراتوار"
-                checkbox is used (createLabOrder fires on save), so it
-                doesn't need a separate button here — but nothing
-                previously connected a finished visit to Billing or to
-                starting an implant case, even though those are exactly
-                the next real-world steps after treatment. */}
-            {encounterTreatments.length > 0 && (
+                checkbox is used (createLabOrder fires on save), and now
+                Billing does too (the treatment wizard's own "پس از ثبت،
+                برای دریافت پرداخت به مالی بروم" checkbox, added right at
+                treatment-creation time) — so this panel no longer needs a
+                separate "ارسال به مالی" button either; showing it here
+                after the fact just duplicated a choice staff should
+                already have made while creating the treatment. Implant
+                referral stays: nothing else offers that path. */}
+            {encounterTreatments.length > 0 && encounterTreatments.some((t) => /ایمپلنت|implant/i.test(t.procedure_name || '')) && (
               <div className="p-3.5 rounded-2xl bg-slate-50 border border-slate-100 space-y-2.5">
                 <p className="text-xs font-bold text-slate-500 uppercase tracking-wider">مرحله‌ی بعد</p>
                 <div className="flex flex-wrap gap-2">
                   <button
-                    onClick={() => {
-                      const totalCost = encounterTreatments.filter((t) => t.status !== 'cancelled').reduce((s, t) => s + (t.total_price || 0), 0)
-                      navigate('/billing', { state: { openPaymentForPatientId: detailEnc.patient_id, suggestedAmount: totalCost, fromEncounterId: detailEnc.id } })
-                    }}
-                    className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-emerald-50 text-emerald-700 text-xs font-bold hover:bg-emerald-100 transition-all-smooth press-scale"
+                    onClick={() => navigate('/implants', { state: { quickStartPatientId: detailEnc.patient_id, quickStartDoctorId: detailEnc.doctor_id } })}
+                    className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-blue-50 text-blue-700 text-xs font-bold hover:bg-blue-100 transition-all-smooth press-scale"
                   >
-                    <DollarSign size={14} /> ارسال به مالی
+                    <Bone size={14} /> ارسال به ایمپلنت
                   </button>
-                  {encounterTreatments.some((t) => /ایمپلنت|implant/i.test(t.procedure_name || '')) && (
-                    <button
-                      onClick={() => navigate('/implants', { state: { quickStartPatientId: detailEnc.patient_id, quickStartDoctorId: detailEnc.doctor_id } })}
-                      className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-blue-50 text-blue-700 text-xs font-bold hover:bg-blue-100 transition-all-smooth press-scale"
-                    >
-                      <Bone size={14} /> ارسال به ایمپلنت
-                    </button>
-                  )}
                   {encounterTreatments.some((t) => t.lab_id) && (
                     <span className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-cyan-50 text-cyan-700 text-xs font-bold">
                       <FlaskConical size={14} /> به لابراتوار ارسال شد
