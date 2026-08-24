@@ -559,9 +559,18 @@ interface DentalChartProps {
   treatments: Treatment[]
   onUpdateTooth: (toothNumber: string, data: { is_missing: boolean; is_implant: boolean; notes: string; condition?: string; surfaces?: string }) => void
   onAddTreatment?: (toothNumber: string) => void
+  /** Fires every time a tooth gets clicked/selected on the chart — lets
+   * the parent remember "the last tooth someone actually pointed at"
+   * so the general '+ درمان جدید' button (not the per-tooth one, which
+   * already carries the number correctly) can default to it too instead
+   * of opening blank. Direct fix for "دندونی که تو ویزیت انتخاب کردیم
+   * باید خودکار پر بشه" — marking a condition on a tooth should count
+   * as "selecting" it for this purpose, not just clicking the dedicated
+   * per-tooth treatment button. */
+  onToothSelect?: (toothNumber: string) => void
 }
 
-export default function DentalChart({ toothRecords, treatments, onUpdateTooth, onAddTreatment }: DentalChartProps) {
+export default function DentalChart({ toothRecords, treatments, onUpdateTooth, onAddTreatment, onToothSelect }: DentalChartProps) {
   const [selectedTooth, setSelectedTooth] = useState<ToothData | null>(null)
   const [showPrimary, setShowPrimary] = useState(false)
 
@@ -635,17 +644,17 @@ export default function DentalChart({ toothRecords, treatments, onUpdateTooth, o
   const getToothLabel = (fdiNumber: number): string => fdiToPalmer(fdiNumber)
 
   const renderQuadrant = (teeth: number[], _label: string, palmerSymbol?: string) => (
-    <div className="flex items-center gap-0.5 relative">
+    <div className="flex items-center gap-0.5 relative shrink-0">
       {palmerSymbol && (
-        <span className="text-2xl font-bold text-slate-400 ml-0.5 mr-0.5 select-none">{palmerSymbol}</span>
+        <span className="text-2xl font-bold text-slate-400 ml-0.5 mr-0.5 select-none shrink-0">{palmerSymbol}</span>
       )}
       {teeth.map((num) => {
         const data = getToothData(num)
         return (
           <div
             key={num}
-            onClick={() => setSelectedTooth(data)}
-            className={`relative rounded-lg p-0.5 cursor-pointer transition-all-smooth hover:bg-slate-100 ${selectedTooth?.number === num ? 'bg-primary-50 ring-2 ring-primary-300' : ''} ${data.isPlannedOnly ? 'opacity-60' : ''}`}
+            onClick={() => { setSelectedTooth(data); onToothSelect?.(String(num)) }}
+            className={`relative rounded-lg p-0.5 cursor-pointer transition-all-smooth hover:bg-slate-100 shrink-0 ${selectedTooth?.number === num ? 'bg-primary-50 ring-2 ring-primary-300' : ''} ${data.isPlannedOnly ? 'opacity-60' : ''}`}
           >
             <ToothSVG
               number={num}
@@ -710,9 +719,17 @@ export default function DentalChart({ toothRecords, treatments, onUpdateTooth, o
         {/* Upper Jaw */}
         <div className="mb-6">
           <p className="text-xs text-slate-400 mb-3 text-center font-medium">فک بالا (ماکسیلاری)</p>
-          <div className="flex items-center justify-center gap-1 flex-wrap">
+          {/* Was flex-wrap — on a phone-width screen, 16 tooth icons plus
+              the divider don't fit on one line, so the browser wrapped it
+              into two stacked rows (right quadrant on its own line, left
+              quadrant below it) instead of the intended single continuous
+              row with the divider sitting at the real midline — exactly
+              what a handwritten diagram showed this should look like
+              instead: one unbroken row, scrolling horizontally if it
+              doesn't fit rather than breaking into two lines. */}
+          <div className="flex items-center gap-1 overflow-x-auto dock-scroll px-1 py-1">
             {renderQuadrant(upperRight, 'فوق راست', palmerSymbols.upperRight)}
-            <div className="w-px h-12 bg-slate-200 mx-2" />
+            <div className="w-px h-12 bg-slate-200 mx-2 shrink-0" />
             {renderQuadrant(upperLeft, 'فوق چپ', palmerSymbols.upperLeft)}
           </div>
         </div>
@@ -720,9 +737,9 @@ export default function DentalChart({ toothRecords, treatments, onUpdateTooth, o
         {/* Lower Jaw */}
         <div>
           <p className="text-xs text-slate-400 mb-3 text-center font-medium">فک پایین (ماندیبول)</p>
-          <div className="flex items-center justify-center gap-1 flex-wrap">
+          <div className="flex items-center gap-1 overflow-x-auto dock-scroll px-1 py-1">
             {renderQuadrant(lowerRight, 'تحت راست', palmerSymbols.lowerRight)}
-            <div className="w-px h-12 bg-slate-200 mx-2" />
+            <div className="w-px h-12 bg-slate-200 mx-2 shrink-0" />
             {renderQuadrant(lowerLeft, 'تحت چپ', palmerSymbols.lowerLeft)}
           </div>
         </div>
@@ -733,16 +750,16 @@ export default function DentalChart({ toothRecords, treatments, onUpdateTooth, o
         <div className="bg-amber-50/30 rounded-2xl border border-amber-100 p-4 md:p-6">
           <p className="text-xs text-amber-600 mb-3 text-center font-medium">دندان‌های شیری</p>
           <div className="mb-4">
-            <div className="flex items-center justify-center gap-1 flex-wrap">
+            <div className="flex items-center gap-1 overflow-x-auto dock-scroll px-1 py-1">
               {renderQuadrant(primaryUpperRight, 'شیری فوق راست', palmerSymbols.primaryUpperRight)}
-              <div className="w-px h-10 bg-amber-200 mx-2" />
+              <div className="w-px h-10 bg-amber-200 mx-2 shrink-0" />
               {renderQuadrant(primaryUpperLeft, 'شیری فوق چپ', palmerSymbols.primaryUpperLeft)}
             </div>
           </div>
           <div>
-            <div className="flex items-center justify-center gap-1 flex-wrap">
+            <div className="flex items-center gap-1 overflow-x-auto dock-scroll px-1 py-1">
               {renderQuadrant(primaryLowerRight, 'شیری تحت راست', palmerSymbols.primaryLowerRight)}
-              <div className="w-px h-10 bg-amber-200 mx-2" />
+              <div className="w-px h-10 bg-amber-200 mx-2 shrink-0" />
               {renderQuadrant(primaryLowerLeft, 'شیری تحت چپ', palmerSymbols.primaryLowerLeft)}
             </div>
           </div>

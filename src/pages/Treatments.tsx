@@ -136,6 +136,12 @@ export default function Treatments() {
   const [treatWizardStep, setTreatWizardStep] = useState(0)
   const [editingTreat, setEditingTreat] = useState<Treatment | null>(null)
   const [treatEncounterId, setTreatEncounterId] = useState<string | null>(null)
+  // The most recent tooth clicked on the chart (marking a condition
+  // counts, not just the dedicated per-tooth button) — lets the general
+  // '+ درمان جدید' button default to it too, per direct feedback that a
+  // tooth "selected" on the visit should flow into treatment
+  // automatically instead of asking again from a blank form.
+  const [lastSelectedTooth, setLastSelectedTooth] = useState<string>('')
   const [treatPatientId, setTreatPatientId] = useState<string | null>(null)
   const [savingTreat, setSavingTreat] = useState(false)
   const [treatForm, setTreatForm] = useState({
@@ -442,7 +448,7 @@ export default function Treatments() {
     setTreatEncounterId(encId); setTreatPatientId(patId)
     setTreatForm({
       procedure_code: '', procedure_name: '', procedure_category: '',
-      tooth_number: '', tooth_surface: '', quantity: '1', unit_price: '',
+      tooth_number: lastSelectedTooth, tooth_surface: '', quantity: '1', unit_price: '',
       discount: '', total_price: '', status: 'planned', notes: '',
       has_lab: false, lab_id: '', lab_cost: '', lab_work_type: '', lab_material: '', lab_shade: '', go_to_billing: false,
     })
@@ -884,7 +890,7 @@ export default function Treatments() {
       />
 
       {/* ── Encounter Detail Modal (treatments + dental chart) ── */}
-      <Modal open={!!detailEnc} onClose={() => { h.cancel(); setDetailEnc(null) }} title={detailEnc ? `ویزیت: ${encounterPatientName(detailEnc)}` : ''} size="full">
+      <Modal open={!!detailEnc} onClose={() => { h.cancel(); setDetailEnc(null); setLastSelectedTooth('') }} title={detailEnc ? `ویزیت: ${encounterPatientName(detailEnc)}` : ''} size="full">
         {detailEnc && (
           <div className="space-y-5">
             {/* Info bar */}
@@ -899,7 +905,7 @@ export default function Treatments() {
             {/* Dental Chart */}
             <div>
               <h4 className="text-xs font-bold text-slate-500 mb-3 uppercase tracking-wider flex items-center gap-1.5"><Smile size={14} /> چارت دندانی (پالمر)</h4>
-              <DentalChart toothRecords={toothRecords} treatments={encounterTreatments} onUpdateTooth={handleUpdateTooth} onAddTreatment={(toothNum) => { if (!detailEnc) return; setTreatEncounterId(detailEnc.id); setTreatPatientId(detailEnc.patient_id); setEditingTreat(null); setTreatWizardStep(0); setTreatForm({ procedure_code: '', procedure_name: '', procedure_category: '', tooth_number: toothNum, tooth_surface: '', quantity: '1', unit_price: '', discount: '', total_price: '', status: 'planned', notes: '', has_lab: false, lab_id: '', lab_cost: '', lab_work_type: '', lab_material: '', lab_shade: '', go_to_billing: false }); setTreatModalOpen(true) }} />
+              <DentalChart toothRecords={toothRecords} treatments={encounterTreatments} onUpdateTooth={handleUpdateTooth} onToothSelect={(toothNum) => setLastSelectedTooth(toothNum)} onAddTreatment={(toothNum) => { if (!detailEnc) return; setTreatEncounterId(detailEnc.id); setTreatPatientId(detailEnc.patient_id); setEditingTreat(null); setTreatWizardStep(0); setTreatForm({ procedure_code: '', procedure_name: '', procedure_category: '', tooth_number: toothNum, tooth_surface: '', quantity: '1', unit_price: '', discount: '', total_price: '', status: 'planned', notes: '', has_lab: false, lab_id: '', lab_cost: '', lab_work_type: '', lab_material: '', lab_shade: '', go_to_billing: false }); setTreatModalOpen(true) }} />
             </div>
 
             {/* Treatments list */}
