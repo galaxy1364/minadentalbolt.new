@@ -378,8 +378,24 @@ function ToothDetailPanel({
         {/* Header */}
         <div className="sticky top-0 bg-white border-b border-slate-100 px-5 py-4 flex items-center justify-between z-10">
           <div className="flex items-center gap-3">
-            <div className="w-12 h-12 rounded-xl bg-primary-50 flex items-center justify-center">
-              <Smile size={24} className="text-primary-600" />
+            {/* Compact quadrant indicator — from a direct request with a
+                handwritten diagram: instead of a generic icon, show which
+                of the 4 real jaw quadrants this specific tooth sits in at
+                a glance (matches the number shown right next to it), not
+                the full 32-tooth chart. A text label rather than a
+                spatial grid deliberately — a mirrored left/right grid
+                risks being genuinely misread in a clinical context, and
+                that's worse than not showing one at all. FDI numbering:
+                first digit 1/2 = upper right/left, 3/4 = lower left/
+                right; primary (baby) teeth 5/6/7/8 map the same way. */}
+            <div className="w-12 h-12 rounded-xl bg-primary-50 flex flex-col items-center justify-center px-1 text-center">
+              <span className="text-[9px] font-bold text-primary-600 leading-tight">
+                {(() => {
+                  const q = Math.floor(tooth.number / 10)
+                  const norm = q >= 5 ? q - 4 : q
+                  return norm === 1 ? 'بالا راست' : norm === 2 ? 'بالا چپ' : norm === 3 ? 'پایین چپ' : 'پایین راست'
+                })()}
+              </span>
             </div>
             <div>
               <h3 className="text-base font-bold text-slate-800">دندان {toPersianDigits(tooth.number)}</h3>

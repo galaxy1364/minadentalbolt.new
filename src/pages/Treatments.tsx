@@ -921,7 +921,16 @@ export default function Treatments() {
               {encounterTreatments.length === 0 && (
                 <Button variant="secondary" onClick={() => navigate(`/billing`, { state: { openPaymentForPatientId: detailEnc.patient_id } })} className="flex items-center gap-1.5"><DollarSign size={16} /> ارجاع به مالی</Button>
               )}
-              <Button variant="secondary" onClick={() => navigate(`/laboratory`, { state: { quickStartPatientId: detailEnc.patient_id, quickStartDoctorId: detailEnc.doctor_id || undefined } })} className="flex items-center gap-1.5"><FlaskConical size={16} /> ارجاع به لابراتوار</Button>
+              {/* Removed the standalone 'ارجاع به لابراتوار' button that
+                  used to live here — genuinely redundant with the
+                  'ارسال به لابراتوار + مالی' checkbox inside the treatment
+                  wizard itself (لابراتوار step), which does strictly more:
+                  it creates the real lab order with lab/work-type/
+                  material/shade in one step, tied to the actual treatment,
+                  instead of just navigating to a blank page. Confirmed via
+                  a direct question about this — two paths to the same
+                  destination where one is clearly worse is the same
+                  duplicate-action pattern found elsewhere this session. */}
               <Button variant="ghost" onClick={() => navigate(`/patients/${detailEnc.patient_id}`)} className="flex items-center gap-1.5 mr-auto"><Eye size={16} /> پرونده بیمار</Button>
             </div>
           </div>
