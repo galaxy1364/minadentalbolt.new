@@ -290,6 +290,50 @@ export default function Treatments() {
     setEncModalOpen(true)
   }
 
+  // Real, repeated complaint: creating a "ویزیت" first (patient/doctor
+  // step, then chief-complaint/diagnosis/treatment-plan free-text step,
+  // then amount/status step, then notes) before you can even pick a
+  // tooth felt like an artificial, repeated version of the same work —
+  // "دندون انتخاب کنید اصلا چیزی به اسم ویزیت وجود نداره". Not every
+  // patient interaction needs that ceremony. This is the direct path:
+  // pick only the patient (doctor optional), an encounter is created
+  // silently in the background with sensible defaults, and the tooth
+  // chart opens immediately — the same chart 'ویزیت جدید' eventually
+  // leads to anyway, just without the detour through 4 wizard steps
+  // first. The underlying encounter record still exists (treatments
+  // need a parent to group under for billing/lab purposes) — it's just
+  // never shown to the person as a separate thing to fill out.
+  const [quickTreatModalOpen, setQuickTreatModalOpen] = useState(false)
+  const [quickTreatPatientId, setQuickTreatPatientId] = useState('')
+  const [quickTreatDoctorId, setQuickTreatDoctorId] = useState('')
+  const [savingQuickTreat, setSavingQuickTreat] = useState(false)
+
+  const openQuickTreatModal = () => {
+    h.tap()
+    setQuickTreatPatientId('')
+    setQuickTreatDoctorId('')
+    setQuickTreatModalOpen(true)
+  }
+
+  const handleQuickTreatStart = async () => {
+    if (!quickTreatPatientId) { showToast('error', 'انتخاب بیمار الزامی است'); return }
+    setSavingQuickTreat(true)
+    try {
+      const newEnc = await createEncounter({
+        patient_id: quickTreatPatientId, doctor_id: quickTreatDoctorId || null,
+        encounter_date: new Date().toISOString().slice(0, 10),
+        chief_complaint: null, diagnosis: null, treatment_plan: null, notes: null,
+        status: 'in_progress', total_amount: 0, discount_amount: 0,
+      } as any)
+      setQuickTreatModalOpen(false)
+      await loadData()
+      const p = patients.find((pt) => pt.id === quickTreatPatientId)
+      const d = doctors.find((dt) => dt.id === quickTreatDoctorId)
+      setDetailEnc({ ...newEnc, patient: p ?? null, doctor: d ?? null } as any)
+    } catch { showToast('error', 'خطا در شروع درمان') }
+    finally { setSavingQuickTreat(false) }
+  }
+
   const openEncEditModal = (e: EncounterWithRelations) => {
     h.tap()
     setEditingEnc(e)
@@ -582,7 +626,12 @@ export default function Treatments() {
         moduleKey="treatments"
         title="درمان‌ها"
         subtitle="مدیریت ویزیت‌ها و رویه‌های درمانی"
-        action={<Button onClick={openEncCreateModal} className="flex items-center gap-1.5"><Plus size={16} /> ویزیت جدید</Button>}
+        action={
+          <div className="flex gap-2">
+            <Button onClick={openQuickTreatModal} variant="primary" className="flex items-center gap-1.5"><Stethoscope size={16} /> شروع درمان مستقیم</Button>
+            <Button onClick={openEncCreateModal} variant="secondary" className="flex items-center gap-1.5"><Plus size={16} /> ویزیت جدید</Button>
+          </div>
+        }
       />
 
       {/* Stats */}
@@ -1076,6 +1125,31 @@ export default function Treatments() {
           },
         ]}
       />
+
+      <Modal open={quickTreatModalOpen} onClose={() => setQuickTreatModalOpen(false)} title="شروع درمان مستقیم">
+        <div className="space-y-4 p-1">
+          <p className="text-xs text-slate-500">
+            فقط بیمار را انتخاب کنید — بلافاصله وارد چارت دندانی می‌شوید تا دندان و درمان را مستقیم ثبت کنید، بدون فرم‌های اضافه.
+          </p>
+          <Select
+            label="بیمار *"
+            value={quickTreatPatientId}
+            onChange={setQuickTreatPatientId}
+            options={patients.filter((p) => p.is_active).map((p) => ({ value: p.id, label: `${p.first_name} ${p.last_name}` }))}
+            placeholder="انتخاب بیمار..."
+          />
+          <Select
+            label="پزشک (اختیاری)"
+            value={quickTreatDoctorId}
+            onChange={setQuickTreatDoctorId}
+            options={doctors.filter((d) => d.is_active).map((d) => ({ value: d.id, label: `دکتر ${d.name}` }))}
+            placeholder="بعداً هم قابل تعیین است..."
+          />
+          <Button onClick={handleQuickTreatStart} disabled={savingQuickTreat || !quickTreatPatientId} className="w-full flex items-center justify-center gap-1.5">
+            {savingQuickTreat ? <Spinner size={16} /> : <><Stethoscope size={16} /> ورود به چارت و شروع درمان</>}
+          </Button>
+        </div>
+      </Modal>
 
       {ConfirmActionModal}
     </div>
