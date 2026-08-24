@@ -335,9 +335,19 @@ export default function Treatments() {
       onConfirm: async () => {
         setSavingEnc(true)
         try {
+          let savedEnc: Encounter | null = null
           if (editingEnc) { await updateEncounter(editingEnc.id, payload); showToast('success', 'ویزیت ویرایش شد') }
-          else { await createEncounter(payload); showToast('success', 'ویزیت ثبت شد') }
+          else { savedEnc = await createEncounter(payload); showToast('success', 'ویزیت ثبت شد — حالا می‌توانید از چارت دندانی، درمان‌ها را ثبت کنید') }
           setEncModalOpen(false); await loadData()
+          // Previously this just closed back to the plain list — a
+          // brand-new visit had zero connection to the tooth-chart /
+          // checkbox-based treatment planner that already exists on the
+          // encounter detail view, so staff had to manually find and
+          // re-open the visit they'd just created to actually use it.
+          // Now it opens straight into that chart automatically.
+          if (savedEnc) {
+            setDetailEnc({ ...savedEnc, patient: patient ?? null, doctor: doctors.find((d) => d.id === savedEnc!.doctor_id) ?? null } as any)
+          }
         } catch { showToast('error', 'خطا در ذخیره') }
         finally { setSavingEnc(false) }
       },

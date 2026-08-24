@@ -206,17 +206,26 @@ export default function Patients() {
     const genderLabel = formData.gender ? (formData.gender === 'male' ? 'آقا' : 'خانم') : '—'
     const age = calculateAge(formData.birth_date)
 
-    // Duplicate-patient detection: same phone number or same national
-    // ID matching an EXISTING different patient — a soft warning, not
-    // a block, since a real family could legitimately share a landline,
-    // but two records for the same actual person is a real and common
-    // data-quality problem worth flagging before it happens.
+    // Duplicate-patient detection. National ID is a real, legally
+    // unique identifier — two genuine different people can never
+    // actually share one, so a match here is always a true duplicate
+    // record and must be a hard block, never just a warning. Phone
+    // stays a soft warning: a real family can legitimately share one
+    // landline/mobile between different actual patients, so it's
+    // allowed — but flagged clearly before confirming, so staff always
+    // know when it happens rather than it passing silently.
     const dupPhone = formData.phone
       ? patients.find((p) => p.phone === formData.phone.trim() && p.id !== editingPatient?.id)
       : null
     const dupNationalId = formData.national_id
       ? patients.find((p) => p.national_id === formData.national_id.trim() && p.id !== editingPatient?.id)
       : null
+
+    if (dupNationalId) {
+      h.error()
+      showToast('error', `این کد ملی قبلاً برای «${dupNationalId.first_name} ${dupNationalId.last_name}» ثبت شده — کد ملی نمی‌تواند تکراری باشد`)
+      return
+    }
 
     const fields: ConfirmActionConfig['fields'] = [
       { label: 'نام کامل', value: `${formData.first_name} ${formData.last_name}`, icon: <User size={16} />, highlight: true },
@@ -231,10 +240,10 @@ export default function Patients() {
     if (formData.allergies) fields.push({ label: 'حساسیت‌ها', value: formData.allergies, icon: <AlertCircle size={16} /> })
     if (formData.address) fields.push({ label: 'آدرس', value: `${formData.city || ''} ${formData.address}`.trim(), icon: <MapPin size={16} /> })
     if (formData.notes) fields.push({ label: 'یادداشت', value: formData.notes })
-    if (dupNationalId) {
-      fields.push({ label: '⚠ احتمال تکراری بودن', value: `کد ملی مشابه بیمار «${dupNationalId.first_name} ${dupNationalId.last_name}» است` })
-    } else if (dupPhone) {
-      fields.push({ label: '⚠ احتمال تکراری بودن', value: `شماره تلفن مشابه بیمار «${dupPhone.first_name} ${dupPhone.last_name}» است` })
+    // National ID duplicates are already blocked above (return, never
+    // reach here) — only phone can still legitimately reach this point.
+    if (dupPhone) {
+      fields.push({ label: '⚠ شماره تلفن مشترک', value: `این شماره برای بیمار «${dupPhone.first_name} ${dupPhone.last_name}» هم ثبت شده — اگر عضو خانواده‌ی دیگری‌ست، مشکلی نیست` })
     }
 
     confirmAction({
