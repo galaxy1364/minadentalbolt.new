@@ -643,11 +643,8 @@ export default function DentalChart({ toothRecords, treatments, onUpdateTooth, o
 
   const getToothLabel = (fdiNumber: number): string => fdiToPalmer(fdiNumber)
 
-  const renderQuadrant = (teeth: number[], _label: string, palmerSymbol?: string) => (
+  const renderQuadrant = (teeth: number[]) => (
     <div className="flex items-center gap-0.5 relative shrink-0">
-      {palmerSymbol && (
-        <span className="text-2xl font-bold text-slate-400 ml-0.5 mr-0.5 select-none shrink-0">{palmerSymbol}</span>
-      )}
       {teeth.map((num) => {
         const data = getToothData(num)
         return (
@@ -728,9 +725,24 @@ export default function DentalChart({ toothRecords, treatments, onUpdateTooth, o
               instead: one unbroken row, scrolling horizontally if it
               doesn't fit rather than breaking into two lines. */}
           <div className="flex items-center gap-1 overflow-x-auto dock-scroll px-1 py-1">
-            {renderQuadrant(upperRight, 'فوق راست', palmerSymbols.upperRight)}
-            <div className="w-px h-12 bg-slate-200 mx-2 shrink-0" />
-            {renderQuadrant(upperLeft, 'فوق چپ', palmerSymbols.upperLeft)}
+            {renderQuadrant(upperRight)}
+            {/* Explicit sibling elements right at the midline, in a fixed
+                DOM order — was previously rendered from inside
+                renderQuadrant itself, whose internal element order
+                stopped reliably mapping to visual position once this row
+                became RTL + horizontally-scrollable (a known cross-
+                browser inconsistency for that specific combination): the
+                left-quadrant symbol was landing at the far outer edge
+                behind tooth 8 instead of at the midline it belongs at,
+                confirmed exactly by a screenshot. Two plain siblings next
+                to the divider can't be misplaced this way regardless of
+                directionality quirks. */}
+            <div className="flex items-center gap-1 shrink-0">
+              <span className="text-2xl font-bold text-slate-400 select-none">{palmerSymbols.upperRight}</span>
+              <div className="w-px h-12 bg-slate-200 mx-1" />
+              <span className="text-2xl font-bold text-slate-400 select-none">{palmerSymbols.upperLeft}</span>
+            </div>
+            {renderQuadrant(upperLeft)}
           </div>
         </div>
 
@@ -738,9 +750,13 @@ export default function DentalChart({ toothRecords, treatments, onUpdateTooth, o
         <div>
           <p className="text-xs text-slate-400 mb-3 text-center font-medium">فک پایین (ماندیبول)</p>
           <div className="flex items-center gap-1 overflow-x-auto dock-scroll px-1 py-1">
-            {renderQuadrant(lowerRight, 'تحت راست', palmerSymbols.lowerRight)}
-            <div className="w-px h-12 bg-slate-200 mx-2 shrink-0" />
-            {renderQuadrant(lowerLeft, 'تحت چپ', palmerSymbols.lowerLeft)}
+            {renderQuadrant(lowerRight)}
+            <div className="flex items-center gap-1 shrink-0">
+              <span className="text-2xl font-bold text-slate-400 select-none">{palmerSymbols.lowerRight}</span>
+              <div className="w-px h-12 bg-slate-200 mx-1" />
+              <span className="text-2xl font-bold text-slate-400 select-none">{palmerSymbols.lowerLeft}</span>
+            </div>
+            {renderQuadrant(lowerLeft)}
           </div>
         </div>
       </div>
@@ -751,16 +767,24 @@ export default function DentalChart({ toothRecords, treatments, onUpdateTooth, o
           <p className="text-xs text-amber-600 mb-3 text-center font-medium">دندان‌های شیری</p>
           <div className="mb-4">
             <div className="flex items-center gap-1 overflow-x-auto dock-scroll px-1 py-1">
-              {renderQuadrant(primaryUpperRight, 'شیری فوق راست', palmerSymbols.primaryUpperRight)}
-              <div className="w-px h-10 bg-amber-200 mx-2 shrink-0" />
-              {renderQuadrant(primaryUpperLeft, 'شیری فوق چپ', palmerSymbols.primaryUpperLeft)}
+              {renderQuadrant(primaryUpperRight)}
+              <div className="flex items-center gap-1 shrink-0">
+                <span className="text-xl font-bold text-amber-500 select-none">{palmerSymbols.primaryUpperRight}</span>
+                <div className="w-px h-10 bg-amber-200 mx-1" />
+                <span className="text-xl font-bold text-amber-500 select-none">{palmerSymbols.primaryUpperLeft}</span>
+              </div>
+              {renderQuadrant(primaryUpperLeft)}
             </div>
           </div>
           <div>
             <div className="flex items-center gap-1 overflow-x-auto dock-scroll px-1 py-1">
-              {renderQuadrant(primaryLowerRight, 'شیری تحت راست', palmerSymbols.primaryLowerRight)}
-              <div className="w-px h-10 bg-amber-200 mx-2 shrink-0" />
-              {renderQuadrant(primaryLowerLeft, 'شیری تحت چپ', palmerSymbols.primaryLowerLeft)}
+              {renderQuadrant(primaryLowerRight)}
+              <div className="flex items-center gap-1 shrink-0">
+                <span className="text-xl font-bold text-amber-500 select-none">{palmerSymbols.primaryLowerRight}</span>
+                <div className="w-px h-10 bg-amber-200 mx-1" />
+                <span className="text-xl font-bold text-amber-500 select-none">{palmerSymbols.primaryLowerLeft}</span>
+              </div>
+              {renderQuadrant(primaryLowerLeft)}
             </div>
           </div>
         </div>

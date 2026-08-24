@@ -651,6 +651,21 @@ export default function Treatments() {
         }
       />
 
+      {/* Second entry point, placed in its own full-width row rather than
+          crammed into the header action slot again — that exact spot
+          already caused a real overflow bug twice when it held more than
+          one button. "ویزیت" leads into the same tooth chart as "شروع
+          درمان" for now (the underlying flow this session unified into
+          one continuous path) — kept as its own labeled button per
+          direct request, with room to grow into something more
+          specialized later without needing to touch the header again. */}
+      <button
+        onClick={openQuickTreatModal}
+        className="w-full flex items-center justify-center gap-2 py-3 rounded-2xl border-2 border-dashed border-primary-200 dark:border-primary-800 text-primary-600 dark:text-primary-400 text-sm font-bold hover:bg-primary-50 dark:hover:bg-primary-900/20 transition-all-smooth press-scale"
+      >
+        <ClipboardList size={16} /> ویزیت — ورود به چارت دندانی
+      </button>
+
       {/* Stats */}
       <ReorderableStatGrid
         storageKey="treatments"
@@ -1090,6 +1105,15 @@ export default function Treatments() {
           },
           {
             label: 'لابراتوار و مالی',
+            // Direct request: staff shouldn't be able to skip past this
+            // step having picked neither option, since forgetting both
+            // (no lab referral AND no follow-up to collect payment) is
+            // exactly the kind of thing this step exists to prevent.
+            // Scoped to NEW treatments only — editing an existing one
+            // (which may have already gone through this decision, or been
+            // paid/sent to lab through a different path entirely) shouldn't
+            // retroactively force a choice that no longer applies.
+            validate: () => (!editingTreat && !treatForm.has_lab && !treatForm.go_to_billing ? 'یکی از «ارسال به لابراتوار» یا «ارسال به مالی» را انتخاب کنید' : null),
             content: (
               <div className="space-y-3">
                 <div className="p-4 rounded-2xl border-2 border-dashed border-slate-200 dark:border-slate-600">
