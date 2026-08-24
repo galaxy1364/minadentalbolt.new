@@ -22,6 +22,7 @@ import { useConfirmAction } from '../components/ConfirmAction'
 import { h } from '../lib/haptics'
 import DentalChart from '../components/DentalChart'
 import { CurrencyInput } from '../components/CurrencyInput'
+import { logError } from '../lib/errorLog'
 
 // ── Constants ──────────────────────────────────────────────────
 
@@ -355,12 +356,19 @@ export default function Treatments() {
       setQuickTreatModalOpen(false)
       await loadData()
       if (quickModalMode === 'visit') {
-        const p = patients.find((pt) => pt.id === quickTreatPatientId)
-        const d = doctors.find((dt) => dt.id === quickTreatDoctorId)
-        setDetailEnc({ ...newEnc, patient: p ?? null, doctor: d ?? null } as any)
+        // Re-fetch the just-created encounter fresh, WITH its patient/
+        // doctor relations already resolved by fetchEncounters itself,
+        // rather than manually constructing them from the patients/
+        // doctors arrays captured in this closure — those could still
+        // be one render behind the just-completed loadData() call, which
+        // is exactly the kind of subtle bug that could leave detailEnc
+        // set but with a null patient, breaking the chart silently.
+        const fresh = await fetchEncounters(quickTreatPatientId)
+        const found = fresh.find((e) => e.id === newEnc.id)
+        if (!found) { showToast('error', 'ویزیت ساخته شد اما بارگذاری آن ناموفق بود — از لیست ویزیت‌ها باز کنید'); return }
+        setDetailEnc(found)
         return
-      }
-      setTreatEncounterId(newEnc.id)
+      }      setTreatEncounterId(newEnc.id)
       setTreatPatientId(quickTreatPatientId)
       setEditingTreat(null)
       setTreatWizardStep(0)
@@ -370,7 +378,14 @@ export default function Treatments() {
         has_lab: false, lab_id: '', lab_cost: '', lab_work_type: '', lab_material: '', lab_shade: '', go_to_billing: false,
       })
       setTreatModalOpen(true)
-    } catch { showToast('error', 'خطا در شروع') }
+    } catch (err) {
+      // Was a silent catch before — if this ever fails again, the exact
+      // error is now saved to Settings -> گزارش خطاها instead of just
+      // showing a generic toast with no way to pin down what broke.
+      console.error('handleQuickTreatStart failed:', err)
+      logError(err, 'react', `quickModalMode=${quickModalMode}`)
+      showToast('error', 'خطا در شروع — جزئیات در تنظیمات ← گزارش خطاها ثبت شد')
+    }
     finally { setSavingQuickTreat(false) }
   }
 
