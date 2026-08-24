@@ -67,8 +67,8 @@ const palmerPrimaryLowerLeft = ['A', 'B', 'C', 'D', 'E']
 const palmerPrimaryLowerRight = ['E', 'D', 'C', 'B', 'A']
 
 const palmerSymbols: Record<string, string> = {
-  upperRight: '┘', upperLeft: '└', lowerLeft: '┐', lowerRight: '┌',
-  primaryUpperRight: '┘', primaryUpperLeft: '└', primaryLowerLeft: '┐', primaryLowerRight: '┌',
+  upperRight: '└', upperLeft: '┘', lowerLeft: '┐', lowerRight: '┌',
+  primaryUpperRight: '└', primaryUpperLeft: '┘', primaryLowerLeft: '┐', primaryLowerRight: '┌',
 }
 
 // Convert FDI number to Palmer display string

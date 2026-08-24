@@ -311,23 +311,37 @@ export default function Treatments() {
   const [quickTreatPatientId, setQuickTreatPatientId] = useState('')
   const [quickTreatDoctorId, setQuickTreatDoctorId] = useState('')
   const [savingQuickTreat, setSavingQuickTreat] = useState(false)
+  // Which of the two buttons opened this picker — genuinely different
+  // destinations after the patient is picked, not the same flow with two
+  // labels. Was previously wired to the exact same function for both,
+  // which is exactly the bug reported: tapping "ویزیت" landed on
+  // "شروع درمان"'s screen instead of the chart it's actually meant for.
+  const [quickModalMode, setQuickModalMode] = useState<'treatment' | 'visit'>('treatment')
 
   const openQuickTreatModal = () => {
     h.tap()
+    setQuickModalMode('treatment')
     setQuickTreatPatientId('')
     setQuickTreatDoctorId('')
     setQuickTreatModalOpen(true)
   }
 
-  // Per direct confirmation: one continuous flow only, no two-hop
-  // detour through the full visual chart before the actual treatment
-  // wizard opens. Creates the encounter silently (same as before), then
-  // jumps straight into the treatment wizard itself — which already has
-  // its own staged steps (procedure -> tooth+level+cost -> lab+billing
-  // -> notes), including a proper tooth picker as step 2. The big
-  // 32-tooth chart view (detailEnc) is no longer part of this path at
-  // all; it stays reachable afterward from the ویزیت‌ها list for anyone
-  // who wants to see everything recorded on that visit together.
+  const openQuickVisitModal = () => {
+    h.tap()
+    setQuickModalMode('visit')
+    setQuickTreatPatientId('')
+    setQuickTreatDoctorId('')
+    setQuickTreatModalOpen(true)
+  }
+
+  // "شروع درمان" and "ویزیت" diverge here, right after the encounter is
+  // created — treatment mode jumps straight into the single-procedure
+  // wizard (fastest path for "I know exactly what I'm recording"); visit
+  // mode opens the full tooth chart instead, for marking/reviewing
+  // conditions across multiple teeth before deciding what to treat — the
+  // "چارت دندانی مختص ویزیت" this button is meant to lead into, ready to
+  // grow into something more specialized later without being tangled up
+  // with the treatment wizard's own code path.
   const handleQuickTreatStart = async () => {
     if (!quickTreatPatientId) { showToast('error', 'انتخاب بیمار الزامی است'); return }
     setSavingQuickTreat(true)
@@ -340,6 +354,12 @@ export default function Treatments() {
       } as any)
       setQuickTreatModalOpen(false)
       await loadData()
+      if (quickModalMode === 'visit') {
+        const p = patients.find((pt) => pt.id === quickTreatPatientId)
+        const d = doctors.find((dt) => dt.id === quickTreatDoctorId)
+        setDetailEnc({ ...newEnc, patient: p ?? null, doctor: d ?? null } as any)
+        return
+      }
       setTreatEncounterId(newEnc.id)
       setTreatPatientId(quickTreatPatientId)
       setEditingTreat(null)
@@ -350,7 +370,7 @@ export default function Treatments() {
         has_lab: false, lab_id: '', lab_cost: '', lab_work_type: '', lab_material: '', lab_shade: '', go_to_billing: false,
       })
       setTreatModalOpen(true)
-    } catch { showToast('error', 'خطا در شروع درمان') }
+    } catch { showToast('error', 'خطا در شروع') }
     finally { setSavingQuickTreat(false) }
   }
 
@@ -647,24 +667,12 @@ export default function Treatments() {
         title="درمان‌ها"
         subtitle="مدیریت ویزیت‌ها و رویه‌های درمانی"
         action={
-          <Button onClick={openQuickTreatModal} variant="primary" className="flex items-center gap-1.5"><Stethoscope size={16} /> شروع درمان</Button>
+          <div className="flex flex-wrap items-center justify-end gap-2">
+            <Button onClick={openQuickVisitModal} variant="secondary" size="sm" className="flex items-center gap-1.5 whitespace-nowrap"><ClipboardList size={14} /> ویزیت</Button>
+            <Button onClick={openQuickTreatModal} variant="primary" size="sm" className="flex items-center gap-1.5 whitespace-nowrap"><Stethoscope size={14} /> شروع درمان</Button>
+          </div>
         }
       />
-
-      {/* Second entry point, placed in its own full-width row rather than
-          crammed into the header action slot again — that exact spot
-          already caused a real overflow bug twice when it held more than
-          one button. "ویزیت" leads into the same tooth chart as "شروع
-          درمان" for now (the underlying flow this session unified into
-          one continuous path) — kept as its own labeled button per
-          direct request, with room to grow into something more
-          specialized later without needing to touch the header again. */}
-      <button
-        onClick={openQuickTreatModal}
-        className="w-full flex items-center justify-center gap-2 py-3 rounded-2xl border-2 border-dashed border-primary-200 dark:border-primary-800 text-primary-600 dark:text-primary-400 text-sm font-bold hover:bg-primary-50 dark:hover:bg-primary-900/20 transition-all-smooth press-scale"
-      >
-        <ClipboardList size={16} /> ویزیت — ورود به چارت دندانی
-      </button>
 
       {/* Stats */}
       <ReorderableStatGrid
@@ -1167,10 +1175,12 @@ export default function Treatments() {
         ]}
       />
 
-      <Modal open={quickTreatModalOpen} onClose={() => setQuickTreatModalOpen(false)} title="شروع درمان مستقیم">
+      <Modal open={quickTreatModalOpen} onClose={() => setQuickTreatModalOpen(false)} title={quickModalMode === 'visit' ? 'ویزیت جدید' : 'شروع درمان مستقیم'}>
         <div className="space-y-4 p-1">
           <p className="text-xs text-slate-500">
-            فقط بیمار را انتخاب کنید — بلافاصله وارد چارت دندانی می‌شوید تا دندان و درمان را مستقیم ثبت کنید، بدون فرم‌های اضافه.
+            {quickModalMode === 'visit'
+              ? 'فقط بیمار را انتخاب کنید — بلافاصله وارد چارت دندانی کامل می‌شوید تا وضعیت همه‌ی دندان‌ها را مرور و ثبت کنید.'
+              : 'فقط بیمار را انتخاب کنید — بلافاصله وارد ثبت درمان می‌شوید تا دندان و رویه‌ی درمانی را مستقیم ثبت کنید، بدون فرم‌های اضافه.'}
           </p>
           <Select
             label="بیمار *"
@@ -1187,7 +1197,7 @@ export default function Treatments() {
             placeholder="بعداً هم قابل تعیین است..."
           />
           <Button onClick={handleQuickTreatStart} disabled={savingQuickTreat || !quickTreatPatientId} className="w-full flex items-center justify-center gap-1.5">
-            {savingQuickTreat ? <Spinner size={16} /> : <><Stethoscope size={16} /> ورود به چارت و شروع درمان</>}
+            {savingQuickTreat ? <Spinner size={16} /> : quickModalMode === 'visit' ? <><ClipboardList size={16} /> ورود به چارت دندانی</> : <><Stethoscope size={16} /> ورود به ثبت درمان</>}
           </Button>
         </div>
       </Modal>
