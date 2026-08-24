@@ -209,7 +209,14 @@ export default function Appointments() {
   const wizardNext = () => {
     if (wizardStep === 0 && !wizardData.patient_id) { h.error(); showToast('error', 'انتخاب بیمار الزامی است'); return }
     if (wizardStep === 1 && !wizardData.doctor_id) { h.error(); showToast('error', 'انتخاب پزشک الزامی است'); return }
+    // Unit wasn't required even after a doctor was chosen — a real
+    // scheduling gap, since which physical unit/chair the patient sees
+    // matters just as much as which doctor once one is selected.
+    if (wizardStep === 1 && units.filter((u) => u.is_active).length > 0 && !wizardData.unit_id) { h.error(); showToast('error', 'انتخاب یونیت الزامی است'); return }
+    if (wizardStep === 2 && !wizardData.date) { h.error(); showToast('error', 'انتخاب تاریخ الزامی است'); return }
+    if (wizardStep === 2 && (!wizardData.start_time || !wizardData.end_time)) { h.error(); showToast('error', 'انتخاب ساعت شروع و پایان الزامی است'); return }
     if (wizardStep === 2 && wizardData.start_time >= wizardData.end_time) { h.error(); showToast('error', 'ساعت پایان باید بعد از شروع باشد'); return }
+    if (wizardStep === 3 && !wizardData.type) { h.error(); showToast('error', 'انتخاب نوع نوبت الزامی است'); return }
     h.confirm()
     setWizardStep((s) => Math.min(s + 1, 3))
   }
@@ -813,7 +820,16 @@ export default function Appointments() {
                   <Select
                     label="پزشک"
                     value={wizardData.doctor_id}
-                    onChange={(v) => { h.select(); setWizardData((p) => ({ ...p, doctor_id: v })) }}
+                    onChange={(v) => {
+                      h.select()
+                      // Changing the doctor resets unit + previously
+                      // picked time — a different doctor may not use the
+                      // same unit or have that slot free at all, so
+                      // silently keeping a stale selection risked booking
+                      // a conflict the wizard's own conflict-check
+                      // wouldn't catch until much later.
+                      setWizardData((p) => ({ ...p, doctor_id: v, unit_id: '', start_time: '09:00', end_time: '09:30' }))
+                    }}
                     options={doctors.filter((d) => d.is_active || d.id === wizardData.doctor_id).map((d) => ({ value: d.id, label: `دکتر ${d.name || d.specialty || 'پزشک'}${!d.is_active ? ' (غیرفعال)' : ''}` }))}
                     placeholder="انتخاب پزشک..."
                   />
@@ -824,7 +840,7 @@ export default function Appointments() {
                   </div>
                 ) : (
                 <Select
-                  label="یونیت"
+                  label="یونیت *"
                   value={wizardData.unit_id}
                   onChange={(v) => { h.select(); setWizardData((p) => ({ ...p, unit_id: v })) }}
                   options={units.filter((u) => u.is_active || u.id === wizardData.unit_id).map((u) => ({ value: u.id, label: `${u.name}${!u.is_active ? ' (غیرفعال)' : ''}` }))}
@@ -844,8 +860,8 @@ export default function Appointments() {
                   />
                 </div>
                 <div className="grid grid-cols-2 gap-3">
-                  <Input label="ساعت شروع" type="time" value={wizardData.start_time} onChange={(v) => setWizardData((p) => ({ ...p, start_time: v }))} />
-                  <Input label="ساعت پایان" type="time" value={wizardData.end_time} onChange={(v) => setWizardData((p) => ({ ...p, end_time: v }))} />
+                  <Input label="ساعت شروع *" type="time" value={wizardData.start_time} onChange={(v) => setWizardData((p) => ({ ...p, start_time: v }))} />
+                  <Input label="ساعت پایان *" type="time" value={wizardData.end_time} onChange={(v) => setWizardData((p) => ({ ...p, end_time: v }))} />
                 </div>
                 {/* Quick time slots */}
                 <div>
@@ -923,7 +939,7 @@ export default function Appointments() {
                 </div>
                 {/* Editable details */}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                  <Select label="نوع نوبت" value={wizardData.type} onChange={(v) => { h.select(); setWizardData((p) => ({ ...p, type: v })) }} options={typeOptions} />
+                  <Select label="نوع نوبت *" value={wizardData.type} onChange={(v) => { h.select(); setWizardData((p) => ({ ...p, type: v })) }} options={typeOptions} />
                   {wizardData.type === 'other' && (
                     <Input label="نوع نوبت (دستی)" value={wizardData.custom_type} onChange={(v) => setWizardData((p) => ({ ...p, custom_type: v }))} placeholder="مثلاً: ادامه‌ی کار قبلی، مشاوره‌ی خاص..." />
                   )}

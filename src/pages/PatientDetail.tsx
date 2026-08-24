@@ -828,7 +828,7 @@ export default function PatientDetail() {
           </h3>
           <div className="space-y-2">
             <InfoRow label="تلفن" value={patient.phone ? toPersianDigits(patient.phone) : '-'} dir="ltr" icon={<Phone size={12} />} />
-            <InfoRow label="تلفن دوم" value={patient.phone2 ? toPersianDigits(patient.phone2) : '-'} dir="ltr" />
+            <InfoRow label="شماره منزل" value={patient.phone2 ? toPersianDigits(patient.phone2) : '-'} dir="ltr" />
             <InfoRow label="ایمیل" value={patient.email || '-'} dir="ltr" icon={<Mail size={12} />} />
             <InfoRow label="استان" value={patient.province || '-'} />
             <InfoRow label="شهر" value={patient.city || '-'} />
@@ -1488,7 +1488,7 @@ export default function PatientDetail() {
               <Input label="نام خانوادگی" value={formData.last_name} onChange={(v) => setFormData((p) => ({ ...p, last_name: v }))} />
               <Input label="کد ملی" value={formData.national_id} onChange={(v) => setFormData((p) => ({ ...p, national_id: v }))} dir="ltr" />
               <Input label="تلفن" value={formData.phone} onChange={(v) => setFormData((p) => ({ ...p, phone: v }))} dir="ltr" />
-              <Input label="تلفن دوم" value={formData.phone2} onChange={(v) => setFormData((p) => ({ ...p, phone2: v }))} dir="ltr" />
+              <Input label="شماره منزل" value={formData.phone2} onChange={(v) => setFormData((p) => ({ ...p, phone2: v }))} dir="ltr" />
               <Input label="ایمیل" type="email" value={formData.email} onChange={(v) => setFormData((p) => ({ ...p, email: v }))} dir="ltr" />
               <PersianDateInput label="تاریخ تولد" value={formData.birth_date} onChange={(v) => setFormData((p) => ({ ...p, birth_date: v }))} />
               <Select label="جنسیت" value={formData.gender} onChange={(v) => setFormData((p) => ({ ...p, gender: v }))} options={genderOptions} placeholder="انتخاب کنید" />
