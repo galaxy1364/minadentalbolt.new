@@ -77,6 +77,36 @@ html {
   --space-4: 1rem;
   --space-6: 1.5rem;
   --space-8: 2rem;
+
+  /* ── MOD-UI-003 Motion tokens ──────────────────────────
+     Four tiers only. Durations were previously ad-hoc values scattered
+     through this file (0.12s, 0.2s, 0.22s, 0.25s, 0.3s...) which is how
+     an interface ends up feeling subtly inconsistent without anyone
+     being able to point at why. */
+  --duration-scalar: 1;
+  --duration-instant: calc(80ms * var(--duration-scalar));
+  --duration-fast:    calc(160ms * var(--duration-scalar));
+  --duration-base:    calc(240ms * var(--duration-scalar));
+  --duration-slow:    calc(360ms * var(--duration-scalar));
+  /* Exits are deliberately ~0.7x their entrance. An entrance introduces
+     something; an exit removes something already finished with, and a
+     slow exit reads as lag rather than polish. */
+  --duration-exit:    calc(170ms * var(--duration-scalar));
+
+  --ease-standard:   cubic-bezier(0.4, 0, 0.2, 1);
+  --ease-emphasized: cubic-bezier(0.34, 1.56, 0.64, 1);
+  --ease-decelerate: cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-exit:       cubic-bezier(0.4, 0, 1, 1);
+}
+
+/* The duration-scalar pattern: because every duration above is
+   multiplied by it, setting the scalar to zero here disables motion
+   everywhere at once. This makes reduced-motion support structural
+   rather than something each new animation has to remember to opt into
+   — the existing global block further down handles anything that
+   bypasses these tokens. */
+@media (prefers-reduced-motion: reduce) {
+  :root { --duration-scalar: 0; }
 }
 
 /* Reading measure: lines running the full width of a wide screen are
@@ -805,11 +835,20 @@ input, textarea, select { font-size: 16px !important; }
   border-radius: 50%;
   background: currentColor;
   opacity: 0;
-  transition: opacity 0.2s, width 0.3s cubic-bezier(0.34,1.56,0.64,1);
+  /* Was animating `width`, which is a layout property — every frame
+     forced a reflow of the tab bar, the classic cause of a stutter on
+     exactly the element users tap most. Now scaled on the GPU instead:
+     fixed 24px wide, scaled down to nothing when inactive. Visually
+     identical, but composited rather than re-laid-out each frame. */
+  width: 24px;
+  transform: scaleX(0);
+  transform-origin: center;
+  transition: opacity var(--duration-fast) var(--ease-standard),
+              transform var(--duration-base) var(--ease-emphasized);
 }
 .liquid-indicator.active::after {
   opacity: 1;
-  width: 24px;
+  transform: scaleX(1);
   border-radius: 3px;
 }
 
