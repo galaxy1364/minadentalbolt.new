@@ -641,7 +641,25 @@ export default function DentalChart({ toothRecords, treatments, onUpdateTooth, o
     setSelectedTooth(null)
   }
 
-  const getToothLabel = (fdiNumber: number): string => fdiToPalmer(fdiNumber)
+  /**
+   * برچسب دندان با پیشوند ربع (UR/UL/LR/LL).
+   *
+   * چرا: در نماد پالمر خالص، هر ربع دوباره از ۱ شماره‌گذاری می‌شود،
+   * بنابراین چهار دندان مختلف همگی «۱» نامیده می‌شوند و در کنار هم
+   * روی صفحه، جفتِ «۱ ۱» وسط چارت به‌طور مکرر به‌عنوان تکرار یا
+   * خطا خوانده می‌شد. رقیب (مینادنت.ir) دقیقاً همین را با پیشوند
+   * ربع حل کرده و در بررسی ویدیوی واقعی برنامه‌شان تأیید شد.
+   *
+   * FDI: رقم اول ربع را می‌دهد — ۱=بالا راست، ۲=بالا چپ،
+   * ۳=پایین چپ، ۴=پایین راست. دندان‌های شیری (۵۱-۸۵) با همان
+   * ترتیب، چهار واحد بالاتر شماره‌گذاری می‌شوند.
+   */
+  const getToothLabel = (fdiNumber: number): string => {
+    const rawQuadrant = Math.floor(fdiNumber / 10)
+    const quadrant = rawQuadrant >= 5 ? rawQuadrant - 4 : rawQuadrant
+    const prefix = quadrant === 1 ? 'UR' : quadrant === 2 ? 'UL' : quadrant === 3 ? 'LL' : 'LR'
+    return `${prefix}${fdiToPalmer(fdiNumber)}`
+  }
 
   const renderQuadrant = (teeth: number[]) => (
     <div className="flex items-center gap-0.5 relative shrink-0">
