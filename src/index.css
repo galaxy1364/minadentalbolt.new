@@ -56,32 +56,48 @@ input, textarea, select { font-size: 16px !important; }
 ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 3px; }
 ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
 
-/* ── iOS 27 Liquid Glass ─────────────────────────────── */
+/* ── iOS 27 Liquid Glass (token-driven) ──────────────────
+   Every glass surface derives from three root variables set at runtime
+   by src/lib/materials.ts. This is the iOS 27 change specifically:
+   iOS 26 shipped Liquid Glass with fixed heavy transparency, and Apple
+   walked it back at WWDC 2026 with a user transparency control because
+   legibility suffered. In a medical app that's a safety issue, not a
+   preference — an unreadable tooth number or amount causes real harm.
+   Hardcoded blur values (was 40px/20px/60px/50px scattered across
+   these rules) made that control impossible, so they're gone. */
+:root {
+  --glass-blur: 28px;
+  --glass-opacity: 0.78;
+  --glass-saturate: 180%;
+}
+
 .glass {
-  background: color-mix(in srgb, var(--module-color, #0d9488) 10%, rgba(255,255,255,0.72));
-  backdrop-filter: blur(40px) saturate(200%);
-  -webkit-backdrop-filter: blur(40px) saturate(200%);
+  background: color-mix(in srgb, var(--module-color, #0d9488) 10%, rgba(255,255,255,var(--glass-opacity)));
+  backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturate));
+  -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturate));
 }
 
 .glass-dark {
-  background: rgba(15, 118, 110, 0.88);
-  backdrop-filter: blur(40px) saturate(200%);
-  -webkit-backdrop-filter: blur(40px) saturate(200%);
+  background: rgba(15, 118, 110, calc(var(--glass-opacity) + 0.1));
+  backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturate));
+  -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturate));
 }
 
 .glass-teal {
   background: rgba(13, 148, 136, 0.08);
-  backdrop-filter: blur(20px);
-  -webkit-backdrop-filter: blur(20px);
+  backdrop-filter: blur(calc(var(--glass-blur) * 0.5));
+  -webkit-backdrop-filter: blur(calc(var(--glass-blur) * 0.5));
 }
 
 .glass-ultra {
-  background: rgba(255,255,255,0.55);
-  backdrop-filter: blur(60px) saturate(240%);
-  -webkit-backdrop-filter: blur(60px) saturate(240%);
+  background: rgba(255,255,255,calc(var(--glass-opacity) - 0.15));
+  backdrop-filter: blur(calc(var(--glass-blur) * 1.4)) saturate(calc(var(--glass-saturate) + 40%));
+  -webkit-backdrop-filter: blur(calc(var(--glass-blur) * 1.4)) saturate(calc(var(--glass-saturate) + 40%));
 }
 
-/* Specular highlight — the liquid-glass "edge light" */
+/* Specular highlight — the liquid-glass "edge light".
+   Fades out as the material approaches opaque: an edge highlight on a
+   solid surface reads as a stray border, not depth. */
 .glass-specular {
   position: relative;
 }
@@ -92,10 +108,23 @@ input, textarea, select { font-size: 16px !important; }
   border-radius: inherit;
   padding: 1px;
   background: linear-gradient(180deg, rgba(255,255,255,0.5), rgba(255,255,255,0.05));
+  opacity: calc((1 - var(--glass-opacity)) * 2.4);
   -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
   -webkit-mask-composite: xor;
   mask-composite: exclude;
   pointer-events: none;
+}
+
+/* Accessibility: the OS-level "Reduce Transparency" setting always wins,
+   matching Apple's own Human Interface Guidelines. materials.ts also
+   checks this in JS at startup; this rule is the CSS-side guarantee so
+   the correct rendering holds even before scripts run. */
+@media (prefers-reduced-transparency: reduce) {
+  :root {
+    --glass-blur: 0px;
+    --glass-opacity: 1;
+    --glass-saturate: 100%;
+  }
 }
 
 /* ── Cards ──────────────────────────────────────────── */
@@ -131,9 +160,13 @@ input, textarea, select { font-size: 16px !important; }
 
 /* ── Bottom tab bar (iOS 27 liquid glass) ───────────── */
 .tab-bar {
-  background: color-mix(in srgb, var(--module-color, #0d9488) 14%, rgba(255,255,255,0.88));
-  backdrop-filter: blur(50px) saturate(200%);
-  -webkit-backdrop-filter: blur(50px) saturate(200%);
+  /* Kept slightly more opaque than other glass surfaces at every level:
+     the tab bar sits over arbitrary scrolling content, so it's the most
+     likely surface to lose legibility — exactly the failure iOS 27's
+     transparency control was introduced to fix. */
+  background: color-mix(in srgb, var(--module-color, #0d9488) 14%, rgba(255,255,255,calc(var(--glass-opacity) + 0.12)));
+  backdrop-filter: blur(calc(var(--glass-blur) * 1.2)) saturate(var(--glass-saturate));
+  -webkit-backdrop-filter: blur(calc(var(--glass-blur) * 1.2)) saturate(var(--glass-saturate));
   border-top: 0.5px solid rgba(0,0,0,0.08);
   box-shadow: 0 -4px 30px rgba(0,0,0,0.04);
 }

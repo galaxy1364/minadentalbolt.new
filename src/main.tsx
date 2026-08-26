@@ -3,8 +3,14 @@ import ReactDOM from 'react-dom/client'
 import App from './App'
 import './index.css'
 import { initGlobalErrorLogging } from './lib/errorLog'
+import { initMaterialSystem } from './lib/materials'
 
 initGlobalErrorLogging()
+
+// MOD-UI-001 — apply the saved (or accessibility-forced) glass level to
+// the root element BEFORE first paint, so surfaces never render at the
+// default transparency and then visibly snap to the user's setting.
+initMaterialSystem()
 
 // Auto-recover from stale-chunk errors: when a background deploy has
 // gone out (this app deploys often), a tab that's been open since

@@ -7,6 +7,7 @@ import {
   Stethoscope, Wrench, ListOrdered, Tag, Copy, CheckCircle2, History, CloudOff, Sparkles, Megaphone, Fingerprint,
 } from 'lucide-react'
 import { isAppLockEnabled, setAppLockPin, disableAppLock, isBiometricAvailable, registerBiometric, hasBiometricRegistered } from '../lib/appLock'
+import { MATERIAL_LEVELS, getMaterialLevel, setMaterialLevel, prefersReducedTransparency, type MaterialLevel } from '../lib/materials'
 import {
   fetchSmsTemplates, fetchTreatmentPackages, fetchDoctors, fetchUnits, fetchProcedures,
   fetchInventoryCategories, fetchPatients,
@@ -64,6 +65,8 @@ function getCatLabel(cat: string | null) {
 
 export default function Settings() {
   const [activeTab, setActiveTab] = useState('general')
+  // MOD-UI-001 — سطح شفازیت فعلی برای نمایش انتخاب جاری در تب ظاهر
+  const [materialLevel, setMaterialLevelState] = useState<MaterialLevel>(() => getMaterialLevel())
   const [smsTemplates, setSmsTemplates] = useState<SmsTemplate[]>([])
   const [packages, setPackages] = useState<TreatmentPackage[]>([])
   const [doctors, setDoctors] = useState<Doctor[]>([])
@@ -440,6 +443,7 @@ export default function Settings() {
           { key: 'doctors', label: 'پزشکان و یونیت‌ها', icon: <Stethoscope size={16} /> },
           { key: 'procedures', label: 'رویه‌ها', icon: <ListOrdered size={16} /> },
           { key: 'backup', label: 'پشتیبان', icon: <Cloud size={16} /> },
+          { key: 'appearance', label: 'ظاهر و شفافیت', icon: <Sparkles size={16} /> },
           { key: 'haptics', label: 'لرزش و صدا', icon: <Vibrate size={16} /> },
           { key: 'app_lock', label: 'قفل امنیتی', icon: <Fingerprint size={16} /> },
           { key: 'file_number', label: 'شماره پرونده', icon: <Hash size={16} /> },
@@ -592,6 +596,46 @@ export default function Settings() {
       {activeTab === 'updates' && <UpdatesTab />}
 
       {/* Haptics Tab */}
+      {activeTab === 'appearance' && (
+        <div className="space-y-4">
+          <Card className="p-5">
+            <h2 className="text-base font-bold text-slate-800 mb-1 flex items-center gap-2">
+              <Sparkles size={18} className="text-primary-600" /> شفافیت شیشه‌ای
+            </h2>
+            <p className="text-xs text-slate-500 mb-4">
+              اگر متن روی پس‌زمینه‌ی شلوغ کم‌رنگ یا سخت‌خوان به‌نظر می‌رسد، سطح را
+              مات‌تر کنید. تغییر بلافاصله در کل برنامه اعمال می‌شود.
+            </p>
+            <div className="space-y-2">
+              {(Object.keys(MATERIAL_LEVELS) as MaterialLevel[]).map((level) => {
+                const isActive = materialLevel === level
+                return (
+                  <button
+                    key={level}
+                    onClick={() => { h.select(); setMaterialLevel(level); setMaterialLevelState(level) }}
+                    className={`w-full flex items-center justify-between p-4 rounded-xl transition-all-smooth press-scale border-2 ${
+                      isActive ? 'border-primary-400 bg-primary-50' : 'border-transparent bg-slate-50 hover:bg-slate-100'
+                    }`}
+                  >
+                    <span className={`text-sm font-medium ${isActive ? 'text-primary-700' : 'text-slate-700'}`}>
+                      {MATERIAL_LEVELS[level]}
+                    </span>
+                    {isActive && <CheckCircle2 size={18} className="text-primary-600" />}
+                  </button>
+                )
+              })}
+            </div>
+            {prefersReducedTransparency() && (
+              <p className="text-[11px] text-amber-600 mt-3 leading-relaxed">
+                ⚠️ در تنظیمات دستگاه شما «کاهش شفافیت» فعال است، بنابراین برنامه
+                همیشه حالت مات را نشان می‌دهد — این ترجیح دسترس‌پذیری بر انتخاب
+                بالا اولویت دارد.
+              </p>
+            )}
+          </Card>
+        </div>
+      )}
+
       {activeTab === 'haptics' && (
         <div className="space-y-4">
           <Card className="p-5">
