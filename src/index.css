@@ -238,16 +238,16 @@ input, textarea, select { font-size: 16px !important; }
 .card-shadow-lg { box-shadow: 0 8px 40px rgba(0,0,0,0.09), 0 2px 8px rgba(0,0,0,0.05); }
 
 /* ── Spring Physics Motion ───────────────────────────── */
-.transition-all-smooth { transition: all 0.28s cubic-bezier(0.4,0,0.2,1); }
-.transition-spring     { transition: all 0.38s cubic-bezier(0.34,1.56,0.64,1); }
-.transition-spring-lg  { transition: all 0.5s cubic-bezier(0.34,1.56,0.64,1); }
-.transition-bounce     { transition: all 0.45s cubic-bezier(0.68,-0.55,0.27,1.55); }
+.transition-all-smooth { transition: all var(--duration-base) var(--ease-standard); }
+.transition-spring     { transition: all var(--duration-slow) var(--ease-emphasized); }
+.transition-spring-lg  { transition: all calc(var(--duration-slow) * 1.4) var(--ease-emphasized); }
+.transition-bounce     { transition: all calc(var(--duration-slow) * 1.25) var(--ease-emphasized); }
 
 /* ── Active press scale (haptic-like visual) ─────────── */
-.press-scale { transition: transform 0.12s cubic-bezier(0.4,0,0.2,1); }
+.press-scale { transition: transform var(--duration-instant) var(--ease-standard); }
 .press-scale:active { transform: scale(0.95); }
 
-.press-scale-lg { transition: transform 0.15s cubic-bezier(0.4,0,0.2,1); }
+.press-scale-lg { transition: transform var(--duration-instant) var(--ease-standard); }
 .press-scale-lg:active { transform: scale(0.92); }
 
 /* ── Scrollable rows (no bar) ───────────────────────── */
@@ -277,7 +277,7 @@ input, textarea, select { font-size: 16px !important; }
   border-radius: 18px;
   border: 0.5px solid rgba(0,0,0,0.05);
   box-shadow: 0 2px 12px rgba(0,0,0,0.04);
-  transition: box-shadow 0.22s ease, transform 0.12s cubic-bezier(0.4,0,0.2,1);
+  transition: box-shadow var(--duration-fast) var(--ease-standard), transform var(--duration-instant) var(--ease-standard);
 }
 .appt-card:active { transform: scale(0.985); }
 
@@ -299,7 +299,7 @@ input, textarea, select { font-size: 16px !important; }
   border-radius: 14px;
   font-weight: 700;
   box-shadow: 0 4px 14px rgba(13,148,136,0.35);
-  transition: transform 0.12s cubic-bezier(0.4,0,0.2,1), box-shadow 0.2s ease;
+  transition: transform var(--duration-instant) var(--ease-standard), box-shadow var(--duration-fast) var(--ease-standard);
 }
 .btn-teal:hover { box-shadow: 0 6px 20px rgba(13,148,136,0.45); transform: translateY(-1px); }
 .btn-teal:active { transform: scale(0.95); box-shadow: 0 2px 8px rgba(13,148,136,0.3); }
@@ -355,35 +355,35 @@ input, textarea, select { font-size: 16px !important; }
   from { opacity: 0; transform: translateY(12px); }
   to   { opacity: 1; transform: translateY(0); }
 }
-.page-in { animation: page-in 0.3s cubic-bezier(0.4,0,0.2,1) both; }
+.page-in { animation: page-in var(--duration-base) var(--ease-standard) both; }
 
 /* ── Tooth-surface picker expand animation ──────────── */
 @keyframes scale-in-kf {
   from { opacity: 0; transform: scaleY(0.85) translateY(-4px); }
   to   { opacity: 1; transform: scaleY(1) translateY(0); }
 }
-.animate-scale-in { animation: scale-in-kf 0.18s cubic-bezier(0.4,0,0.2,1) both; transform-origin: top; }
+.animate-scale-in { animation: scale-in-kf var(--duration-fast) var(--ease-standard) both; transform-origin: top; }
 
 /* ── Toast animate-in ───────────────────────────────── */
 @keyframes animate-in-kf {
   from { opacity: 0; transform: translateX(20px); }
   to   { opacity: 1; transform: translateX(0); }
 }
-.animate-in { animation: animate-in-kf 0.25s cubic-bezier(0.4,0,0.2,1); }
+.animate-in { animation: animate-in-kf var(--duration-base) var(--ease-standard); }
 
 /* ── Modal enter ────────────────────────────────────── */
 @keyframes modal-in {
   from { opacity: 0; transform: scale(0.92) translateY(20px); }
   to   { opacity: 1; transform: scale(1) translateY(0); }
 }
-.modal-in { animation: modal-in 0.35s cubic-bezier(0.34,1.56,0.64,1) both; }
+.modal-in { animation: modal-in var(--duration-slow) var(--ease-emphasized) both; }
 
 /* ── Drawer enter ───────────────────────────────────── */
 @keyframes drawer-in {
   from { transform: translateY(100%); }
   to   { transform: translateY(0); }
 }
-.drawer-in { animation: drawer-in 0.35s cubic-bezier(0.32,0.72,0,1) both; }
+.drawer-in { animation: drawer-in var(--duration-slow) var(--ease-decelerate) both; }
 
 /* ── Success check pop ──────────────────────────────── */
 @keyframes check-pop {
@@ -391,7 +391,7 @@ input, textarea, select { font-size: 16px !important; }
   60%  { transform: scale(1.15); opacity: 1; }
   100% { transform: scale(1); }
 }
-.check-pop { animation: check-pop 0.4s cubic-bezier(0.34,1.56,0.64,1) both; }
+.check-pop { animation: check-pop var(--duration-slow) var(--ease-emphasized) both; }
 
 /* ── Ripple effect ──────────────────────────────────── */
 @keyframes ripple {
@@ -436,7 +436,7 @@ input, textarea, select { font-size: 16px !important; }
    Android quirk (reported on both Chrome/Blink and Firefox/Gecko) that
    iOS Safari doesn't exhibit. This wraps literally every page's content,
    so removing the transform here fixes it everywhere at once. */
-.slide-in-right { animation: slide-in-right 0.3s cubic-bezier(0.32,0.72,0,1) both; }
+.slide-in-right { animation: slide-in-right var(--duration-base) var(--ease-decelerate) both; }
 
 /* ── Time badge ─────────────────────────────────────── */
 .time-badge {
@@ -495,7 +495,7 @@ input, textarea, select { font-size: 16px !important; }
   font-weight: 600;
   text-align: center;
   color: #64748b;
-  transition: all 0.2s cubic-bezier(0.4,0,0.2,1);
+  transition: all var(--duration-fast) var(--ease-standard);
   white-space: nowrap;
 }
 .segmented-item.active {
@@ -520,7 +520,7 @@ input, textarea, select { font-size: 16px !important; }
   align-items: center;
   justify-content: center;
   box-shadow: 0 6px 20px rgba(13,148,136,0.4);
-  transition: transform 0.15s cubic-bezier(0.4,0,0.2,1);
+  transition: transform var(--duration-instant) var(--ease-standard);
 }
 .fab:active { transform: scale(0.88); }
 
@@ -528,7 +528,7 @@ input, textarea, select { font-size: 16px !important; }
 .swipe-item {
   position: relative;
   overflow: hidden;
-  transition: transform 0.3s cubic-bezier(0.32,0.72,0,1);
+  transition: transform var(--duration-base) var(--ease-decelerate);
 }
 .swipe-actions {
   position: absolute;
@@ -550,7 +550,7 @@ input, textarea, select { font-size: 16px !important; }
   from { transform: translateY(100%); }
   to   { transform: translateY(0); }
 }
-.fullmodal-in { animation: fullmodal-slide-up 0.38s cubic-bezier(0.32,0.72,0,1) both; }
+.fullmodal-in { animation: fullmodal-slide-up var(--duration-slow) var(--ease-decelerate) both; }
 
 /* ── Wizard enter (bottom sheet morph) ───────────────────────── */
 @keyframes wizard-enter {
@@ -558,14 +558,14 @@ input, textarea, select { font-size: 16px !important; }
   60%  { opacity: 1; transform: translateY(-8px) scale(0.98); }
   100% { opacity: 1; transform: translateY(0) scale(1); }
 }
-.wizard-enter { animation: wizard-enter 0.42s cubic-bezier(0.32,0.72,0,1) both; }
+.wizard-enter { animation: wizard-enter calc(var(--duration-slow) * 1.15) var(--ease-decelerate) both; }
 
 /* ── Wizard step slide-up (content morph between steps) ──────── */
 @keyframes wizard-slide-up {
   from { opacity: 0; transform: translateY(16px); }
   to   { opacity: 1; transform: translateY(0); }
 }
-.wizard-slide-up { animation: wizard-slide-up 0.3s cubic-bezier(0.32,0.72,0,1) both; }
+.wizard-slide-up { animation: wizard-slide-up var(--duration-base) var(--ease-decelerate) both; }
 
 /* ── Wizard done pop (success celebration) ───────────────────── */
 @keyframes wizard-done-pop {
@@ -573,7 +573,7 @@ input, textarea, select { font-size: 16px !important; }
   50%  { opacity: 1; transform: scale(1.06); }
   100% { opacity: 1; transform: scale(1); }
 }
-.wizard-done-pop { animation: wizard-done-pop 0.5s cubic-bezier(0.34,1.56,0.64,1) both; }
+.wizard-done-pop { animation: wizard-done-pop calc(var(--duration-slow) * 1.4) var(--ease-emphasized) both; }
 
 /* ── Sparkle confetti ────────────────────────────────────────── */
 @keyframes sparkle-out {
@@ -587,14 +587,14 @@ input, textarea, select { font-size: 16px !important; }
   from { opacity: 0; transform: translateX(-12px); }
   to   { opacity: 1; transform: translateX(0); }
 }
-.field-stagger { animation: field-stagger 0.3s cubic-bezier(0.32,0.72,0,1) both; }
+.field-stagger { animation: field-stagger var(--duration-base) var(--ease-decelerate) both; }
 
 /* ── Stagger item (list entrance) ────────────────────────────── */
 @keyframes stagger-item {
   from { opacity: 0; transform: translateY(8px); }
   to   { opacity: 1; transform: translateY(0); }
 }
-.stagger-item { animation: stagger-item 0.35s cubic-bezier(0.32,0.72,0,1) both; }
+.stagger-item { animation: stagger-item var(--duration-slow) var(--ease-decelerate) both; }
 
 /* ── Enterprise Dashboard Animations ──────────────────────────── */
 
@@ -618,7 +618,7 @@ input, textarea, select { font-size: 16px !important; }
 
 /* Card lift on hover */
 .card-lift {
-  transition: transform 0.25s cubic-bezier(0.34,1.56,0.64,1), box-shadow 0.25s ease;
+  transition: transform var(--duration-base) var(--ease-emphasized), box-shadow var(--duration-base) var(--ease-standard);
 }
 .card-lift:hover {
   transform: translateY(-4px);
@@ -633,7 +633,7 @@ input, textarea, select { font-size: 16px !important; }
   from { opacity: 0; transform: translateY(16px) scale(0.96); }
   to   { opacity: 1; transform: translateY(0) scale(1); }
 }
-.tile-in { animation: tile-in 0.45s cubic-bezier(0.34,1.56,0.64,1) both; }
+.tile-in { animation: tile-in calc(var(--duration-slow) * 1.25) var(--ease-emphasized) both; }
 
 /* Count-up glow text */
 @keyframes count-glow {
@@ -854,7 +854,7 @@ input, textarea, select { font-size: 16px !important; }
 
 /* ── iOS 27 Haptic Press Feedback ────────────────────────── */
 .haptic-press {
-  transition: transform 0.1s cubic-bezier(0.4,0,0.2,1);
+  transition: transform var(--duration-instant) var(--ease-standard);
 }
 .haptic-press:active {
   transform: scale(0.97);
@@ -929,7 +929,7 @@ input, textarea, select { font-size: 16px !important; }
   border-radius: 16px;
   padding: 14px 16px;
   box-shadow: 0 2px 12px color-mix(in srgb, var(--module-color) 8%, transparent);
-  transition: transform 0.25s cubic-bezier(0.34,1.56,0.64,1), box-shadow 0.25s ease;
+  transition: transform var(--duration-base) var(--ease-emphasized), box-shadow var(--duration-base) var(--ease-standard);
 }
 .dark .module-stat-card {
   background: linear-gradient(135deg, color-mix(in srgb, var(--module-color-dark) 30%, #1e293b), #1e293b);
@@ -1005,7 +1005,7 @@ input, textarea, select { font-size: 16px !important; }
   to { opacity: 1; transform: translateY(0); }
 }
 .list-stagger-item {
-  animation: list-item-in 0.35s cubic-bezier(0.16,1,0.3,1) both;
+  animation: list-item-in var(--duration-slow) var(--ease-decelerate) both;
 }
 @media (prefers-reduced-motion: reduce) {
   .list-stagger-item { animation: none; }

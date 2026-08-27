@@ -37,6 +37,7 @@ import { useAuth } from '../lib/auth'
 import DoctorDashboard from './DoctorDashboard'
 import { ErrorBoundary } from '../components/ErrorBoundary'
 import { h } from '../lib/haptics'
+import { staggerDelay } from '../lib/motion'
 import { usePullToRefresh } from '../lib/usePullToRefresh'
 
 // ============================================================================
@@ -320,7 +321,12 @@ function AppointmentRow({ apt, index, patientName, doctorName, onClick }: {
       tabIndex={0}
       onKeyDown={(e) => { if (e.key === 'Enter') { h.tap(); onClick() } }}
       aria-label={`نوبت ${patientName(apt)} ساعت ${formatTime(apt.start_time)}`}
-      style={{ animationDelay: `${index * 60}ms` }}
+      // Was `index * 60` — linear stagger meant a long appointment list
+      // took proportionally longer to finish appearing (30 items = 1.8s
+      // before the last one showed). staggerDelay() falls off
+      // sub-linearly so the list stays responsive at any length, and
+      // unlike the inline math it's unit-tested.
+      style={{ animationDelay: `${staggerDelay(index)}ms` }}
       className={`stagger-item flex items-center gap-3 p-3 rounded-2xl transition-all-smooth cursor-pointer hover:shadow-md border border-slate-100 dark:border-slate-700 hover:border-primary-200 dark:hover:border-primary-700 hover:bg-primary-50/30 dark:hover:bg-slate-700/50 ${isInChair ? 'bg-warning-50 dark:bg-warning-900/20 border-warning-200 dark:border-warning-700' : isCompleted ? 'bg-success-50/50 dark:bg-success-900/10 border-success-100 dark:border-success-800' : isCancelled ? 'bg-error-50/30 dark:bg-error-900/10 border-error-100 dark:border-error-800 opacity-70' : 'bg-white dark:bg-slate-800'}`}
     >
       <div className="flex flex-col items-center justify-center w-14 h-14 rounded-xl bg-gradient-to-br from-slate-700 to-slate-900 text-white flex-shrink-0">
