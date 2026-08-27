@@ -1,3 +1,4 @@
+import { getLunarHoliday } from './lunarHolidays'
 import { toJalaali, toGregorian as jalaaliToGregorian, isLeapJalaaliYear } from 'jalaali-js'
 
 // Jalali (Shamsi) date conversion utilities
@@ -139,33 +140,6 @@ const fixedHolidays: Record<string, string> = {
 // wrong in the same way — flagged here rather than silently trusted.
 // Only 1405 (the current year) has been verified and corrected.
 const variableHolidays: Record<string, string> = {
-  '1403-02-11': 'شهادت حضرت فاطمه زهرا (س)',
-  '1403-02-28': 'ولادت امام علی (ع) - روز پدر',
-  '1403-03-06': 'مبعث پیامبر اکرم (ص)',
-  '1403-03-25': 'شهادت امام جعفر صادق (ع)',
-  '1403-06-03': 'شهادت امام علی (ع)',
-  '1403-06-15': 'ولادت امام زمان (ع) - نیمه شعبان',
-  '1403-07-13': 'شهادت امام حسین (ع) - تاسوعا',
-  '1403-07-14': 'شهادت امام حسین (ع) - عاشورا',
-  '1403-08-20': 'اربعین حسینی',
-  '1403-09-28': 'شهادت پیامبر اکرم (ص) و شهادت امام حسن (ع)',
-  '1403-09-29': 'شهادت امام رضا (ع)',
-  '1403-10-09': 'ولادت پیامبر اکرم (ص) و امام صادق (ع)',
-  '1403-12-18': 'ولادت امام علی (ع) - روز پدر',
-  '1403-12-28': 'شهادت امام حسین (ع) - تاسوعا',
-  '1403-12-29': 'شهادت امام حسین (ع) - عاشورا',
-  '1404-02-11': 'شهادت حضرت فاطمه زهرا (س)',
-  '1404-02-28': 'ولادت امام علی (ع) - روز پدر',
-  '1404-03-06': 'مبعث پیامبر اکرم (ص)',
-  '1404-03-25': 'شهادت امام جعفر صادق (ع)',
-  '1404-06-03': 'شهادت امام علی (ع)',
-  '1404-06-15': 'ولادت امام زمان (ع) - نیمه شعبان',
-  '1404-07-13': 'شهادت امام حسین (ع) - تاسوعا',
-  '1404-07-14': 'شهادت امام حسین (ع) - عاشورا',
-  '1404-08-20': 'اربعین حسینی',
-  '1404-09-28': 'شهادت پیامبر اکرم (ص) و شهادت امام حسن (ع)',
-  '1404-09-29': 'شهادت امام رضا (ع)',
-  '1404-10-09': 'ولادت پیامبر اکرم (ص) و امام صادق (ع)',
   '1405-01-25': 'شهادت امام جعفر صادق (ع)',
   '1405-03-06': 'عید سعید قربان',
   '1405-03-14': 'عید سعید غدیر خم',
@@ -177,35 +151,18 @@ const variableHolidays: Record<string, string> = {
   '1405-06-08': 'میلاد پیامبر اکرم (ص) و امام جعفر صادق (ع)',
   '1405-08-22': 'شهادت حضرت فاطمه زهرا (س)',
   '1405-12-09': 'شهادت امام علی (ع)',
-  '1406-02-11': 'شهادت حضرت فاطمه زهرا (س)',
-  '1406-02-28': 'ولادت امام علی (ع) - روز پدر',
-  '1406-03-06': 'مبعث پیامبر اکرم (ص)',
-  '1406-03-25': 'شهادت امام جعفر صادق (ع)',
-  '1406-06-03': 'شهادت امام علی (ع)',
-  '1406-06-15': 'ولادت امام زمان (ع) - نیمه شعبان',
-  '1406-07-13': 'شهادت امام حسین (ع) - تاسوعا',
-  '1406-07-14': 'شهادت امام حسین (ع) - عاشورا',
-  '1406-08-20': 'اربعین حسینی',
-  '1406-09-28': 'شهادت پیامبر اکرم (ص) و شهادت امام حسن (ع)',
-  '1406-09-29': 'شهادت امام رضا (ع)',
-  '1406-10-09': 'ولادت پیامبر اکرم (ص) و امام صادق (ع)',
-  '1407-02-11': 'شهادت حضرت فاطمه زهرا (س)',
-  '1407-02-28': 'ولادت امام علی (ع) - روز پدر',
-  '1407-03-06': 'مبعث پیامبر اکرم (ص)',
-  '1407-03-25': 'شهادت امام جعفر صادق (ع)',
-  '1407-06-03': 'شهادت امام علی (ع)',
-  '1407-06-15': 'ولادت امام زمان (ع) - نیمه شعبان',
-  '1407-07-13': 'شهادت امام حسین (ع) - تاسوعا',
-  '1407-07-14': 'شهادت امام حسین (ع) - عاشورا',
-  '1407-08-20': 'اربعین حسینی',
-  '1407-09-28': 'شهادت پیامبر اکرم (ص) و شهادت امام حسن (ع)',
-  '1407-09-29': 'شهادت امام رضا (ع)',
-  '1407-10-09': 'ولادت پیامبر اکرم (ص) و امام صادق (ع)',
 }
 
 export function getHoliday(jalaliDateStr: string): string | null {
   // jalaliDateStr format: "YYYY/MM/DD" or "YYYY-MM-DD"
-  const normalized = jalaliDateStr.replace('/', '-')
+  // replaceAll, not replace: String.replace with a string pattern only
+  // swaps the FIRST occurrence, so "1406/05/01" became "1406-05/01" and
+  // the day parsed as "05/01" — meaning no lookup key ever matched and
+  // getHoliday silently returned null for every slash-formatted date.
+  // This was a pre-existing bug, not introduced here; it surfaced only
+  // because an integration test scanned a full year instead of testing
+  // the function with the dash format it happened to work with.
+  const normalized = jalaliDateStr.replace(/\//g, '-')
   const parts = normalized.split('-')
   if (parts.length < 3) return null
   const year = parts[0]
@@ -213,7 +170,33 @@ export function getHoliday(jalaliDateStr: string): string | null {
   const day = parts[2].padStart(2, '0')
   const fixedKey = `${month}-${day}`
   const variableKey = `${year}-${month}-${day}`
-  return variableHolidays[variableKey] || fixedHolidays[fixedKey] || null
+
+  const verified = variableHolidays[variableKey] || fixedHolidays[fixedKey]
+  if (verified) return verified
+
+  // MOD-DATA-001 — fall back to computing the lunar holiday from the
+  // Hijri calendar for any year without hand-verified data.
+  //
+  // This replaced 51 hardcoded entries for 1403/1404/1406/1407 that
+  // were copy-pasted forward from 1405 with identical month/day values.
+  // Lunar holidays shift ~11 days earlier per solar year, so those were
+  // mathematically guaranteed wrong — and this data is shown directly
+  // in the appointments UI, meaning a wrong date books a patient on a
+  // holiday or closes the clinic on a working day.
+  //
+  // Deleting wrong data rather than keeping it was deliberate: a
+  // confidently-wrong holiday is worse than a computed approximation,
+  // because staff trust it. Iran determines the lunar calendar by
+  // moon sighting rather than calculation, so these computed dates can
+  // differ from the official announcement by about a day — which is
+  // why they're prefixed as approximate rather than presented as fact.
+  try {
+    const gregorian = jalaliToGregorian(Number(year), Number(month), Number(day))
+    const computed = getLunarHoliday(gregorian)
+    return computed ? `${computed} (تقریبی)` : null
+  } catch {
+    return null
+  }
 }
 
 export function isHoliday(jalaliDateStr: string): boolean {
