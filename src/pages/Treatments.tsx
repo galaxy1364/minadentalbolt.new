@@ -2,7 +2,7 @@
 import { useState, useEffect, useCallback, useMemo } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
 import {
-  Activity, ClipboardList, Stethoscope, Search, Eye, Smile, Plus, Edit2, Trash2,
+  Activity, ClipboardList, Stethoscope, Search, Eye, Smile, Plus, Edit2, Trash2, Layers,
   DollarSign, FlaskConical, CheckCircle2, X, UserPlus, ChevronRight, Bone,
 } from 'lucide-react'
 import { BarChart, Bar, XAxis, YAxis, Tooltip as RTooltip, ResponsiveContainer, Cell } from 'recharts'
@@ -23,6 +23,7 @@ import { h } from '../lib/haptics'
 import DentalChart from '../components/DentalChart'
 import { CurrencyInput } from '../components/CurrencyInput'
 import { logError } from '../lib/errorLog'
+import { itemTotal, basketTotal, distinctTeeth, findDuplicate, validateBasket, makeTempId, type BasketItem } from '../lib/bulkTreatment'
 
 // ── Constants ──────────────────────────────────────────────────
 
@@ -143,6 +144,117 @@ export default function Treatments() {
   // tooth "selected" on the visit should flow into treatment
   // automatically instead of asking again from a blank form.
   const [lastSelectedTooth, setLastSelectedTooth] = useState<string>('')
+
+  // MOD-FEAT-002 — bulk treatment entry.
+  // The progress view (MOD-FEAT-001) made tracking 40 planned items
+  // workable, but CREATING them still meant 40 passes through a 4-step
+  // wizard. This basket collects items with a live running total and
+  // saves them in one go, which is what "patient comes once with 40
+  // problems" actually requires to be practical.
+  const [bulkModalOpen, setBulkModalOpen] = useState(false)
+  const [bulkEncounterId, setBulkEncounterId] = useState<string | null>(null)
+  const [bulkPatientId, setBulkPatientId] = useState<string | null>(null)
+  const [basket, setBasket] = useState<BasketItem[]>([])
+  const [savingBulk, setSavingBulk] = useState(false)
+  const [bulkTooth, setBulkTooth] = useState('')
+  const [bulkProcedureCode, setBulkProcedureCode] = useState('')
+
+  const openBulkModal = (encId: string, patId: string) => {
+    h.tap()
+    setBulkEncounterId(encId)
+    setBulkPatientId(patId)
+    setBasket([])
+    setBulkTooth(lastSelectedTooth)
+    setBulkProcedureCode('')
+    setBulkModalOpen(true)
+  }
+
+  const addToBasket = () => {
+    const proc = procedures.find((p) => p.code === bulkProcedureCode)
+    if (!proc) { showToast('error', 'رویه‌ی درمانی را انتخاب کنید'); return }
+
+    const candidate = {
+      toothNumber: bulkTooth,
+      procedureCode: proc.code,
+      procedureName: proc.name,
+      unitPrice: Number(proc.default_price) || 0,
+      quantity: 1,
+      discount: 0,
+    }
+
+    // Duplicates are flagged, not blocked: two fillings on one tooth at
+    // different surfaces is legitimate, but double-tapping the same
+    // procedure by accident is also common. Tell the user, let them decide.
+    if (findDuplicate(basket, candidate)) {
+      showToast('error', `«${proc.name}» برای این دندان از قبل در سبد هست`)
+      return
+    }
+
+    h.select()
+    setBasket((prev) => [...prev, { ...candidate, tempId: makeTempId() }])
+    setBulkProcedureCode('')
+  }
+
+  const updateBasketItem = (tempId: string, patch: Partial<BasketItem>) => {
+    setBasket((prev) => prev.map((i) => (i.tempId === tempId ? { ...i, ...patch } : i)))
+  }
+
+  const removeBasketItem = (tempId: string) => {
+    h.tap()
+    setBasket((prev) => prev.filter((i) => i.tempId !== tempId))
+  }
+
+  const handleSaveBulk = async () => {
+    const error = validateBasket(basket)
+    if (error) { h.error(); showToast('error', error); return }
+    if (!bulkEncounterId || !bulkPatientId) return
+
+    setSavingBulk(true)
+    try {
+      // Saved sequentially rather than with Promise.all: each create
+      // enqueues a sync operation, and keeping insertion order makes the
+      // offline sync queue replay in the same order the dentist entered
+      // them, which matters when reviewing what happened later.
+      for (const i of basket) {
+        await createTreatment({
+          clinic_id: undefined as never,
+          encounter_id: bulkEncounterId,
+          patient_id: bulkPatientId,
+          doctor_id: detailEnc?.doctor_id ?? null,
+          procedure_code: i.procedureCode || null,
+          procedure_name: i.procedureName,
+          procedure_category: null,
+          tooth_number: i.toothNumber || null,
+          tooth_surface: null,
+          quantity: i.quantity,
+          unit_price: i.unitPrice,
+          discount: i.discount,
+          total_price: itemTotal(i),
+          status: 'planned',
+          notes: null,
+        } as never)
+      }
+
+      const newTotal = basketTotal(basket)
+      showToast('success', `${toPersianDigits(basket.length)} درمان ثبت شد`)
+      setBulkModalOpen(false)
+      setBasket([])
+
+      if (bulkEncounterId) {
+        const existing = treatments
+          .filter((t) => t.encounter_id === bulkEncounterId && t.status !== 'cancelled')
+          .reduce((s, t) => s + (t.total_price || 0), 0)
+        await updateEncounter(bulkEncounterId, { total_amount: existing + newTotal } as never)
+      }
+      await loadData()
+    } catch (err) {
+      logError(err, 'react', 'handleSaveBulk')
+      showToast('error', 'خطا در ثبت دسته‌ای — جزئیات در گزارش خطاها')
+    } finally {
+      setSavingBulk(false)
+    }
+  }
+
   const [treatPatientId, setTreatPatientId] = useState<string | null>(null)
   const [savingTreat, setSavingTreat] = useState(false)
   const [treatForm, setTreatForm] = useState({
@@ -950,6 +1062,7 @@ export default function Treatments() {
             <div>
               <div className="flex items-center justify-between mb-3">
                 <h4 className="text-xs font-bold text-slate-500 uppercase tracking-wider flex items-center gap-1.5"><Stethoscope size={14} /> درمان‌ها</h4>
+                <Button size="sm" variant="secondary" onClick={() => openBulkModal(detailEnc.id, detailEnc.patient_id)} className="flex items-center gap-1"><Layers size={14} /> ثبت دسته‌ای</Button>
                 <Button size="sm" onClick={() => openTreatCreateModal(detailEnc.id, detailEnc.patient_id)} className="flex items-center gap-1"><Plus size={14} /> درمان جدید</Button>
               </div>
               {encounterTreatments.length === 0 ? (
@@ -1214,6 +1327,122 @@ export default function Treatments() {
           <Button onClick={handleQuickTreatStart} disabled={savingQuickTreat || !quickTreatPatientId} className="w-full flex items-center justify-center gap-1.5">
             {savingQuickTreat ? <Spinner size={16} /> : quickModalMode === 'visit' ? <><ClipboardList size={16} /> ورود به چارت دندانی</> : <><Stethoscope size={16} /> ورود به ثبت درمان</>}
           </Button>
+        </div>
+      </Modal>
+
+      <Modal open={bulkModalOpen} onClose={() => setBulkModalOpen(false)} title="ثبت دسته‌ای طرح درمان" size="full">
+        <div className="space-y-4">
+          <p className="text-xs text-slate-500">
+            دندان و رویه را انتخاب کنید و به سبد اضافه کنید. در پایان همه یک‌جا ثبت می‌شوند.
+          </p>
+
+          {/* Found by querying the live database: none of the existing
+              procedures have a default_price set. Without this notice the
+              basket silently fills prices with zero, validation then
+              blocks saving, and the user has no way to know why. Better
+              to say it up front than to let them build a basket that
+              can't be saved. */}
+          {procedures.filter((p) => p.is_active && Number(p.default_price) > 0).length === 0 && (
+            <div className="p-3 rounded-xl bg-warning-50 border border-warning-200">
+              <p className="text-xs text-warning-800 leading-relaxed">
+                هیچ‌کدام از رویه‌های درمانی قیمت پیش‌فرض ندارند، بنابراین قیمت هر قلم را
+                باید دستی وارد کنید. برای ثبت سریع‌تر، در «رویه‌های درمانی» قیمت پایه را
+                یک‌بار تعیین کنید.
+              </p>
+            </div>
+          )}
+
+          <Card className="p-4 space-y-3">
+            <PalmerToothPicker value={bulkTooth} onChange={setBulkTooth} />
+            <div className="flex items-end gap-2">
+              <div className="flex-1">
+                <Select
+                  label="رویه‌ی درمانی"
+                  value={bulkProcedureCode}
+                  onChange={setBulkProcedureCode}
+                  options={procedures.filter((p) => p.is_active).map((p) => ({
+                    value: p.code,
+                    label: p.default_price
+                      ? `${p.name} — ${formatCurrency(p.default_price)} ت`
+                      : p.name,
+                  }))}
+                  placeholder="انتخاب رویه..."
+                />
+              </div>
+              <Button onClick={addToBasket} disabled={!bulkProcedureCode} className="shrink-0 flex items-center gap-1">
+                <Plus size={16} /> افزودن
+              </Button>
+            </div>
+          </Card>
+
+          {basket.length === 0 ? (
+            <Card className="p-6">
+              <EmptyState icon={<Layers size={28} />} title="سبد خالی است" description="اولین درمان را اضافه کنید" />
+            </Card>
+          ) : (
+            <>
+              <div className="space-y-2">
+                {basket.map((i) => (
+                  <Card key={i.tempId} className="p-3">
+                    <div className="flex items-center justify-between gap-2 mb-2">
+                      <div className="min-w-0">
+                        <p className="text-sm font-medium text-slate-800 truncate">{i.procedureName}</p>
+                        <p className="text-xs text-slate-500">
+                          {i.toothNumber ? `دندان ${toPersianDigits(i.toothNumber)}` : 'درمان عمومی'}
+                        </p>
+                      </div>
+                      <button
+                        onClick={() => removeBasketItem(i.tempId)}
+                        aria-label={`حذف ${i.procedureName} از سبد`}
+                        className="shrink-0 p-2 rounded-lg text-error-600 hover:bg-error-50 transition-all-smooth"
+                      >
+                        <Trash2 size={16} />
+                      </button>
+                    </div>
+                    <div className="grid grid-cols-3 gap-2">
+                      <Input
+                        label="تعداد"
+                        type="number"
+                        value={String(i.quantity)}
+                        onChange={(v) => updateBasketItem(i.tempId, { quantity: Number(v) || 0 })}
+                      />
+                      <CurrencyInput
+                        label="قیمت واحد"
+                        value={String(i.unitPrice)}
+                        onChange={(v) => updateBasketItem(i.tempId, { unitPrice: Number(v) || 0 })}
+                      />
+                      <CurrencyInput
+                        label="تخفیف"
+                        value={String(i.discount)}
+                        onChange={(v) => updateBasketItem(i.tempId, { discount: Number(v) || 0 })}
+                      />
+                    </div>
+                    <p className="text-xs text-primary-700 font-bold mt-2 text-left">
+                      {formatCurrency(itemTotal(i))} ت
+                    </p>
+                  </Card>
+                ))}
+              </div>
+
+              <Card className="p-4 sticky bottom-0 glass-ultra">
+                <div className="flex items-center justify-between mb-3 flex-wrap gap-2">
+                  <span className="text-xs text-slate-600">
+                    {toPersianDigits(basket.length)} درمان روی {toPersianDigits(distinctTeeth(basket))} دندان
+                  </span>
+                  <span className="text-base font-bold text-primary-700">
+                    {formatCurrency(basketTotal(basket))} ت
+                  </span>
+                </div>
+                <Button
+                  onClick={handleSaveBulk}
+                  disabled={savingBulk}
+                  className="w-full flex items-center justify-center gap-1.5"
+                >
+                  {savingBulk ? <Spinner size={16} /> : <><CheckCircle2 size={16} /> ثبت همه در طرح درمان</>}
+                </Button>
+              </Card>
+            </>
+          )}
         </div>
       </Modal>
 
