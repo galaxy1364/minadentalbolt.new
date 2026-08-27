@@ -2,12 +2,13 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { ArrowRight, Edit2, Phone, Mail, MapPin, Calendar, CreditCard, Activity, FileText, Image as ImageIcon, Shield, Pill, Smile, Award, AlertCircle, Clock, CheckCircle2, Layers, Plus, Trash2, FileSignature, Printer, Bone, FlaskConical } from 'lucide-react'
-import { fetchPatient, updatePatient, fetchTimeline, fetchTreatments, fetchAppointments, fetchPayments, fetchToothRecords, createToothRecord, updateToothRecord, fetchPrescriptions, fetchRadiologyImages, fetchEncounters, fetchDoctors, fetchImplantCases, fetchTreatmentPhases, createTreatmentPhase, updateTreatmentPhase, fetchConsentForms, createConsentForm, updateConsentForm, fetchLabOrders } from '../lib/api'
+import { fetchPatient, updatePatient, fetchTimeline, fetchTreatments, fetchAppointments, fetchPayments, fetchToothRecords, createToothRecord, updateToothRecord, fetchPrescriptions, fetchRadiologyImages, fetchEncounters, fetchDoctors, fetchImplantCases, fetchTreatmentPhases, createTreatmentPhase, updateTreatmentPhase, fetchConsentForms, createConsentForm, updateConsentForm, fetchLabOrders, updateTreatment } from '../lib/api'
 import { toJalaliString, toJalaliStringPretty, formatCurrency, toPersianDigits, formatTime } from '../lib/persianDate'
 import { calcPatientBalance } from '../lib/finance'
 import { Patient, Doctor, PatientTimeline, Treatment, Appointment, Payment, ToothRecord, Prescription, RadiologyImage, Encounter, ImplantCase, TreatmentPhase, ConsentForm, LabOrder } from '../types'
 import { Modal, Card, Button, Input, Select, Textarea, Badge, Spinner, EmptyState, Tabs, showToast, Wizard } from '../components/ui'
 import { PersianDateInput } from '../components/PersianDateInput'
+import { calcPlanProgress, groupByTooth, nextStatus } from '../lib/treatmentPlan'
 import { useConfirmAction } from '../components/ConfirmAction'
 import { h } from '../lib/haptics'
 import { calculateAge } from '../lib/patientUtils'
@@ -951,6 +952,20 @@ export default function PatientDetail() {
   // Render: Treatments Tab
   // ===========================================================================
 
+  /**
+   * MOD-FEAT-001 — replaces what was a flat chronological list.
+   *
+   * Direct request: "patient comes once with 40 problems, record them
+   * all, then work through them session by session and know what's done
+   * and what's left." The data model already supported that (treatments
+   * carry planned/in_progress/completed), but nothing surfaced it — you
+   * couldn't see progress, remaining cost, or what was outstanding per
+   * tooth without reading every row.
+   *
+   * Grouped by tooth because that's the dentist's unit of work, with
+   * unfinished teeth sorted first, and a one-tap status advance so
+   * marking work done during a session doesn't require opening a form.
+   */
   const renderTreatments = () => {
     if (treatments.length === 0) {
       return (
@@ -959,36 +974,110 @@ export default function PatientDetail() {
         </Card>
       )
     }
+
+    const progress = calcPlanProgress(treatments)
+    const groups = groupByTooth(treatments)
+
+    const advanceStatus = async (t: Treatment) => {
+      const next = nextStatus(t.status)
+      if (next === t.status) return
+      h.tap()
+      try {
+        await updateTreatment(t.id, { status: next } as never)
+        showToast('success', next === 'completed' ? 'به‌عنوان انجام‌شده ثبت شد' : 'در حال انجام ثبت شد')
+        await loadTabData()
+      } catch {
+        showToast('error', 'خطا در به‌روزرسانی')
+      }
+    }
+
     return (
-      <div className="space-y-2">
-        {treatments.map((t) => {
-          const statusMeta = treatmentStatuses.find((s) => s.value === t.status) || treatmentStatuses[0]
-          return (
-            <Card key={t.id} className="p-4">
-              <div className="flex items-start justify-between gap-3 flex-wrap">
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2 flex-wrap mb-1">
-                    <h4 className="text-sm font-medium text-slate-800">
-                      {t.procedure_name || t.description || 'درمان'}
-                    </h4>
-                    <Badge color={statusMeta.color}>{statusMeta.label}</Badge>
+      <div className="space-y-4">
+        <Card className="p-5">
+          <div className="flex items-center justify-between mb-3 flex-wrap gap-2">
+            <h3 className="text-sm font-bold text-slate-800">پیشرفت طرح درمان</h3>
+            <span className="text-sm font-bold text-primary-700">
+              {toPersianDigits(progress.completed)} از {toPersianDigits(progress.total)} کار
+            </span>
+          </div>
+
+          <div
+            className="h-2.5 rounded-full bg-slate-100 overflow-hidden"
+            role="progressbar"
+            aria-valuenow={progress.percent}
+            aria-valuemin={0}
+            aria-valuemax={100}
+            aria-label={`پیشرفت طرح درمان: ${progress.percent} درصد`}
+          >
+            <div
+              className="h-full bg-primary-700 rounded-full transition-all-smooth"
+              style={{ width: `${progress.percent}%` }}
+            />
+          </div>
+
+          <div className="grid grid-cols-3 gap-2 mt-4 text-center">
+            <div>
+              <p className="text-xs text-slate-500 mb-0.5">انجام‌شده</p>
+              <p className="text-sm font-bold text-success-700">{formatCurrency(progress.completedValue)} ت</p>
+            </div>
+            <div>
+              <p className="text-xs text-slate-500 mb-0.5">باقی‌مانده</p>
+              <p className="text-sm font-bold text-warning-700">{formatCurrency(progress.remainingValue)} ت</p>
+            </div>
+            <div>
+              <p className="text-xs text-slate-500 mb-0.5">کل طرح</p>
+              <p className="text-sm font-bold text-slate-700">{formatCurrency(progress.totalValue)} ت</p>
+            </div>
+          </div>
+        </Card>
+
+        {groups.map((group) => (
+          <Card key={group.tooth} className={`p-4 ${group.allDone ? 'opacity-70' : ''}`}>
+            <div className="flex items-center justify-between mb-3 flex-wrap gap-2">
+              <h4 className="text-sm font-bold text-slate-800 flex items-center gap-2">
+                {group.tooth === 'عمومی' ? 'درمان‌های عمومی' : `دندان ${toPersianDigits(group.tooth)}`}
+                {group.allDone && <CheckCircle2 size={16} className="text-success-600" />}
+              </h4>
+              {!group.allDone && (
+                <Badge color="warning">{toPersianDigits(group.remainingCount)} کار مانده</Badge>
+              )}
+            </div>
+
+            <div className="space-y-2">
+              {group.treatments.map((t) => {
+                const statusMeta = treatmentStatuses.find((s) => s.value === t.status) || treatmentStatuses[0]
+                const isDone = t.status === 'completed'
+                return (
+                  <div key={t.id} className="flex items-center gap-3 p-3 rounded-xl bg-slate-50">
+                    <button
+                      onClick={() => advanceStatus(t)}
+                      disabled={isDone}
+                      aria-label={isDone ? 'انجام شده' : `ثبت پیشرفت برای ${t.procedure_name || 'درمان'}`}
+                      className={`shrink-0 w-7 h-7 rounded-full border-2 flex items-center justify-center transition-all-smooth ${
+                        isDone
+                          ? 'bg-success-600 border-success-600 text-white'
+                          : 'border-slate-300 hover:border-primary-600 hover:bg-primary-50'
+                      }`}
+                    >
+                      {isDone && <CheckCircle2 size={16} />}
+                    </button>
+                    <div className="flex-1 min-w-0">
+                      <p className={`text-sm font-medium ${isDone ? 'text-slate-400 line-through' : 'text-slate-800'}`}>
+                        {t.procedure_name || t.description || 'درمان'}
+                      </p>
+                      <div className="flex items-center gap-2 flex-wrap mt-0.5">
+                        <Badge color={statusMeta.color}>{statusMeta.label}</Badge>
+                        {t.total_price != null && (
+                          <span className="text-xs text-slate-500">{formatCurrency(t.total_price)} ت</span>
+                        )}
+                      </div>
+                    </div>
                   </div>
-                  <div className="flex items-center gap-3 flex-wrap text-xs text-slate-500">
-                    {t.tooth_number && <span>دندان: {toPersianDigits(t.tooth_number)}</span>}
-                    <span>پزشک: {getDoctorName(t.doctor_id)}</span>
-                    <span>{toJalaliStringPretty(t.created_at)}</span>
-                  </div>
-                  {t.notes && <p className="text-xs text-slate-400 mt-1">{t.notes}</p>}
-                </div>
-                <div className="text-left">
-                  {t.total_price != null && (
-                    <p className="text-sm font-bold text-slate-700">{formatCurrency(t.total_price)} تومان</p>
-                  )}
-                </div>
-              </div>
-            </Card>
-          )
-        })}
+                )
+              })}
+            </div>
+          </Card>
+        ))}
       </div>
     )
   }
