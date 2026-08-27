@@ -258,6 +258,41 @@ input, textarea, select { font-size: 16px !important; }
 .pb-safe { padding-bottom: env(safe-area-inset-bottom, 0px); }
 .mb-safe { margin-bottom: env(safe-area-inset-bottom, 0px); }
 
+/* ── MOD-UI-004 Focus visibility (WCAG 2.2 SC 2.4.11) ────
+   The audit found the app had NO focus styles at all, which is a
+   complete blocker for anyone navigating by keyboard — they cannot see
+   where they are. SC 2.4.11 ("Focus Appearance") is new in WCAG 2.2 and
+   requires the indicator to have at least 3:1 contrast against adjacent
+   colors and to cover a minimum area; the sources note it fails many
+   default browser styles, and here there weren't even defaults left to
+   fail because Tailwind's preflight removes them.
+
+   primary-700 measured against white is 5.47:1 — comfortably past the
+   3:1 floor. The white outer ring keeps the indicator visible when the
+   focused control sits on a dark or teal surface, where the teal ring
+   alone would disappear.
+
+   :focus-visible rather than :focus deliberately — mouse users don't
+   get a ring on click, keyboard users always do. */
+:focus-visible {
+  outline: 3px solid theme('colors.primary.700');
+  outline-offset: 2px;
+  border-radius: 4px;
+  box-shadow: 0 0 0 1px #ffffff;
+}
+
+/* Windows High Contrast Mode strips custom colors — the system's own
+   focus color must be allowed through rather than suppressed. */
+@media (forced-colors: active) {
+  :focus-visible {
+    outline: 3px solid Highlight;
+  }
+}
+
+.dark :focus-visible {
+  box-shadow: 0 0 0 1px #0f172a;
+}
+
 /* ── Bottom tab bar (iOS 27 liquid glass) ───────────── */
 .tab-bar {
   /* Kept slightly more opaque than other glass surfaces at every level:

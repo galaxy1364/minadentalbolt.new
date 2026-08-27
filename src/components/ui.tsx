@@ -40,7 +40,14 @@ export function StatCard({ icon, title, value, color = 'primary', subtitle }: { 
 
 export function Button({ children, onClick, variant = 'primary', size = 'md', className = '', type = 'button', disabled }: { children: React.ReactNode; onClick?: () => void; variant?: 'primary' | 'secondary' | 'ghost' | 'danger' | 'success'; size?: 'sm' | 'md' | 'lg'; className?: string; type?: 'button' | 'submit'; disabled?: boolean }) {
   const variants: Record<string, string> = {
-    primary: 'bg-primary-600 hover:bg-primary-700 text-white',
+    // primary-700, not 600: white text on primary-600 measures 3.74:1,
+    // below the WCAG 2.2 AA floor of 4.5:1 for normal text. 700 gives
+    // 5.47:1. Caught by an automated contrast test against the real
+    // palette (src/lib/contrast.test.ts), not by eye — this is exactly
+    // the kind of failure that looks fine to someone with good vision
+    // on a bright screen and is unreadable in sunlight or with low
+    // vision. Hover goes darker still to keep the state change visible.
+    primary: 'bg-primary-700 hover:bg-primary-800 text-white',
     secondary: 'bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 dark:hover:bg-slate-600 text-slate-700 dark:text-slate-200',
     ghost: 'hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300',
     danger: 'bg-error-600 hover:bg-error-700 text-white',
@@ -231,8 +238,8 @@ export function Wizard({
               className={`flex-1 flex flex-col items-center gap-1.5 min-w-0 ${i > step ? 'opacity-40' : ''}`}
             >
               <div className={`w-9 h-9 rounded-full flex items-center justify-center text-sm font-bold transition-all-smooth shrink-0 ${
-                i < step ? 'bg-primary-600 text-white' :
-                i === step ? 'bg-primary-600 text-white ring-4 ring-primary-100 dark:ring-primary-900/40 pulse-glow' :
+                i < step ? 'bg-primary-700 text-white' :
+                i === step ? 'bg-primary-700 text-white ring-4 ring-primary-100 dark:ring-primary-900/40 pulse-glow' :
                 'bg-slate-100 dark:bg-slate-700 text-slate-400 dark:text-slate-500'
               }`}>
                 {i < step ? <CheckCircle2 size={18} /> : toPersianDigits(i + 1)}
