@@ -278,3 +278,58 @@ describe('validatePolicy', () => {
     expect(validatePolicy({ coverage_percentage: 60, ceiling_amount: null })).toEqual([])
   })
 })
+
+// ── Regression guards for the treatment-form integration ────────────────
+// These lock the exact behaviours the form now depends on, so a future
+// refactor of splitCoverage cannot silently change what a doctor is
+// quoted at the chair.
+describe('treatment form integration', () => {
+  const pol = policy({ coverage_percentage: 60, ceiling_amount: 100_000_000 })
+
+  it('a treatment costing exactly the remaining ceiling is fully covered at 100%', () => {
+    const full = policy({ coverage_percentage: 100, ceiling_amount: 10_000_000 })
+    const r = splitCoverage(10_000_000, full, [], DATE)
+    expect(r.insuranceShare).toBe(10_000_000)
+    expect(r.patientShare).toBe(0)
+    expect(r.cappedByCeiling).toBe(false)
+    expect(r.remainingAfter).toBe(0)
+  })
+
+  it('remainingAfter never goes negative, so the banner cannot show a minus', () => {
+    const claims = [claim({ approved_amount: 99_000_000 })]
+    const r = splitCoverage(50_000_000, pol, claims, DATE)
+    expect(r.remainingAfter).toBe(0)
+    expect(r.remainingAfter! >= 0).toBe(true)
+  })
+
+  it('a zero-cost line yields a zero split rather than a warning', () => {
+    const r = splitCoverage(0, pol, [], DATE)
+    expect(r.insuranceShare).toBe(0)
+    expect(r.patientShare).toBe(0)
+    expect(r.warning).toBeNull()
+  })
+
+  it('a discount that drives the total below zero cannot pay the patient', () => {
+    // The form computes qty*price-discount; an over-large discount must
+    // not flip into the clinic owing the patient money.
+    const r = splitCoverage(-250_000, pol, [], DATE)
+    expect(r.patientShare).toBe(0)
+    expect(r.insuranceShare).toBe(0)
+  })
+
+  it('the warning text is present exactly when the share was capped', () => {
+    const uncapped = splitCoverage(1_000_000, pol, [], DATE)
+    expect(uncapped.cappedByCeiling).toBe(false)
+    expect(uncapped.warning).toBeNull()
+
+    const capped = splitCoverage(50_000_000, pol, [claim({ approved_amount: 95_000_000 })], DATE)
+    expect(capped.cappedByCeiling).toBe(true)
+    expect(capped.warning).not.toBeNull()
+  })
+
+  it('no applicable policy means the form shows no banner at all', () => {
+    // selectApplicablePolicy returning null is the form's signal to
+    // render nothing, rather than a misleading "0 covered" banner.
+    expect(selectApplicablePolicy([policy({ is_active: false })], [], DATE)).toBeNull()
+  })
+})
