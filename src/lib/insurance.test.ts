@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest'
 import {
   toRial, isConsumingClaim, usedCeiling, remainingCeiling, isPolicyValidOn,
   splitCoverage, ceilingUsagePercent, selectApplicablePolicy, validatePolicy,
+  buildSettlement, readSettlement, summariseSettlements,
 } from './insurance'
 import type { PatientPolicy } from './insurance'
 import type { InsuranceClaim } from '../types'
@@ -331,5 +332,104 @@ describe('treatment form integration', () => {
     // selectApplicablePolicy returning null is the form's signal to
     // render nothing, rather than a misleading "0 covered" banner.
     expect(selectApplicablePolicy([policy({ is_active: false })], [], DATE)).toBeNull()
+  })
+})
+
+// ── Stored settlement (MOD-FEAT-007) ────────────────────────────────────
+describe('buildSettlement', () => {
+  it('freezes the split onto the treatment', () => {
+    const s = buildSettlement(10_000_000, policy(), [], DATE)
+    expect(s.policy_id).toBe('pol1')
+    expect(s.insurance_share).toBe(6_000_000)
+    expect(s.patient_share).toBe(4_000_000)
+    expect(s.insurance_capped).toBe(false)
+  })
+
+  it('records that the ceiling capped the share', () => {
+    const s = buildSettlement(50_000_000, policy(), [claim({ approved_amount: 95_000_000 })], DATE)
+    expect(s.insurance_share).toBe(5_000_000)
+    expect(s.insurance_capped).toBe(true)
+  })
+
+  it('writes nulls rather than zeros when there is no policy', () => {
+    // "uninsured" must stay distinguishable from "insured, covered zero".
+    const s = buildSettlement(10_000_000, null, [], DATE)
+    expect(s.policy_id).toBeNull()
+    expect(s.insurance_share).toBeNull()
+    expect(s.patient_share).toBeNull()
+  })
+})
+
+describe('readSettlement', () => {
+  it('reads a stored split back exactly', () => {
+    const r = readSettlement({ total_price: 10_000_000, insurance_share: 6_000_000, patient_share: 4_000_000 })
+    expect(r).toEqual({ insured: true, insuranceShare: 6_000_000, patientShare: 4_000_000 })
+  })
+
+  it('treats a legacy row with no split as uninsured', () => {
+    // Rows written before this feature existed must not break the ledger.
+    const r = readSettlement({ total_price: 10_000_000, insurance_share: null, patient_share: null })
+    expect(r).toEqual({ insured: false, insuranceShare: 0, patientShare: 10_000_000 })
+  })
+
+  it('derives the patient share when only the insurer share was written', () => {
+    const r = readSettlement({ total_price: 10_000_000, insurance_share: 6_000_000, patient_share: null })
+    expect(r.patientShare).toBe(4_000_000)
+  })
+
+  it('honours a zero insurer share as genuinely insured', () => {
+    const r = readSettlement({ total_price: 1000, insurance_share: 0, patient_share: 1000 })
+    expect(r.insured).toBe(true)
+    expect(r.patientShare).toBe(1000)
+  })
+})
+
+describe('summariseSettlements', () => {
+  const t = (over: Partial<Parameters<typeof summariseSettlements>[0][0]> = {}) => ({
+    total_price: 10_000_000,
+    insurance_share: 6_000_000,
+    patient_share: 4_000_000,
+    insurance_submitted: false,
+    status: 'completed',
+    ...over,
+  })
+
+  it('totals insurer and patient shares', () => {
+    const r = summariseSettlements([t(), t()])
+    expect(r.insuredCount).toBe(2)
+    expect(r.totalInsuranceShare).toBe(12_000_000)
+    expect(r.totalPatientShare).toBe(8_000_000)
+  })
+
+  it('excludes cancelled treatments entirely', () => {
+    // Claiming a cancelled treatment would risk the clinic's contract
+    // with the insurer.
+    const r = summariseSettlements([t(), t({ status: 'cancelled' })])
+    expect(r.insuredCount).toBe(1)
+    expect(r.totalInsuranceShare).toBe(6_000_000)
+  })
+
+  it('ignores uninsured treatments', () => {
+    const r = summariseSettlements([t(), t({ insurance_share: null, patient_share: null })])
+    expect(r.insuredCount).toBe(1)
+  })
+
+  it('counts what is still waiting to be submitted', () => {
+    const r = summariseSettlements([t(), t({ insurance_submitted: true })])
+    expect(r.pendingSubmission).toBe(1)
+    expect(r.pendingSubmissionAmount).toBe(6_000_000)
+  })
+
+  it('does not queue a zero-value claim for submission', () => {
+    // There is nothing to claim, so it must not sit in the worklist.
+    const r = summariseSettlements([t({ insurance_share: 0, patient_share: 10_000_000 })])
+    expect(r.pendingSubmission).toBe(0)
+  })
+
+  it('returns zeroes for an empty list', () => {
+    expect(summariseSettlements([])).toEqual({
+      insuredCount: 0, totalInsuranceShare: 0, totalPatientShare: 0,
+      pendingSubmission: 0, pendingSubmissionAmount: 0,
+    })
   })
 })

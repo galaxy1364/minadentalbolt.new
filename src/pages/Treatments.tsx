@@ -13,7 +13,7 @@ import {
   updateTreatment, createLabOrder, fetchLabOrders, updateLabOrder,
   createToothRecord, updateToothRecord,
 } from '../lib/api'
-import { selectApplicablePolicy, splitCoverage } from '../lib/insurance'
+import { selectApplicablePolicy, splitCoverage, buildSettlement } from '../lib/insurance'
 import type { PatientPolicy } from '../lib/insurance'
 import { toJalaliString, toJalaliStringPretty, formatCurrency, formatNumber, toPersianDigits } from '../lib/persianDate'
 import { Encounter, EncounterWithRelations, Treatment, Procedure, Patient, Doctor, Laboratory, ToothRecord, LabOrder, InsuranceClaim } from '../types'
@@ -656,14 +656,16 @@ export default function Treatments() {
   /** The split the insurer will actually honour for the amount currently
    * typed in the form — recomputed live so the doctor sees the ceiling
    * bite before committing, not after the claim is rejected. */
+  const applicablePolicy = useMemo(
+    () => selectApplicablePolicy(treatPolicies, treatClaims, new Date().toISOString().slice(0, 10)),
+    [treatPolicies, treatClaims],
+  )
+
   const insuranceSplit = useMemo(() => {
     const total = (Number(treatForm.quantity) || 1) * (Number(treatForm.unit_price) || 0) - (Number(treatForm.discount) || 0)
-    if (total <= 0) return null
-    const onDate = new Date().toISOString().slice(0, 10)
-    const policy = selectApplicablePolicy(treatPolicies, treatClaims, onDate)
-    if (!policy) return null
-    return splitCoverage(total, policy, treatClaims, onDate)
-  }, [treatForm.quantity, treatForm.unit_price, treatForm.discount, treatPolicies, treatClaims])
+    if (total <= 0 || !applicablePolicy) return null
+    return splitCoverage(total, applicablePolicy, treatClaims, new Date().toISOString().slice(0, 10))
+  }, [treatForm.quantity, treatForm.unit_price, treatForm.discount, applicablePolicy, treatClaims])
 
   const calcTotal = () => {
     const qty = Number(treatForm.quantity) || 1
@@ -689,6 +691,12 @@ export default function Treatments() {
       lab_cost: treatForm.has_lab && treatForm.lab_cost ? Number(treatForm.lab_cost) : null,
       status: treatForm.status, notes: treatForm.notes || null,
       doctor_share: null, doctor_share_calculated: false,
+      // Frozen at the moment of recording: recomputing later would give a
+      // different answer once further claims have eaten the ceiling, and
+      // no longer match what the patient was quoted and agreed to.
+      ...buildSettlement(total, applicablePolicy, treatClaims, new Date().toISOString().slice(0, 10)),
+      insurance_submitted: false,
+      insurance_submitted_at: null,
     } as any
     const enc = encounters.find((e) => e.id === treatEncounterId)
     const fields = [

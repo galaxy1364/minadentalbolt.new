@@ -147,6 +147,22 @@ export interface Treatment {
   procedure_category: string | null
   doctor_share: number | null
   doctor_share_calculated: boolean | null
+  // ── Insurance settlement (MOD-FEAT-007) ──────────────────────────────
+  // The split is frozen onto the treatment at the moment it is recorded.
+  // Recomputing it later would give a different answer once further
+  // claims have eaten into the ceiling, so what the patient was actually
+  // quoted has to be stored, not derived.
+  /** Policy the split was computed against, for auditability. */
+  policy_id: string | null
+  /** Insurer's share as agreed at the time of treatment. */
+  insurance_share: number | null
+  /** Patient's share. Always total_price - insurance_share. */
+  patient_share: number | null
+  /** True when the policy ceiling reduced the insurer's share. */
+  insurance_capped: boolean | null
+  /** Submission tracking, mirroring the competitor's claim columns. */
+  insurance_submitted: boolean | null
+  insurance_submitted_at: string | null
 }
 
 export interface Payment {

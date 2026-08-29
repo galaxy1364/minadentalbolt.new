@@ -197,3 +197,94 @@ export function validatePolicy(p: Partial<PatientPolicy>): string[] {
   }
   return errors
 }
+
+// ── Freezing a split onto a treatment ───────────────────────────────────
+// A treatment's split must be *stored*, not recomputed on read: once
+// later claims eat into the ceiling, recomputing would give a different
+// answer than what the patient was actually quoted and agreed to.
+
+/** The insurance fields written onto a Treatment row. */
+export interface TreatmentSettlement {
+  policy_id: string | null
+  insurance_share: number | null
+  patient_share: number | null
+  insurance_capped: boolean | null
+}
+
+export function buildSettlement(
+  cost: number,
+  policy: PatientPolicy | null,
+  claims: InsuranceClaim[],
+  onDate: string,
+): TreatmentSettlement {
+  if (!policy) {
+    // No policy at all: leave the columns null rather than writing zeros,
+    // so "uninsured" stays distinguishable from "insured but covered 0".
+    return { policy_id: null, insurance_share: null, patient_share: null, insurance_capped: null }
+  }
+  const split = splitCoverage(cost, policy, claims, onDate)
+  return {
+    policy_id: policy.id,
+    insurance_share: split.insuranceShare,
+    patient_share: split.patientShare,
+    insurance_capped: split.cappedByCeiling,
+  }
+}
+
+/** Reads back the stored split, tolerating rows written before this
+ * feature existed. Those have null columns and are simply uninsured. */
+export function readSettlement(t: {
+  total_price: number | null
+  insurance_share: number | null
+  patient_share: number | null
+}): { insured: boolean; insuranceShare: number; patientShare: number } {
+  const total = toRial(t.total_price || 0)
+  if (t.insurance_share === null || t.insurance_share === undefined) {
+    return { insured: false, insuranceShare: 0, patientShare: total }
+  }
+  const ins = toRial(t.insurance_share)
+  // Trust the stored patient share when present; fall back to the
+  // remainder so a partially-written legacy row still balances.
+  const pat = t.patient_share === null || t.patient_share === undefined ? total - ins : toRial(t.patient_share)
+  return { insured: true, insuranceShare: ins, patientShare: pat }
+}
+
+export interface InsuranceTotals {
+  insuredCount: number
+  totalInsuranceShare: number
+  totalPatientShare: number
+  /** Treatments carrying a split but not yet submitted to the insurer. */
+  pendingSubmission: number
+  pendingSubmissionAmount: number
+}
+
+/** Roll-up across a patient's treatments, for the submission worklist. */
+export function summariseSettlements(
+  treatments: {
+    total_price: number | null
+    insurance_share: number | null
+    patient_share: number | null
+    insurance_submitted: boolean | null
+    status: string
+  }[],
+): InsuranceTotals {
+  const totals: InsuranceTotals = {
+    insuredCount: 0, totalInsuranceShare: 0, totalPatientShare: 0,
+    pendingSubmission: 0, pendingSubmissionAmount: 0,
+  }
+  for (const t of treatments) {
+    // A cancelled treatment is never claimable — submitting it would put
+    // the clinic's contract with the insurer at risk.
+    if (t.status === 'cancelled') continue
+    const s = readSettlement(t)
+    if (!s.insured) continue
+    totals.insuredCount += 1
+    totals.totalInsuranceShare += s.insuranceShare
+    totals.totalPatientShare += s.patientShare
+    if (!t.insurance_submitted && s.insuranceShare > 0) {
+      totals.pendingSubmission += 1
+      totals.pendingSubmissionAmount += s.insuranceShare
+    }
+  }
+  return totals
+}

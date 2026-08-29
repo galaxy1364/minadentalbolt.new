@@ -7,14 +7,16 @@ import { Card, Button, Input, Select, Badge, showToast } from './ui'
 import { PersianDateInput } from './PersianDateInput'
 import {
   fetchPatientPolicies, createPatientPolicy, archivePatientPolicy,
-  fetchInsuranceClaims, fetchInsuranceCompanies,
+  fetchInsuranceClaims, fetchInsuranceCompanies, fetchTreatments,
+  markTreatmentsSubmitted,
 } from '../lib/api'
 import {
   usedCeiling, remainingCeiling, ceilingUsagePercent, isPolicyValidOn,
   validatePolicy, splitCoverage, selectApplicablePolicy,
+  readSettlement, summariseSettlements,
 } from '../lib/insurance'
 import type { PatientPolicy } from '../lib/insurance'
-import type { InsuranceClaim, InsuranceCompany } from '../types'
+import type { InsuranceClaim, InsuranceCompany, Treatment } from '../types'
 import { formatNumber, toPersianDigits } from '../lib/persianDate'
 
 interface Props {
@@ -38,6 +40,8 @@ export function InsurancePanel({ patientId, previewCost }: Props) {
   const [policies, setPolicies] = useState<PatientPolicy[]>([])
   const [claims, setClaims] = useState<InsuranceClaim[]>([])
   const [companies, setCompanies] = useState<InsuranceCompany[]>([])
+  const [treatments, setTreatments] = useState<Treatment[]>([])
+  const [submitting, setSubmitting] = useState(false)
   const [loading, setLoading] = useState(true)
   const [adding, setAdding] = useState(false)
   const [form, setForm] = useState(emptyForm)
@@ -45,19 +49,28 @@ export function InsurancePanel({ patientId, previewCost }: Props) {
   const load = async () => {
     setLoading(true)
     try {
-      const [pols, cls, cos] = await Promise.all([
+      const [pols, cls, cos, trs] = await Promise.all([
         fetchPatientPolicies(patientId),
         fetchInsuranceClaims(),
         fetchInsuranceCompanies(),
+        fetchTreatments(),
       ])
       setPolicies(pols)
       setClaims(cls.filter((c) => c.patient_id === patientId))
       setCompanies(cos)
+      setTreatments(trs.filter((t) => t.patient_id === patientId))
     } finally { setLoading(false) }
   }
   useEffect(() => { void load() }, [patientId])
 
   const today = new Date().toISOString().slice(0, 10)
+  const totals = useMemo(() => summariseSettlements(treatments), [treatments])
+  const pending = useMemo(
+    () => treatments.filter(
+      (t) => t.status !== 'cancelled' && !t.insurance_submitted && readSettlement(t).insuranceShare > 0,
+    ),
+    [treatments],
+  )
   const active = useMemo(() => policies.filter((p) => p.is_active), [policies])
 
   const draft: Partial<PatientPolicy> = {
@@ -148,6 +161,48 @@ export function InsurancePanel({ patientId, previewCost }: Props) {
           {/* Disabled purely on the shared validator — a required field
               must block, never merely warn. */}
           <Button className="mt-3" onClick={save} disabled={errors.length > 0}>ثبت بیمه</Button>
+        </Card>
+      )}
+
+      {/* Submission worklist — treatments carrying a stored insurer share
+          that have not yet been sent to the insurer. */}
+      {pending.length > 0 && (
+        <Card className="p-4">
+          <div className="flex items-center justify-between flex-wrap gap-2">
+            <div>
+              <h4 className="font-bold text-slate-800">در انتظار ارسال به بیمه</h4>
+              <p className="text-xs text-slate-500 mt-0.5">
+                {toPersianDigits(totals.pendingSubmission)} درمان — مجموع {formatNumber(totals.pendingSubmissionAmount)}
+              </p>
+            </div>
+            <Button
+              disabled={submitting}
+              onClick={async () => {
+                setSubmitting(true)
+                try {
+                  await markTreatmentsSubmitted(pending.map((t) => t.id))
+                  showToast('success', 'به‌عنوان ارسال‌شده ثبت شد')
+                  await load()
+                } catch { showToast('error', 'خطا در ثبت ارسال') } finally { setSubmitting(false) }
+              }}
+            >
+              ثبت ارسال همه
+            </Button>
+          </div>
+          <ul className="mt-3 divide-y divide-slate-100">
+            {pending.map((t) => {
+              const st = readSettlement(t)
+              return (
+                <li key={t.id} className="py-2 flex items-center justify-between gap-2 text-sm">
+                  <span className="text-slate-700">
+                    {t.procedure_name || 'درمان'}
+                    {t.tooth_number && <span className="text-slate-400"> — دندان {toPersianDigits(t.tooth_number)}</span>}
+                  </span>
+                  <span className="font-bold text-emerald-700">{formatNumber(st.insuranceShare)}</span>
+                </li>
+              )
+            })}
+          </ul>
         </Card>
       )}
 

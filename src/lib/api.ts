@@ -1663,3 +1663,15 @@ export async function updatePatientPolicy(id: string, updates: Partial<PatientPo
 export async function archivePatientPolicy(id: string): Promise<void> {
   await updatePatientPolicy(id, { is_active: false })
 }
+
+/** Marks treatments as sent to the insurer. The timestamp and the flag
+ * are written together — a timestamp without the flag (or the reverse)
+ * would make the worklist disagree with the audit trail. */
+export async function markTreatmentsSubmitted(ids: string[]): Promise<void> {
+  const at = nowISO()
+  // Sequential so the offline sync queue replays in the same order it
+  // was created.
+  for (const id of ids) {
+    await updateTreatment(id, { insurance_submitted: true, insurance_submitted_at: at } as any)
+  }
+}
