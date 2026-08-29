@@ -26,6 +26,7 @@ import {
   ConsentFormInput, DashboardStats, DoctorInput, UnitInput,
   RolePermission, RolePermissionInput, CustomRole, CustomRoleInput,
   ManualReminder, ManualReminderInput,
+  ToothNote, ToothNoteInput,
 } from '../types'
 
 function uid(): string {
@@ -1599,4 +1600,35 @@ export async function updateManualReminder(id: string, updates: Partial<ManualRe
   await db.manual_reminders.put(updated)
   await queueOperation('manual_reminders', 'update', id, rest)
   return updated
+}
+
+// ── Tooth-scoped clinical notes ─────────────────────────────────────────
+export async function fetchToothNotes(patientId: string): Promise<ToothNote[]> {
+  const rows = await db.tooth_notes.where('patient_id').equals(patientId).toArray()
+  return rows.filter((n) => n.clinic_id === CLINIC_ID)
+}
+
+export async function createToothNote(n: ToothNoteInput): Promise<ToothNote> {
+  const { clinic_id, ...rest } = n
+  const id = uid()
+  const row: ToothNote = { ...rest, id, clinic_id: CLINIC_ID, created_at: nowISO(), updated_at: nowISO(), sync_version: 1 }
+  await db.tooth_notes.put(row)
+  await queueOperation('tooth_notes', 'insert', id, row)
+  return row
+}
+
+export async function updateToothNote(id: string, updates: Partial<ToothNoteInput>): Promise<ToothNote> {
+  const existing = await db.tooth_notes.get(id)
+  if (!existing) throw new Error('یادداشت یافت نشد')
+  const { clinic_id, ...rest } = updates
+  const updated: ToothNote = { ...existing, ...rest, updated_at: nowISO() }
+  await db.tooth_notes.put(updated)
+  await queueOperation('tooth_notes', 'update', id, rest)
+  return updated
+}
+
+/** Soft-delete only — a clinical note is a medical record, so 'delete'
+ * archives it exactly like radiology images and patients. */
+export async function archiveToothNote(id: string): Promise<void> {
+  await updateToothNote(id, { is_active: false })
 }

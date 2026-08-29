@@ -7,7 +7,7 @@ import type {
   ToothRecord, InventoryItem, InventoryCategory, PaymentPlan, Installment,
   Cheque, DoctorSchedule, ImplantCase, ImplantComponent, SmsTemplate, PersonalFinanceItem, CashRegisterSession,
   RolePermission, CustomRole,
-  ManualReminder,
+  ManualReminder, ToothNote,
 } from '../types'
 
 export interface SyncQueueEntry {
@@ -89,6 +89,7 @@ class MinadentDB extends Dexie {
   role_permissions!: Table<RolePermission, string>
   custom_roles!: Table<CustomRole, string>
   manual_reminders!: Table<ManualReminder, string>
+  tooth_notes!: Table<ToothNote, string>
 
   constructor() {
     super('minadent')
@@ -177,6 +178,12 @@ class MinadentDB extends Dexie {
     this.version(10).stores({
       manual_reminders: 'id, clinic_id, patient_id, due_date, status',
     })
+    // v11: tooth-scoped clinical notes (text / sketch / voice memo).
+    // Indexed by tooth_fdi so the per-tooth filter is a direct index hit
+    // rather than a full-table scan on large patient histories.
+    this.version(11).stores({
+      tooth_notes: 'id, clinic_id, patient_id, tooth_fdi, kind, is_active, created_at',
+    })
   }
 }
 
@@ -209,7 +216,7 @@ export const TABLE_NAMES = [
   'consent_forms', 'tooth_records', 'inventory_items', 'inventory_categories',
   'payment_plans', 'installments', 'cheques', 'doctor_schedules',
   'implant_cases', 'implant_components', 'sms_templates', 'personal_finance_items', 'cash_register_sessions',
-  'role_permissions', 'custom_roles', 'manual_reminders',
+  'role_permissions', 'custom_roles', 'manual_reminders', 'tooth_notes',
 ] as const
 
 export type TableName = typeof TABLE_NAMES[number]

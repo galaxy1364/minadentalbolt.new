@@ -1,7 +1,8 @@
 // PatientDetail.tsx - Persian RTL Dental Clinic Patient Detail Page
+import { ToothNotesPanel } from '../components/ToothNotesPanel'
 import { useState, useEffect, useCallback } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { ArrowRight, Edit2, Phone, Mail, MapPin, Calendar, CreditCard, Activity, FileText, Image as ImageIcon, Shield, Pill, Smile, Award, AlertCircle, Clock, CheckCircle2, Layers, Plus, Trash2, FileSignature, Printer, Bone, FlaskConical } from 'lucide-react'
+import { ArrowRight, Edit2, Phone, Mail, MapPin, Calendar, CreditCard, Activity, FileText, Image as ImageIcon, Shield, Pill, Smile, Award, AlertCircle, Clock, CheckCircle2, Layers, Plus, Trash2, FileSignature, Printer, Bone, FlaskConical, Pencil } from 'lucide-react'
 import { fetchPatient, updatePatient, fetchTimeline, fetchTreatments, fetchAppointments, fetchPayments, fetchToothRecords, createToothRecord, updateToothRecord, fetchPrescriptions, fetchRadiologyImages, fetchEncounters, fetchDoctors, fetchImplantCases, fetchTreatmentPhases, createTreatmentPhase, updateTreatmentPhase, fetchConsentForms, createConsentForm, updateConsentForm, fetchLabOrders, updateTreatment } from '../lib/api'
 import { toJalaliString, toJalaliStringPretty, formatCurrency, toPersianDigits, formatTime } from '../lib/persianDate'
 import { calcPatientBalance } from '../lib/finance'
@@ -794,6 +795,7 @@ export default function PatientDetail() {
     { key: 'appointments', label: 'نوبت‌ها', icon: <Calendar size={16} /> },
     { key: 'payments', label: 'پرداخت‌ها', icon: <CreditCard size={16} /> },
     { key: 'teeth', label: 'نمودار دندان‌ها', icon: <Smile size={16} /> },
+    { key: 'toothNotes', label: 'یادداشت دندانی', icon: <Pencil size={16} /> },
     { key: 'prescriptions', label: 'نسخه‌ها', icon: <Pill size={16} /> },
     { key: 'radiology', label: 'رادیولوژی', icon: <ImageIcon size={16} /> },
     { key: 'insurance', label: 'بیمه', icon: <Shield size={16} /> },
@@ -1788,6 +1790,7 @@ export default function PatientDetail() {
       {activeTab === 'appointments' && renderAppointments()}
       {activeTab === 'payments' && renderPayments()}
       {activeTab === 'teeth' && renderTeethChart()}
+      {activeTab === 'toothNotes' && <ToothNotesPanel patientId={id!} authorName={null} />}
       {activeTab === 'prescriptions' && renderPrescriptions()}
       {activeTab === 'radiology' && renderRadiology()}
       {activeTab === 'insurance' && renderInsurance()}
