@@ -9,11 +9,14 @@ import { BarChart, Bar, XAxis, YAxis, Tooltip as RTooltip, ResponsiveContainer, 
 import {
   fetchEncounters, fetchTreatments, fetchProcedures, fetchPatients, fetchDoctors,
   fetchLabs, fetchToothRecords, createEncounter, updateEncounter, createTreatment,
+  fetchPatientPolicies, fetchInsuranceClaims,
   updateTreatment, createLabOrder, fetchLabOrders, updateLabOrder,
   createToothRecord, updateToothRecord,
 } from '../lib/api'
+import { selectApplicablePolicy, splitCoverage, buildSettlement, settlementIsStale } from '../lib/insurance'
+import type { PatientPolicy } from '../lib/insurance'
 import { toJalaliString, toJalaliStringPretty, formatCurrency, formatNumber, toPersianDigits } from '../lib/persianDate'
-import { Encounter, EncounterWithRelations, Treatment, Procedure, Patient, Doctor, Laboratory, ToothRecord, LabOrder } from '../types'
+import { Encounter, EncounterWithRelations, Treatment, Procedure, Patient, Doctor, Laboratory, ToothRecord, LabOrder, InsuranceClaim } from '../types'
 import { Card, Button, Badge, Spinner, EmptyState, Tabs, Input, Select, Textarea, Modal, Wizard, showToast } from '../components/ui'
 import { PersianDateInput } from '../components/PersianDateInput'
 import { PalmerToothPicker } from '../components/PalmerToothPicker'
@@ -256,6 +259,11 @@ export default function Treatments() {
   }
 
   const [treatPatientId, setTreatPatientId] = useState<string | null>(null)
+  // Insurance context for the patient currently being treated. Loaded
+  // lazily when the treatment form opens rather than up-front for every
+  // patient in the list — this page can hold hundreds of encounters.
+  const [treatPolicies, setTreatPolicies] = useState<PatientPolicy[]>([])
+  const [treatClaims, setTreatClaims] = useState<InsuranceClaim[]>([])
   const [savingTreat, setSavingTreat] = useState(false)
   const [treatForm, setTreatForm] = useState({
     procedure_code: '', procedure_name: '', procedure_category: '',
@@ -482,7 +490,7 @@ export default function Treatments() {
         return
       }      setTreatEncounterId(newEnc.id)
       setTreatPatientId(quickTreatPatientId)
-      setEditingTreat(null)
+      setEditingTreat(null); setRecalcSettlement(false)
       setTreatWizardStep(0)
       setTreatForm({
         procedure_code: '', procedure_name: '', procedure_category: '', tooth_number: '', tooth_surface: '',
@@ -590,7 +598,7 @@ export default function Treatments() {
 
   const openTreatCreateModal = (encId: string, patId: string) => {
     h.tap()
-    setEditingTreat(null)
+    setEditingTreat(null); setRecalcSettlement(false)
     setTreatWizardStep(0)
     setTreatEncounterId(encId); setTreatPatientId(patId)
     setTreatForm({
@@ -604,7 +612,7 @@ export default function Treatments() {
 
   const openTreatEditModal = (t: Treatment) => {
     h.tap()
-    setEditingTreat(t)
+    setEditingTreat(t); setRecalcSettlement(false)
     setTreatWizardStep(0)
     setTreatEncounterId(t.encounter_id); setTreatPatientId(t.patient_id)
     setTreatForm({
@@ -633,6 +641,55 @@ export default function Treatments() {
     }
   }
 
+  useEffect(() => {
+    if (!treatPatientId) { setTreatPolicies([]); setTreatClaims([]); return }
+    let cancelled = false
+    void (async () => {
+      const [pols, cls] = await Promise.all([fetchPatientPolicies(treatPatientId), fetchInsuranceClaims()])
+      if (cancelled) return
+      setTreatPolicies(pols.filter((p) => p.is_active))
+      setTreatClaims(cls.filter((c) => c.patient_id === treatPatientId))
+    })()
+    return () => { cancelled = true }
+  }, [treatPatientId])
+
+  /** The split the insurer will actually honour for the amount currently
+   * typed in the form — recomputed live so the doctor sees the ceiling
+   * bite before committing, not after the claim is rejected. */
+  /** The date the work was actually done — the encounter's date, not
+   * today. Back-dating an encounter must price against the policy that
+   * was live on that day, otherwise a lapsed policy silently covers work
+   * it never covered. */
+  const treatmentDate = useMemo(() => {
+    const enc = encounters.find((e) => e.id === treatEncounterId)
+    return (enc?.encounter_date || new Date().toISOString().slice(0, 10)).slice(0, 10)
+  }, [encounters, treatEncounterId])
+
+  const applicablePolicy = useMemo(
+    () => selectApplicablePolicy(treatPolicies, treatClaims, treatmentDate),
+    [treatPolicies, treatClaims, treatmentDate],
+  )
+
+  /** When editing, whether the stored split no longer matches the
+   * current price/policy. Surfaced as a prompt — never applied silently,
+   * because the stored figure is what the patient agreed to. */
+  const settlementStale = useMemo(() => {
+    if (!editingTreat) return false
+    const total = (Number(treatForm.quantity) || 1) * (Number(treatForm.unit_price) || 0) - (Number(treatForm.discount) || 0)
+    return settlementIsStale(
+      { total_price: total, insurance_share: (editingTreat as any).insurance_share ?? null, policy_id: (editingTreat as any).policy_id ?? null },
+      applicablePolicy, treatClaims, treatmentDate,
+    )
+  }, [editingTreat, treatForm.quantity, treatForm.unit_price, treatForm.discount, applicablePolicy, treatClaims, treatmentDate])
+
+  const [recalcSettlement, setRecalcSettlement] = useState(false)
+
+  const insuranceSplit = useMemo(() => {
+    const total = (Number(treatForm.quantity) || 1) * (Number(treatForm.unit_price) || 0) - (Number(treatForm.discount) || 0)
+    if (total <= 0 || !applicablePolicy) return null
+    return splitCoverage(total, applicablePolicy, treatClaims, treatmentDate)
+  }, [treatForm.quantity, treatForm.unit_price, treatForm.discount, applicablePolicy, treatClaims, treatmentDate])
+
   const calcTotal = () => {
     const qty = Number(treatForm.quantity) || 1
     const price = Number(treatForm.unit_price) || 0
@@ -657,6 +714,16 @@ export default function Treatments() {
       lab_cost: treatForm.has_lab && treatForm.lab_cost ? Number(treatForm.lab_cost) : null,
       status: treatForm.status, notes: treatForm.notes || null,
       doctor_share: null, doctor_share_calculated: false,
+      // Frozen at the moment of recording: recomputing later would give a
+      // different answer once further claims have eaten the ceiling, and
+      // no longer match what the patient was quoted and agreed to.
+      // On create, always freeze a fresh split. On edit, keep the stored
+      // one unless the operator explicitly asked to recalculate — the
+      // original figure is a commitment made to the patient.
+      ...(editingTreat && !recalcSettlement
+        ? {}
+        : buildSettlement(total, applicablePolicy, treatClaims, treatmentDate)),
+      ...(editingTreat ? {} : { insurance_submitted: false, insurance_submitted_at: null }),
     } as any
     const enc = encounters.find((e) => e.id === treatEncounterId)
     const fields = [
@@ -665,6 +732,13 @@ export default function Treatments() {
       { label: 'دندان', value: treatForm.tooth_number ? toPersianDigits(treatForm.tooth_number) : '-' },
       { label: 'هزینه کل', value: `${formatCurrency(total)} ت` },
     ]
+    // Surfaced at the point of commit: if the ceiling caps the insurer's
+    // share, the doctor must see the real patient share before agreeing
+    // to the price, not after the claim comes back short.
+    if (insuranceSplit) {
+      fields.push({ label: 'سهم بیمه', value: `${formatCurrency(insuranceSplit.insuranceShare)} ت` })
+      fields.push({ label: 'سهم بیمار', value: `${formatCurrency(insuranceSplit.patientShare)} ت`, highlight: insuranceSplit.cappedByCeiling })
+    }
     if (treatForm.has_lab && treatForm.lab_id) {
       const lab = labs.find((l) => l.id === treatForm.lab_id)
       fields.push({ label: 'لابراتوار', value: lab?.name || '-', highlight: true })
@@ -673,6 +747,7 @@ export default function Treatments() {
     confirmAction({
       type: editingTreat ? 'edit' : 'create',
       title: editingTreat ? 'ویرایش درمان' : 'درمان جدید',
+      warning: insuranceSplit?.warning || undefined,
       fields,
       confirmLabel: editingTreat ? 'ذخیره' : 'ثبت درمان',
       onConfirm: async () => {
@@ -1055,7 +1130,7 @@ export default function Treatments() {
             {/* Dental Chart */}
             <div>
               <h4 className="text-xs font-bold text-slate-500 mb-3 uppercase tracking-wider flex items-center gap-1.5"><Smile size={14} /> چارت دندانی (پالمر)</h4>
-              <DentalChart toothRecords={toothRecords} treatments={encounterTreatments} onUpdateTooth={handleUpdateTooth} onToothSelect={(toothNum) => setLastSelectedTooth(toothNum)} onAddTreatment={(toothNum) => { if (!detailEnc) return; setTreatEncounterId(detailEnc.id); setTreatPatientId(detailEnc.patient_id); setEditingTreat(null); setTreatWizardStep(0); setTreatForm({ procedure_code: '', procedure_name: '', procedure_category: '', tooth_number: toothNum, tooth_surface: '', quantity: '1', unit_price: '', discount: '', total_price: '', status: 'planned', notes: '', has_lab: false, lab_id: '', lab_cost: '', lab_work_type: '', lab_material: '', lab_shade: '', go_to_billing: false }); setTreatModalOpen(true) }} />
+              <DentalChart toothRecords={toothRecords} treatments={encounterTreatments} onUpdateTooth={handleUpdateTooth} onToothSelect={(toothNum) => setLastSelectedTooth(toothNum)} onAddTreatment={(toothNum) => { if (!detailEnc) return; setTreatEncounterId(detailEnc.id); setTreatPatientId(detailEnc.patient_id); setEditingTreat(null); setRecalcSettlement(false); setTreatWizardStep(0); setTreatForm({ procedure_code: '', procedure_name: '', procedure_category: '', tooth_number: toothNum, tooth_surface: '', quantity: '1', unit_price: '', discount: '', total_price: '', status: 'planned', notes: '', has_lab: false, lab_id: '', lab_cost: '', lab_work_type: '', lab_material: '', lab_shade: '', go_to_billing: false }); setTreatModalOpen(true) }} />
             </div>
 
             {/* Treatments list */}
@@ -1236,6 +1311,42 @@ export default function Treatments() {
                   </div>
                   <Select label="وضعیت" value={treatForm.status} onChange={(v) => setTreatForm((p) => ({ ...p, status: v }))} options={treatmentStatuses} />
                 </div>
+                {/* Live insurance split. Shown here as well as in the
+                    confirm dialog so the doctor can adjust the price
+                    while quoting, instead of discovering the ceiling
+                    only at the moment of commit. */}
+                {settlementStale && (
+                  <div className="rounded-xl p-3 border bg-blue-50 border-blue-200">
+                    <p className="text-xs text-blue-900">
+                      سهم بیمه‌ی ذخیره‌شده با قیمت یا بیمه‌نامه‌ی فعلی هم‌خوانی ندارد.
+                    </p>
+                    <label className="mt-2 flex items-center gap-2 text-sm text-blue-900 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={recalcSettlement}
+                        onChange={(e) => setRecalcSettlement(e.target.checked)}
+                      />
+                      سهم بیمه دوباره محاسبه شود
+                    </label>
+                    <p className="mt-1 text-xs text-blue-700">
+                      بدون تیک، مبلغ توافق‌شده‌ی قبلی دست‌نخورده می‌ماند.
+                    </p>
+                  </div>
+                )}
+                {insuranceSplit && (
+                  <div className={`rounded-xl p-3 border ${insuranceSplit.cappedByCeiling ? 'bg-amber-50 border-amber-200' : 'bg-slate-50 border-slate-200'}`}>
+                    <div className="flex flex-wrap gap-x-5 gap-y-1 text-sm">
+                      <span>سهم بیمه: <b className="text-emerald-700">{formatCurrency(insuranceSplit.insuranceShare)} ت</b></span>
+                      <span>سهم بیمار: <b className="text-slate-800">{formatCurrency(insuranceSplit.patientShare)} ت</b></span>
+                      {insuranceSplit.remainingAfter !== null && (
+                        <span className="text-slate-500">مانده سقف پس از این درمان: {formatCurrency(insuranceSplit.remainingAfter)} ت</span>
+                      )}
+                    </div>
+                    {insuranceSplit.warning && (
+                      <p className="mt-2 text-xs text-amber-800">⚠ {insuranceSplit.warning}</p>
+                    )}
+                  </div>
+                )}
               </>
             ),
           },
