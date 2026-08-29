@@ -288,3 +288,29 @@ export function summariseSettlements(
   }
   return totals
 }
+
+/**
+ * Whether a stored settlement still matches what the current price and
+ * policy would produce.
+ *
+ * Used to *offer* a recalculation, never to perform one silently: the
+ * stored split is what the patient agreed to, so changing it has to be a
+ * deliberate act by the operator.
+ */
+export function settlementIsStale(
+  stored: { total_price: number | null; insurance_share: number | null; policy_id: string | null },
+  policy: PatientPolicy | null,
+  claims: InsuranceClaim[],
+  onDate: string,
+): boolean {
+  const storedInsured = stored.insurance_share !== null && stored.insurance_share !== undefined
+  if (!storedInsured && !policy) return false // uninsured then, uninsured now
+  if (!storedInsured && policy) return true   // a policy has since been added
+  if (storedInsured && !policy) return true   // the policy is gone
+
+  // Exclude this treatment's own past claim from the ceiling maths,
+  // otherwise recalculating always looks stale by its own contribution.
+  const fresh = splitCoverage(stored.total_price || 0, policy!, claims, onDate)
+  if (stored.policy_id !== policy!.id) return true
+  return fresh.insuranceShare !== stored.insurance_share
+}

@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest'
 import {
   toRial, isConsumingClaim, usedCeiling, remainingCeiling, isPolicyValidOn,
   splitCoverage, ceilingUsagePercent, selectApplicablePolicy, validatePolicy,
-  buildSettlement, readSettlement, summariseSettlements,
+  buildSettlement, readSettlement, summariseSettlements, settlementIsStale,
 } from './insurance'
 import type { PatientPolicy } from './insurance'
 import type { InsuranceClaim } from '../types'
@@ -431,5 +431,46 @@ describe('summariseSettlements', () => {
       insuredCount: 0, totalInsuranceShare: 0, totalPatientShare: 0,
       pendingSubmission: 0, pendingSubmissionAmount: 0,
     })
+  })
+})
+
+describe('settlementIsStale', () => {
+  const pol = policy()
+
+  it('is not stale when the stored share still matches', () => {
+    const stored = { total_price: 10_000_000, insurance_share: 6_000_000, policy_id: 'pol1' }
+    expect(settlementIsStale(stored, pol, [], DATE)).toBe(false)
+  })
+
+  it('is stale when the price changed', () => {
+    const stored = { total_price: 20_000_000, insurance_share: 6_000_000, policy_id: 'pol1' }
+    expect(settlementIsStale(stored, pol, [], DATE)).toBe(true)
+  })
+
+  it('is stale when a different policy now applies', () => {
+    const stored = { total_price: 10_000_000, insurance_share: 6_000_000, policy_id: 'other' }
+    expect(settlementIsStale(stored, pol, [], DATE)).toBe(true)
+  })
+
+  it('is stale when a policy was added after the fact', () => {
+    const stored = { total_price: 10_000_000, insurance_share: null, policy_id: null }
+    expect(settlementIsStale(stored, pol, [], DATE)).toBe(true)
+  })
+
+  it('is stale when the policy is gone', () => {
+    const stored = { total_price: 10_000_000, insurance_share: 6_000_000, policy_id: 'pol1' }
+    expect(settlementIsStale(stored, null, [], DATE)).toBe(true)
+  })
+
+  it('is not stale for a treatment that was and remains uninsured', () => {
+    const stored = { total_price: 10_000_000, insurance_share: null, policy_id: null }
+    expect(settlementIsStale(stored, null, [], DATE)).toBe(false)
+  })
+
+  it('becomes stale once other claims have eaten the ceiling', () => {
+    // The doctor should be *offered* a recalculation here, never have one
+    // applied silently — the stored figure is what the patient agreed to.
+    const stored = { total_price: 50_000_000, insurance_share: 30_000_000, policy_id: 'pol1' }
+    expect(settlementIsStale(stored, pol, [claim({ approved_amount: 95_000_000 })], DATE)).toBe(true)
   })
 })
