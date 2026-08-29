@@ -998,3 +998,35 @@ export interface CashRegisterSession {
 }
 
 export type CashRegisterSessionInput = Omit<CashRegisterSession, 'id' | 'created_at' | 'updated_at'> & { clinic_id?: string }
+
+// ── Tooth-scoped clinical notes (MOD-FEAT-003) ──────────────────────────
+// A note is either general (tooth_fdi === null) or pinned to one tooth.
+// Three kinds mirror how a dentist actually records chairside: typed
+// text, a freehand sketch (stylus/finger), or a short voice memo — the
+// last two are stored as data URLs so they survive fully offline in
+// IndexedDB and sync later like any other record.
+export type ToothNoteKind = 'text' | 'drawing' | 'audio'
+
+export interface ToothNote {
+  id: string
+  clinic_id: string
+  patient_id: string
+  /** FDI number as string (e.g. "16"), or null for a general note. */
+  tooth_fdi: string | null
+  kind: ToothNoteKind
+  /** Typed body. Required for kind='text', optional caption otherwise. */
+  body: string | null
+  /** data: URL holding the sketch PNG or the recorded audio clip. */
+  attachment_data_url: string | null
+  /** Recording length in seconds — only meaningful for kind='audio'. */
+  duration_sec: number | null
+  /** Palette tag so a doctor can colour-code notes, like the competitor. */
+  color: string | null
+  author_name: string | null
+  /** Soft-delete only — clinical notes are never destroyed. */
+  is_active: boolean
+  created_at: string
+  updated_at: string
+  sync_version: number
+}
+export type ToothNoteInput = Omit<ToothNote, 'id' | 'clinic_id' | 'created_at' | 'updated_at' | 'sync_version'> & { clinic_id?: string }
