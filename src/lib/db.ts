@@ -9,6 +9,7 @@ import type {
   RolePermission, CustomRole,
   ManualReminder, ToothNote,
 } from '../types'
+import type { PatientPolicy } from './insurance'
 
 export interface SyncQueueEntry {
   id?: number
@@ -90,6 +91,7 @@ class MinadentDB extends Dexie {
   custom_roles!: Table<CustomRole, string>
   manual_reminders!: Table<ManualReminder, string>
   tooth_notes!: Table<ToothNote, string>
+  patient_policies!: Table<PatientPolicy, string>
 
   constructor() {
     super('minadent')
@@ -184,6 +186,12 @@ class MinadentDB extends Dexie {
     this.version(11).stores({
       tooth_notes: 'id, clinic_id, patient_id, tooth_fdi, kind, is_active, created_at',
     })
+    // v12: per-patient insurance policies. The clinic-wide
+    // insurance_companies table holds the insurer; this holds what THIS
+    // patient is actually entitled to — ceiling included.
+    this.version(12).stores({
+      patient_policies: 'id, clinic_id, patient_id, company_id, is_active, start_date, end_date',
+    })
   }
 }
 
@@ -216,7 +224,7 @@ export const TABLE_NAMES = [
   'consent_forms', 'tooth_records', 'inventory_items', 'inventory_categories',
   'payment_plans', 'installments', 'cheques', 'doctor_schedules',
   'implant_cases', 'implant_components', 'sms_templates', 'personal_finance_items', 'cash_register_sessions',
-  'role_permissions', 'custom_roles', 'manual_reminders', 'tooth_notes',
+  'role_permissions', 'custom_roles', 'manual_reminders', 'tooth_notes', 'patient_policies',
 ] as const
 
 export type TableName = typeof TABLE_NAMES[number]
