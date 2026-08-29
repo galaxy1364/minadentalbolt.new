@@ -3,6 +3,10 @@ import { useState, useEffect, useCallback, useMemo } from 'react'
 import { FlaskConical, Plus, Search, Clock, CheckCircle2, AlertCircle, Edit2, Trash2, Phone, Filter, TrendingUp, Package, CalendarClock, ChevronLeft, RotateCcw } from 'lucide-react'
 import { downloadICSReminder } from '../lib/icsReminder'
 import { fetchLabOrders, createLabOrder, updateLabOrder, fetchLabs, createLab, updateLab, fetchPatients, fetchDoctors, fetchTreatments, updateTreatment } from '../lib/api'
+import {
+  formatShelfLocation, validateShelf, alarmInfo, suggestAlarmDate,
+  readyForDelivery, sortByUrgency, summariseLab,
+} from '../lib/labShelf'
 import { toJalaliString, toJalaliStringPretty, formatCurrency, toPersianDigits } from '../lib/persianDate'
 import { h } from '../lib/haptics'
 import { useConfirmAction } from '../components/ConfirmAction'
@@ -148,6 +152,13 @@ export default function Laboratory() {
     cost: '',
     notes: '',
     status: 'ordered',
+    shelf: '',
+    shelf_number: '',
+    shelf_space: '',
+    alarm_date: '',
+    work_done: false,
+    delivered: false,
+    material_returned: false,
   })
 
   // ===========================================================================
@@ -319,6 +330,9 @@ export default function Laboratory() {
       cost: '',
       notes: '',
       status: 'ordered',
+      shelf: '', shelf_number: '', shelf_space: '',
+      alarm_date: '',
+      work_done: false, delivered: false, material_returned: false,
     })
     setOrderModalOpen(true)
   }
@@ -341,13 +355,36 @@ export default function Laboratory() {
       cost: order.cost ? String(order.cost) : '',
       notes: order.notes || '',
       status: order.status,
+      shelf: order.shelf || '',
+      shelf_number: order.shelf_number || '',
+      shelf_space: order.shelf_space || '',
+      alarm_date: order.alarm_date || '',
+      work_done: Boolean(order.work_done),
+      delivered: Boolean(order.delivered),
+      material_returned: Boolean(order.material_returned),
     })
     setOrderModalOpen(true)
   }
 
+  const today = new Date().toISOString().slice(0, 10)
+
+  /** Cases the lab has finished that have not reached the patient yet.
+   * This is where work quietly rots: the lab is done, so it drops off
+   * the lab's radar, but nobody has called the patient in. */
+  const readyOrders = useMemo(
+    () => sortByUrgency(readyForDelivery(labOrders), today),
+    [labOrders, today],
+  )
+  const labSummary = useMemo(() => summariseLab(labOrders, today), [labOrders, today])
+
   const handleSaveOrder = () => {
     if (!orderForm.lab_id) { showToast('error', 'انتخاب لابراتوار الزامی است'); return }
     if (!orderForm.patient_id) { showToast('error', 'انتخاب بیمار الزامی است'); return }
+    // A required field must block, never merely warn.
+    const shelfErrors = validateShelf({
+      shelf: orderForm.shelf, shelf_number: orderForm.shelf_number, shelf_space: orderForm.shelf_space,
+    })
+    if (shelfErrors.length) { showToast('error', shelfErrors[0]); return }
     const payload = {
       lab_id: orderForm.lab_id,
       patient_id: orderForm.patient_id,
@@ -363,6 +400,13 @@ export default function Laboratory() {
       encounter_id: null,
       sent_at: null,
       received_at: null,
+      shelf: orderForm.shelf.trim() || null,
+      shelf_number: orderForm.shelf_number.trim() || null,
+      shelf_space: orderForm.shelf_space.trim() || null,
+      alarm_date: orderForm.alarm_date || null,
+      work_done: orderForm.work_done,
+      delivered: orderForm.delivered,
+      material_returned: orderForm.material_returned,
     } as any
     const patient = patientMap.get(orderForm.patient_id)
     const lab = labMap.get(orderForm.lab_id)
@@ -375,6 +419,8 @@ export default function Laboratory() {
         { label: 'نوع کار', value: workTypes.find((w) => w.value === orderForm.work_type)?.label || orderForm.work_type },
         { label: 'موعد', value: orderForm.deadline ? toJalaliString(orderForm.deadline) : '-' },
         { label: 'هزینه', value: orderForm.cost ? `${formatCurrency(Number(orderForm.cost))} ت` : '-' },
+        { label: 'مکان قفسه', value: formatShelfLocation({ shelf: orderForm.shelf, shelf_number: orderForm.shelf_number, shelf_space: orderForm.shelf_space }) || '-' },
+        { label: 'یادآور', value: orderForm.alarm_date ? toJalaliString(orderForm.alarm_date) : '-' },
       ],
       confirmLabel: editingOrder ? 'ذخیره' : 'ثبت سفارش',
       onConfirm: async () => {
@@ -540,9 +586,76 @@ export default function Laboratory() {
         { key: 'inprogress', node: <ModuleStatCard moduleKey="laboratory" icon={<Clock size={20} />} label="در حال انجام" value={toPersianDigits(stats.inProgress)} /> },
         { key: 'overdue', node: <ModuleStatCard moduleKey="laboratory" icon={<AlertCircle size={20} />} label="علی‌رغم موعد" value={toPersianDigits(stats.overdue)} /> },
         { key: 'cost', node: <ModuleStatCard moduleKey="laboratory" icon={<TrendingUp size={20} />} label="کل هزینه" value={`${formatCurrency(stats.totalCost)} ت`} /> },
+        { key: 'ready', node: <ModuleStatCard moduleKey="laboratory" icon={<Package size={20} />} label="آماده تحویل" value={toPersianDigits(labSummary.readyForDelivery)} /> },
+        { key: 'alarms', node: <ModuleStatCard moduleKey="laboratory" icon={<AlertCircle size={20} />} label="یادآور گذشته" value={toPersianDigits(labSummary.overdueAlarms)} /> },
       ]}
     />
   )
+
+  /** Ready-for-delivery worklist. Shows the shelf address so staff can
+   * physically fetch the case, and flags the ones with no address yet —
+   * those are exactly the cases that get lost in a box. */
+  const renderReadyForDelivery = () => {
+    if (readyOrders.length === 0) return null
+    return (
+      <Card className="p-4">
+        <div className="flex items-center justify-between flex-wrap gap-2">
+          <div className="flex items-center gap-2">
+            <Package size={18} className="text-emerald-600" />
+            <h3 className="font-bold text-slate-800">آماده تحویل به بیمار</h3>
+            <Badge color="success">{toPersianDigits(readyOrders.length)}</Badge>
+          </div>
+          {labSummary.missingShelf > 0 && (
+            <Badge color="warning">{toPersianDigits(labSummary.missingShelf)} بدون مکان قفسه</Badge>
+          )}
+        </div>
+
+        <ul className="mt-3 divide-y divide-slate-100">
+          {readyOrders.map((o) => {
+            const patient = patientMap.get(o.patient_id)
+            const location = formatShelfLocation(o)
+            const alarm = alarmInfo(o, today)
+            return (
+              <li key={o.id} className="py-2.5 flex items-center justify-between gap-3 flex-wrap">
+                <div className="min-w-0">
+                  <button
+                    type="button"
+                    className="font-medium text-slate-800 hover:text-primary-700 text-right"
+                    onClick={() => openEditOrderModal(o)}
+                  >
+                    {patient ? `${patient.first_name} ${patient.last_name}` : 'بیمار نامشخص'}
+                  </button>
+                  <p className="text-xs text-slate-500 mt-0.5">
+                    {o.work_type || 'کار لابراتوار'}
+                    {o.tooth_number && <span> — دندان {toPersianDigits(o.tooth_number)}</span>}
+                  </p>
+                </div>
+                <div className="flex items-center gap-2 flex-wrap">
+                  {alarm.state === 'overdue' && <Badge color="error">{alarm.label}</Badge>}
+                  {location
+                    ? <Badge color="primary">قفسه {toPersianDigits(location)}</Badge>
+                    : <Badge color="warning">مکان ثبت نشده</Badge>}
+                  <Button
+                    size="sm"
+                    variant="secondary"
+                    onClick={async () => {
+                      try {
+                        await updateLabOrder(o.id, { delivered: true, status: 'delivered' } as any)
+                        showToast('success', 'تحویل ثبت شد')
+                        await loadData()
+                      } catch { showToast('error', 'خطا در ثبت تحویل') }
+                    }}
+                  >
+                    ثبت تحویل
+                  </Button>
+                </div>
+              </li>
+            )
+          })}
+        </ul>
+      </Card>
+    )
+  }
 
   // ===========================================================================
   // Render: Order Card
@@ -574,6 +687,14 @@ export default function Laboratory() {
             </div>
           </div>
           <Badge color={statusMeta.color}>{statusMeta.label}</Badge>
+          {/* Shelf address on the card itself: the whole point is that
+              staff can find the physical case without opening it. */}
+          {formatShelfLocation(order) && (
+            <Badge color="primary">قفسه {toPersianDigits(formatShelfLocation(order)!)}</Badge>
+          )}
+          {alarmInfo(order, today).state === 'overdue' && (
+            <Badge color="error">یادآور {alarmInfo(order, today).label}</Badge>
+          )}
         </div>
 
         {/* Details */}
@@ -989,7 +1110,43 @@ export default function Laboratory() {
             validate: () => (!orderForm.deadline ? 'موعد تحویل الزامی است — بدون آن هشدار تأخیر ساخته نمی‌شود' : null),
             content: (
               <>
-                <PersianDateInput label="موعد تحویل *" value={orderForm.deadline} onChange={(v) => setOrderForm((p) => ({ ...p, deadline: v }))} />
+                <PersianDateInput
+                  label="موعد تحویل *"
+                  value={orderForm.deadline}
+                  onChange={(v) => setOrderForm((p) => ({
+                    ...p,
+                    deadline: v,
+                    // Pre-fill a chase reminder two days ahead, but never
+                    // overwrite one the operator already chose.
+                    alarm_date: p.alarm_date || suggestAlarmDate(v, new Date().toISOString().slice(0, 10)) || '',
+                  }))}
+                />
+                <PersianDateInput label="تاریخ یادآور (پیگیری از لابراتوار)" value={orderForm.alarm_date} onChange={(v) => setOrderForm((p) => ({ ...p, alarm_date: v }))} />
+
+                {/* Physical location. All three or none — a partial
+                    address still means opening every box on the shelf. */}
+                <div className="grid grid-cols-3 gap-2">
+                  <Input label="قفسه" value={orderForm.shelf} onChange={(v) => setOrderForm((p) => ({ ...p, shelf: v }))} />
+                  <Input label="شماره قفسه" value={orderForm.shelf_number} onChange={(v) => setOrderForm((p) => ({ ...p, shelf_number: v }))} />
+                  <Input label="فضای قفسه" value={orderForm.shelf_space} onChange={(v) => setOrderForm((p) => ({ ...p, shelf_space: v }))} />
+                </div>
+
+                <div className="flex flex-wrap gap-4">
+                  <label className="flex items-center gap-2 text-sm cursor-pointer">
+                    <input type="checkbox" checked={orderForm.work_done} onChange={(e) => setOrderForm((p) => ({ ...p, work_done: e.target.checked, delivered: e.target.checked ? p.delivered : false }))} />
+                    اتمام کار
+                  </label>
+                  {/* Delivery is disabled until the lab has finished:
+                      a case cannot reach the patient before it exists. */}
+                  <label className={`flex items-center gap-2 text-sm ${orderForm.work_done ? 'cursor-pointer' : 'opacity-50'}`}>
+                    <input type="checkbox" disabled={!orderForm.work_done} checked={orderForm.delivered} onChange={(e) => setOrderForm((p) => ({ ...p, delivered: e.target.checked }))} />
+                    تحویل شده
+                  </label>
+                  <label className="flex items-center gap-2 text-sm cursor-pointer">
+                    <input type="checkbox" checked={orderForm.material_returned} onChange={(e) => setOrderForm((p) => ({ ...p, material_returned: e.target.checked }))} />
+                    برگشت متریال
+                  </label>
+                </div>
                 {!editingOrder && typicalTurnaroundDays[orderForm.work_type] && (
                   <p className="text-[11px] text-slate-400 -mt-2">
                     پیشنهاد خودکار بر اساس زمان معمول «{workTypes.find((w) => w.value === orderForm.work_type)?.label}» — قابل تغییر است
@@ -1117,6 +1274,7 @@ export default function Laboratory() {
 
       {/* Stats */}
       {renderStats()}
+      {renderReadyForDelivery()}
       {view === 'orders' && renderOrdersView()}
       {view === 'labs' && renderLabsView()}
 
