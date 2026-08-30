@@ -2,6 +2,7 @@ import { createContext, useContext, useEffect, useState, createElement, type Rea
 import type { Session, User } from '@supabase/supabase-js'
 import { supabase } from './supabase'
 import { currentActor } from './auditLog'
+import { logError } from './errorLog'
 
 export interface StaffProfile {
   id: string
@@ -99,7 +100,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const { error } = isPhone
       ? await supabase.auth.signInWithPassword({ phone: identifier, password })
       : await supabase.auth.signInWithPassword({ email: identifier, password })
-    return { error: error ? mapAuthError(error.message) : null }
+    if (error) {
+      // The generic fallback message ("خطا در ورود") hid the actual
+      // cause, which made a real login failure impossible to diagnose
+      // from the phone — the only place it can be reproduced. Log the
+      // real error and record it in Settings → گزارش خطاها so there's
+      // something concrete to look at instead of a guess.
+      console.error('[auth] signIn failed:', error.status, error.message)
+      logError(error, 'react', `signIn status=${error.status ?? 'none'}`)
+    }
+    return { error: error ? mapAuthError(error.message, error.status) : null }
   }
 
   async function signOut() {
@@ -113,10 +123,25 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, children)
 }
 
-function mapAuthError(message: string): string {
+function mapAuthError(message: string, status?: number): string {
   if (/invalid login credentials/i.test(message)) return 'ایمیل یا رمز عبور اشتباه است'
   if (/email not confirmed/i.test(message)) return 'ایمیل شما هنوز تایید نشده است'
-  return 'خطا در ورود، لطفاً دوباره تلاش کنید'
+  // Supabase returns 429 when too many attempts hit the same account or
+  // IP in a short window. Retrying immediately makes it worse, so say
+  // that plainly rather than inviting another attempt.
+  if (status === 429 || /rate limit|too many/i.test(message)) {
+    return 'تعداد تلاش‌ها زیاد بوده — چند دقیقه صبر کنید و دوباره تلاش کنید'
+  }
+  // A failed fetch means the request never reached the server at all —
+  // network, DNS, or a paused project. Completely different from a
+  // rejected password, and the user needs to know which.
+  if (/failed to fetch|network|load failed/i.test(message)) {
+    return 'اتصال به سرور برقرار نشد — اینترنت را بررسی کنید'
+  }
+  if (status === 401 || /api key|apikey|jwt/i.test(message)) {
+    return 'کلید اتصال به سرور نامعتبر است — با پشتیبانی تماس بگیرید'
+  }
+  return `خطا در ورود: ${message}`
 }
 
 export function useAuth(): AuthState {
