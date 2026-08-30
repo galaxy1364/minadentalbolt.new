@@ -8,7 +8,7 @@ import {
   Clock, TrendingUp, TrendingDown, Smile, AlertTriangle, Package,
   ClipboardList, Wallet, Zap, ChevronLeft, Timer, Moon, Sun, Target, Settings2,
   CheckCircle2, ArrowUpRight, ArrowDownRight, Sparkles, Building2,
-  RefreshCw, Download, FileText, Bell,
+  RefreshCw, Download, FileText, Bell, AlertCircle
 } from 'lucide-react'
 import {
   AreaChart, Area, XAxis, YAxis, Tooltip as RTooltip, ResponsiveContainer,
@@ -30,6 +30,9 @@ import type {
   Encounter, Installment, TreatmentWithRelations, ImplantCase,
 } from '../types'
 import { Card, Badge, EmptyState, showToast, Modal } from '../components/ui'
+import { buildClinicalFollowUps, applyDismissals, snoozeUntil } from '../lib/followUps'
+import type { Dismissal } from '../lib/followUps'
+import { fetchTreatmentPhases } from '../lib/api'
 import { findBirthdays, findDebtors, findLapsedPatients, findDueInstallments, findNoShows, findUnfinishedTreatmentFollowups, findUnresolvedPastAppointments, REMINDER_CATEGORY_META, SmartReminder } from '../lib/smartReminders'
 import { calcAllPatientBalances } from '../lib/finance'
 import { supabase } from '../lib/supabase'
@@ -550,6 +553,9 @@ export default function Dashboard() {
       setEncounters(encs); setInstallments(insts)
       setTreatments(trts)
       setImplantCases(implCases)
+      // Loaded for the clinical follow-up list; failure here must not
+      // take the dashboard down with it.
+      fetchTreatmentPhases().then(setPhasesState).catch(() => setPhasesState([]))
       setLabOrdersState(labOrders as LabOrder[])
       const { totalOutstanding } = calcAllPatientBalances(pays, trts, implCases)
       setOutstandingBalance(totalOutstanding)
@@ -640,6 +646,39 @@ export default function Dashboard() {
       unfinished_treatment: findUnfinishedTreatmentFollowups(treatments, appointments, patients),
     }
   }, [patients, encounters, installments, treatments, appointments, implantCases])
+
+  // ── Clinical follow-ups ──────────────────────────────────────
+  // smartReminders covers the patient-facing side. Nothing covered the
+  // clinical side: a crown three weeks late at the lab, an implant that
+  // has not moved since spring, a phase a month past its estimate. That
+  // is work the clinic loses money and trust on, and it appeared nowhere.
+  const [phasesState, setPhasesState] = useState<any[]>([])
+
+  // Snoozes live in localStorage rather than a new table. Adding one to
+  // TABLE_NAMES ahead of its migration is what broke the sync loop once
+  // before, and a "I called them" note is per-device UI state, not a
+  // clinical record.
+  const [dismissals, setDismissals] = useState<Dismissal[]>(() => {
+    try { return JSON.parse(localStorage.getItem('followup-snoozes') || '[]') } catch { return [] }
+  })
+
+  const clinicalFollowUps = useMemo(() => {
+    const today = new Date().toISOString().slice(0, 10)
+    const all = buildClinicalFollowUps(labOrdersState as any, implantCases as any, phasesState, today)
+    return applyDismissals(all, dismissals, today)
+  }, [labOrdersState, implantCases, phasesState, dismissals])
+
+  const handleSnooze = (key: string, days: number) => {
+    const today = new Date().toISOString().slice(0, 10)
+    // Keep only live snoozes, so the stored list cannot grow for ever.
+    const next = [
+      ...clinicalFollowUps.liveDismissals.filter((d) => d.key !== key),
+      { key, until: snoozeUntil(today, days) },
+    ]
+    setDismissals(next)
+    try { localStorage.setItem('followup-snoozes', JSON.stringify(next)) } catch { /* private mode */ }
+    showToast('success', `${days} روز بعد دوباره یادآوری می‌شود`)
+  }
 
   const [sendingReminderId, setSendingReminderId] = useState<string | null>(null)
   const handleSendReminderSms = async (reminder: SmartReminder) => {
@@ -1479,6 +1518,60 @@ export default function Dashboard() {
           )}
         </Card>
       </div>
+
+      {/* ═══ Clinical follow-ups ════════════════════════════════════
+          Work that is stuck, as opposed to patients who need contacting.
+          Separate card on purpose: chasing a lab is a different job from
+          phoning a patient, and mixing them made neither list get
+          worked through. */}
+      {clinicalFollowUps.visible.length > 0 && (
+        <Card className="p-4 tile-in">
+          <div className="flex items-center justify-between mb-3">
+            <h2 className="text-base font-bold text-slate-800 dark:text-slate-100 flex items-center gap-2">
+              <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-rose-400 to-rose-600 flex items-center justify-center text-white">
+                <AlertCircle size={16} />
+              </div>
+              کارهای معطل‌مانده
+              <span className="text-xs font-normal text-slate-400">
+                ({toPersianDigits(clinicalFollowUps.visible.length)})
+              </span>
+            </h2>
+            {clinicalFollowUps.hiddenCount > 0 && (
+              <span className="text-[11px] text-slate-400">
+                {toPersianDigits(clinicalFollowUps.hiddenCount)} مورد به تعویق افتاده
+              </span>
+            )}
+          </div>
+          <div className="space-y-2">
+            {clinicalFollowUps.visible.slice(0, 8).map((f) => {
+              const patient = patients.find((p) => p.id === f.patientId)
+              const tone = f.kind === 'lab_overdue' ? 'bg-amber-50 border-amber-200'
+                : f.kind === 'implant_stalled' ? 'bg-violet-50 border-violet-200'
+                : 'bg-rose-50 border-rose-200'
+              return (
+                <div key={f.key} className={`flex items-center gap-3 p-2.5 rounded-xl border ${tone}`}>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-bold text-slate-800 truncate">
+                      {f.title}
+                      {patient && <span className="font-normal text-slate-500"> — {patient.first_name} {patient.last_name}</span>}
+                    </p>
+                    <p className="text-xs text-slate-500">{toPersianDigits(f.detail)}</p>
+                  </div>
+                  {/* Snooze, not dismiss: the crown still has not arrived
+                      after you tick "called the lab", so it must come
+                      back if nothing changed. */}
+                  <button
+                    onClick={() => handleSnooze(f.key, 3)}
+                    className="shrink-0 text-[11px] px-2.5 py-1.5 rounded-lg bg-white/70 border border-slate-200 text-slate-600 font-bold"
+                  >
+                    پیگیری شد
+                  </button>
+                </div>
+              )
+            })}
+          </div>
+        </Card>
+      )}
 
       {/* ═══ Smart Reminders ════════════════════════════════════════ */}
       {(smartReminders.birthday.length + smartReminders.debtor.length + smartReminders.lapsed.length + smartReminders.installment_due.length) > 0 && (

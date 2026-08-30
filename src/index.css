@@ -15,7 +15,8 @@
    different rates, which reads as movement without any edge crossing
    text.
    
-   The tints stay under 14%. Text contrast is a locked project standard
+   Raised on request. Surface tints stay under 16% and the drifting pools
+   under 34% — the pools sit behind cards, not under text. Text contrast is a locked project standard
    (MOD-UI-004), and a background that competes with the words fails the
    thing it was meant to improve. */
 @keyframes module-drift-a {
@@ -38,8 +39,8 @@ body::before {
   z-index: -1;
   pointer-events: none;
   background:
-    radial-gradient(42% 38% at 18% 12%, color-mix(in srgb, var(--module-color, #0d9488) 22%, transparent) 0%, transparent 62%),
-    radial-gradient(46% 42% at 82% 26%, color-mix(in srgb, var(--module-gradient-from, #14b8a6) 18%, transparent) 0%, transparent 66%),
+    radial-gradient(42% 38% at 18% 12%, color-mix(in srgb, var(--module-color, #0d9488) 34%, transparent) 0%, transparent 62%),
+    radial-gradient(46% 42% at 82% 26%, color-mix(in srgb, var(--module-gradient-from, #14b8a6) 30%, transparent) 0%, transparent 66%),
     radial-gradient(52% 46% at 50% 96%, color-mix(in srgb, var(--module-color-light, #f0fdfa) 90%, transparent) 0%, transparent 70%);
   animation: module-drift-a 26s ease-in-out infinite;
   will-change: transform;
@@ -54,10 +55,10 @@ body::after {
   inset: -25%;
   z-index: -1;
   pointer-events: none;
-  opacity: 0.55;
+  opacity: 0.7;
   background:
-    radial-gradient(38% 34% at 72% 72%, color-mix(in srgb, var(--module-gradient-to, #0d9488) 16%, transparent) 0%, transparent 64%),
-    radial-gradient(34% 30% at 24% 62%, color-mix(in srgb, var(--module-color, #0d9488) 12%, transparent) 0%, transparent 60%);
+    radial-gradient(38% 34% at 72% 72%, color-mix(in srgb, var(--module-gradient-to, #0d9488) 26%, transparent) 0%, transparent 64%),
+    radial-gradient(34% 30% at 24% 62%, color-mix(in srgb, var(--module-color, #0d9488) 20%, transparent) 0%, transparent 60%);
   animation: module-drift-b 34s ease-in-out infinite;
   will-change: transform;
 }
@@ -71,7 +72,7 @@ body::after {
 
 body {
   font-family: 'Vazirmatn', sans-serif;
-  background: color-mix(in srgb, var(--module-color-light, #f0fdfa) 60%, #ffffff);
+  background: color-mix(in srgb, var(--module-color-light, #f0fdfa) 95%, #ffffff);
   overscroll-behavior-y: none;
   -webkit-tap-highlight-color: transparent;
   overflow-x: hidden;
@@ -300,8 +301,8 @@ input, textarea, select { font-size: 16px !important; }
      contrast floor. */
   background:
     linear-gradient(160deg,
-      color-mix(in srgb, var(--module-color, #0d9488) 6%, #ffffff) 0%,
-      color-mix(in srgb, var(--module-color, #0d9488) 2%, #ffffff) 55%,
+      color-mix(in srgb, var(--module-color, #0d9488) 11%, #ffffff) 0%,
+      color-mix(in srgb, var(--module-color, #0d9488) 5%, #ffffff) 55%,
       #ffffff 100%);
   border-radius: 18px;
   box-shadow: 0 2px 20px rgba(0,0,0,0.05), 0 1px 3px rgba(0,0,0,0.04);
@@ -452,8 +453,8 @@ input, textarea, select { font-size: 16px !important; }
   border-radius: 20px;
   font-size: 12px;
   font-weight: 600;
-  border: 1.5px solid color-mix(in srgb, var(--module-color, #0d9488) 18%, #e2e8f0);
-  background: color-mix(in srgb, var(--module-color, #0d9488) 7%, #ffffff);
+  border: 1.5px solid color-mix(in srgb, var(--module-color, #0d9488) 30%, #e2e8f0);
+  background: color-mix(in srgb, var(--module-color, #0d9488) 12%, #ffffff);
   color: #475569;
   white-space: nowrap;
   transition: all 0.18s ease;
@@ -609,11 +610,11 @@ input, textarea, select { font-size: 16px !important; }
 .quick-stat {
   background:
     linear-gradient(150deg,
-      color-mix(in srgb, var(--module-color, #0d9488) 10%, #ffffff) 0%,
-      color-mix(in srgb, var(--module-color, #0d9488) 3%, #ffffff) 70%,
+      color-mix(in srgb, var(--module-color, #0d9488) 16%, #ffffff) 0%,
+      color-mix(in srgb, var(--module-color, #0d9488) 7%, #ffffff) 70%,
       #ffffff 100%);
   border-radius: 16px;
-  border: 0.5px solid color-mix(in srgb, var(--module-color, #0d9488) 14%, rgba(0,0,0,0.04));
+  border: 0.5px solid color-mix(in srgb, var(--module-color, #0d9488) 22%, rgba(0,0,0,0.04));
   padding: 14px 16px;
   box-shadow: 0 1px 8px rgba(0,0,0,0.03);
 }
@@ -1098,7 +1099,7 @@ input, textarea, select { font-size: 16px !important; }
   position: absolute;
   border-radius: 50%;
   filter: blur(90px);
-  opacity: 0.55;
+  opacity: 0.7;
   will-change: transform;
 }
 .login-blob-1 {
@@ -1223,5 +1224,5 @@ input, textarea, select { font-size: 16px !important; }
    excluded inside SVG where a white fill is doing real drawing work —
    the gloss highlight on a tooth crown, for one. */
 .bg-white:not(.dark .bg-white):not(svg *) {
-  background-color: color-mix(in srgb, var(--module-color, #0d9488) 5%, #ffffff);
+  background-color: color-mix(in srgb, var(--module-color, #0d9488) 9%, #ffffff);
 }
