@@ -1,4 +1,5 @@
 import { supabase, CLINIC_ID } from './supabase'
+import { isMissingTableError } from './syncErrors'
 import { db, TABLE_NAMES, TableName, SyncQueueEntry } from './db'
 import { logAudit } from './auditLog'
 
@@ -40,7 +41,21 @@ async function pullTable(tableName: TableName): Promise<number> {
     query = query.gt('updated_at', lastSync)
   }
   const { data, error } = await query.limit(BATCH_SIZE)
-  if (error) throw new Error(`Pull ${tableName}: ${error.message}`)
+  if (error) {
+    // A table that does not exist server-side must not take the whole
+    // sync down with it. This happens whenever the app ships ahead of
+    // its migrations: because this pull loop is sequential, every table
+    // AFTER the missing one would never be pulled either — so a single
+    // un-migrated table means no patients, no appointments, nothing,
+    // and the app looks broken rather than merely out of date.
+    // Postgres 42P01 = undefined_table, PostgREST PGRST205 = table not
+    // found in schema cache.
+    if (isMissingTableError(error)) {
+      console.warn(`[sync] skipping ${tableName}: not present server-side yet`)
+      return 0
+    }
+    throw new Error(`Pull ${tableName}: ${error.message}`)
+  }
   if (!data || data.length === 0) return 0
   const table = (db as any)[tableName]
   await table.bulkPut(data)
@@ -72,6 +87,11 @@ async function pushQueue(): Promise<void> {
       }
       if (entry.id) await db.sync_queue.delete(entry.id)
     } catch (err: any) {
+      // Same reasoning as pullTable: when the table has not been created
+      // server-side yet, this entry is not *wrong*, it is merely early.
+      // Burning its retry budget would park a perfectly good record as
+      // permanently failed right before its migration finally lands.
+      if (isMissingTableError(err)) continue
       if (entry.id) {
         const newRetry = entry.retry_count + 1
         if (newRetry >= 10) {
