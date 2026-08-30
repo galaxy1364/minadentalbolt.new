@@ -4,6 +4,7 @@ import { useNavigate, useLocation } from 'react-router-dom'
 import { Smile, Plus, Search, Edit2, Eye, Filter, Package, Calendar, DollarSign, ShieldCheck, AlertTriangle, CheckCircle2, Clock, Activity, Layers, Trash2, CalendarClock, ScanLine } from 'lucide-react'
 import { downloadICSReminder } from '../lib/icsReminder'
 import { fetchImplantCases, createImplantCase, updateImplantCase, createImplantComponent, deleteImplantComponent, fetchPatients, fetchDoctors, createExpense, fetchInventoryItems } from '../lib/api'
+import { calcSurgeryShare, canMoveStage, validateImplantCase, caseFinancials } from '../lib/implants'
 import { BarcodeScanner } from '../components/BarcodeScanner'
 import { CLINIC_ID } from '../lib/supabase'
 import { toJalaliString, toJalaliStringPretty, formatCurrency, formatNumber, toPersianDigits } from '../lib/persianDate'
@@ -88,18 +89,6 @@ function getBrandModels(brand: string | null): string[] {
   return implantBrands.find((b) => b.value === brand)?.models || []
 }
 
-// Computes the surgeon's share for a case: negotiated flat amount, or
-// the formula (total_cost minus deductible component costs) / 2.
-// Fixture cost is always excluded regardless of include_in_doctor_share
-// (billed separately, never part of the surgeon's deduction base).
-function calcSurgeryShare(c: ImplantCaseWithRelations): number {
-  if (c.surgery_fee_mode === 'negotiated') return c.surgery_fee_amount || 0
-  const deductible = (c.components || [])
-    .filter((comp) => comp.component_type !== 'fixture' && comp.include_in_doctor_share !== false)
-    .reduce((s, comp) => s + (comp.cost || 0), 0)
-  const net = (c.total_cost || 0) - deductible
-  return Math.max(0, net / 2)
-}
 
 function getComponentTypeLabel(type: string | null) {
   return componentTypes.find((c) => c.value === type)?.label || type || '-'
@@ -369,7 +358,12 @@ export default function Implants() {
 
   const handleSettleSurgery = (c: ImplantCaseWithRelations) => {
     h.tap()
-    const amount = calcSurgeryShare(c)
+    // The whole split is shown at the moment of settling, not just the
+    // surgeon's slice: paying out a share of a case the patient has
+    // barely paid for is a decision, and it should be made with the
+    // remaining balance visible rather than looked up afterwards.
+    const fin = caseFinancials(c)
+    const amount = fin.surgeryShare
     const doctorName = c.doctor?.name || 'پزشک جراح'
     confirmAction({
       type: 'create',
@@ -379,6 +373,13 @@ export default function Implants() {
         { label: 'جراح', value: `دکتر ${doctorName}` },
         { label: 'روش محاسبه', value: c.surgery_fee_mode === 'negotiated' ? 'توافقی' : 'فرمول خودکار' },
         { label: 'مبلغ', value: `${formatCurrency(amount)} ت`, highlight: true },
+        { label: 'سهم پروتز', value: `${formatCurrency(fin.prosthesisShare)} ت` },
+        { label: 'سهم کلینیک', value: `${formatCurrency(fin.clinicShare)} ت` },
+        {
+          label: 'مانده بیمار',
+          value: `${formatCurrency(fin.remaining)} ت`,
+          highlight: fin.remaining > 0,
+        },
       ],
       confirmLabel: 'ثبت پرداخت',
       onConfirm: async () => {
@@ -456,6 +457,13 @@ export default function Implants() {
       crown_delivery_date: editingCase?.crown_delivery_date || null,
       failure_reason: editingCase?.failure_reason || null,
     } as any
+
+    // Blocks rather than warns. Negative money and out-of-order dates
+    // were both accepted before, and those dates drive the warranty
+    // window and the healing interval.
+    const caseErrors = validateImplantCase(payload)
+    if (caseErrors.length) { showToast('error', caseErrors[0]); return }
+
     const patient = patients.find((p) => p.id === caseForm.patient_id)
     confirmAction({
       type: editingCase ? 'edit' : 'create',
@@ -486,6 +494,13 @@ export default function Implants() {
 
   const handleAdvanceStage = (c: ImplantCaseWithRelations, newStage: string) => {
     h.select()
+    // Skipping is refused, going back is not. A file claiming a crown
+    // was delivered with no surgery behind it is what the clinic would
+    // rely on years later in a warranty argument — but staff also
+    // mis-tap, and forcing them to live with a wrong stage is how a
+    // record stops being trusted.
+    const move = canMoveStage(c.stage, newStage)
+    if (!move.allowed) { showToast('error', move.reason || 'این تغییر مرحله مجاز نیست'); return }
     const meta = getStageMeta(newStage)
     confirmAction({
       type: 'status',
