@@ -4,9 +4,74 @@
 
 * { -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; box-sizing: border-box; -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }
 
+/* ── Living module background ────────────────────────────
+   Requested directly: no bare white anywhere, every section tinted with
+   its own colour, drifting rather than static, in the manner of Gemini's
+   background.
+   
+   Built on the --module-color that setModuleTheme() already sets per
+   route, so this adds no new palette — it makes the one the app already
+   had visible. Three very soft radial pools drift over a white base at
+   different rates, which reads as movement without any edge crossing
+   text.
+   
+   The tints stay under 14%. Text contrast is a locked project standard
+   (MOD-UI-004), and a background that competes with the words fails the
+   thing it was meant to improve. */
+@keyframes module-drift-a {
+  0%, 100% { transform: translate3d(0, 0, 0) scale(1); }
+  50%      { transform: translate3d(6%, -4%, 0) scale(1.12); }
+}
+@keyframes module-drift-b {
+  0%, 100% { transform: translate3d(0, 0, 0) scale(1.08); }
+  50%      { transform: translate3d(-5%, 5%, 0) scale(1); }
+}
+@keyframes module-drift-c {
+  0%, 100% { transform: translate3d(0, 0, 0) scale(1); }
+  50%      { transform: translate3d(3%, 6%, 0) scale(1.15); }
+}
+
+body::before {
+  content: '';
+  position: fixed;
+  inset: -20%;
+  z-index: -1;
+  pointer-events: none;
+  background:
+    radial-gradient(42% 38% at 18% 12%, color-mix(in srgb, var(--module-color, #0d9488) 22%, transparent) 0%, transparent 62%),
+    radial-gradient(46% 42% at 82% 26%, color-mix(in srgb, var(--module-gradient-from, #14b8a6) 18%, transparent) 0%, transparent 66%),
+    radial-gradient(52% 46% at 50% 96%, color-mix(in srgb, var(--module-color-light, #f0fdfa) 90%, transparent) 0%, transparent 70%);
+  animation: module-drift-a 26s ease-in-out infinite;
+  will-change: transform;
+  /* The colour swap on navigation is a fade, not a jump — the module
+     identity should feel like moving room, not like a repaint. */
+  transition: background 700ms ease;
+}
+
+body::after {
+  content: '';
+  position: fixed;
+  inset: -25%;
+  z-index: -1;
+  pointer-events: none;
+  opacity: 0.55;
+  background:
+    radial-gradient(38% 34% at 72% 72%, color-mix(in srgb, var(--module-gradient-to, #0d9488) 16%, transparent) 0%, transparent 64%),
+    radial-gradient(34% 30% at 24% 62%, color-mix(in srgb, var(--module-color, #0d9488) 12%, transparent) 0%, transparent 60%);
+  animation: module-drift-b 34s ease-in-out infinite;
+  will-change: transform;
+}
+
+/* Respecting the motion setting is not optional here: a permanently
+   drifting background is exactly what triggers vestibular symptoms.
+   The colour stays, only the movement stops. */
+@media (prefers-reduced-motion: reduce) {
+  body::before, body::after { animation: none; }
+}
+
 body {
   font-family: 'Vazirmatn', sans-serif;
-  background: #f0fdfa;
+  background: color-mix(in srgb, var(--module-color-light, #f0fdfa) 60%, #ffffff);
   overscroll-behavior-y: none;
   -webkit-tap-highlight-color: transparent;
   overflow-x: hidden;
@@ -229,7 +294,15 @@ input, textarea, select { font-size: 16px !important; }
 
 /* ── Cards ──────────────────────────────────────────── */
 .card-ios {
-  background: #ffffff;
+  /* A gentle wash of the module colour rather than flat white, and a
+     slight top-to-bottom lift so a card reads as a surface with a light
+     source instead of a rectangle. 6% keeps it well clear of the text
+     contrast floor. */
+  background:
+    linear-gradient(160deg,
+      color-mix(in srgb, var(--module-color, #0d9488) 6%, #ffffff) 0%,
+      color-mix(in srgb, var(--module-color, #0d9488) 2%, #ffffff) 55%,
+      #ffffff 100%);
   border-radius: 18px;
   box-shadow: 0 2px 20px rgba(0,0,0,0.05), 0 1px 3px rgba(0,0,0,0.04);
 }
@@ -379,8 +452,8 @@ input, textarea, select { font-size: 16px !important; }
   border-radius: 20px;
   font-size: 12px;
   font-weight: 600;
-  border: 1.5px solid #e2e8f0;
-  background: #fff;
+  border: 1.5px solid color-mix(in srgb, var(--module-color, #0d9488) 18%, #e2e8f0);
+  background: color-mix(in srgb, var(--module-color, #0d9488) 7%, #ffffff);
   color: #475569;
   white-space: nowrap;
   transition: all 0.18s ease;
@@ -534,9 +607,13 @@ input, textarea, select { font-size: 16px !important; }
 
 /* ── Quick stat card ────────────────────────────────── */
 .quick-stat {
-  background: rgba(255,255,255,0.96);
+  background:
+    linear-gradient(150deg,
+      color-mix(in srgb, var(--module-color, #0d9488) 10%, #ffffff) 0%,
+      color-mix(in srgb, var(--module-color, #0d9488) 3%, #ffffff) 70%,
+      #ffffff 100%);
   border-radius: 16px;
-  border: 0.5px solid rgba(0,0,0,0.04);
+  border: 0.5px solid color-mix(in srgb, var(--module-color, #0d9488) 14%, rgba(0,0,0,0.04));
   padding: 14px 16px;
   box-shadow: 0 1px 8px rgba(0,0,0,0.03);
 }
@@ -1133,4 +1210,18 @@ input, textarea, select { font-size: 16px !important; }
 }
 @media (prefers-reduced-motion: reduce) {
   .module-page-blob { animation: none !important; }
+}
+
+/* ── No bare white ───────────────────────────────────────
+   Requested directly: white empty surfaces are not allowed anywhere.
+   Dozens of components use Tailwind's bg-white directly, so rather than
+   editing every one, the utility itself is retinted with the module
+   colour. 5% is enough to stop a panel reading as a blank sheet and far
+   too little to disturb text contrast.
+
+   Scoped to :not(.dark *) so dark mode keeps its own surfaces, and
+   excluded inside SVG where a white fill is doing real drawing work —
+   the gloss highlight on a tooth crown, for one. */
+.bg-white:not(.dark .bg-white):not(svg *) {
+  background-color: color-mix(in srgb, var(--module-color, #0d9488) 5%, #ffffff);
 }
