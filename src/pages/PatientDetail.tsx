@@ -1,4 +1,5 @@
 // PatientDetail.tsx - Persian RTL Dental Clinic Patient Detail Page
+import { InsurancePanel } from '../components/InsurancePanel'
 import { useState, useEffect, useCallback } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { ArrowRight, Edit2, Phone, Mail, MapPin, Calendar, CreditCard, Activity, FileText, Image as ImageIcon, Shield, Pill, Smile, Award, AlertCircle, Clock, CheckCircle2, Layers, Plus, Trash2, FileSignature, Printer, Bone, FlaskConical } from 'lucide-react'
@@ -1790,7 +1791,12 @@ export default function PatientDetail() {
       {activeTab === 'teeth' && renderTeethChart()}
       {activeTab === 'prescriptions' && renderPrescriptions()}
       {activeTab === 'radiology' && renderRadiology()}
-      {activeTab === 'insurance' && renderInsurance()}
+      {activeTab === 'insurance' && (
+        <div className="space-y-4">
+          {renderInsurance()}
+          <InsurancePanel patientId={id!} />
+        </div>
+      )}
       {activeTab === 'documents' && renderDocuments()}
 
       {/* Modals */}

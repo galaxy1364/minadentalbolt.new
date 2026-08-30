@@ -2,6 +2,7 @@
 // All reads come from local IndexedDB (instant). All writes go to local DB + sync queue.
 import { supabase, CLINIC_ID } from './supabase'
 import { db } from './db'
+import type { PatientPolicy } from './insurance'
 import { DOCTOR_COLOR_PALETTE } from './doctorColors'
 import { queueOperation } from './sync'
 import { setPermissionOverrides } from './permissions'
@@ -1599,4 +1600,34 @@ export async function updateManualReminder(id: string, updates: Partial<ManualRe
   await db.manual_reminders.put(updated)
   await queueOperation('manual_reminders', 'update', id, rest)
   return updated
+}
+
+// ── Per-patient insurance policies (MOD-FEAT-005) ───────────────────────
+export async function fetchPatientPolicies(patientId: string): Promise<PatientPolicy[]> {
+  const rows = await db.patient_policies.where('patient_id').equals(patientId).toArray()
+  return rows.filter((p) => p.clinic_id === CLINIC_ID)
+}
+
+export type PatientPolicyInput = Omit<PatientPolicy, 'id' | 'clinic_id' | 'created_at' | 'updated_at'>
+
+export async function createPatientPolicy(p: PatientPolicyInput): Promise<PatientPolicy> {
+  const id = uid()
+  const row: PatientPolicy = { ...p, id, clinic_id: CLINIC_ID, created_at: nowISO(), updated_at: nowISO() }
+  await db.patient_policies.put(row)
+  await queueOperation('patient_policies', 'insert', id, row)
+  return row
+}
+
+export async function updatePatientPolicy(id: string, updates: Partial<PatientPolicyInput>): Promise<PatientPolicy> {
+  const existing = await db.patient_policies.get(id)
+  if (!existing) throw new Error('بیمه یافت نشد')
+  const updated: PatientPolicy = { ...existing, ...updates, updated_at: nowISO() }
+  await db.patient_policies.put(updated)
+  await queueOperation('patient_policies', 'update', id, updates)
+  return updated
+}
+
+/** Soft-deactivate — a lapsed policy stays on file for past treatments. */
+export async function archivePatientPolicy(id: string): Promise<void> {
+  await updatePatientPolicy(id, { is_active: false })
 }
