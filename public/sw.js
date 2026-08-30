@@ -1,7 +1,11 @@
-// Bump this on every deploy-worthy change so old caches are dropped and
-// clients pick up fresh JS/CSS immediately instead of being stuck on a
-// stale cached bundle.
-const CACHE_NAME = 'minadent-v3'
+// Cache name is tied to the app version and rewritten automatically by
+// scripts/sync-sw-version.mjs (run as part of `npm run verify`), because
+// relying on a human to bump it by hand demonstrably failed: it sat at
+// 'minadent-v3' across 61 released versions. A stale cache in a PWA
+// means users keep getting an old JS bundle after a deploy, which can
+// leave the app failing to load entirely when the cached HTML and the
+// new assets no longer match.
+const CACHE_NAME = 'minadent-v1.148.0'
 const STATIC_ASSETS = [
   '/',
   '/index.html',

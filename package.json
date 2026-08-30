@@ -9,7 +9,7 @@
     "preview": "vite preview",
     "test": "vitest run",
     "test:watch": "vitest",
-    "verify": "tsc --noEmit && vitest run && vite build"
+    "verify": "node scripts/sync-sw-version.mjs && tsc --noEmit && vitest run && vite build"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.45.4",
