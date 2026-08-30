@@ -26,6 +26,7 @@ import { runAutoBackupIfNeeded } from '../lib/autoBackup'
 import { calcAllPatientBalances } from '../lib/finance'
 import { h } from '../lib/haptics'
 import { CheckCircle2, CloudOff } from 'lucide-react'
+import { hasSupabaseCredentials } from '../lib/supabase'
 
 // ── Dark mode toggle ───────────────────────────────────
 function DarkModeToggle() {
@@ -537,6 +538,32 @@ export function Layout() {
   }
 
   if (REQUIRE_LOGIN && !session) {
+    // Without an anon key there is no way to reach the auth server, so
+    // the login form would silently fail on every attempt with no
+    // explanation. Say so plainly instead of letting someone retype
+    // their password over and over against a server we can't call.
+    if (!hasSupabaseCredentials) {
+      return (
+        <div className="min-h-screen flex items-center justify-center p-6 bg-slate-50 dark:bg-slate-900">
+          <div className="max-w-sm text-center space-y-3">
+            <div className="w-14 h-14 mx-auto rounded-2xl bg-warning-100 flex items-center justify-center">
+              <CloudOff size={26} className="text-warning-600" />
+            </div>
+            <h1 className="text-base font-bold text-slate-800 dark:text-slate-100">
+              پیکربندی سرور ناقص است
+            </h1>
+            <p className="text-sm text-slate-600 dark:text-slate-300 leading-relaxed">
+              کلید اتصال به سرور (<span dir="ltr">VITE_SUPABASE_ANON_KEY</span>) در
+              محیط استقرار تنظیم نشده، بنابراین ورود به حساب ممکن نیست.
+            </p>
+            <p className="text-xs text-slate-500 leading-relaxed">
+              این مقدار را در تنظیمات پروژه‌ی Vercel، بخش Environment
+              Variables اضافه کنید و دوباره منتشر کنید.
+            </p>
+          </div>
+        </div>
+      )
+    }
     return <Login />
   }
 
