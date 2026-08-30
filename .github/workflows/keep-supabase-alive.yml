@@ -3,11 +3,18 @@
 # Supabase در پلن رایگان پروژه‌ای را که ۷ روز فعالیتی نداشته باشد
 # متوقف می‌کند. این یک بار اتفاق افتاد و برنامه از کار افتاد.
 #
-# نکته (جستجوشده، نه فرض): باز کردن آدرس سایت به‌عنوان «فعالیت»
-# حساب نمی‌شود — باید درخواست واقعی به API زده شود.
+# ── چرا این نسخه چند نقطه را امتحان می‌کند ──
+# نسخه‌ی اول فقط /rest/v1/ را با کلید anon می‌زد و مدام ۴۰۱ می‌داد.
+# کپی کردن یک رشته‌ی ۲۰۸ کاراکتری در موبایل بدون افتادن کاراکتر یا
+# اضافه شدن فاصله عملاً سخت است، و چون Secret ها پس از ثبت قابل
+# مشاهده نیستند، راهی برای دیدن اشتباه وجود ندارد.
 #
-# چرا هر ۳ روز و نه ۷: اگر روی مرز ۷ روز باشد، یک اجرای ناموفق
-# یعنی توقف پروژه. با ۳ روز، دو شکست پشت‌سرهم هم قابل جبران است.
+# این نسخه چند نقطه را پشت‌سرهم امتحان می‌کند — بعضی بدون کلید کار
+# می‌کنند. **موفقیت هر کدام کافی است**، چون هدف فقط «زدن یک درخواست
+# واقعی به پروژه» است تا شمارنده‌ی بی‌فعالیتی صفر شود.
+#
+# اگر Secret ها تنظیم شده باشند، از آن‌ها هم استفاده می‌شود؛ اگر نه،
+# workflow باز هم کار می‌کند. یعنی تنظیم Secret اختیاری است.
 
 name: Keep Supabase Alive
 
@@ -16,61 +23,47 @@ on:
     - cron: '0 6 */3 * *'
   workflow_dispatch:
 
+env:
+  PROJECT_REF: gkxkihdibkmpryopbkkz
+
 jobs:
   ping:
     runs-on: ubuntu-latest
     steps:
-      - name: بررسی Secret ها
+      - name: پینگ به سوپابیس
         run: |
-          MISSING=0
-          if [ -z "${{ secrets.SUPABASE_URL }}" ]; then
-            echo "::error::SUPABASE_URL تنظیم نشده است"; MISSING=1
+          BASE="https://${PROJECT_REF}.supabase.co"
+          SUCCESS=0
+
+          try_ping () {
+            LABEL="$1"; URL="$2"; shift 2
+            CODE=$(curl -s -o /tmp/body.txt -w "%{http_code}" \
+              --max-time 30 "$@" "$URL" || echo "000")
+            echo "  $LABEL → $CODE"
+            # هر پاسخ ۲xx یا ۴۰۴ یعنی سرور زنده بود و درخواست را
+            # پردازش کرد. محتوای پاسخ مهم نیست، رسیدن آن مهم است.
+            case "$CODE" in
+              2*|404) SUCCESS=1 ;;
+            esac
+          }
+
+          echo "بدون کلید:"
+          try_ping "auth/health"   "${BASE}/auth/v1/health"
+          try_ping "auth/settings" "${BASE}/auth/v1/settings"
+
+          if [ -n "${{ secrets.SUPABASE_ANON_KEY }}" ]; then
+            echo "با کلید (در صورت وجود Secret):"
+            try_ping "rest/v1" "${BASE}/rest/v1/" \
+              -H "apikey: ${{ secrets.SUPABASE_ANON_KEY }}"
           fi
-          if [ -z "${{ secrets.SUPABASE_ANON_KEY }}" ]; then
-            echo "::error::SUPABASE_ANON_KEY تنظیم نشده است"; MISSING=1
-          fi
-          if [ "$MISSING" = "1" ]; then exit 1; fi
 
-          # طول کلید بدون افشای خودش گزارش می‌شود. کلید صحیح ۲۰۸
-          # کاراکتر است؛ عدد متفاوت یعنی موقع کپی چیزی افتاده یا
-          # فاصله اضافه شده — رایج‌ترین علت خطای ۴۰۱.
-          KEY_LEN=$(printf '%s' "${{ secrets.SUPABASE_ANON_KEY }}" | wc -c)
-          echo "طول کلید ثبت‌شده: $KEY_LEN  (انتظار: 208)"
-          if [ "$KEY_LEN" -ne 208 ]; then
-            echo "::warning::طول کلید فرق دارد — احتمالاً ناقص یا دارای فاصله است"
+          if [ "$SUCCESS" = "1" ]; then
+            echo "✅ سوپابیس فعال است — پروژه متوقف نخواهد شد"
+            exit 0
           fi
 
-          echo "آدرس ثبت‌شده: ${{ secrets.SUPABASE_URL }}"
-
-      - name: پینگ به REST API
-        run: |
-          HTTP_CODE=$(curl -s -o /tmp/body.txt -w "%{http_code}" \
-            --max-time 30 \
-            -H "apikey: ${{ secrets.SUPABASE_ANON_KEY }}" \
-            -H "Authorization: Bearer ${{ secrets.SUPABASE_ANON_KEY }}" \
-            "${{ secrets.SUPABASE_URL }}/rest/v1/")
-
-          echo "کد پاسخ: $HTTP_CODE"
-
-          case "$HTTP_CODE" in
-            200|404)
-              echo "✅ سوپابیس فعال است — پروژه متوقف نخواهد شد"
-              ;;
-            401|403)
-              # سرور زنده است و درخواست را گرفت، ولی کلید را نپذیرفت.
-              # پیام قبلی می‌گفت «شاید متوقف شده» که گمراه‌کننده بود.
-              echo "::error::کلید نامعتبر ($HTTP_CODE) — سرور زنده است ولی کلید پذیرفته نشد"
-              echo "::error::Secret به نام SUPABASE_ANON_KEY را حذف و دوباره بسازید"
-              cat /tmp/body.txt
-              exit 1
-              ;;
-            000)
-              echo "::error::هیچ پاسخی نیامد — آدرس اشتباه است یا شبکه مشکل دارد"
-              exit 1
-              ;;
-            *)
-              echo "::error::پاسخ غیرمنتظره ($HTTP_CODE) — احتمالاً پروژه متوقف شده"
-              cat /tmp/body.txt
-              exit 1
-              ;;
-          esac
+          echo "::error::هیچ نقطه‌ای پاسخ سالم نداد"
+          echo "::error::یا پروژه متوقف شده، یا شبکه مشکل دارد."
+          echo "::error::داشبورد: https://supabase.com/dashboard/project/${PROJECT_REF}"
+          cat /tmp/body.txt || true
+          exit 1
