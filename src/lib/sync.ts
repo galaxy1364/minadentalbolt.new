@@ -1,7 +1,6 @@
 import { supabase, CLINIC_ID } from './supabase'
 import { db, TABLE_NAMES, TableName, SyncQueueEntry } from './db'
 import { logAudit } from './auditLog'
-import { isMissingTableError } from './syncErrors'
 
 export type SyncStatus = 'idle' | 'syncing' | 'online' | 'offline' | 'error'
 
@@ -41,19 +40,7 @@ async function pullTable(tableName: TableName): Promise<number> {
     query = query.gt('updated_at', lastSync)
   }
   const { data, error } = await query.limit(BATCH_SIZE)
-  if (error) {
-    // A table that does not exist server-side must not take the whole
-    // sync down with it. This happens whenever the app ships ahead of
-    // its migrations: every table after the missing one would otherwise
-    // never be pulled, and the app looks broken rather than merely
-    // out of date. Postgres 42P01 = undefined_table, PostgREST PGRST205
-    // = table not found in schema cache.
-    if (isMissingTableError(error)) {
-      console.warn(`[sync] skipping ${tableName}: not present server-side yet`)
-      return 0
-    }
-    throw new Error(`Pull ${tableName}: ${error.message}`)
-  }
+  if (error) throw new Error(`Pull ${tableName}: ${error.message}`)
   if (!data || data.length === 0) return 0
   const table = (db as any)[tableName]
   await table.bulkPut(data)
@@ -65,7 +52,6 @@ async function pullTable(tableName: TableName): Promise<number> {
   await db.sync_meta.put({ table_name: tableName, last_sync_at: maxUpdatedAt || new Date().toISOString() })
   return data.length
 }
-
 
 async function pushQueue(): Promise<void> {
   const allEntries = await db.sync_queue.orderBy('created_at').toArray()
@@ -86,11 +72,6 @@ async function pushQueue(): Promise<void> {
       }
       if (entry.id) await db.sync_queue.delete(entry.id)
     } catch (err: any) {
-      // Same reasoning as pullTable: when the table has not been created
-      // server-side yet, the entry is not *wrong*, it is merely early.
-      // Burning its retry budget would park a perfectly good record as
-      // permanently failed once the migration finally lands.
-      if (isMissingTableError(err)) continue
       if (entry.id) {
         const newRetry = entry.retry_count + 1
         if (newRetry >= 10) {

@@ -2,7 +2,6 @@
 // All reads come from local IndexedDB (instant). All writes go to local DB + sync queue.
 import { supabase, CLINIC_ID } from './supabase'
 import { db } from './db'
-import type { PatientPolicy } from './insurance'
 import { DOCTOR_COLOR_PALETTE } from './doctorColors'
 import { queueOperation } from './sync'
 import { setPermissionOverrides } from './permissions'
@@ -27,7 +26,6 @@ import {
   ConsentFormInput, DashboardStats, DoctorInput, UnitInput,
   RolePermission, RolePermissionInput, CustomRole, CustomRoleInput,
   ManualReminder, ManualReminderInput,
-  ToothNote, ToothNoteInput,
 } from '../types'
 
 function uid(): string {
@@ -1601,77 +1599,4 @@ export async function updateManualReminder(id: string, updates: Partial<ManualRe
   await db.manual_reminders.put(updated)
   await queueOperation('manual_reminders', 'update', id, rest)
   return updated
-}
-
-// ── Tooth-scoped clinical notes ─────────────────────────────────────────
-export async function fetchToothNotes(patientId: string): Promise<ToothNote[]> {
-  const rows = await db.tooth_notes.where('patient_id').equals(patientId).toArray()
-  return rows.filter((n) => n.clinic_id === CLINIC_ID)
-}
-
-export async function createToothNote(n: ToothNoteInput): Promise<ToothNote> {
-  const { clinic_id, ...rest } = n
-  const id = uid()
-  const row: ToothNote = { ...rest, id, clinic_id: CLINIC_ID, created_at: nowISO(), updated_at: nowISO(), sync_version: 1 }
-  await db.tooth_notes.put(row)
-  await queueOperation('tooth_notes', 'insert', id, row)
-  return row
-}
-
-export async function updateToothNote(id: string, updates: Partial<ToothNoteInput>): Promise<ToothNote> {
-  const existing = await db.tooth_notes.get(id)
-  if (!existing) throw new Error('یادداشت یافت نشد')
-  const { clinic_id, ...rest } = updates
-  const updated: ToothNote = { ...existing, ...rest, updated_at: nowISO() }
-  await db.tooth_notes.put(updated)
-  await queueOperation('tooth_notes', 'update', id, rest)
-  return updated
-}
-
-/** Soft-delete only — a clinical note is a medical record, so 'delete'
- * archives it exactly like radiology images and patients. */
-export async function archiveToothNote(id: string): Promise<void> {
-  await updateToothNote(id, { is_active: false })
-}
-
-// ── Per-patient insurance policies ──────────────────────────────────────
-export async function fetchPatientPolicies(patientId: string): Promise<PatientPolicy[]> {
-  const rows = await db.patient_policies.where('patient_id').equals(patientId).toArray()
-  return rows.filter((p) => p.clinic_id === CLINIC_ID)
-}
-
-export type PatientPolicyInput = Omit<PatientPolicy, 'id' | 'clinic_id' | 'created_at' | 'updated_at'>
-
-export async function createPatientPolicy(p: PatientPolicyInput): Promise<PatientPolicy> {
-  const id = uid()
-  const row: PatientPolicy = { ...p, id, clinic_id: CLINIC_ID, created_at: nowISO(), updated_at: nowISO() }
-  await db.patient_policies.put(row)
-  await queueOperation('patient_policies', 'insert', id, row)
-  return row
-}
-
-export async function updatePatientPolicy(id: string, updates: Partial<PatientPolicyInput>): Promise<PatientPolicy> {
-  const existing = await db.patient_policies.get(id)
-  if (!existing) throw new Error('بیمه یافت نشد')
-  const updated: PatientPolicy = { ...existing, ...updates, updated_at: nowISO() }
-  await db.patient_policies.put(updated)
-  await queueOperation('patient_policies', 'update', id, updates)
-  return updated
-}
-
-/** Soft-deactivate — a lapsed policy stays on file for past treatments. */
-export async function archivePatientPolicy(id: string): Promise<void> {
-  await updatePatientPolicy(id, { is_active: false })
-}
-
-/** Marks treatments as sent to the insurer. The timestamp and the flag
- * are written together — a timestamp without the flag (or the reverse)
- * would make the worklist disagree with the audit trail. */
-export async function markTreatmentsSubmitted(ids: string[]): Promise<void> {
-  const at = nowISO()
-  // Sequential so the offline sync queue replays in the same order it
-  // was created.
-  for (const id of ids) {
-    await updateTreatment(id, { insurance_submitted: true, insurance_submitted_at: at } as any)
-  }
 }

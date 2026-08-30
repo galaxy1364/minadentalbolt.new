@@ -11,12 +11,6 @@ import { Card, Button, Badge, Spinner, EmptyState, Modal, Wizard, Input, Select,
 import { PersianDateInput } from '../components/PersianDateInput'
 import { ModuleHeader, ModuleStatCard, ReorderableStatGrid } from '../components/ModuleHeader'
 import { useConfirmAction } from '../components/ConfirmAction'
-import { PalmerToothPicker } from '../components/PalmerToothPicker'
-import {
-  DOC_CATEGORY_LABELS, filterDocuments, documentCountByTooth, countByCategory,
-  toggleSelection, isAllSelected, toggleSelectAll, pruneSelection,
-} from '../lib/documentGallery'
-import type { DocCategory, GalleryFilter } from '../lib/documentGallery'
 
 // ============================================================================
 // Constants
@@ -53,11 +47,6 @@ export default function Radiology() {
   // Filters
   const [searchQuery, setSearchQuery] = useState('')
   const [filterType, setFilterType] = useState('')
-  // Category tab + per-tooth filter + bulk selection, driven entirely by
-  // src/lib/documentGallery.ts so the rules stay unit-tested.
-  const [filterCategory, setFilterCategory] = useState<DocCategory | null>(null)
-  const [filterTooth, setFilterTooth] = useState<string | null>(null)
-  const [selectedIds, setSelectedIds] = useState<string[]>([])
 
   // Detail modal
   const [selectedImage, setSelectedImage] = useState<RadiologyImage | null>(null)
@@ -167,48 +156,6 @@ export default function Radiology() {
     })
   }
 
-  // ── Bulk actions ─────────────────────────────────────────────────────────
-  // Both operate only on the pruned selection, so they can never reach a
-  // record outside the current filter.
-  const handleBulkArchive = () => {
-    const targets = filteredImages.filter((i) => selectedIds.includes(i.id))
-    if (targets.length === 0) return
-    confirmAction({
-      type: 'status',
-      title: 'آرشیو گروهی اسناد',
-      warning: 'این اسناد هیچ‌وقت پاک نمی‌شوند — فقط از گالری فعال مخفی می‌شوند و همیشه قابل بازگردانی هستند.',
-      fields: [{ label: 'تعداد', value: toPersianDigits(targets.length), highlight: true }],
-      confirmLabel: 'تایید آرشیو',
-      onConfirm: async () => {
-        try {
-          // Sequential, not parallel: each update queues its own sync
-          // operation and preserving order keeps the offline queue
-          // replaying in the same order it was created.
-          for (const t of targets) await updateRadiologyImage(t.id, { is_active: false } as any)
-          showToast('success', `${toPersianDigits(targets.length)} سند آرشیو شد`)
-          setSelectedIds([])
-          loadData()
-        } catch { showToast('error', 'خطا در آرشیو گروهی') }
-      },
-    })
-  }
-
-  const handleBulkDownload = () => {
-    const targets = filteredImages.filter((i) => selectedIds.includes(i.id) && i.image_url)
-    if (targets.length === 0) { showToast('error', 'سند قابل دریافتی انتخاب نشده است'); return }
-    for (const t of targets) {
-      const a = document.createElement('a')
-      a.href = t.image_url as string
-      a.download = ''
-      a.target = '_blank'
-      a.rel = 'noopener'
-      document.body.appendChild(a)
-      a.click()
-      a.remove()
-    }
-    showToast('success', `${toPersianDigits(targets.length)} سند در حال دریافت است`)
-  }
-
   // ===========================================================================
   // Data Fetching
   // ===========================================================================
@@ -240,29 +187,20 @@ export default function Radiology() {
   // Derived Data
   // ===========================================================================
 
-  const nameOf = useCallback((img: RadiologyImage) => {
-    const pat = patients.find((p) => p.id === img.patient_id)
-    return pat ? `${pat.first_name} ${pat.last_name}` : ''
-  }, [patients])
-
   const filteredImages = useMemo(() => {
-    const gf: GalleryFilter = { category: filterCategory, toothFdi: filterTooth, query: searchQuery }
-    const base = filterDocuments(images, gf, nameOf)
-    // The legacy exact-modality dropdown still narrows within a tab.
-    return filterType ? base.filter((i) => i.image_type === filterType) : base
-  }, [images, searchQuery, filterType, filterCategory, filterTooth, nameOf])
-
-  const categoryCounts = useMemo(() => countByCategory(images), [images])
-  const toothCounts = useMemo(() => documentCountByTooth(images), [images])
-
-  // A bulk action must never reach a record the user cannot currently
-  // see, so the selection is pruned whenever the visible set changes.
-  useEffect(() => {
-    setSelectedIds((prev) => {
-      const pruned = pruneSelection(prev, filteredImages)
-      return pruned.length === prev.length ? prev : pruned
+    return images.filter((img) => {
+      if (searchQuery) {
+        const pat = patients.find((p) => p.id === img.patient_id)
+        const name = pat ? `${pat.first_name} ${pat.last_name}` : ''
+        const desc = img.description || ''
+        const tooth = img.tooth_number || ''
+        const q = searchQuery.toLowerCase()
+        if (!name.toLowerCase().includes(q) && !desc.toLowerCase().includes(q) && !tooth.toLowerCase().includes(q)) return false
+      }
+      if (filterType && img.image_type !== filterType) return false
+      return true
     })
-  }, [filteredImages])
+  }, [images, patients, searchQuery, filterType])
 
   const stats = useMemo(() => {
     const total = images.length
@@ -363,79 +301,12 @@ export default function Radiology() {
               <option key={t.value} value={t.value}>{t.label}</option>
             ))}
           </select>
-          {(searchQuery || filterType || filterCategory || filterTooth) && (
-            <Button variant="ghost" size="sm" onClick={() => { setSearchQuery(''); setFilterType(''); setFilterCategory(null); setFilterTooth(null) }}>
+          {(searchQuery || filterType) && (
+            <Button variant="ghost" size="sm" onClick={() => { setSearchQuery(''); setFilterType('') }}>
               پاک کردن
             </Button>
           )}
         </div>
-
-        {/* Category tabs — the four buckets a doctor actually thinks in. */}
-        <div className="mt-4 flex flex-wrap gap-1">
-          <button
-            type="button"
-            onClick={() => setFilterCategory(null)}
-            className={`px-3 py-1.5 rounded-full text-xs border transition-all-smooth ${filterCategory === null ? 'bg-blue-600 text-white border-blue-600' : 'bg-white text-slate-600 border-slate-200'}`}
-          >
-            همه ({toPersianDigits(images.filter((i) => i.is_active).length)})
-          </button>
-          {(Object.keys(DOC_CATEGORY_LABELS) as DocCategory[]).map((c) => (
-            <button
-              key={c}
-              type="button"
-              onClick={() => setFilterCategory(filterCategory === c ? null : c)}
-              className={`px-3 py-1.5 rounded-full text-xs border transition-all-smooth ${filterCategory === c ? 'bg-blue-600 text-white border-blue-600' : 'bg-white text-slate-600 border-slate-200'}`}
-            >
-              {DOC_CATEGORY_LABELS[c]} ({toPersianDigits(categoryCounts[c])})
-            </button>
-          ))}
-        </div>
-
-        {/* Filter by clicking the tooth itself — the doctor picks the
-            tooth, then reads what was imaged on it. */}
-        <div className="mt-4">
-          <div className="flex items-center justify-between mb-1">
-            <span className="text-xs font-medium text-slate-600">فیلتر بر اساس دندان</span>
-            {filterTooth && (
-              <button type="button" className="text-xs text-blue-600" onClick={() => setFilterTooth(null)}>
-                حذف فیلتر دندان
-              </button>
-            )}
-          </div>
-          <PalmerToothPicker label="" value={filterTooth || ''} onChange={(fdi) => setFilterTooth(fdi || null)} />
-          {Object.keys(toothCounts).length > 0 && (
-            <p className="mt-1 text-xs text-slate-500">
-              دندان‌های دارای سند: {Object.entries(toothCounts).map(([t, c]) => `${toPersianDigits(t)} (${toPersianDigits(c)})`).join('، ')}
-            </p>
-          )}
-        </div>
-
-        {/* Bulk actions */}
-        {filteredImages.length > 0 && (
-          <div className="mt-4 flex flex-wrap items-center gap-2 border-t border-slate-100 pt-3">
-            <label className="flex items-center gap-2 text-xs text-slate-600 cursor-pointer">
-              <input
-                type="checkbox"
-                checked={isAllSelected(filteredImages, selectedIds)}
-                onChange={() => setSelectedIds(toggleSelectAll(filteredImages, selectedIds))}
-                aria-label="انتخاب همه"
-              />
-              انتخاب همه
-            </label>
-            {selectedIds.length > 0 && (
-              <>
-                <Badge color="primary">{toPersianDigits(selectedIds.length)} انتخاب‌شده</Badge>
-                <Button variant="secondary" size="sm" onClick={handleBulkDownload}>
-                  <Download size={14} /> دریافت
-                </Button>
-                <Button variant="danger" size="sm" onClick={handleBulkArchive}>
-                  <Trash2 size={14} /> بایگانی
-                </Button>
-                <Button variant="ghost" size="sm" onClick={() => setSelectedIds([])}>لغو انتخاب</Button>
-              </>
-            )}
-          </div>
-        )}
       </Card>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -455,22 +326,9 @@ export default function Radiology() {
                 return (
                   <div
                     key={img.id}
-                    className={`relative rounded-xl border overflow-hidden hover:card-shadow transition-all-smooth cursor-pointer ${selectedIds.includes(img.id) ? 'border-blue-500 ring-1 ring-blue-300' : 'border-slate-100'}`}
+                    className="rounded-xl border border-slate-100 overflow-hidden hover:card-shadow transition-all-smooth cursor-pointer"
                     onClick={() => setSelectedImage(img)}
                   >
-                    {/* stopPropagation: ticking the box must not also open
-                        the detail modal. */}
-                    <label
-                      className="absolute top-2 left-2 z-10 bg-white/90 rounded p-1 cursor-pointer"
-                      onClick={(e) => e.stopPropagation()}
-                    >
-                      <input
-                        type="checkbox"
-                        aria-label="انتخاب سند"
-                        checked={selectedIds.includes(img.id)}
-                        onChange={() => setSelectedIds(toggleSelection(selectedIds, img.id))}
-                      />
-                    </label>
                     {/* Image placeholder */}
                     <div className="aspect-video bg-gradient-to-br from-slate-100 to-slate-200 flex items-center justify-center relative">
                       {img.image_url ? (
@@ -656,7 +514,7 @@ export default function Radiology() {
                 <Select label="بیمار" value={uploadForm.patient_id} onChange={(v) => setUploadForm((p) => ({ ...p, patient_id: v }))} options={patients.map((p) => ({ value: p.id, label: `${p.first_name} ${p.last_name}` }))} placeholder="انتخاب بیمار" />
                 <div className="grid grid-cols-2 gap-3">
                   <Select label="نوع تصویر" value={uploadForm.image_type} onChange={(v) => setUploadForm((p) => ({ ...p, image_type: v }))} options={imageTypes.map((t) => ({ value: t.value, label: t.label }))} />
-                  <PalmerToothPicker label="دندان (اختیاری)" value={uploadForm.tooth_number} onChange={(fdi) => setUploadForm((p) => ({ ...p, tooth_number: fdi }))} />
+                  <Input label="شماره دندان" value={uploadForm.tooth_number} onChange={(v) => setUploadForm((p) => ({ ...p, tooth_number: v }))} placeholder="مثال: 16" dir="ltr" />
                 </div>
               </>
             ),

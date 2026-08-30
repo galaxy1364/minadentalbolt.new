@@ -147,22 +147,6 @@ export interface Treatment {
   procedure_category: string | null
   doctor_share: number | null
   doctor_share_calculated: boolean | null
-  // ── Insurance settlement (MOD-FEAT-007) ──────────────────────────────
-  // The split is frozen onto the treatment at the moment it is recorded.
-  // Recomputing it later would give a different answer once further
-  // claims have eaten into the ceiling, so what the patient was actually
-  // quoted has to be stored, not derived.
-  /** Policy the split was computed against, for auditability. */
-  policy_id: string | null
-  /** Insurer's share as agreed at the time of treatment. */
-  insurance_share: number | null
-  /** Patient's share. Always total_price - insurance_share. */
-  patient_share: number | null
-  /** True when the policy ceiling reduced the insurer's share. */
-  insurance_capped: boolean | null
-  /** Submission tracking, mirroring the competitor's claim columns. */
-  insurance_submitted: boolean | null
-  insurance_submitted_at: string | null
 }
 
 export interface Payment {
@@ -243,23 +227,6 @@ export interface LabOrder {
   sent_at: string | null
   received_at: string | null
   notes: string | null
-  // ── Physical tracking (MOD-FEAT-009) ─────────────────────────────────
-  // Where the case physically sits once it is back at the clinic. Split
-  // into three parts because that is how shelving is actually labelled;
-  // a single free-text field turns into inconsistent scribbles.
-  shelf: string | null
-  shelf_number: string | null
-  shelf_space: string | null
-  /** Chase reminder, deliberately earlier than `deadline`: staff need to
-   * ring the lab a few days ahead, not discover the miss on the day. */
-  alarm_date: string | null
-  /** The lab has finished. Distinct from `delivered` — a finished case
-   * sitting on a shelf uncollected is exactly what gets forgotten. */
-  work_done: boolean | null
-  /** Handed to the patient. */
-  delivered: boolean | null
-  /** Whether leftover material went back to the lab. */
-  material_returned: boolean | null
   created_at: string
   updated_at: string
 }
@@ -1031,35 +998,3 @@ export interface CashRegisterSession {
 }
 
 export type CashRegisterSessionInput = Omit<CashRegisterSession, 'id' | 'created_at' | 'updated_at'> & { clinic_id?: string }
-
-// ── Tooth-scoped clinical notes (MOD-FEAT-003) ──────────────────────────
-// A note is either general (tooth_fdi === null) or pinned to one tooth.
-// Three kinds mirror how a dentist actually records chairside: typed
-// text, a freehand sketch (stylus/finger), or a short voice memo — the
-// last two are stored as data URLs so they survive fully offline in
-// IndexedDB and sync later like any other record.
-export type ToothNoteKind = 'text' | 'drawing' | 'audio'
-
-export interface ToothNote {
-  id: string
-  clinic_id: string
-  patient_id: string
-  /** FDI number as string (e.g. "16"), or null for a general note. */
-  tooth_fdi: string | null
-  kind: ToothNoteKind
-  /** Typed body. Required for kind='text', optional caption otherwise. */
-  body: string | null
-  /** data: URL holding the sketch PNG or the recorded audio clip. */
-  attachment_data_url: string | null
-  /** Recording length in seconds — only meaningful for kind='audio'. */
-  duration_sec: number | null
-  /** Palette tag so a doctor can colour-code notes, like the competitor. */
-  color: string | null
-  author_name: string | null
-  /** Soft-delete only — clinical notes are never destroyed. */
-  is_active: boolean
-  created_at: string
-  updated_at: string
-  sync_version: number
-}
-export type ToothNoteInput = Omit<ToothNote, 'id' | 'clinic_id' | 'created_at' | 'updated_at' | 'sync_version'> & { clinic_id?: string }
