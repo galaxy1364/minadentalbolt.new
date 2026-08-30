@@ -4,6 +4,7 @@ import { useNavigate, useLocation } from 'react-router-dom'
 import { CreditCard, Plus, Search, DollarSign, TrendingUp, Wallet, Calendar, CalendarClock, CheckCircle2, AlertCircle, Edit2, Filter, Receipt, Banknote, Clock, Trash2, Printer } from 'lucide-react'
 import { BarChart, Bar, XAxis, YAxis, Tooltip as RTooltip, ResponsiveContainer, PieChart, Pie, Cell as RCell } from 'recharts'
 import { fetchPayments, createPayment, updatePayment, fetchEncounters, fetchCheques, createCheque, updateCheque, fetchPaymentPlans, createPaymentPlan, updatePaymentPlan, updateInstallment, fetchPatients, fetchExpenses, createExpense, updateExpense, deleteExpense, fetchTreatments, fetchImplantCases } from '../lib/api'
+import { buildSchedule, splitAmount, planProgress, reconcilePlan } from '../lib/installments'
 import { toJalaliString, toJalaliStringPretty, formatCurrency, formatNumber, toPersianDigits, toEnglishDigits } from '../lib/persianDate'
 import { h } from '../lib/haptics'
 import { useConfirmAction } from '../components/ConfirmAction'
@@ -434,7 +435,16 @@ export default function Billing() {
         { label: 'بیمار', value: patient ? `${patient.first_name} ${patient.last_name}` : '-', highlight: true },
         { label: 'مبلغ کل', value: `${formatCurrency(Number(planForm.total_amount))} ت` },
         { label: 'تعداد اقساط', value: toPersianDigits(count) },
-        { label: 'مبلغ هر قسط', value: `${formatCurrency(Math.round(Number(planForm.total_amount) / count))} ت` },
+        // Shows the real first and last figures rather than one rounded
+        // number the final instalment will not match.
+        { label: 'مبلغ هر قسط', value: (() => {
+          const parts = splitAmount(Number(planForm.total_amount), count)
+          const first = parts[0] ?? 0
+          const last = parts[parts.length - 1] ?? 0
+          return first === last
+            ? `${formatCurrency(first)} ت`
+            : `${formatCurrency(first)} ت — قسط آخر ${formatCurrency(last)} ت`
+        })() },
         { label: 'چک ضمانت', value: `${formatCurrency(Number(planForm.total_amount))} ت — شماره ${planForm.guarantee_cheque_number}`, highlight: true },
       ],
       confirmLabel: 'ایجاد طرح',
@@ -442,14 +452,16 @@ export default function Billing() {
         setSavingPlan(true)
         try {
           const totalAmount = Number(planForm.total_amount)
-          const installmentAmount = Math.round(totalAmount / count)
-          const startDate = new Date(planForm.start_date)
-          const installments = Array.from({ length: count }, (_, i) => {
-            const dueDate = new Date(startDate); dueDate.setMonth(dueDate.getMonth() + i)
-            return { patient_id: planForm.patient_id, installment_number: i + 1,
-              amount: i === count - 1 ? totalAmount - installmentAmount * (count - 1) : installmentAmount,
-              due_date: dueDate.toISOString().slice(0, 10), status: 'pending' }
-          })
+          // Amounts and dates come from one tested place. The version
+          // that lived here used Date.setMonth, which overflows: a plan
+          // starting 31 January put its second instalment on 3 March.
+          const installments = buildSchedule(totalAmount, count, planForm.start_date).map((row) => ({
+            patient_id: planForm.patient_id,
+            installment_number: row.installment_number,
+            amount: row.amount,
+            due_date: row.due_date,
+            status: 'pending',
+          }))
           await createPaymentPlan({
             patient_id: planForm.patient_id, encounter_id: planForm.encounter_id || null,
             total_amount: totalAmount, installment_count: count, start_date: planForm.start_date,
@@ -1030,7 +1042,9 @@ export default function Billing() {
   // Render: Payment Plans Tab
   // ===========================================================================
 
-  const renderPlansTab = () => (
+  const renderPlansTab = () => {
+    const todayStr = new Date().toISOString().slice(0, 10)
+    return (
     <div className="space-y-3">
       <div className="flex items-center justify-between">
         <h3 className="text-sm font-bold text-slate-700">طرح‌های قسطی</h3>
@@ -1044,9 +1058,17 @@ export default function Billing() {
           {paymentPlans.map((plan) => {
             const statusMeta = planStatuses.find((s) => s.value === plan.status) || planStatuses[0]
             const installments = (plan as any).installments || []
-            const paidCount = installments.filter((i: any) => i.status === 'paid').length
-            const paidAmount = installments.filter((i: any) => i.status === 'paid').reduce((sum: number, i: any) => sum + i.amount, 0)
-            const progress = installments.length > 0 ? (paidCount / installments.length) * 100 : 0
+            // Progress comes from the tested helper: it excludes
+            // cancelled rows, which the inline version counted as money
+            // still owed forever.
+            const prog = planProgress(installments, todayStr)
+            const paidCount = prog.paidCount
+            const paidAmount = prog.paid
+            const progress = prog.total > 0 ? (prog.paid / prog.total) * 100 : 0
+            // If someone edited an instalment after the plan was agreed,
+            // the rows and the header disagree. Say so rather than
+            // showing whichever number happens to be rendered.
+            const check = reconcilePlan({ planTotal: plan.total_amount, installments })
             return (
               <Card key={plan.id} className="p-4">
                 <div className="flex items-center justify-between gap-3 flex-wrap mb-3">
@@ -1071,6 +1093,19 @@ export default function Billing() {
                   <div className="w-full h-2 rounded-full bg-slate-100 overflow-hidden">
                     <div className="h-full rounded-full bg-success-500 transition-all-smooth" style={{ width: `${progress}%` }} />
                   </div>
+                  <div className="flex items-center gap-3 flex-wrap mt-1.5 text-xs">
+                    {prog.overdueCount > 0 && (
+                      <span className="text-error-600 font-medium">{toPersianDigits(prog.overdueCount)} قسط سررسید گذشته</span>
+                    )}
+                    {prog.nextDue && (
+                      <span className="text-slate-500">قسط بعدی: {toJalaliString(prog.nextDue)}</span>
+                    )}
+                  </div>
+                  {!check.ok && (
+                    <p className="mt-2 text-xs text-amber-700">
+                      ⚠ {check.message} ({formatCurrency(Math.abs(check.difference))} ت اختلاف)
+                    </p>
+                  )}
                 </div>
 
                 {/* Installments */}
@@ -1128,7 +1163,8 @@ export default function Billing() {
         </div>
       )}
     </div>
-  )
+    )
+  }
 
   // ===========================================================================
   // Render: Patient Balances Tab
