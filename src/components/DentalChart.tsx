@@ -165,8 +165,16 @@ function ToothSVG({
   const isAnterior = kind === 'canine' || kind === 'incisor'
 
   // Colors based on condition
+  // Reported from the device: the arch was almost invisible — white
+  // crowns outlined in #cbd5e1 on a white card, with roots drawn at 0.5
+  // opacity, so a dentist saw faint cups and no anatomy at all.
+  //
+  // The fills stay pale, because a tooth is pale; what changed is that
+  // every one now sits on an ivory tint rather than pure white, and the
+  // outlines carry real contrast. Colour still says the state, but the
+  // tooth is legible before you read the colour.
   const fillColors: Record<ToothCondition, string> = {
-    healthy: '#ffffff',
+    healthy: '#fdfdfb',
     caries: '#fef2f2',
     restored: '#eff6ff',
     rct: '#fffbeb',
@@ -181,31 +189,43 @@ function ToothSVG({
     sealant: '#f0fdf4',
   }
 
+  // Outlines are a full step darker than before. #cbd5e1 on white is
+  // roughly 1.3:1 — below anything a person can pick out at 48px on a
+  // phone held at arm's length in a surgery.
   const strokeColors: Record<ToothCondition, string> = {
-    healthy: '#cbd5e1',
-    caries: '#f87171',
-    restored: '#3b82f6',
-    rct: '#f59e0b',
-    post: '#ea580c',
-    pin: '#ea580c',
-    crown: '#06b6d4',
-    implant: '#8b5cf6',
-    extraction: '#64748b',
+    healthy: '#64748b',
+    caries: '#dc2626',
+    restored: '#2563eb',
+    rct: '#d97706',
+    post: '#c2410c',
+    pin: '#c2410c',
+    crown: '#0891b2',
+    implant: '#7c3aed',
+    extraction: '#475569',
     missing: '#94a3b8',
-    bridge: '#3b82f6',
-    veneer: '#06b6d4',
-    sealant: '#22c55e',
+    bridge: '#2563eb',
+    veneer: '#0891b2',
+    sealant: '#16a34a',
   }
 
   const fillColor = fillColors[condition]
   const strokeColor = strokeColors[condition]
-  const sw = selected ? 3 : 1.5
+  const sw = selected ? 3 : 1.9
   // Subtle depth/gloss — a soft drop-shadow plus a light highlight
   // ellipse on the crown gives these flat SVG shapes a dimensional,
   // glossy-porcelain feel without needing full WebGL 3D rendering.
   const dropShadowStyle = { filter: selected ? 'drop-shadow(0 3px 5px rgba(13,148,136,0.35))' : 'drop-shadow(0 1.5px 2px rgba(15,23,42,0.12))' }
 
   // Surface fill colors (for caries on specific surfaces)
+  /** True when this surface carries a condition of its own. Used to keep
+   * a surface invisible unless something was actually recorded on it —
+   * painting every surface faintly would turn a healthy tooth into a
+   * patchwork. */
+  const hasSurface = (surface: ToothSurface): boolean => {
+    const sc = surfaces.find((x) => x.surface === surface)
+    return !!sc && sc.condition !== 'healthy'
+  }
+
   const getSurfaceFill = (surface: ToothSurface): string => {
     const sc = surfaces.find((s) => s.surface === surface)
     if (!sc || sc.condition === 'healthy') return fillColor
@@ -283,7 +303,7 @@ function ToothSVG({
           stroke={strokeColor}
           strokeWidth={rootFilled ? sw * 2.2 : sw}
           strokeLinecap="round"
-          opacity={rootFilled ? 0.95 : 0.5}
+          opacity={rootFilled ? 1 : 0.85}
         />
         {/* Crown outline */}
         <path
@@ -302,10 +322,17 @@ function ToothSVG({
         <circle cx="32" cy="13" r="2.5" fill={getSurfaceFill('occlusal')} stroke={strokeColor} strokeWidth="0.6" opacity="0.5" />
         <circle cx="16" cy="22" r="2.5" fill={getSurfaceFill('occlusal')} stroke={strokeColor} strokeWidth="0.6" opacity="0.5" />
         <circle cx="32" cy="22" r="2.5" fill={getSurfaceFill('occlusal')} stroke={strokeColor} strokeWidth="0.6" opacity="0.5" />
-        {/* Mesial (right side) */}
+        {/* Mesial (right side) — a band rather than a hairline, so a
+            mesial restoration is visible at 48px instead of being a
+            slightly darker edge nobody notices. */}
+        <path d="M 37 12 L 40 14 L 40 26 L 37 27 Z" fill={getSurfaceFill('mesial')} stroke="none" opacity={hasSurface('mesial') ? 0.9 : 0} />
         <line x1="40" y1="14" x2="40" y2="26" stroke={strokeColor} strokeWidth="1" opacity="0.3" />
         {/* Distal (left side) */}
+        <path d="M 11 12 L 8 14 L 8 26 L 11 27 Z" fill={getSurfaceFill('distal')} stroke="none" opacity={hasSurface('distal') ? 0.9 : 0} />
         <line x1="8" y1="14" x2="8" y2="26" stroke={strokeColor} strokeWidth="1" opacity="0.3" />
+        {/* Buccal (front face) and lingual (back edge) */}
+        <path d="M 12 24 L 36 24 L 34 28 L 14 28 Z" fill={getSurfaceFill('buccal')} stroke="none" opacity={hasSurface('buccal') ? 0.9 : 0} />
+        <path d="M 12 8 L 36 8 L 36 11 L 12 11 Z" fill={getSurfaceFill('lingual')} stroke="none" opacity={hasSurface('lingual') ? 0.9 : 0} />
         {/* Number */}
         <text x="24" y="50" textAnchor="middle" fontSize="9" fill={strokeColor} fontWeight="700">
           {labelOverride || toPersianDigits(number)}
@@ -317,7 +344,7 @@ function ToothSVG({
     return (
       <svg width={size} height={size * 1.2} viewBox="0 0 48 56" onClick={onClick} className="cursor-pointer transition-all" style={dropShadowStyle}>
         {/* Root */}
-        <path d="M 20 28 Q 18 42, 22 48 M 28 28 Q 30 42, 26 48" fill="none" stroke={strokeColor} strokeWidth={rootFilled ? sw * 2.2 : sw} strokeLinecap="round" opacity={rootFilled ? 0.95 : 0.5} />
+        <path d="M 20 28 Q 18 42, 22 48 M 28 28 Q 30 42, 26 48" fill="none" stroke={strokeColor} strokeWidth={rootFilled ? sw * 2.2 : sw} strokeLinecap="round" opacity={rootFilled ? 1 : 0.85} />
         {/* Crown */}
         <path
           d="M 12 12 Q 10 6, 16 5 L 32 5 Q 38 6, 36 12 L 36 26 Q 34 30, 30 28 L 18 28 Q 14 30, 12 26 Z"
@@ -329,6 +356,10 @@ function ToothSVG({
         <ellipse cx="19" cy="10" rx="5" ry="2.5" fill="white" opacity="0.35" transform="rotate(-20 19 10)" />
         {/* Occlusal */}
         <ellipse cx="24" cy="16" rx="7" ry="5" fill={getSurfaceFill('occlusal')} stroke={strokeColor} strokeWidth="0.8" opacity="0.7" />
+        <path d="M 33 12 L 36 14 L 36 25 L 33 26 Z" fill={getSurfaceFill('mesial')} stroke="none" opacity={hasSurface('mesial') ? 0.9 : 0} />
+        <path d="M 15 12 L 12 14 L 12 25 L 15 26 Z" fill={getSurfaceFill('distal')} stroke="none" opacity={hasSurface('distal') ? 0.9 : 0} />
+        <path d="M 16 24 L 32 24 L 30 28 L 18 28 Z" fill={getSurfaceFill('buccal')} stroke="none" opacity={hasSurface('buccal') ? 0.9 : 0} />
+        <path d="M 16 7 L 32 7 L 32 10 L 16 10 Z" fill={getSurfaceFill('lingual')} stroke="none" opacity={hasSurface('lingual') ? 0.9 : 0} />
         {/* 2 cusps */}
         <circle cx="18" cy="13" r="2" fill={getSurfaceFill('occlusal')} stroke={strokeColor} strokeWidth="0.5" opacity="0.5" />
         <circle cx="30" cy="13" r="2" fill={getSurfaceFill('occlusal')} stroke={strokeColor} strokeWidth="0.5" opacity="0.5" />
@@ -349,7 +380,7 @@ function ToothSVG({
           stroke={strokeColor}
           strokeWidth={rootFilled ? sw * 2.2 : sw}
           strokeLinecap="round"
-          opacity={rootFilled ? 0.95 : 0.5}
+          opacity={rootFilled ? 1 : 0.85}
         />
         {/* Crown */}
         {isCanine ? (
@@ -370,8 +401,42 @@ function ToothSVG({
           />
         )}
         <ellipse cx="21" cy="8" rx="4" ry="2" fill="white" opacity="0.35" transform="rotate(-15 21 8)" />
+
+        {/* Surfaces. Anteriors previously drew none at all, so an incisor
+            with a mesial caries looked identical to a healthy one — and
+            anteriors are most of what is visible on a phone-width arch.
+            Molars and premolars only ever showed the occlusal, so a
+            buccal restoration was invisible there too.
+
+            Laid out the way the surface picker labels them: incisal
+            across the biting edge, mesial and distal down the sides,
+            buccal across the front. */}
+        <path
+          d={isCanine ? "M 16 8 Q 14 4, 20 3 L 28 3 Q 34 4, 32 8 Z" : "M 14 6 Q 12 3, 18 2 L 30 2 Q 36 3, 34 6 Z"}
+          fill={getSurfaceFill('occlusal')}
+          stroke="none"
+          opacity={hasSurface('occlusal') ? 0.85 : 0}
+        />
+        <path
+          d="M 16 8 L 18 28 Q 21 30, 22 29 L 21 8 Z"
+          fill={getSurfaceFill('mesial')}
+          stroke="none"
+          opacity={hasSurface('mesial') ? 0.85 : 0}
+        />
+        <path
+          d="M 32 8 L 30 28 Q 27 30, 26 29 L 27 8 Z"
+          fill={getSurfaceFill('distal')}
+          stroke="none"
+          opacity={hasSurface('distal') ? 0.85 : 0}
+        />
+        <path
+          d="M 21 14 L 27 14 L 26 28 Q 24 30, 22 28 Z"
+          fill={getSurfaceFill('buccal')}
+          stroke="none"
+          opacity={hasSurface('buccal') ? 0.85 : 0}
+        />
         {/* Lingual surface (back) */}
-        <path d="M 18 8 Q 24 12, 30 8" fill="none" stroke={strokeColor} strokeWidth="0.8" opacity="0.4" />
+        <path d="M 18 8 Q 24 12, 30 8" fill="none" stroke={hasSurface('lingual') ? getSurfaceFill('lingual') : strokeColor} strokeWidth={hasSurface('lingual') ? 2.5 : 0.8} opacity={hasSurface('lingual') ? 0.9 : 0.4} />
         <text x="24" y="50" textAnchor="middle" fontSize="9" fill={strokeColor} fontWeight="700">
           {labelOverride || toPersianDigits(number)}
         </text>
