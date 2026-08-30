@@ -1,5 +1,7 @@
 // PatientDetail.tsx - Persian RTL Dental Clinic Patient Detail Page
 import { InsurancePanel } from '../components/InsurancePanel'
+import { PatientAlerts } from '../components/PatientAlerts'
+import { buildPatientAlerts, alertChips } from '../lib/patientAlerts'
 import { useState, useEffect, useCallback } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { ArrowRight, Edit2, Phone, Mail, MapPin, Calendar, CreditCard, Activity, FileText, Image as ImageIcon, Shield, Pill, Smile, Award, AlertCircle, Clock, CheckCircle2, Layers, Plus, Trash2, FileSignature, Printer, Bone, FlaskConical } from 'lucide-react'
@@ -361,6 +363,12 @@ export default function PatientDetail() {
   // Shared with Dashboard/Billing/Patients (src/lib/finance.ts) so this
   // number can never silently diverge between pages again.
   const { paid: totalPaid, totalCost: totalTreatmentCost, balance: patientBalance } = calcPatientBalance(payments, treatments, implantCases)
+
+  // COMP-78: the same clinical facts as the floating cards, compressed to
+  // chips beside the name. The cards can be dismissed; these cannot, so a
+  // fact stays visible for the whole visit.
+  const patientAlerts = patient ? buildPatientAlerts(patient, { balance: patientBalance }) : []
+  const headerChips = alertChips(patientAlerts)
 
   // ── Staged treatment plan (phases) ──────────────────────────────
   const [phaseModalOpen, setPhaseModalOpen] = useState(false)
@@ -725,6 +733,9 @@ export default function PatientDetail() {
               </h1>
               <Badge color={vipMeta.color}>{vipMeta.label}</Badge>
               {!patient.is_active && <Badge color="error">غیرفعال</Badge>}
+              {headerChips.map((chip) => (
+                <Badge key={chip} color="error">{chip}</Badge>
+              ))}
             </div>
             <div className="flex items-center gap-3 flex-wrap text-sm text-slate-500">
               {patient.file_number && (
@@ -1772,6 +1783,11 @@ export default function PatientDetail() {
 
   return (
     <div className="space-y-4">
+      {/* Floating clinical and financial alerts. Rendered above the header
+          rather than inside it: the whole point is that they interrupt
+          regardless of how far down the file has been scrolled. */}
+      <PatientAlerts patient={patient} balance={{ balance: patientBalance }} />
+
       {/* Header */}
       {renderHeader()}
 
