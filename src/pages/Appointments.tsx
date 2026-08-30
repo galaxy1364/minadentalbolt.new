@@ -4,7 +4,8 @@ import { Calendar, Clock, CheckCircle2, User, ChevronRight, ChevronLeft, Plus, S
 import { fetchAppointments, createAppointment, updateAppointment, checkConflict, fetchPatients, updatePatient, fetchDoctors, fetchUnits, peekNextFileNumber, createPatient, createEncounter, fetchDoctorSchedules, fetchOnlineBookingRequests, rejectBookingRequest } from '../lib/api'
 import { toJalaliString, toJalaliStringPretty, getJalaliDateInfo, formatTime, formatCurrency, toPersianDigits, persianWeekdaysShort, getHoliday, jsDateToPersianWeekday } from '../lib/persianDate'
 import { doctorColor } from '../lib/doctorColors'
-import { Appointment, AppointmentWithRelations, Patient, Doctor, Unit } from '../types'
+import { summariseDay, shiftsCapacityMinutes } from '../lib/dayMetrics'
+import { Appointment, AppointmentWithRelations, Patient, Doctor, Unit, DoctorSchedule } from '../types'
 import { Modal, Card, Button, Input, Select, Textarea, EmptyState, showToast, Badge } from '../components/ui'
 import { ModuleHeader } from '../components/ModuleHeader'
 import { useConfirmAction, ConfirmActionConfig } from '../components/ConfirmAction'
@@ -85,11 +86,13 @@ export default function Appointments() {
 
   const { config, confirmAction, close, ConfirmActionModal } = useConfirmAction()
 
+  const [schedules, setSchedules] = useState<DoctorSchedule[]>([])
+
   const loadData = useCallback(async () => {
     setLoading(true)
     try {
-      const [a, p, d, u, br] = await Promise.all([fetchAppointments(), fetchPatients(), fetchDoctors(), fetchUnits(), fetchOnlineBookingRequests().catch(() => [])])
-      setAppointments(a); setPatients(p); setDoctors(d); setUnits(u)
+      const [a, p, d, u, br, sch] = await Promise.all([fetchAppointments(), fetchPatients(), fetchDoctors(), fetchUnits(), fetchOnlineBookingRequests().catch(() => []), fetchDoctorSchedules().catch(() => [])])
+      setAppointments(a); setPatients(p); setDoctors(d); setUnits(u); setSchedules(sch)
       setBookingRequests(br.filter((r: any) => r.status === 'pending'))
     } catch { showToast('error', 'خطا در بارگذاری نوبت‌ها') }
     finally { setLoading(false) }
@@ -125,8 +128,16 @@ export default function Appointments() {
     const completed = today.filter((a) => a.status === 'completed').length
     const inChair = today.filter((a) => a.status === 'in_chair').length
     const waiting = today.filter((a) => a.status === 'scheduled' || a.status === 'confirmed').length
-    return { total: today.length, completed, inChair, waiting }
-  }, [appointments, todayStr])
+
+    // Occupancy needs today's shifts, not the whole schedule table:
+    // capacity is what the doctors on duty today can actually absorb.
+    const weekday = jsDateToPersianWeekday(new Date())
+    const capacity = shiftsCapacityMinutes(schedules.filter((sc) => sc.day_of_week === weekday))
+    const now = new Date()
+    const day = summariseDay(today, now.getHours() * 60 + now.getMinutes(), capacity)
+
+    return { total: today.length, completed, inChair, waiting, day }
+  }, [appointments, todayStr, schedules])
 
   const patientSearchResults = useMemo(() => {
     // Archived patients are now findable here too (with a badge marking
@@ -488,6 +499,68 @@ export default function Appointments() {
             <span className="text-[10px] text-slate-500 font-medium">تکمیل شده</span>
           </div>
           <p className="text-2xl font-extrabold text-slate-800">{toPersianDigits(stats.completed)}</p>
+        </div>
+      </div>
+
+      {/* COMP-133/134/135 — how full the day is, not just how many rows
+          it has. Counting appointments says nothing about whether the
+          chairs are busy: three implant cases can fill a day that a row
+          count calls quiet. */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-2.5">
+        <div className="quick-stat">
+          <div className="flex items-center gap-1.5 mb-1">
+            <Activity size={14} className="text-primary-600" />
+            <span className="text-[10px] text-slate-500 font-medium">اشغال امروز</span>
+          </div>
+          {stats.day.occupancy.capacityMinutes > 0 ? (
+            <>
+              <p className={`text-2xl font-extrabold ${stats.day.occupancy.percent > 100 ? 'text-error-600' : 'text-slate-800'}`}>
+                {toPersianDigits(stats.day.occupancy.percent)}٪
+              </p>
+              <p className="text-[10px] text-slate-500 mt-0.5">
+                {toPersianDigits(stats.day.occupancy.bookedSlots)} از {toPersianDigits(stats.day.occupancy.totalSlots)} نوبت
+              </p>
+            </>
+          ) : (
+            // An explicit reason beats a silent 0٪ — the number is
+            // missing because no shift is defined, not because the day
+            // is empty.
+            <p className="text-xs text-slate-500 mt-1.5">برنامه‌ی کاری پزشکان برای امروز ثبت نشده</p>
+          )}
+        </div>
+
+        <div className="quick-stat">
+          <div className="flex items-center gap-1.5 mb-1">
+            <Clock size={14} className="text-warning-600" />
+            <span className="text-[10px] text-slate-500 font-medium">میانگین انتظار</span>
+          </div>
+          <p className="text-2xl font-extrabold text-slate-800">
+            {stats.day.averageWait === null ? '—' : `${toPersianDigits(stats.day.averageWait)}′`}
+          </p>
+          {stats.day.averageWait === null && (
+            <p className="text-[10px] text-slate-500 mt-0.5">کسی منتظر نیست</p>
+          )}
+        </div>
+
+        <div className="quick-stat">
+          <div className="flex items-center gap-1.5 mb-1">
+            <User size={14} className="text-secondary-600" />
+            <span className="text-[10px] text-slate-500 font-medium">در مطب</span>
+          </div>
+          <p className="text-2xl font-extrabold text-slate-800">{toPersianDigits(stats.day.present)}</p>
+        </div>
+
+        <div className="quick-stat">
+          <div className="flex items-center gap-1.5 mb-1">
+            <Calendar size={14} className="text-success-600" />
+            <span className="text-[10px] text-slate-500 font-medium">نوبت بعدی</span>
+          </div>
+          <p className="text-2xl font-extrabold text-slate-800" dir="ltr">
+            {stats.day.nextAt === null ? '—' : toPersianDigits(stats.day.nextAt)}
+          </p>
+          {stats.day.nextAt === null && (
+            <p className="text-[10px] text-slate-500 mt-0.5">نوبتی برای امروز باقی نمانده</p>
+          )}
         </div>
       </div>
 
