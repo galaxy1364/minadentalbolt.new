@@ -11,13 +11,13 @@ import { MATERIAL_LEVELS, getMaterialLevel, setMaterialLevel, prefersReducedTran
 import {
   fetchSmsTemplates, fetchTreatmentPackages, fetchDoctors, fetchUnits, fetchProcedures,
   fetchInventoryCategories, fetchPatients,
-  createDoctor, updateDoctor, deleteDoctor,
-  createUnit, updateUnit, deleteUnit,
-  createProcedure, updateProcedure, deleteProcedure,
-  createTreatmentPackage, updateTreatmentPackage, deleteTreatmentPackage,
-  createInventoryCategory, updateInventoryCategory, deleteInventoryCategory,
-  fetchDoctorSchedules, createDoctorSchedule, deleteDoctorSchedule,
-  fetchRolePermissions, fetchCustomRoles, setRolePermission, createCustomRole, deleteCustomRole, loadRolePermissionOverrides,
+  createDoctor, updateDoctor, deactivateDoctor,
+  createUnit, updateUnit, deactivateUnit,
+  createProcedure, updateProcedure, deactivateProcedure,
+  createTreatmentPackage, updateTreatmentPackage, deactivateTreatmentPackage,
+  createInventoryCategory, updateInventoryCategory, deactivateInventoryCategory,
+  fetchDoctorSchedules, createDoctorSchedule, deactivateDoctorSchedule,
+  fetchRolePermissions, fetchCustomRoles, setRolePermission, createCustomRole, deactivateCustomRole, loadRolePermissionOverrides,
 } from '../lib/api'
 import { db, TABLE_NAMES } from '../lib/db'
 import { syncNow, subscribeSync, SyncStatus, getFailedSyncEntries, retryFailedEntry, retryAllFailedEntries, discardFailedEntry } from '../lib/sync'
@@ -271,7 +271,7 @@ export default function Settings() {
       // doctor: replace the doctor's whole week — delete whatever
       // existed, then re-create the current in-memory state.
       const existing = (await fetchDoctorSchedules()).filter((sc) => sc.doctor_id === editingDoctor.id)
-      for (const s of existing) await deleteDoctorSchedule(s.id)
+      for (const s of existing) await deactivateDoctorSchedule(s.id)
       for (const s of doctorSchedule) {
         await createDoctorSchedule({
           clinic_id: '', doctor_id: editingDoctor.id, day_of_week: s.day_of_week,
@@ -303,7 +303,7 @@ export default function Settings() {
     } catch { showToast('error', 'خطا در ذخیره') } finally { setSavingDoctor(false) }
   }
   const handleDeleteDoctor = (d: Doctor) => {
-    confirmAction({ type: 'delete', title: 'حذف پزشک', fields: [{ label: 'تخصص', value: d.specialty || '', highlight: true }], confirmLabel: 'تایید حذف', onConfirm: async () => { await deleteDoctor(d.id); showToast('success', 'حذف شد'); loadData() } })
+    confirmAction({ type: 'delete', title: 'غیرفعال کردن پزشک', fields: [{ label: 'تخصص', value: d.specialty || '', highlight: true }], confirmLabel: 'غیرفعال کن', onConfirm: async () => { await deactivateDoctor(d.id); showToast('success', 'غیرفعال شد'); loadData() } })
   }
 
   // ── Unit handlers ──
@@ -320,7 +320,7 @@ export default function Settings() {
     } catch { showToast('error', 'خطا در ذخیره') } finally { setSavingUnit(false) }
   }
   const handleDeleteUnit = (u: Unit) => {
-    confirmAction({ type: 'delete', title: 'حذف یونیت', fields: [{ label: 'نام', value: u.name || '', highlight: true }], confirmLabel: 'تایید حذف', onConfirm: async () => { await deleteUnit(u.id); showToast('success', 'حذف شد'); loadData() } })
+    confirmAction({ type: 'delete', title: 'غیرفعال کردن یونیت', fields: [{ label: 'نام', value: u.name || '', highlight: true }], confirmLabel: 'غیرفعال کن', onConfirm: async () => { await deactivateUnit(u.id); showToast('success', 'غیرفعال شد'); loadData() } })
   }
 
   // ── Procedure handlers ──
@@ -337,7 +337,7 @@ export default function Settings() {
     } catch { showToast('error', 'خطا در ذخیره') } finally { setSavingProc(false) }
   }
   const handleDeleteProc = (p: Procedure) => {
-    confirmAction({ type: 'delete', title: 'حذف رویه', fields: [{ label: 'نام', value: p.name, highlight: true }, { label: 'کد', value: p.code }], confirmLabel: 'تایید حذف', onConfirm: async () => { await deleteProcedure(p.id); showToast('success', 'حذف شد'); loadData() } })
+    confirmAction({ type: 'delete', title: 'غیرفعال کردن رویه', fields: [{ label: 'نام', value: p.name, highlight: true }, { label: 'کد', value: p.code }], confirmLabel: 'غیرفعال کن', onConfirm: async () => { await deactivateProcedure(p.id); showToast('success', 'غیرفعال شد'); loadData() } })
   }
 
   // ── Package handlers ──
@@ -354,7 +354,7 @@ export default function Settings() {
     } catch { showToast('error', 'خطا در ذخیره') } finally { setSavingPkg(false) }
   }
   const handleDeletePkg = (p: TreatmentPackage) => {
-    confirmAction({ type: 'delete', title: 'حذف پکیج', fields: [{ label: 'نام', value: p.name, highlight: true }], confirmLabel: 'تایید حذف', onConfirm: async () => { await deleteTreatmentPackage(p.id); showToast('success', 'حذف شد'); loadData() } })
+    confirmAction({ type: 'delete', title: 'غیرفعال کردن پکیج', fields: [{ label: 'نام', value: p.name, highlight: true }], confirmLabel: 'غیرفعال کن', onConfirm: async () => { await deactivateTreatmentPackage(p.id); showToast('success', 'غیرفعال شد'); loadData() } })
   }
 
   // ── Category handlers ──
@@ -371,7 +371,7 @@ export default function Settings() {
     } catch { showToast('error', 'خطا در ذخیره') } finally { setSavingCat(false) }
   }
   const handleDeleteCat = (c: InventoryCategory) => {
-    confirmAction({ type: 'delete', title: 'حذف دسته‌بندی', fields: [{ label: 'نام', value: c.name, highlight: true }], confirmLabel: 'تایید حذف', onConfirm: async () => { await deleteInventoryCategory(c.id); showToast('success', 'حذف شد'); loadData() } })
+    confirmAction({ type: 'delete', title: 'غیرفعال کردن دسته‌بندی', fields: [{ label: 'نام', value: c.name, highlight: true }], confirmLabel: 'غیرفعال کن', onConfirm: async () => { await deactivateInventoryCategory(c.id); showToast('success', 'غیرفعال شد'); loadData() } })
   }
 
   // ── Generic CRUD list renderer ──
@@ -1075,14 +1075,14 @@ function RbacMatrixTab() {
       title: 'حذف نقش سفارشی',
       warning: 'این عملیات قابل بازگشت نیست. کارکنانی که این نقش به آن‌ها اختصاص داده شده، تا تغییر نقش‌شان فقط به داشبورد دسترسی خواهند داشت.',
       fields: [{ label: 'نقش', value: role.label, highlight: true }],
-      confirmLabel: 'تایید حذف',
+      confirmLabel: 'غیرفعال کن',
       onConfirm: async () => {
         try {
-          await deleteCustomRole(role.key)
+          await deactivateCustomRole(role.key)
           if (activeRole === role.key) setActiveRole('owner')
           await load()
           await loadRolePermissionOverrides()
-          showToast('success', 'نقش حذف شد')
+          showToast('success', 'نقش غیرفعال شد')
         } catch { showToast('error', 'خطا در حذف نقش') }
       },
     })

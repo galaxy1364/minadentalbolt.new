@@ -5,7 +5,7 @@ import { Shield, FileText, Search, Building2, Percent, Eye, Plus, Edit2, Trash2,
 import { PieChart, Pie, Cell, XAxis, YAxis, Tooltip as RTooltip, ResponsiveContainer, Legend } from 'recharts'
 import {
   fetchInsuranceCompanies, fetchInsuranceClaims,
-  createInsuranceCompany, updateInsuranceCompany, deleteInsuranceCompany,
+  createInsuranceCompany, updateInsuranceCompany, deactivateInsuranceCompany,
   createInsuranceClaim, updateInsuranceClaim,
   fetchPatients, createPayment,
 } from '../lib/api'
@@ -236,11 +236,11 @@ export default function Insurance() {
 
     confirmAction({
       type: 'delete',
-      title: 'حذف شرکت بیمه',
+      title: 'غیرفعال کردن شرکت بیمه',
       warning: 'این عملیات قابل بازگشت نیست',
       fields: [{ label: 'نام', value: c.name, highlight: true }],
-      confirmLabel: 'تایید حذف',
-      onConfirm: async () => { await deleteInsuranceCompany(c.id); showToast('success', 'حذف شد'); loadData() },
+      confirmLabel: 'غیرفعال کن',
+      onConfirm: async () => { await deactivateInsuranceCompany(c.id); showToast('success', 'غیرفعال شد'); loadData() },
     })
   }
 

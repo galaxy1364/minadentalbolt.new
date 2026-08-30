@@ -6,7 +6,7 @@ import { useState, useEffect, useMemo } from 'react'
 import { Megaphone, MessageSquareText, Plus, Edit2, Trash2 } from 'lucide-react'
 import { ModuleHeader } from '../components/ModuleHeader'
 import { Card, Button, Input, Textarea, Select, Badge, Tabs, EmptyState, Spinner, Modal, showToast } from '../components/ui'
-import { fetchSmsTemplates, createSmsTemplate, updateSmsTemplate, deleteSmsTemplate, fetchPatients } from '../lib/api'
+import { fetchSmsTemplates, createSmsTemplate, updateSmsTemplate, deactivateSmsTemplate, fetchPatients } from '../lib/api'
 import { supabase } from '../lib/supabase'
 import { toPersianDigits } from '../lib/persianDate'
 import { h } from '../lib/haptics'
@@ -189,7 +189,7 @@ function TemplatesTab({ templates, onChange }: { templates: SmsTemplate[]; onCha
 
   const handleDelete = async (t: SmsTemplate) => {
     if (!window.confirm(`قالب «${t.name}» حذف شود؟`)) return
-    try { await deleteSmsTemplate(t.id); showToast('success', 'حذف شد'); onChange() }
+    try { await deactivateSmsTemplate(t.id); showToast('success', 'غیرفعال شد'); onChange() }
     catch { showToast('error', 'خطا در حذف') }
   }
 

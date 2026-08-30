@@ -1,0 +1,7 @@
+-- 026, 027, 028 — applied to live Supabase on 1405/06/09. See CHANGELOG MOD-SEC-005.
+-- 026: config tables (doctors, staff, procedures, units, laboratories,
+--      insurance_companies, inventory_items, inventory_categories,
+--      sms_templates, treatment_packages, doctor_schedules, custom_roles)
+--      lose DELETE and gain is_active where missing.
+-- 027: expenses gains is_active — it was closed by 023 with no way to retire a row.
+-- 028: implant_components gains is_active, closing a local-only delete.

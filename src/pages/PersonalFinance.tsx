@@ -4,7 +4,7 @@
 import { useState, useEffect, useMemo } from 'react'
 import { PiggyBank, Plus, Landmark, Home, Banknote, HandCoins, Trash2, Edit2, CalendarClock } from 'lucide-react'
 import {
-  fetchPersonalFinanceItems, createPersonalFinanceItem, updatePersonalFinanceItem, deletePersonalFinanceItem,
+  fetchPersonalFinanceItems, createPersonalFinanceItem, updatePersonalFinanceItem, cancelPersonalFinanceItem,
 } from '../lib/api'
 import { toJalaliStringPretty, formatCurrency, toPersianDigits } from '../lib/persianDate'
 import { h } from '../lib/haptics'
@@ -138,7 +138,7 @@ export default function PersonalFinance() {
       fields: [{ label: 'عنوان', value: item.title, highlight: true }],
       confirmLabel: 'تایید حذف',
       onConfirm: async () => {
-        await deletePersonalFinanceItem(item.id)
+        await cancelPersonalFinanceItem(item.id)
         showToast('success', 'حذف شد')
         await loadData()
       },

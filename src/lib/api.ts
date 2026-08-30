@@ -812,9 +812,15 @@ export async function cancelPayment(id: string): Promise<void> {
 export async function cancelLabOrder(id: string): Promise<void> {
   await updateLabOrder(id, { status: 'cancelled' } as never)
 }
-export async function deleteLab(id: string): Promise<void> {
-  await db.laboratories.delete(id)
-  await queueOperation('laboratories', 'delete', id)
+/** Deactivates instead of deleting. Migration 026 removed DELETE from
+ * public.laboratories.
+ *
+ * The reason is not tidiness: treatments, appointments and lab orders
+ * that already happened still point at these rows. Deleting one does not
+ * delete the history referencing it — it makes that history unreadable,
+ * so last year's invoice can no longer say what was done or who did it. */
+export async function deactivateLab(id: string): Promise<void> {
+  await updateLab(id, { is_active: false } as never)
 }
 /** Cancels this record. Migration 023 removed DELETE from
  * public.implant_cases, so destroying it is no longer possible — and the row
@@ -822,7 +828,7 @@ export async function deleteLab(id: string): Promise<void> {
 export async function cancelImplantCase(id: string): Promise<void> {
   await updateImplantCase(id, { status: 'cancelled' } as never)
 }
-export async function deleteImplantComponent(id: string): Promise<void> {
+export async function deactivateImplantComponent(id: string): Promise<void> {
   // Reverse the inventory deduction — removing a mistakenly-added
   // component (or one entered by mistake) shouldn't leave stock
   // permanently short.
@@ -835,15 +841,29 @@ export async function deleteImplantComponent(id: string): Promise<void> {
       await queueOperation('inventory_items', 'update', item.id, { quantity: updated.quantity })
     }
   }
-  await db.implant_components.delete(id)
+  // Deactivated, not deleted — see migration 028. Deleting locally
+  // while the server keeps the row is the divergence case.
+  await updateImplantComponent(id, { is_active: false } as never)
 }
-export async function deleteInventoryItem(id: string): Promise<void> {
-  await db.inventory_items.delete(id)
-  await queueOperation('inventory_items', 'delete', id)
+/** Deactivates instead of deleting. Migration 026 removed DELETE from
+ * public.inventory_items.
+ *
+ * The reason is not tidiness: treatments, appointments and lab orders
+ * that already happened still point at these rows. Deleting one does not
+ * delete the history referencing it — it makes that history unreadable,
+ * so last year's invoice can no longer say what was done or who did it. */
+export async function deactivateInventoryItem(id: string): Promise<void> {
+  await updateInventoryItem(id, { is_active: false } as never)
 }
-export async function deleteStaff(id: string): Promise<void> {
-  await db.staff.delete(id)
-  await queueOperation('staff', 'delete', id)
+/** Deactivates instead of deleting. Migration 026 removed DELETE from
+ * public.staff.
+ *
+ * The reason is not tidiness: treatments, appointments and lab orders
+ * that already happened still point at these rows. Deleting one does not
+ * delete the history referencing it — it makes that history unreadable,
+ * so last year's invoice can no longer say what was done or who did it. */
+export async function deactivateStaff(id: string): Promise<void> {
+  await updateStaff(id, { is_active: false } as never)
 }
 /** Cancels this record. Migration 023 removed DELETE from
  * public.waiting_list, so destroying it is no longer possible — and the row
@@ -889,8 +909,23 @@ export async function updatePaymentPlan(id: string, updates: Partial<PaymentPlan
 export async function cancelPaymentPlan(id: string): Promise<void> {
   await updatePaymentPlan(id, { status: 'cancelled' } as never)
 }
-export async function deleteToothRecord(id: string): Promise<void> {
-  await db.tooth_records.delete(id)
+/** Resets a tooth to healthy rather than removing its row.
+ *
+ * The old version deleted only the LOCAL row while migration 023 had
+ * already stopped the server doing the same — the divergence case, which
+ * is worse than either behaviour alone: the record vanishes on this
+ * device, survives on the server, and the next sync pull brings it back,
+ * so the user believes the app ignored them.
+ *
+ * A tooth always exists; what is being undone is the finding recorded on
+ * it, so clearing the finding is the honest operation. */
+export async function resetToothRecord(id: string): Promise<void> {
+  await updateToothRecord(id, {
+    condition: 'healthy',
+    surfaces: '[]',
+    is_missing: false,
+    is_implant: false,
+  } as never)
 }
 
 // ── SMS Templates ────────────────────────────────────────────
@@ -973,9 +1008,15 @@ export async function updateDoctor(id: string, updates: Partial<DoctorInput>): P
   return updated
 }
 
-export async function deleteDoctor(id: string): Promise<void> {
-  await db.doctors.delete(id)
-  await queueOperation('doctors', 'delete', id)
+/** Deactivates instead of deleting. Migration 026 removed DELETE from
+ * public.doctors.
+ *
+ * The reason is not tidiness: treatments, appointments and lab orders
+ * that already happened still point at these rows. Deleting one does not
+ * delete the history referencing it — it makes that history unreadable,
+ * so last year's invoice can no longer say what was done or who did it. */
+export async function deactivateDoctor(id: string): Promise<void> {
+  await updateDoctor(id, { is_active: false } as never)
 }
 
 // ── Units CRUD ───────────────────────────────────────────────
@@ -998,9 +1039,15 @@ export async function updateUnit(id: string, updates: Partial<UnitInput>): Promi
   return updated
 }
 
-export async function deleteUnit(id: string): Promise<void> {
-  await db.units.delete(id)
-  await queueOperation('units', 'delete', id)
+/** Deactivates instead of deleting. Migration 026 removed DELETE from
+ * public.units.
+ *
+ * The reason is not tidiness: treatments, appointments and lab orders
+ * that already happened still point at these rows. Deleting one does not
+ * delete the history referencing it — it makes that history unreadable,
+ * so last year's invoice can no longer say what was done or who did it. */
+export async function deactivateUnit(id: string): Promise<void> {
+  await updateUnit(id, { is_active: false } as never)
 }
 
 // ── Procedures CRUD ──────────────────────────────────────────
@@ -1023,9 +1070,15 @@ export async function updateProcedure(id: string, updates: Partial<ProcedureInpu
   return updated
 }
 
-export async function deleteProcedure(id: string): Promise<void> {
-  await db.procedures.delete(id)
-  await queueOperation('procedures', 'delete', id)
+/** Deactivates instead of deleting. Migration 026 removed DELETE from
+ * public.procedures.
+ *
+ * The reason is not tidiness: treatments, appointments and lab orders
+ * that already happened still point at these rows. Deleting one does not
+ * delete the history referencing it — it makes that history unreadable,
+ * so last year's invoice can no longer say what was done or who did it. */
+export async function deactivateProcedure(id: string): Promise<void> {
+  await updateProcedure(id, { is_active: false } as never)
 }
 
 // ── Payment Update ───────────────────────────────────────────
@@ -1095,9 +1148,11 @@ export async function updateExpense(id: string, updates: Partial<ExpenseInput>):
   return updated
 }
 
-export async function deleteExpense(id: string): Promise<void> {
-  await db.expenses.delete(id)
-  await queueOperation('expenses', 'delete', id)
+/** Deactivates. expenses is one of the tables migration 023 closed
+ * DELETE on, and it had no status column at all — migration 027 added
+ * is_active so a mistaken expense can still be retired. */
+export async function deactivateExpense(id: string): Promise<void> {
+  await updateExpense(id, { is_active: false } as never)
 }
 
 // ── Insurance Companies CRUD ─────────────────────────────────
@@ -1120,9 +1175,15 @@ export async function updateInsuranceCompany(id: string, updates: Partial<Insura
   return updated
 }
 
-export async function deleteInsuranceCompany(id: string): Promise<void> {
-  await db.insurance_companies.delete(id)
-  await queueOperation('insurance_companies', 'delete', id)
+/** Deactivates instead of deleting. Migration 026 removed DELETE from
+ * public.insurance_companies.
+ *
+ * The reason is not tidiness: treatments, appointments and lab orders
+ * that already happened still point at these rows. Deleting one does not
+ * delete the history referencing it — it makes that history unreadable,
+ * so last year's invoice can no longer say what was done or who did it. */
+export async function deactivateInsuranceCompany(id: string): Promise<void> {
+  await updateInsuranceCompany(id, { is_active: false } as never)
 }
 
 // ── Insurance Claims CRUD ────────────────────────────────────
@@ -1226,9 +1287,15 @@ export async function updateSmsTemplate(id: string, updates: Partial<SmsTemplate
   return updated
 }
 
-export async function deleteSmsTemplate(id: string): Promise<void> {
-  await db.sms_templates.delete(id)
-  await queueOperation('sms_templates', 'delete', id)
+/** Deactivates instead of deleting. Migration 026 removed DELETE from
+ * public.sms_templates.
+ *
+ * The reason is not tidiness: treatments, appointments and lab orders
+ * that already happened still point at these rows. Deleting one does not
+ * delete the history referencing it — it makes that history unreadable,
+ * so last year's invoice can no longer say what was done or who did it. */
+export async function deactivateSmsTemplate(id: string): Promise<void> {
+  await updateSmsTemplate(id, { is_active: false } as never)
 }
 
 // ── Treatment Packages CRUD ──────────────────────────────────
@@ -1251,9 +1318,15 @@ export async function updateTreatmentPackage(id: string, updates: Partial<Treatm
   return updated
 }
 
-export async function deleteTreatmentPackage(id: string): Promise<void> {
-  await db.treatment_packages.delete(id)
-  await queueOperation('treatment_packages', 'delete', id)
+/** Deactivates instead of deleting. Migration 026 removed DELETE from
+ * public.treatment_packages.
+ *
+ * The reason is not tidiness: treatments, appointments and lab orders
+ * that already happened still point at these rows. Deleting one does not
+ * delete the history referencing it — it makes that history unreadable,
+ * so last year's invoice can no longer say what was done or who did it. */
+export async function deactivateTreatmentPackage(id: string): Promise<void> {
+  await updateTreatmentPackage(id, { is_active: false } as never)
 }
 
 // ── Inventory Categories CRUD ────────────────────────────────
@@ -1276,9 +1349,15 @@ export async function updateInventoryCategory(id: string, updates: Partial<Inven
   return updated
 }
 
-export async function deleteInventoryCategory(id: string): Promise<void> {
-  await db.inventory_categories.delete(id)
-  await queueOperation('inventory_categories', 'delete', id)
+/** Deactivates instead of deleting. Migration 026 removed DELETE from
+ * public.inventory_categories.
+ *
+ * The reason is not tidiness: treatments, appointments and lab orders
+ * that already happened still point at these rows. Deleting one does not
+ * delete the history referencing it — it makes that history unreadable,
+ * so last year's invoice can no longer say what was done or who did it. */
+export async function deactivateInventoryCategory(id: string): Promise<void> {
+  await updateInventoryCategory(id, { is_active: false } as never)
 }
 
 // ── Consent Forms CRUD ───────────────────────────────────────
@@ -1328,9 +1407,15 @@ export async function updateDoctorSchedule(id: string, updates: Partial<DoctorSc
   return updated
 }
 
-export async function deleteDoctorSchedule(id: string): Promise<void> {
-  await db.doctor_schedules.delete(id)
-  await queueOperation('doctor_schedules', 'delete', id)
+/** Deactivates instead of deleting. Migration 026 removed DELETE from
+ * public.doctor_schedules.
+ *
+ * The reason is not tidiness: treatments, appointments and lab orders
+ * that already happened still point at these rows. Deleting one does not
+ * delete the history referencing it — it makes that history unreadable,
+ * so last year's invoice can no longer say what was done or who did it. */
+export async function deactivateDoctorSchedule(id: string): Promise<void> {
+  await updateDoctorSchedule(id, { is_active: false } as never)
 }
 
 // ── Personal Finance (loans, rent, personal cheques, debts) ─────────
@@ -1358,9 +1443,10 @@ export async function updatePersonalFinanceItem(id: string, updates: Partial<Per
   return updated
 }
 
-export async function deletePersonalFinanceItem(id: string): Promise<void> {
-  await db.personal_finance_items.delete(id)
-  await queueOperation('personal_finance_items', 'delete', id)
+/** Cancels. personal_finance_items already has a status column, so it
+ * needed no migration — only stopping the delete the server refuses. */
+export async function cancelPersonalFinanceItem(id: string): Promise<void> {
+  await updatePersonalFinanceItem(id, { status: 'cancelled' } as never)
 }
 
 // ── Smart Cash Register (صندوق‌داری هوشمند) ──────────────────────
@@ -1521,17 +1607,16 @@ export async function createCustomRole(roleKey: string, label: string, modulePat
  * (system) roles aren't rows in custom_roles at all, so they can never be
  * passed to this function by construction — the UI only offers delete on
  * roles that came from fetchCustomRoles(). */
-export async function deleteCustomRole(roleKey: string): Promise<void> {
+export async function deactivateCustomRole(roleKey: string): Promise<void> {
   const role = (await db.custom_roles.where('clinic_id').equals(CLINIC_ID).toArray()).find((r) => r.role_key === roleKey)
-  if (role) {
-    await db.custom_roles.delete(role.id)
-    await queueOperation('custom_roles', 'delete', role.id)
-  }
-  const perms = (await db.role_permissions.where('clinic_id').equals(CLINIC_ID).toArray()).filter((p) => p.role_key === roleKey)
-  for (const p of perms) {
-    await db.role_permissions.delete(p.id)
-    await queueOperation('role_permissions', 'delete', p.id)
-  }
+  if (!role) return
+  const updated = { ...role, is_active: false, updated_at: nowISO() }
+  await db.custom_roles.put(updated)
+  await queueOperation('custom_roles', 'update', role.id, { is_active: false })
+  // The role's permission rows are left alone. They are meaningless
+  // while the role is inactive, and keeping them means reactivating a
+  // role restores exactly what it could do before rather than silently
+  // coming back with no access.
 }
 
 /** Builds the { role_key: allowedPaths[] } map that permissions.ts'

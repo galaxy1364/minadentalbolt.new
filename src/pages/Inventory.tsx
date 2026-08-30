@@ -4,7 +4,7 @@ import { useNavigate } from 'react-router-dom'
 import { Package, Boxes, Search, Plus, Edit2, Trash2, AlertTriangle, TrendingDown, PackageCheck, Smile, ScanLine } from 'lucide-react'
 import { BarcodeScanner } from '../components/BarcodeScanner'
 import { BarChart, Bar, XAxis, YAxis, Tooltip as RTooltip, ResponsiveContainer, Cell } from 'recharts'
-import { fetchInventoryItems, fetchInventoryCategories, createInventoryItem, updateInventoryItem, deleteInventoryItem } from '../lib/api'
+import { fetchInventoryItems, fetchInventoryCategories, createInventoryItem, updateInventoryItem, deactivateInventoryItem } from '../lib/api'
 import { toJalaliString, toJalaliStringPretty, formatCurrency, formatNumber, toPersianDigits } from '../lib/persianDate'
 import { h } from '../lib/haptics'
 import { useConfirmAction } from '../components/ConfirmAction'
@@ -292,7 +292,7 @@ export default function Inventory() {
       ],
       confirmLabel: 'حذف قطعی',
       onConfirm: async () => {
-        try { await deleteInventoryItem(item.id); showToast('success', 'حذف شد'); await loadData() }
+        try { await deactivateInventoryItem(item.id); showToast('success', 'غیرفعال شد'); await loadData() }
         catch { showToast('error', 'خطا در حذف') }
       },
     })

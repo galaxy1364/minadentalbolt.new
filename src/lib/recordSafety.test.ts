@@ -19,6 +19,18 @@ const PROTECTED = [
   'waiting_list', 'lab_orders', 'implant_cases', 'implant_components',
   'payment_plans', 'installments', 'cheques', 'consent_forms',
   'treatment_phases', 'insurance_claims', 'patient_policies',
+  'expenses', 'personal_finance_items', 'cash_register_sessions',
+  'manual_reminders',
+]
+
+/** Configuration tables. Migration 026 closed DELETE on these too:
+ * treatments, appointments and lab orders that already happened still
+ * point at them, so deleting one does not delete the history — it makes
+ * that history unreadable. */
+const CONFIG = [
+  'doctors', 'staff', 'procedures', 'units', 'laboratories',
+  'insurance_companies', 'inventory_items', 'inventory_categories',
+  'sms_templates', 'treatment_packages', 'doctor_schedules', 'custom_roles',
 ]
 
 describe('no permanent delete of a patient record', () => {
@@ -56,5 +68,43 @@ describe('no permanent delete of a patient record', () => {
       new RegExp(`db\\.${t}\\.where\\('patient_id'\\)\\.equals\\([^)]*\\)\\.delete\\(`).test(api),
     )
     expect(offenders).toEqual([])
+  })
+})
+
+describe('no permanent delete of configuration either', () => {
+  it('never queues a delete for a config table', () => {
+    const offenders = CONFIG.filter((t) =>
+      new RegExp(`queueOperation\\(\\s*'${t}'\\s*,\\s*'delete'`).test(api),
+    )
+    expect(offenders).toEqual([])
+  })
+
+  it('never clears a config table locally', () => {
+    const offenders = CONFIG.filter((t) =>
+      new RegExp(`db\\.${t}\\.delete\\(`).test(api),
+    )
+    expect(offenders).toEqual([])
+  })
+
+  it('exposes a deactivate for each config area instead', () => {
+    for (const fn of [
+      'deactivateDoctor', 'deactivateUnit', 'deactivateProcedure',
+      'deactivateStaff', 'deactivateLab', 'deactivateInsuranceCompany',
+      'deactivateInventoryItem', 'deactivateInventoryCategory',
+      'deactivateSmsTemplate', 'deactivateTreatmentPackage',
+      'deactivateDoctorSchedule', 'deactivateCustomRole',
+      'deactivateExpense', 'cancelPersonalFinanceItem',
+    ]) {
+      expect(api).toContain(`export async function ${fn}`)
+    }
+  })
+
+  it('leaves no delete helper behind for any protected or config table', () => {
+    // The compiler catches renamed call sites; this catches a new one
+    // being written from scratch.
+    const stale = [...PROTECTED, ...CONFIG].filter((t) =>
+      new RegExp(`db\\.${t}\\.delete\\(|queueOperation\\(\\s*'${t}'\\s*,\\s*'delete'`).test(api),
+    )
+    expect(stale).toEqual([])
   })
 })

@@ -3,7 +3,7 @@ import { useState, useEffect, useCallback, useMemo } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
 import { CreditCard, Plus, Search, DollarSign, TrendingUp, Wallet, Calendar, CalendarClock, CheckCircle2, AlertCircle, Edit2, Filter, Receipt, Banknote, Clock, Trash2, Printer } from 'lucide-react'
 import { BarChart, Bar, XAxis, YAxis, Tooltip as RTooltip, ResponsiveContainer, PieChart, Pie, Cell as RCell } from 'recharts'
-import { fetchPayments, createPayment, updatePayment, fetchEncounters, fetchCheques, createCheque, updateCheque, fetchPaymentPlans, createPaymentPlan, updatePaymentPlan, updateInstallment, fetchPatients, fetchExpenses, createExpense, updateExpense, deleteExpense, fetchTreatments, fetchImplantCases } from '../lib/api'
+import { fetchPayments, createPayment, updatePayment, fetchEncounters, fetchCheques, createCheque, updateCheque, fetchPaymentPlans, createPaymentPlan, updatePaymentPlan, updateInstallment, fetchPatients, fetchExpenses, createExpense, updateExpense, deactivateExpense, fetchTreatments, fetchImplantCases } from '../lib/api'
 import { buildSchedule, splitAmount, planProgress, reconcilePlan } from '../lib/installments'
 import { checkOverpayment } from '../lib/finance'
 import { toJalaliString, toJalaliStringPretty, formatCurrency, formatNumber, toPersianDigits, toEnglishDigits } from '../lib/persianDate'
@@ -1225,7 +1225,7 @@ export default function Billing() {
       title: 'حذف هزینه',
       fields: [{ label: 'دسته‌بندی', value: e.category, highlight: true }, { label: 'مبلغ', value: `${formatCurrency(e.amount)} ت` }],
       confirmLabel: 'تایید حذف',
-      onConfirm: async () => { await deleteExpense(e.id); showToast('success', 'حذف شد'); loadData() },
+      onConfirm: async () => { await deactivateExpense(e.id); showToast('success', 'غیرفعال شد'); loadData() },
     })
   }
 

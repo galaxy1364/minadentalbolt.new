@@ -3,7 +3,7 @@ import { useState, useEffect, useCallback, useMemo } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
 import { Smile, Plus, Search, Edit2, Eye, Filter, Package, Calendar, DollarSign, ShieldCheck, AlertTriangle, CheckCircle2, Clock, Activity, Layers, Trash2, CalendarClock, ScanLine } from 'lucide-react'
 import { downloadICSReminder } from '../lib/icsReminder'
-import { fetchImplantCases, createImplantCase, updateImplantCase, createImplantComponent, deleteImplantComponent, fetchPatients, fetchDoctors, createExpense, fetchInventoryItems } from '../lib/api'
+import { fetchImplantCases, createImplantCase, updateImplantCase, createImplantComponent, deactivateImplantComponent, fetchPatients, fetchDoctors, createExpense, fetchInventoryItems } from '../lib/api'
 import { calcSurgeryShare, canMoveStage, validateImplantCase, caseFinancials } from '../lib/implants'
 import { BarcodeScanner } from '../components/BarcodeScanner'
 import { CLINIC_ID } from '../lib/supabase'
@@ -350,7 +350,7 @@ export default function Implants() {
       ],
       confirmLabel: 'تایید حذف',
       onConfirm: async () => {
-        try { await deleteImplantComponent(comp.id); showToast('success', 'کامپوننت حذف شد'); await loadData() }
+        try { await deactivateImplantComponent(comp.id); showToast('success', 'کامپوننت حذف شد'); await loadData() }
         catch { showToast('error', 'خطا در حذف') }
       },
     })
