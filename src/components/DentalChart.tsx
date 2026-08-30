@@ -7,6 +7,7 @@ import { h } from '../lib/haptics'
 import { ToothRecord, Treatment } from '../types'
 import { toPersianDigits, toJalaliStringPretty } from '../lib/persianDate'
 import { toothShape, hasRootFilling, hasCrownCap, toothKind, isUpperTooth, toothVisualLabel } from '../lib/toothVisual'
+import { surfaceSectors, centreLetter } from '../lib/surfaceGlyph'
 import { Badge } from './ui'
 
 // ── Types ─────────────────────────────────────────────────────
@@ -94,20 +95,24 @@ const primaryUpperLeft = [61, 62, 63, 64, 65]
 const primaryLowerLeft = [71, 72, 73, 74, 75]
 const primaryLowerRight = [85, 84, 83, 82, 81]
 
-const conditionMeta: Record<ToothCondition, { label: string; color: string; bg: string; border: string; dot: string }> = {
-  healthy: { label: 'سالم', color: 'text-slate-600', bg: 'bg-white', border: 'border-slate-200', dot: 'bg-slate-300' },
-  caries: { label: 'پوسیدگی', color: 'text-error-700', bg: 'bg-error-50', border: 'border-error-300', dot: 'bg-error-500' },
-  restored: { label: 'ترمیم شده', color: 'text-primary-700', bg: 'bg-primary-50', border: 'border-primary-300', dot: 'bg-primary-500' },
-  rct: { label: 'عصب‌کشی', color: 'text-warning-700', bg: 'bg-warning-50', border: 'border-warning-400', dot: 'bg-warning-500' },
-  post: { label: 'پست', color: 'text-orange-700', bg: 'bg-orange-50', border: 'border-orange-400', dot: 'bg-orange-500' },
-  pin: { label: 'پین', color: 'text-orange-600', bg: 'bg-orange-50', border: 'border-orange-300', dot: 'bg-orange-400' },
-  crown: { label: 'روکش', color: 'text-accent-700', bg: 'bg-accent-50', border: 'border-accent-400', dot: 'bg-accent-500' },
-  implant: { label: 'ایمپلنت', color: 'text-secondary-700', bg: 'bg-secondary-50', border: 'border-secondary-400', dot: 'bg-secondary-500' },
-  extraction: { label: 'کشیده شده', color: 'text-slate-500', bg: 'bg-slate-200', border: 'border-slate-400', dot: 'bg-slate-500' },
-  missing: { label: 'مفقود', color: 'text-slate-400', bg: 'bg-slate-100', border: 'border-slate-300', dot: 'bg-slate-400' },
-  bridge: { label: 'بریج', color: 'text-primary-600', bg: 'bg-primary-50', border: 'border-primary-400', dot: 'bg-primary-400' },
-  veneer: { label: 'ونیر', color: 'text-accent-600', bg: 'bg-accent-50', border: 'border-accent-300', dot: 'bg-accent-400' },
-  sealant: { label: 'سیلنت', color: 'text-success-700', bg: 'bg-success-50', border: 'border-success-300', dot: 'bg-success-500' },
+/** `dot` is a Tailwind class for the legend; `dotHex` is the same colour
+ * as a literal, because SVG fill cannot take a class. Kept in one table
+ * so the glyph and the legend can never disagree about what a colour
+ * means. */
+const conditionMeta: Record<ToothCondition, { label: string; color: string; bg: string; border: string; dot: string; dotHex: string }> = {
+  healthy: { label: 'سالم', color: 'text-slate-600', bg: 'bg-white', border: 'border-slate-200', dot: 'bg-slate-300', dotHex: '#cbd5e1' },
+  caries: { label: 'پوسیدگی', color: 'text-error-700', bg: 'bg-error-50', border: 'border-error-300', dot: 'bg-error-500', dotHex: '#ef4444' },
+  restored: { label: 'ترمیم شده', color: 'text-primary-700', bg: 'bg-primary-50', border: 'border-primary-300', dot: 'bg-primary-500', dotHex: '#0d9488' },
+  rct: { label: 'عصب‌کشی', color: 'text-warning-700', bg: 'bg-warning-50', border: 'border-warning-400', dot: 'bg-warning-500', dotHex: '#f59e0b' },
+  post: { label: 'پست', color: 'text-orange-700', bg: 'bg-orange-50', border: 'border-orange-400', dot: 'bg-orange-500', dotHex: '#f97316' },
+  pin: { label: 'پین', color: 'text-orange-600', bg: 'bg-orange-50', border: 'border-orange-300', dot: 'bg-orange-400', dotHex: '#fb923c' },
+  crown: { label: 'روکش', color: 'text-accent-700', bg: 'bg-accent-50', border: 'border-accent-400', dot: 'bg-accent-500', dotHex: '#f97316' },
+  implant: { label: 'ایمپلنت', color: 'text-secondary-700', bg: 'bg-secondary-50', border: 'border-secondary-400', dot: 'bg-secondary-500', dotHex: '#64748b' },
+  extraction: { label: 'کشیده شده', color: 'text-slate-500', bg: 'bg-slate-200', border: 'border-slate-400', dot: 'bg-slate-500', dotHex: '#64748b' },
+  missing: { label: 'مفقود', color: 'text-slate-400', bg: 'bg-slate-100', border: 'border-slate-300', dot: 'bg-slate-400', dotHex: '#94a3b8' },
+  bridge: { label: 'بریج', color: 'text-primary-600', bg: 'bg-primary-50', border: 'border-primary-400', dot: 'bg-primary-400', dotHex: '#2dd4bf' },
+  veneer: { label: 'ونیر', color: 'text-accent-600', bg: 'bg-accent-50', border: 'border-accent-300', dot: 'bg-accent-400', dotHex: '#fb923c' },
+  sealant: { label: 'سیلنت', color: 'text-success-700', bg: 'bg-success-50', border: 'border-success-300', dot: 'bg-success-500', dotHex: '#22c55e' },
 }
 
 const surfaceLabels: Record<ToothSurface, string> = {
@@ -745,6 +750,35 @@ export default function DentalChart({ toothRecords, treatments, onUpdateTooth, o
     }
   }
 
+  /**
+   * Cycles one surface between healthy and the tooth's own condition.
+   *
+   * Writes through onUpdateTooth like every other edit rather than
+   * opening a second save path — two routes to one destination is the
+   * fault this project keeps being bitten by. A tooth still marked
+   * healthy defaults the surface to caries, because that is what a
+   * clinician is recording when they tap a surface during an exam.
+   */
+  const handleSurfaceToggle = (toothNumber: string, surface: ToothSurface) => {
+    const data = getToothData(Number(toothNumber))
+    const existing = data.surfaces.find((x) => x.surface === surface)
+    const target: ToothCondition = data.condition === 'healthy' ? 'caries' : data.condition
+
+    const next = existing && existing.condition !== 'healthy'
+      ? data.surfaces.filter((x) => x.surface !== surface)
+      : [...data.surfaces.filter((x) => x.surface !== surface), { surface, condition: target }]
+
+    onUpdateTooth(toothNumber, {
+      is_missing: data.condition === 'missing' || data.condition === 'extraction',
+      is_implant: data.condition === 'implant',
+      notes: data.notes || '',
+      // A surface can only be marked on a tooth that has a condition, so
+      // marking the first one promotes the tooth itself out of healthy.
+      condition: data.condition === 'healthy' && next.length > 0 ? target : data.condition,
+      surfaces: JSON.stringify(next),
+    })
+  }
+
   const handleUpdate = (condition: ToothCondition, surfaces: ToothSurfaceCondition[], notes: string) => {
     if (!selectedTooth) return
     onUpdateTooth(String(selectedTooth.number), {
@@ -777,6 +811,64 @@ export default function DentalChart({ toothRecords, treatments, onUpdateTooth, o
     return `${prefix}${fdiToPalmer(fdiNumber)}`
   }
 
+  /** COMP-103 — the five-surface target under each tooth.
+   *
+   * Recording a surface used to cost five taps: open the tooth, wait for
+   * the panel, find the row, tap, close. An examination does not move at
+   * that speed. One tap from the arch does.
+   *
+   * Only drawn for the selected tooth: sixteen of these across an arch
+   * would be unreadable at phone width, and would make the teeth
+   * themselves harder to see — which is the fault MOD-UI-006 just fixed. */
+  const renderSurfaceGlyph = (num: number, data: ToothData) => {
+    const sectors = surfaceSectors(num)
+    const currentOf = (surface: ToothSurface): ToothCondition =>
+      data.surfaces.find((x) => x.surface === surface)?.condition || 'healthy'
+
+    return (
+      <svg
+        viewBox="0 0 24 24"
+        className="w-9 h-9 mx-auto mt-0.5"
+        role="group"
+        aria-label={`انتخاب سطح دندان ${num}`}
+      >
+        {sectors.map((sec) => {
+          const cond = currentOf(sec.surface)
+          const marked = cond !== 'healthy'
+          const letter = sec.surface === 'occlusal' ? centreLetter(num) : sec.letter
+          return (
+            <g key={sec.surface}>
+              <path
+                d={sec.d}
+                fill={marked ? conditionMeta[cond].dotHex : '#ffffff'}
+                stroke="#94a3b8"
+                strokeWidth="0.6"
+                className="cursor-pointer"
+                onClick={(e) => {
+                  e.stopPropagation()
+                  handleSurfaceToggle(String(num), sec.surface)
+                }}
+              >
+                <title>{`${letter} — ${conditionMeta[cond].label}`}</title>
+              </path>
+              <text
+                x={sec.labelX}
+                y={sec.labelY}
+                textAnchor="middle"
+                fontSize="5"
+                fontWeight="700"
+                fill={marked ? '#ffffff' : '#94a3b8'}
+                pointerEvents="none"
+              >
+                {letter}
+              </text>
+            </g>
+          )
+        })}
+      </svg>
+    )
+  }
+
   const renderQuadrant = (teeth: number[]) => (
     <div className="flex items-center gap-0.5 relative shrink-0">
       {teeth.map((num) => {
@@ -800,6 +892,7 @@ export default function DentalChart({ toothRecords, treatments, onUpdateTooth, o
                 <Clock size={8} className="text-white" />
               </span>
             )}
+            {selectedTooth?.number === num && renderSurfaceGlyph(num, data)}
           </div>
         )
       })}
