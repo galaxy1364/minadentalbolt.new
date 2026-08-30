@@ -1,7 +1,10 @@
 import { useState, useEffect, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Archive as ArchiveIcon, Search, Users, IdCard, RotateCcw, User, Building2, Syringe, FlaskConical } from 'lucide-react'
-import { fetchPatients, fetchStaff, updatePatient, updateStaff, fetchInsuranceCompanies, updateInsuranceCompany, fetchImplantCases, updateImplantCase, fetchLabs, updateLab } from '../lib/api'
+import { Archive as ArchiveIcon, Search, Users, IdCard, RotateCcw, User, Building2, Syringe, FlaskConical, Settings2 } from 'lucide-react'
+import { fetchPatients, fetchStaff, updatePatient, updateStaff, fetchInsuranceCompanies, updateInsuranceCompany, fetchImplantCases, updateImplantCase, fetchLabs, updateLab,
+  fetchDoctors, updateDoctor, fetchUnits, updateUnit, fetchProcedures, updateProcedure,
+  fetchInventoryItems, updateInventoryItem, fetchTreatmentPackages, updateTreatmentPackage,
+  fetchSmsTemplates, updateSmsTemplate } from '../lib/api'
 import { toJalaliStringPretty, toPersianDigits, formatCurrency } from '../lib/persianDate'
 import type { Patient, Staff as StaffType, InsuranceCompany, ImplantCaseWithRelations, Laboratory } from '../types'
 import { Card, Button, Spinner, EmptyState, Tabs, showToast, HighlightText } from '../components/ui'
@@ -13,12 +16,17 @@ import { h } from '../lib/haptics'
 export default function Archive() {
   const navigate = useNavigate()
   const { confirmAction, ConfirmActionModal } = useConfirmAction()
-  const [tab, setTab] = useState<'patients' | 'staff' | 'insurance' | 'implants' | 'labs'>('patients')
+  const [tab, setTab] = useState<'patients' | 'staff' | 'insurance' | 'implants' | 'labs' | 'config'>('patients')
   const [patients, setPatients] = useState<Patient[]>([])
   const [staff, setStaff] = useState<StaffType[]>([])
   const [companies, setCompanies] = useState<InsuranceCompany[]>([])
   const [implantCases, setImplantCases] = useState<ImplantCaseWithRelations[]>([])
   const [labs, setLabs] = useState<Laboratory[]>([])
+  /** Everything deactivated in Settings. Migration 026 stopped these
+   * being deleted, which left them one-way: you could retire a procedure
+   * or a doctor and had no way to bring it back except through the
+   * database. That is not a safe thing to ship. */
+  const [configRows, setConfigRows] = useState<{ kind: string; label: string; id: string; name: string; restore: (id: string) => Promise<unknown> }[]>([])
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
 
@@ -31,6 +39,26 @@ export default function Archive() {
       setCompanies(comps.filter((c) => !c.is_active))
       setImplantCases(cases.filter((c) => c.is_active === false))
       setLabs(labList.filter((l) => !l.is_active))
+
+      const [docs, units, procs, inv, packs, tmpl] = await Promise.all([
+        fetchDoctors().catch(() => []), fetchUnits().catch(() => []),
+        fetchProcedures().catch(() => []), fetchInventoryItems().catch(() => []),
+        fetchTreatmentPackages().catch(() => []), fetchSmsTemplates().catch(() => []),
+      ])
+      const inactive = <T extends { id: string; is_active?: boolean | null }>(
+        rows: T[], kind: string, label: string,
+        name: (r: T) => string, restore: (id: string) => Promise<unknown>,
+      ) => rows.filter((r) => r.is_active === false)
+        .map((r) => ({ kind, label, id: r.id, name: name(r), restore }))
+
+      setConfigRows([
+        ...inactive(docs as any[], 'doctor', 'پزشک', (d: any) => `دکتر ${d.name || ''}`, (id) => updateDoctor(id, { is_active: true } as never)),
+        ...inactive(units as any[], 'unit', 'یونیت', (u: any) => u.name || '', (id) => updateUnit(id, { is_active: true } as never)),
+        ...inactive(procs as any[], 'procedure', 'رویه', (p: any) => `${p.name || ''} (${p.code || ''})`, (id) => updateProcedure(id, { is_active: true } as never)),
+        ...inactive(inv as any[], 'inventory', 'کالا', (i: any) => i.name || '', (id) => updateInventoryItem(id, { is_active: true } as never)),
+        ...inactive(packs as any[], 'package', 'پکیج', (p: any) => p.name || '', (id) => updateTreatmentPackage(id, { is_active: true } as never)),
+        ...inactive(tmpl as any[], 'template', 'قالب پیامک', (t: any) => t.name || '', (id) => updateSmsTemplate(id, { is_active: true } as never)),
+      ])
     } finally {
       setLoading(false)
     }
@@ -196,10 +224,49 @@ export default function Archive() {
           { key: 'insurance', label: 'بیمه', icon: <Building2 size={16} /> },
           { key: 'implants', label: 'ایمپلنت', icon: <Syringe size={16} /> },
           { key: 'labs', label: 'لابراتوار', icon: <FlaskConical size={16} /> },
+          { key: 'config', label: 'تنظیمات', icon: <Settings2 size={16} /> },
         ]}
         active={tab}
-        onChange={(k) => setTab(k as 'patients' | 'staff' | 'insurance' | 'implants' | 'labs')}
+        onChange={(k) => setTab(k as typeof tab)}
       />
+
+      {tab === 'config' && (
+        configRows.length === 0 ? (
+          <EmptyState icon={<Settings2 size={40} />} title="مورد غیرفعالی نیست" description="پزشک، یونیت، رویه، کالا، پکیج و قالب پیامکِ غیرفعال‌شده اینجا برمی‌گردند" />
+        ) : (
+          <div className="space-y-2">
+            {configRows.map((r) => (
+              <Card key={`${r.kind}:${r.id}`} className="p-3.5 flex items-center gap-3">
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-bold text-slate-800 dark:text-slate-100 truncate">{r.name}</p>
+                  <p className="text-xs text-slate-500">{r.label}</p>
+                </div>
+                <Button
+                  size="sm"
+                  variant="secondary"
+                  onClick={() => {
+                    h.tap()
+                    confirmAction({
+                      type: 'status',
+                      title: 'فعال‌سازی دوباره',
+                      fields: [{ label: r.label, value: r.name, highlight: true }],
+                      confirmLabel: 'فعال کن',
+                      onConfirm: async () => {
+                        await r.restore(r.id)
+                        showToast('success', 'فعال شد')
+                        await loadData()
+                      },
+                    })
+                  }}
+                  className="flex items-center gap-1.5 shrink-0"
+                >
+                  <RotateCcw size={14} /> فعال‌سازی
+                </Button>
+              </Card>
+            ))}
+          </div>
+        )
+      )}
 
       {tab === 'patients' && (
         filteredPatients.length === 0 ? (

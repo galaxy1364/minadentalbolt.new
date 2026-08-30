@@ -258,7 +258,7 @@ function BottomTabBar() {
   return (
     <>
       <nav className="fixed bottom-0 left-0 right-0 z-40 tab-bar pb-safe">
-        <div className="flex items-stretch h-16">
+        <div className="flex items-stretch h-[4.5rem]">
           {visiblePrimary.map((item: ModuleIdentity) => {
             const Icon = item.icon
             const active = isActive(item.path)
@@ -266,21 +266,27 @@ function BottomTabBar() {
               <button
                 key={item.path}
                 onClick={() => { h.select(); navigate(item.path) }}
-                className={`flex-1 flex flex-col items-center justify-center gap-0.5 transition-all-smooth ${
-                  active ? '' : 'text-slate-400 hover:text-slate-600 dark:hover:text-slate-300'
-                }`}
-                style={active ? { color: item.color } : undefined}
+                className="flex-1 flex flex-col items-center justify-center gap-0.5 transition-all-smooth"
+                // Every module keeps its own colour, not just the active
+                // one. Grey icons made the bar read as one undifferentiated
+                // strip; colour is how you find the module you want without
+                // reading five labels at 10px.
+                style={{ color: active ? item.color : `color-mix(in srgb, ${item.color} 62%, #94a3b8)` }}
               >
-                <div className="relative p-1.5 transition-all-smooth">
-                  <Icon size={active ? 22 : 20} strokeWidth={active ? 2.5 : 1.8} />
+                <div className="relative p-1 transition-all-smooth">
+                  {/* Bigger: 20px was below the size an icon can carry a
+                      recognisable shape at, so the custom glyphs read as
+                      smudges on a phone. */}
+                  <Icon size={active ? 28 : 25} strokeWidth={active ? 2.4 : 1.9} />
                   {item.path === '/billing' && debtorCount > 0 && (
                     <span className="absolute -top-1 -left-1 min-w-[16px] h-4 px-1 rounded-full bg-error-500 text-white text-[9px] font-bold flex items-center justify-center border border-white dark:border-slate-900">
                       {debtorCount > 99 ? '99+' : debtorCount}
                     </span>
                   )}
                 </div>
-                <span className={`text-[10px] font-medium leading-none ${active ? '' : 'text-slate-400 dark:text-slate-500'}`}
-                  style={active ? { color: item.color } : undefined}
+                <span
+                  className="text-[10px] font-medium leading-none"
+                  style={{ color: active ? item.color : `color-mix(in srgb, ${item.color} 55%, #94a3b8)` }}
                 >
                   {item.label}
                 </span>
@@ -292,10 +298,10 @@ function BottomTabBar() {
             className={`flex-1 flex flex-col items-center justify-center gap-0.5 transition-all-smooth ${
               isMoreActive ? '' : 'text-slate-400 hover:text-slate-600 dark:hover:text-slate-300'
             }`}
-            style={isMoreActive && currentMod ? { color: currentMod.color } : undefined}
+            style={{ color: isMoreActive && currentMod ? currentMod.color : 'var(--module-color, #64748b)' }}
           >
-            <div className="p-1.5 transition-all-smooth">
-              <MoreHorizontal size={isMoreActive ? 22 : 20} strokeWidth={isMoreActive ? 2.5 : 1.8} />
+            <div className="p-1 transition-all-smooth">
+              <MoreHorizontal size={isMoreActive ? 28 : 25} strokeWidth={isMoreActive ? 2.4 : 1.9} />
             </div>
             <span className={`text-[10px] font-medium leading-none ${isMoreActive ? '' : 'text-slate-400 dark:text-slate-500'}`}
               style={isMoreActive && currentMod ? { color: currentMod.color } : undefined}
