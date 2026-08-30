@@ -46,7 +46,20 @@ export function calcPatientBalance(
   // forever with no way to correct it.
   const billableTreatments = treatments.filter((t) => t.status !== 'cancelled')
   const treatmentCost = billableTreatments.reduce((s, t) => s + (t.total_price || 0), 0)
-  const paid = payments.filter((p) => p.status === 'completed').reduce((s, p) => s + (p.amount || 0), 0)
+  // Implant-linked payments are excluded here because they are already
+  // counted through implant_cases.paid_amount below.
+  //
+  // createPayment() adds the amount onto the case's paid_amount, so the
+  // case mirrors the payment ledger rather than being an independent
+  // figure. Summing both counted every implant payment twice: a patient
+  // who paid 5m toward an implant read as having paid 10m, and their
+  // balance came out 5m LOWER than the truth — the clinic believing it
+  // is owed less than it is. Found by the ledger invariant test in
+  // doctorLedger.test.ts, which requires the per-doctor rows to sum to
+  // exactly this function's result.
+  const paid = payments
+    .filter((p) => p.status === 'completed' && !p.implant_case_id)
+    .reduce((s, p) => s + (p.amount || 0), 0)
   const implantCost = implantCases.reduce((s, c) => s + (c.total_cost || 0), 0)
   const implantPaid = implantCases.reduce((s, c) => s + (c.paid_amount || 0), 0)
   const totalCost = treatmentCost + implantCost

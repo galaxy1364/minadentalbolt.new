@@ -2,9 +2,10 @@
 import { InsurancePanel } from '../components/InsurancePanel'
 import { PatientAlerts } from '../components/PatientAlerts'
 import { buildPatientAlerts, alertChips } from '../lib/patientAlerts'
+import { buildDoctorLedger } from '../lib/doctorLedger'
 import { useState, useEffect, useCallback } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { ArrowRight, Edit2, Phone, Mail, MapPin, Calendar, CreditCard, Activity, FileText, Image as ImageIcon, Shield, Pill, Smile, Award, AlertCircle, Clock, CheckCircle2, Layers, Plus, Trash2, FileSignature, Printer, Bone, FlaskConical } from 'lucide-react'
+import { ArrowRight, Edit2, Phone, Mail, MapPin, Calendar, CreditCard, Activity, FileText, Image as ImageIcon, Shield, Pill, Smile, Award, AlertCircle, Clock, CheckCircle2, Layers, Plus, Trash2, FileSignature, Printer, Bone, FlaskConical, Stethoscope } from 'lucide-react'
 import { fetchPatient, updatePatient, fetchTimeline, fetchTreatments, fetchAppointments, fetchPayments, fetchToothRecords, createToothRecord, updateToothRecord, fetchPrescriptions, fetchRadiologyImages, fetchEncounters, fetchDoctors, fetchImplantCases, fetchTreatmentPhases, createTreatmentPhase, updateTreatmentPhase, fetchConsentForms, createConsentForm, updateConsentForm, fetchLabOrders, updateTreatment } from '../lib/api'
 import { toJalaliString, toJalaliStringPretty, formatCurrency, toPersianDigits, formatTime } from '../lib/persianDate'
 import { calcPatientBalance } from '../lib/finance'
@@ -368,6 +369,11 @@ export default function PatientDetail() {
   // chips beside the name. The cards can be dismissed; these cannot, so a
   // fact stays visible for the whole visit.
   const patientAlerts = patient ? buildPatientAlerts(patient, { balance: patientBalance }) : []
+
+  // COMP-127 — which doctor inside this file is owed what. The single
+  // patient balance answers "does this person owe us"; a multi-doctor
+  // clinic settles on "who is owed", which is a different question.
+  const doctorLedger = buildDoctorLedger(treatments, payments, encounters, implantCases)
   const headerChips = alertChips(patientAlerts)
 
   // ── Staged treatment plan (phases) ──────────────────────────────
@@ -1386,6 +1392,65 @@ export default function PatientDetail() {
   // Render: Payments Tab
   // ===========================================================================
 
+  /** Per-doctor account inside this one file. Only shown once more than
+   * one party is involved — on a single-doctor file the table would just
+   * repeat the summary below it. */
+  const renderDoctorLedger = () => {
+    if (doctorLedger.rows.length < 2) return null
+    const fmt = (n: number) => `${formatCurrency(n)} ت`
+    return (
+      <Card className="p-4">
+        <h3 className="text-sm font-bold text-slate-700 mb-3 flex items-center gap-2">
+          <Stethoscope size={16} /> خلاصه حساب پزشکان معالج
+        </h3>
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="text-slate-500 text-xs">
+                <th className="text-right font-medium pb-2">پزشک</th>
+                <th className="text-left font-medium pb-2">هزینه</th>
+                <th className="text-left font-medium pb-2">پرداختی</th>
+                <th className="text-left font-medium pb-2">مانده</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-100">
+              {doctorLedger.rows.map((row) => (
+                <tr key={row.doctorId ?? 'unattributed'}>
+                  <td className="py-2 text-right">
+                    {row.doctorId === null
+                      ? <span className="text-slate-500">نامشخص</span>
+                      : getDoctorName(row.doctorId)}
+                  </td>
+                  <td className="py-2 text-left" dir="ltr">{fmt(row.cost)}</td>
+                  <td className="py-2 text-left" dir="ltr">{fmt(row.paid)}</td>
+                  <td className={`py-2 text-left font-bold ${row.balance > 0 ? 'text-error-600' : 'text-slate-700'}`} dir="ltr">
+                    {fmt(row.balance)}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+            <tfoot>
+              <tr className="border-t-2 border-slate-200 font-bold">
+                <td className="pt-2 text-right">مجموع</td>
+                <td className="pt-2 text-left" dir="ltr">{fmt(doctorLedger.totals.cost)}</td>
+                <td className="pt-2 text-left" dir="ltr">{fmt(doctorLedger.totals.paid)}</td>
+                <td className="pt-2 text-left" dir="ltr">{fmt(doctorLedger.totals.balance)}</td>
+              </tr>
+            </tfoot>
+          </table>
+        </div>
+        {doctorLedger.hasUnattributed && (
+          // Said out loud rather than hidden: a payment with no encounter
+          // cannot be tied to a doctor, and spreading it across them
+          // would produce a table that balances and is wrong.
+          <p className="mt-3 text-xs text-amber-700">
+            ⚠ بخشی از پرداخت‌ها به هیچ ویزیتی وصل نیست، پس قابل انتساب به پزشک نبود و در ردیف «نامشخص» آمده.
+          </p>
+        )}
+      </Card>
+    )
+  }
+
   const renderPayments = () => {
     if (payments.length === 0) {
       return (
@@ -1396,6 +1461,8 @@ export default function PatientDetail() {
     }
     return (
       <div className="space-y-4">
+        {renderDoctorLedger()}
+
         {/* Summary */}
         <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
           <Card className="p-4">

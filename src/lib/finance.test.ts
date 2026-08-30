@@ -137,3 +137,40 @@ describe('calcAllPatientBalances — تفکیک بین بیماران', () => {
     expect(byPatient.get('p9')!.balance).toBe(10_000_000)
   })
 })
+
+describe('پرداخت ایمپلنت نباید دوبار شمرده شود', () => {
+  /** createPayment() مبلغ را روی implant_cases.paid_amount هم اضافه
+   * می‌کند، پس ردیف پرداخت و paid_amount یک پول‌اند نه دو تا. */
+  const implantPay = (patient_id: string, amount: number, implant_case_id: string): Payment =>
+    ({ patient_id, amount, status: 'completed', implant_case_id } as Payment)
+
+  it('پرداخت متصل به ایمپلنت فقط یک بار در «پرداخت‌شده» می‌آید', () => {
+    // بیمار ۵ میلیون بابت ایمپلنت داده. اگر دوبار شمرده شود، «۱۰
+    // میلیون پرداخت کرده» خوانده می‌شود و مانده‌اش ۵ میلیون کمتر از
+    // واقعیت درمی‌آید — یعنی کلینیک فکر می‌کند کمتر طلبکار است.
+    const r = calcPatientBalance(
+      [implantPay('p1', 5_000_000, 'i1')],
+      [],
+      [implant('p1', 20_000_000, 5_000_000)],
+    )
+    expect(r.paid).toBe(5_000_000)
+    expect(r.balance).toBe(15_000_000)
+  })
+
+  it('پرداخت عادی کنار پرداخت ایمپلنت هر دو درست جمع می‌شوند', () => {
+    const r = calcPatientBalance(
+      [pay('p1', 300_000), implantPay('p1', 5_000_000, 'i1')],
+      [treat('p1', 1_000_000)],
+      [implant('p1', 20_000_000, 5_000_000)],
+    )
+    expect(r.totalCost).toBe(21_000_000)
+    expect(r.paid).toBe(5_300_000)
+    expect(r.balance).toBe(15_700_000)
+  })
+
+  it('پرونده‌ی بدون ایمپلنت دست‌نخورده می‌ماند', () => {
+    const r = calcPatientBalance([pay('p1', 400_000)], [treat('p1', 1_000_000)])
+    expect(r.paid).toBe(400_000)
+    expect(r.balance).toBe(600_000)
+  })
+})
