@@ -9,11 +9,14 @@ import { BarChart, Bar, XAxis, YAxis, Tooltip as RTooltip, ResponsiveContainer, 
 import {
   fetchEncounters, fetchTreatments, fetchProcedures, fetchPatients, fetchDoctors,
   fetchLabs, fetchToothRecords, createEncounter, updateEncounter, createTreatment,
+  fetchPatientPolicies, fetchInsuranceClaims,
   updateTreatment, createLabOrder, fetchLabOrders, updateLabOrder,
   createToothRecord, updateToothRecord,
 } from '../lib/api'
+import { selectApplicablePolicy, splitCoverage } from '../lib/insurance'
+import type { PatientPolicy } from '../lib/insurance'
 import { toJalaliString, toJalaliStringPretty, formatCurrency, formatNumber, toPersianDigits } from '../lib/persianDate'
-import { Encounter, EncounterWithRelations, Treatment, Procedure, Patient, Doctor, Laboratory, ToothRecord, LabOrder } from '../types'
+import { Encounter, EncounterWithRelations, Treatment, Procedure, Patient, Doctor, Laboratory, ToothRecord, LabOrder, InsuranceClaim } from '../types'
 import { Card, Button, Badge, Spinner, EmptyState, Tabs, Input, Select, Textarea, Modal, Wizard, showToast } from '../components/ui'
 import { PersianDateInput } from '../components/PersianDateInput'
 import { PalmerToothPicker } from '../components/PalmerToothPicker'
@@ -256,6 +259,11 @@ export default function Treatments() {
   }
 
   const [treatPatientId, setTreatPatientId] = useState<string | null>(null)
+  // Insurance context for the patient currently being treated. Loaded
+  // lazily when the treatment form opens rather than up-front for every
+  // patient in the list — this page can hold hundreds of encounters.
+  const [treatPolicies, setTreatPolicies] = useState<PatientPolicy[]>([])
+  const [treatClaims, setTreatClaims] = useState<InsuranceClaim[]>([])
   const [savingTreat, setSavingTreat] = useState(false)
   const [treatForm, setTreatForm] = useState({
     procedure_code: '', procedure_name: '', procedure_category: '',
@@ -633,6 +641,37 @@ export default function Treatments() {
     }
   }
 
+  useEffect(() => {
+    if (!treatPatientId) { setTreatPolicies([]); setTreatClaims([]); return }
+    let cancelled = false
+    void (async () => {
+      const [pols, cls] = await Promise.all([fetchPatientPolicies(treatPatientId), fetchInsuranceClaims()])
+      if (cancelled) return
+      setTreatPolicies(pols.filter((p) => p.is_active))
+      setTreatClaims(cls.filter((c) => c.patient_id === treatPatientId))
+    })()
+    return () => { cancelled = true }
+  }, [treatPatientId])
+
+  /** The split the insurer will actually honour for the amount currently
+   * typed in the form — recomputed live so the doctor sees the ceiling
+   * bite before committing, not after the claim is rejected.
+   *
+   * Priced against the ENCOUNTER date, not today. A visit entered a week
+   * late must be split the way it stood on the day of treatment: a policy
+   * that has since expired still covered it, and one that started since
+   * did not. Falls back to today only when the encounter cannot be found,
+   * which is the same date the row would be created with anyway. */
+  const insuranceSplit = useMemo(() => {
+    const total = (Number(treatForm.quantity) || 1) * (Number(treatForm.unit_price) || 0) - (Number(treatForm.discount) || 0)
+    if (total <= 0) return null
+    const enc = encounters.find((e) => e.id === treatEncounterId)
+    const onDate = (enc?.encounter_date || new Date().toISOString()).slice(0, 10)
+    const policy = selectApplicablePolicy(treatPolicies, treatClaims, onDate)
+    if (!policy) return null
+    return splitCoverage(total, policy, treatClaims, onDate)
+  }, [treatForm.quantity, treatForm.unit_price, treatForm.discount, treatPolicies, treatClaims, treatEncounterId, encounters])
+
   const calcTotal = () => {
     const qty = Number(treatForm.quantity) || 1
     const price = Number(treatForm.unit_price) || 0
@@ -665,6 +704,13 @@ export default function Treatments() {
       { label: 'دندان', value: treatForm.tooth_number ? toPersianDigits(treatForm.tooth_number) : '-' },
       { label: 'هزینه کل', value: `${formatCurrency(total)} ت` },
     ]
+    // Surfaced at the point of commit: if the ceiling caps the insurer's
+    // share, the doctor must see the real patient share before agreeing
+    // to the price, not after the claim comes back short.
+    if (insuranceSplit) {
+      fields.push({ label: 'سهم بیمه', value: `${formatCurrency(insuranceSplit.insuranceShare)} ت` })
+      fields.push({ label: 'سهم بیمار', value: `${formatCurrency(insuranceSplit.patientShare)} ت`, highlight: insuranceSplit.cappedByCeiling })
+    }
     if (treatForm.has_lab && treatForm.lab_id) {
       const lab = labs.find((l) => l.id === treatForm.lab_id)
       fields.push({ label: 'لابراتوار', value: lab?.name || '-', highlight: true })
@@ -673,6 +719,7 @@ export default function Treatments() {
     confirmAction({
       type: editingTreat ? 'edit' : 'create',
       title: editingTreat ? 'ویرایش درمان' : 'درمان جدید',
+      warning: insuranceSplit?.warning || undefined,
       fields,
       confirmLabel: editingTreat ? 'ذخیره' : 'ثبت درمان',
       onConfirm: async () => {
@@ -1236,6 +1283,24 @@ export default function Treatments() {
                   </div>
                   <Select label="وضعیت" value={treatForm.status} onChange={(v) => setTreatForm((p) => ({ ...p, status: v }))} options={treatmentStatuses} />
                 </div>
+                {/* Live insurance split. Shown here as well as in the
+                    confirm dialog so the doctor can adjust the price
+                    while quoting, instead of discovering the ceiling
+                    only at the moment of commit. */}
+                {insuranceSplit && (
+                  <div className={`rounded-xl p-3 border ${insuranceSplit.cappedByCeiling ? 'bg-amber-50 border-amber-200' : 'bg-slate-50 border-slate-200'}`}>
+                    <div className="flex flex-wrap gap-x-5 gap-y-1 text-sm">
+                      <span>سهم بیمه: <b className="text-emerald-700">{formatCurrency(insuranceSplit.insuranceShare)} ت</b></span>
+                      <span>سهم بیمار: <b className="text-slate-800">{formatCurrency(insuranceSplit.patientShare)} ت</b></span>
+                      {insuranceSplit.remainingAfter !== null && (
+                        <span className="text-slate-500">مانده سقف پس از این درمان: {formatCurrency(insuranceSplit.remainingAfter)} ت</span>
+                      )}
+                    </div>
+                    {insuranceSplit.warning && (
+                      <p className="mt-2 text-xs text-amber-800">⚠ {insuranceSplit.warning}</p>
+                    )}
+                  </div>
+                )}
               </>
             ),
           },

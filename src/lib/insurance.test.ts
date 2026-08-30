@@ -278,3 +278,80 @@ describe('validatePolicy', () => {
     expect(validatePolicy({ coverage_percentage: 60, ceiling_amount: null })).toEqual([])
   })
 })
+
+// ── Regression guards for the treatment-form integration ────────────────
+// These lock the exact behaviours the form now depends on, so a future
+// refactor of splitCoverage cannot silently change what a doctor is
+// quoted at the chair.
+describe('treatment form integration', () => {
+  const pol = policy({ coverage_percentage: 60, ceiling_amount: 100_000_000 })
+
+  it('a treatment costing exactly the remaining ceiling is fully covered at 100%', () => {
+    const full = policy({ coverage_percentage: 100, ceiling_amount: 10_000_000 })
+    const r = splitCoverage(10_000_000, full, [], DATE)
+    expect(r.insuranceShare).toBe(10_000_000)
+    expect(r.patientShare).toBe(0)
+    expect(r.cappedByCeiling).toBe(false)
+    expect(r.remainingAfter).toBe(0)
+  })
+
+  it('remainingAfter never goes negative, so the banner cannot show a minus', () => {
+    const claims = [claim({ approved_amount: 99_000_000 })]
+    const r = splitCoverage(50_000_000, pol, claims, DATE)
+    expect(r.remainingAfter).toBe(0)
+    expect(r.remainingAfter! >= 0).toBe(true)
+  })
+
+  it('a zero-cost line yields a zero split rather than a warning', () => {
+    const r = splitCoverage(0, pol, [], DATE)
+    expect(r.insuranceShare).toBe(0)
+    expect(r.patientShare).toBe(0)
+    expect(r.warning).toBeNull()
+  })
+
+  it('a discount that drives the total below zero cannot pay the patient', () => {
+    // The form computes qty*price-discount; an over-large discount must
+    // not flip into the clinic owing the patient money.
+    const r = splitCoverage(-250_000, pol, [], DATE)
+    expect(r.patientShare).toBe(0)
+    expect(r.insuranceShare).toBe(0)
+  })
+
+  it('the warning text is present exactly when the share was capped', () => {
+    const uncapped = splitCoverage(1_000_000, pol, [], DATE)
+    expect(uncapped.cappedByCeiling).toBe(false)
+    expect(uncapped.warning).toBeNull()
+
+    const capped = splitCoverage(50_000_000, pol, [claim({ approved_amount: 95_000_000 })], DATE)
+    expect(capped.cappedByCeiling).toBe(true)
+    expect(capped.warning).not.toBeNull()
+  })
+
+  it('no applicable policy means the form shows no banner at all', () => {
+    // selectApplicablePolicy returning null is the form's signal to
+    // render nothing, rather than a misleading "0 covered" banner.
+    expect(selectApplicablePolicy([policy({ is_active: false })], [], DATE)).toBeNull()
+  })
+
+  it('a visit entered late is split as the policy stood on the visit date', () => {
+    // MOD-FEAT-006 originally priced against new Date(). A treatment
+    // recorded a week after the visit would then be split against a
+    // policy that had since lapsed. The form now passes the encounter
+    // date, so these two calls must disagree.
+    const lapsing = policy({ start_date: '2026-01-01', end_date: '2026-08-05' })
+    const onVisitDay = splitCoverage(1_000_000, lapsing, [], '2026-08-01')
+    const enteredLate = splitCoverage(1_000_000, lapsing, [], '2026-08-20')
+
+    expect(onVisitDay.insuranceShare).toBeGreaterThan(0)
+    expect(enteredLate.insuranceShare).toBe(0)
+    expect(enteredLate.warning).not.toBeNull()
+  })
+
+  it('a policy starting after the visit does not cover that visit', () => {
+    // The mirror case: back-dating must not hand out cover that did not
+    // exist yet on the day of treatment.
+    const future = policy({ start_date: '2026-08-10', end_date: '2027-08-10' })
+    expect(selectApplicablePolicy([future], [], '2026-08-01')).toBeNull()
+    expect(splitCoverage(1_000_000, future, [], '2026-08-01').insuranceShare).toBe(0)
+  })
+})
