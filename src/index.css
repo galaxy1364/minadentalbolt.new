@@ -254,6 +254,40 @@ input, textarea, select { font-size: 16px !important; }
 .dock-scroll { overflow-x: auto; overflow-y: hidden; scrollbar-width: none; -ms-overflow-style: none; }
 .dock-scroll::-webkit-scrollbar { display: none; }
 
+/* ── Time-slot rail ──────────────────────────────────────
+   The slot strip used flex-wrap, so 26 buttons became several ragged
+   rows that the page scrolled through in both directions at once —
+   there was nothing to follow with a thumb. One row, one axis, and
+   each chip snaps so a half-scrolled tap cannot land between two
+   times. */
+.slot-rail {
+  display: flex;
+  gap: 0.5rem;
+  overflow-x: auto;
+  overflow-y: hidden;
+  scroll-snap-type: x mandatory;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior-x: contain;
+  padding-block: 0.25rem;
+  scroll-padding-inline: 0.75rem;
+}
+.slot-rail > * {
+  scroll-snap-align: center;
+  flex: 0 0 auto;
+}
+/* A visible track, because a rail with no edge reads as a wrapped grid
+   that happens to be cut off. */
+.slot-rail {
+  scrollbar-width: thin;
+  scrollbar-color: rgb(203 213 225) transparent;
+}
+.slot-rail::-webkit-scrollbar { height: 4px; }
+.slot-rail::-webkit-scrollbar-track { background: rgb(241 245 249); border-radius: 999px; }
+.slot-rail::-webkit-scrollbar-thumb { background: rgb(203 213 225); border-radius: 999px; }
+@media (prefers-reduced-motion: reduce) {
+  .slot-rail { scroll-behavior: auto; }
+}
+
 /* ── Safe area bottom padding ───────────────────────── */
 .pb-safe { padding-bottom: env(safe-area-inset-bottom, 0px); }
 .mb-safe { margin-bottom: env(safe-area-inset-bottom, 0px); }

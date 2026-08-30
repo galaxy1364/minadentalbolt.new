@@ -5,6 +5,7 @@ import { fetchAppointments, createAppointment, updateAppointment, checkConflict,
 import { toJalaliString, toJalaliStringPretty, getJalaliDateInfo, formatTime, formatCurrency, toPersianDigits, persianWeekdaysShort, getHoliday, jsDateToPersianWeekday } from '../lib/persianDate'
 import { doctorColor } from '../lib/doctorColors'
 import { summariseDay, shiftsCapacityMinutes } from '../lib/dayMetrics'
+import { generateSlots, slotAvailability, defaultEndTime, addMinutes, firstBookableSlot } from '../lib/timeSlots'
 import { Appointment, AppointmentWithRelations, Patient, Doctor, Unit, DoctorSchedule } from '../types'
 import { Modal, Card, Button, Input, Select, Textarea, EmptyState, showToast, Badge } from '../components/ui'
 import { ModuleHeader } from '../components/ModuleHeader'
@@ -36,6 +37,13 @@ const statusMeta: Record<string, { label: string; bg: string; color: string }> =
   completed:  { label: 'تکمیل شد',     bg: 'bg-success-100',color: 'text-success-700' },
   cancelled:  { label: 'لغو شد',        bg: 'bg-error-100',  color: 'text-error-700' },
   no_show:    { label: 'غیبت',          bg: 'bg-error-100',  color: 'text-error-700' },
+}
+
+/** Minutes since midnight, 0 when unparseable — used only to work out
+ * how long the appointment currently is. */
+function toMinutesSafe(hhmm: string): number {
+  const m = /^(\d{1,2}):(\d{2})/.exec(hhmm || '')
+  return m ? Number(m[1]) * 60 + Number(m[2]) : 0
 }
 
 const filterTabs = [
@@ -933,24 +941,125 @@ export default function Appointments() {
                   />
                 </div>
                 <div className="grid grid-cols-2 gap-3">
-                  <Input label="ساعت شروع *" type="time" value={wizardData.start_time} onChange={(v) => setWizardData((p) => ({ ...p, start_time: v }))} />
+                  <Input
+                    label="ساعت شروع *"
+                    type="time"
+                    value={wizardData.start_time}
+                    onChange={(v) => setWizardData((p) => {
+                      // Keep the appointment the same length when the
+                      // start moves, and never let the end roll past
+                      // midnight — the old code built it as hour + 1, so
+                      // 23:30 produced "24:00".
+                      const len = Math.max(15, toMinutesSafe(p.end_time) - toMinutesSafe(p.start_time) || 30)
+                      return { ...p, start_time: v, end_time: addMinutes(v, len) }
+                    })}
+                  />
                   <Input label="ساعت پایان *" type="time" value={wizardData.end_time} onChange={(v) => setWizardData((p) => ({ ...p, end_time: v }))} />
                 </div>
-                {/* Quick time slots */}
-                <div>
-                  <p className="text-xs font-semibold text-slate-500 mb-2">ساعت‌های خالی</p>
-                  <div className="flex items-center gap-2 flex-wrap">
-                    {['09:00', '09:30', '10:00', '10:30', '11:00', '11:30', '14:00', '14:30', '15:00', '15:30', '16:00', '16:30', '17:00', '17:30', '18:00', '18:30', '19:00', '19:30', '20:00', '20:30', '21:00', '21:30', '22:00', '22:30', '23:00', '23:30'].map((t) => (
-                      <button
-                        key={t}
-                        onClick={() => { h.select(); setWizardData((p) => ({ ...p, start_time: t, end_time: `${String(parseInt(t.split(':')[0])+1).padStart(2,'0')}:00` })) }}
-                        className={`filter-tab ${wizardData.start_time === t ? 'active' : ''}`}
-                      >
-                        {toPersianDigits(t)}
-                      </button>
-                    ))}
-                  </div>
-                </div>
+                {/* Real free times — see lib/timeSlots.
+                    This strip used to be 26 hard-coded times under the
+                    heading "free times". It was the same list for every
+                    doctor and every day, ignoring the working hours and
+                    ignoring what was already booked, so the most-tapped
+                    control in the app was telling the user something
+                    untrue and the way you found out was a conflict
+                    warning after you had already chosen. */}
+                {(() => {
+                  const weekday = jsDateToPersianWeekday(new Date(wizardData.date))
+                  const dayShifts = schedules.filter((sc) =>
+                    sc.day_of_week === weekday &&
+                    (!wizardData.doctor_id || sc.doctor_id === wizardData.doctor_id))
+                  const duration = Math.max(
+                    15,
+                    (toMinutesSafe(wizardData.end_time) - toMinutesSafe(wizardData.start_time)) || 30,
+                  )
+                  const slots = generateSlots(dayShifts, duration)
+                  const dayAppointments = appointments.filter((a) =>
+                    a.date === wizardData.date &&
+                    a.id !== editingAppt?.id &&
+                    (!wizardData.doctor_id || a.doctor_id === wizardData.doctor_id))
+                  const now = new Date()
+                  const states = slotAvailability(slots, dayAppointments, duration, {
+                    isToday: wizardData.date === todayStr,
+                    nowMinutes: now.getHours() * 60 + now.getMinutes(),
+                  })
+                  const free = states.filter((st) => !st.taken && !st.past)
+
+                  if (dayShifts.length === 0) {
+                    // An explicit reason beats a fake list: the times are
+                    // missing because no shift is defined, not because
+                    // the day is full.
+                    return (
+                      <p className="text-xs text-slate-500">
+                        برنامه‌ی کاری این پزشک برای این روز ثبت نشده — ساعت را دستی وارد کنید.
+                      </p>
+                    )
+                  }
+
+                  return (
+                    <div>
+                      <p className="text-xs font-semibold text-slate-500 mb-2">
+                        ساعت‌های خالی
+                        <span className="font-normal text-slate-400">
+                          {' '}({toPersianDigits(free.length)} از {toPersianDigits(states.length)})
+                        </span>
+                      </p>
+                      {free.length === 0 ? (
+                        <p className="text-xs text-amber-700">این روز برای این پزشک پر است.</p>
+                      ) : (
+                        <>
+                        {/* The currently typed start is not bookable, so
+                            offer the nearest one that is instead of
+                            letting the user find out at the conflict
+                            check two steps later. */}
+                        {!free.some((st) => st.time === wizardData.start_time) && (() => {
+                          const suggestion = firstBookableSlot(states, wizardData.start_time)
+                          if (!suggestion) return null
+                          return (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                h.select()
+                                setWizardData((p) => ({
+                                  ...p,
+                                  start_time: suggestion,
+                                  end_time: defaultEndTime(suggestion, dayShifts, duration),
+                                }))
+                              }}
+                              className="mb-2 text-xs text-primary-700 underline"
+                            >
+                              نزدیک‌ترین ساعت خالی: {toPersianDigits(suggestion)} — انتخاب کن
+                            </button>
+                          )
+                        })()}
+                        <div className="slot-rail" role="listbox" aria-label="ساعت‌های خالی">
+                          {states.map((st) => (
+                            <button
+                              key={st.time}
+                              type="button"
+                              role="option"
+                              aria-selected={wizardData.start_time === st.time}
+                              disabled={st.taken || st.past}
+                              title={st.taken ? 'رزرو شده' : st.past ? 'گذشته' : undefined}
+                              onClick={() => {
+                                h.select()
+                                setWizardData((p) => ({
+                                  ...p,
+                                  start_time: st.time,
+                                  end_time: defaultEndTime(st.time, dayShifts, duration),
+                                }))
+                              }}
+                              className={`filter-tab ${wizardData.start_time === st.time ? 'active' : ''} ${st.taken || st.past ? 'opacity-40 line-through cursor-not-allowed' : ''}`}
+                            >
+                              {toPersianDigits(st.time)}
+                            </button>
+                          ))}
+                        </div>
+                        </>
+                      )}
+                    </div>
+                  )
+                })()}
                 {/* Selected date summary */}
                 <div className="flex items-center gap-3 p-3 rounded-2xl bg-primary-50 border border-primary-100">
                   <Calendar size={20} className="text-primary-600 flex-shrink-0" />
