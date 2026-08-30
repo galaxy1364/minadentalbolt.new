@@ -14,6 +14,8 @@ import {
   createToothRecord, updateToothRecord,
 } from '../lib/api'
 import { selectApplicablePolicy, splitCoverage } from '../lib/insurance'
+import { procedureDefaultPrice } from '../lib/selectionHints'
+import { buildPatientAlerts, alertChips } from '../lib/patientAlerts'
 import type { PatientPolicy } from '../lib/insurance'
 import { toJalaliString, toJalaliStringPretty, formatCurrency, formatNumber, toPersianDigits } from '../lib/persianDate'
 import { Encounter, EncounterWithRelations, Treatment, Procedure, Patient, Doctor, Laboratory, ToothRecord, LabOrder, InsuranceClaim } from '../types'
@@ -628,17 +630,29 @@ export default function Treatments() {
     setTreatModalOpen(true)
   }
 
+  /** Set when the chosen procedure carries no price, so the form can say
+   * so instead of opening an empty field with no explanation. */
+  const [priceMissing, setPriceMissing] = useState<string | null>(null)
+
   const handleProcedureSelect = (procCode: string) => {
     h.select()
     const proc = procedures.find((p) => p.code === procCode)
-    if (proc) {
-      setTreatForm((f) => ({
-        ...f, procedure_code: proc.code, procedure_name: proc.name,
-        procedure_category: proc.category || '',
-        unit_price: proc.default_price ? String(proc.default_price) : '',
-        total_price: proc.default_price ? String(proc.default_price) : '',
-      }))
-    }
+    if (!proc) return
+
+    // Reported in START-HERE as slowing bulk entry: procedures with no
+    // default_price leave the field blank with no hint that the price is
+    // missing rather than zero. It is still left blank on purpose — a
+    // zero prefilled here reads as a real price, and that is how a
+    // treatment gets saved free of charge.
+    const { price, missing } = procedureDefaultPrice(proc)
+    setPriceMissing(missing ? proc.name : null)
+
+    setTreatForm((f) => ({
+      ...f, procedure_code: proc.code, procedure_name: proc.name,
+      procedure_category: proc.category || '',
+      unit_price: missing ? '' : String(price),
+      total_price: missing ? '' : String(price),
+    }))
   }
 
   useEffect(() => {
@@ -1274,7 +1288,14 @@ export default function Treatments() {
                   ]} placeholder="انتخاب سطح..." />
                 <div className="grid grid-cols-3 gap-3">
                   <Input label="تعداد" value={treatForm.quantity} onChange={(v) => setTreatForm((p) => ({ ...p, quantity: v }))} type="number" dir="ltr" />
-                  <CurrencyInput label="قیمت واحد (ت)" value={treatForm.unit_price} onChange={(v) => setTreatForm((p) => ({ ...p, unit_price: v }))} />
+                  <div>
+                    <CurrencyInput label="قیمت واحد (ت)" value={treatForm.unit_price} onChange={(v) => setTreatForm((p) => ({ ...p, unit_price: v }))} />
+                    {priceMissing && !treatForm.unit_price && (
+                      <p className="mt-1 text-xs text-amber-700">
+                        برای «{priceMissing}» قیمت پایه ثبت نشده — دستی وارد کنید یا در تنظیمات رویه‌ها اضافه کنید.
+                      </p>
+                    )}
+                  </div>
                   <Input label="تخفیف (ت)" value={treatForm.discount} onChange={(v) => setTreatForm((p) => ({ ...p, discount: v }))} type="number" dir="ltr" />
                 </div>
                 <div className="grid grid-cols-2 gap-3">
@@ -1370,16 +1391,43 @@ export default function Treatments() {
 
       <Modal open={quickTreatModalOpen} onClose={() => setQuickTreatModalOpen(false)} title={quickModalMode === 'visit' ? 'ویزیت جدید' : 'شروع درمان مستقیم'}>
         <div className="space-y-4 p-1">
-          <p className="text-xs text-slate-500">
-            {quickModalMode === 'visit'
-              ? 'فقط بیمار را انتخاب کنید — بلافاصله وارد چارت دندانی کامل می‌شوید تا وضعیت همه‌ی دندان‌ها را مرور و ثبت کنید.'
-              : 'فقط بیمار را انتخاب کنید — بلافاصله وارد ثبت درمان می‌شوید تا دندان و رویه‌ی درمانی را مستقیم ثبت کنید، بدون فرم‌های اضافه.'}
-          </p>
+          {/* The two modes were the same white form with one word changed,
+              so nothing on screen told you which one you had opened —
+              and they lead to genuinely different places: a full-mouth
+              survey, or straight into recording one treatment. Each mode
+              now carries its own colour, icon and a line saying what
+              happens when you press the button. */}
+          <div className={`rounded-2xl p-3.5 border ${quickModalMode === 'visit'
+            ? 'bg-primary-50 border-primary-200'
+            : 'bg-accent-50 border-accent-200'}`}
+          >
+            <div className="flex items-center gap-2 mb-1.5">
+              <span className={`w-8 h-8 rounded-xl flex items-center justify-center text-white ${quickModalMode === 'visit' ? 'bg-primary-600' : 'bg-accent-600'}`}>
+                {quickModalMode === 'visit' ? <ClipboardList size={16} /> : <Stethoscope size={16} />}
+              </span>
+              <p className={`text-sm font-bold ${quickModalMode === 'visit' ? 'text-primary-800' : 'text-accent-800'}`}>
+                {quickModalMode === 'visit' ? 'مرور کامل دهان' : 'ثبت مستقیم یک درمان'}
+              </p>
+            </div>
+            <p className={`text-xs leading-6 ${quickModalMode === 'visit' ? 'text-primary-900/80' : 'text-accent-900/80'}`}>
+              {quickModalMode === 'visit'
+                ? 'چارت کامل باز می‌شود تا وضعیت همه‌ی دندان‌ها را مرور کنید و کارهایی که باید انجام شود را جمع کنید.'
+                : 'مستقیم وارد ثبت درمان می‌شوید تا دندان و رویه را ثبت کنید، بدون مرور کل دهان.'}
+            </p>
+          </div>
           <Select
             label="بیمار *"
             value={quickTreatPatientId}
             onChange={setQuickTreatPatientId}
-            options={patients.filter((p) => p.is_active).map((p) => ({ value: p.id, label: `${p.first_name} ${p.last_name}` }))}
+            options={patients.filter((p) => p.is_active).map((p) => {
+              // Same warnings as the booking picker: a clinician about to
+              // treat should see an allergy before choosing, not after.
+              const chips = alertChips(buildPatientAlerts(p, null), 2)
+              return {
+                value: p.id,
+                label: `${p.first_name} ${p.last_name}${chips.length ? ` ⚠ ${chips.join('، ')}` : ''}`,
+              }
+            })}
             placeholder="انتخاب بیمار..."
           />
           <Select

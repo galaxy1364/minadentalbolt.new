@@ -1,11 +1,14 @@
 import { useState, useEffect, useCallback, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Calendar, Clock, CheckCircle2, User, ChevronRight, ChevronLeft, Plus, Search, Trash2, AlertCircle, Edit2, Stethoscope, DollarSign, FileText, Activity, List, Grid, X, UserPlus, Globe } from 'lucide-react'
-import { fetchAppointments, createAppointment, updateAppointment, checkConflict, fetchPatients, updatePatient, fetchDoctors, fetchUnits, peekNextFileNumber, createPatient, createEncounter, fetchDoctorSchedules, fetchOnlineBookingRequests, rejectBookingRequest } from '../lib/api'
+import { fetchTreatments, fetchPayments, fetchImplantCases, fetchAppointments, createAppointment, updateAppointment, checkConflict, fetchPatients, updatePatient, fetchDoctors, fetchUnits, peekNextFileNumber, createPatient, createEncounter, fetchDoctorSchedules, fetchOnlineBookingRequests, rejectBookingRequest } from '../lib/api'
 import { toJalaliString, toJalaliStringPretty, getJalaliDateInfo, formatTime, formatCurrency, toPersianDigits, persianWeekdaysShort, getHoliday, jsDateToPersianWeekday } from '../lib/persianDate'
 import { doctorColor } from '../lib/doctorColors'
 import { summariseDay, shiftsCapacityMinutes } from '../lib/dayMetrics'
 import { generateSlots, slotAvailability, defaultEndTime, addMinutes, firstBookableSlot } from '../lib/timeSlots'
+import { doctorsForDay, unitAvailability, patientPickerHint } from '../lib/selectionHints'
+import { calcAllPatientBalances } from '../lib/finance'
+import { buildPatientAlerts, alertChips } from '../lib/patientAlerts'
 import { Appointment, AppointmentWithRelations, Patient, Doctor, Unit, DoctorSchedule } from '../types'
 import { Modal, Card, Button, Input, Select, Textarea, EmptyState, showToast, Badge } from '../components/ui'
 import { ModuleHeader } from '../components/ModuleHeader'
@@ -95,12 +98,21 @@ export default function Appointments() {
   const { config, confirmAction, close, ConfirmActionModal } = useConfirmAction()
 
   const [schedules, setSchedules] = useState<DoctorSchedule[]>([])
+  // Read for the patient picker's debt flag. These are local IndexedDB
+  // reads, so the cost is small; the alternative was booking a patient
+  // with no sign that they owe the clinic money.
+  const [balanceInputs, setBalanceInputs] = useState<{ treatments: any[]; payments: any[]; implants: any[] }>({ treatments: [], payments: [], implants: [] })
 
   const loadData = useCallback(async () => {
     setLoading(true)
     try {
-      const [a, p, d, u, br, sch] = await Promise.all([fetchAppointments(), fetchPatients(), fetchDoctors(), fetchUnits(), fetchOnlineBookingRequests().catch(() => []), fetchDoctorSchedules().catch(() => [])])
+      const [a, p, d, u, br, sch, tr, pay, imp] = await Promise.all([
+        fetchAppointments(), fetchPatients(), fetchDoctors(), fetchUnits(),
+        fetchOnlineBookingRequests().catch(() => []), fetchDoctorSchedules().catch(() => []),
+        fetchTreatments().catch(() => []), fetchPayments().catch(() => []), fetchImplantCases().catch(() => []),
+      ])
       setAppointments(a); setPatients(p); setDoctors(d); setUnits(u); setSchedules(sch)
+      setBalanceInputs({ treatments: tr as any[], payments: pay as any[], implants: imp as any[] })
       setBookingRequests(br.filter((r: any) => r.status === 'pending'))
     } catch { showToast('error', 'خطا در بارگذاری نوبت‌ها') }
     finally { setLoading(false) }
@@ -146,6 +158,12 @@ export default function Appointments() {
 
     return { total: today.length, completed, inChair, waiting, day }
   }, [appointments, todayStr, schedules])
+
+  /** One pass for every patient, shared with the picker rows below. */
+  const patientBalances = useMemo(
+    () => calcAllPatientBalances(balanceInputs.payments, balanceInputs.treatments, balanceInputs.implants).byPatient,
+    [balanceInputs],
+  )
 
   const patientSearchResults = useMemo(() => {
     // Archived patients are now findable here too (with a badge marking
@@ -843,6 +861,33 @@ export default function Appointments() {
                               {!p.is_active && <span className="text-[10px] px-1.5 py-0.5 rounded-md bg-slate-100 text-slate-500 font-bold shrink-0">بایگانی</span>}
                             </p>
                             <p className="text-xs text-slate-500">{p.file_number || 'بدون پرونده'}{p.phone ? ` • ${toPersianDigits(p.phone)}` : ''}</p>
+                            {/* Both facts already sat on the record and
+                                neither reached this list. The debt costs
+                                the clinic money; the clinical one is why
+                                the alert cards exist, and whoever books
+                                the appointment should see it before, not
+                                after. */}
+                            {(() => {
+                              const hint = patientPickerHint(
+                                patientBalances.get(p.id)?.balance ?? 0,
+                                alertChips(buildPatientAlerts(p, null), 2),
+                              )
+                              if (!hint.hasWarning) return null
+                              return (
+                                <div className="flex items-center gap-1 flex-wrap mt-1">
+                                  {hint.debt > 0 && (
+                                    <span className="text-[10px] px-1.5 py-0.5 rounded-md bg-amber-100 text-amber-800 font-bold">
+                                      بدهکار {formatCurrency(hint.debt)} ت
+                                    </span>
+                                  )}
+                                  {hint.clinical.map((c) => (
+                                    <span key={c} className="text-[10px] px-1.5 py-0.5 rounded-md bg-error-100 text-error-700 font-bold">
+                                      {c}
+                                    </span>
+                                  ))}
+                                </div>
+                              )
+                            })()}
                           </div>
                         </button>
                       ))
@@ -911,7 +956,23 @@ export default function Appointments() {
                       // wouldn't catch until much later.
                       setWizardData((p) => ({ ...p, doctor_id: v, unit_id: '', start_time: '09:00', end_time: '09:30' }))
                     }}
-                    options={doctors.filter((d) => d.is_active || d.id === wizardData.doctor_id).map((d) => ({ value: d.id, label: `دکتر ${d.name || d.specialty || 'پزشک'}${!d.is_active ? ' (غیرفعال)' : ''}` }))}
+                    options={(() => {
+                      // Marked, not filtered: clinics do book outside
+                      // declared hours, and hiding the doctor you are
+                      // looking for is worse than warning about them.
+                      const weekday = jsDateToPersianWeekday(new Date(wizardData.date))
+                      const avail = doctorsForDay(doctors, schedules, weekday)
+                      return doctors
+                        .filter((d) => d.is_active || d.id === wizardData.doctor_id)
+                        .map((d) => {
+                          const a = avail.find((x) => x.id === d.id)
+                          const name = `دکتر ${d.name || d.specialty || 'پزشک'}`
+                          const inactive = !d.is_active ? ' (غیرفعال)' : ''
+                          if (a && !a.worksToday) return { value: d.id, label: `${name}${inactive} — این روز کار نمی‌کند` }
+                          if (a?.hours) return { value: d.id, label: `${name}${inactive} — ${toPersianDigits(a.hours)}` }
+                          return { value: d.id, label: `${name}${inactive}` }
+                        })
+                    })()}
                     placeholder="انتخاب پزشک..."
                   />
                 )}
@@ -924,7 +985,28 @@ export default function Appointments() {
                   label="یونیت *"
                   value={wizardData.unit_id}
                   onChange={(v) => { h.select(); setWizardData((p) => ({ ...p, unit_id: v })) }}
-                  options={units.filter((u) => u.is_active || u.id === wizardData.unit_id).map((u) => ({ value: u.id, label: `${u.name}${!u.is_active ? ' (غیرفعال)' : ''}` }))}
+                  options={(() => {
+                    // A unit is a physical chair. The free-times strip
+                    // only checks the chosen doctor, so without this two
+                    // doctors could each be offered the same slot while
+                    // sharing the only chair.
+                    const busy = unitAvailability(
+                      units, appointments, wizardData.date,
+                      wizardData.start_time, wizardData.end_time, editingAppt?.id,
+                    )
+                    return units
+                      .filter((u) => u.is_active || u.id === wizardData.unit_id)
+                      .map((u) => {
+                        const b = busy.find((x) => x.id === u.id)
+                        const inactive = !u.is_active ? ' (غیرفعال)' : ''
+                        return {
+                          value: u.id,
+                          label: b?.busy
+                            ? `${u.name}${inactive} — اشغال ${toPersianDigits(b.busyAt || '')}`
+                            : `${u.name}${inactive}`,
+                        }
+                      })
+                  })()}
                   placeholder="انتخاب یونیت..."
                 />
                 )}
