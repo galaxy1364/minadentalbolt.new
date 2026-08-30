@@ -6,6 +6,7 @@ import { Smile, Plus, Activity, AlertCircle, Clock, Grid3x3 } from 'lucide-react
 import { h } from '../lib/haptics'
 import { ToothRecord, Treatment } from '../types'
 import { toPersianDigits, toJalaliStringPretty } from '../lib/persianDate'
+import { toothShape, hasRootFilling, hasCrownCap, toothKind, isUpperTooth, toothVisualLabel } from '../lib/toothVisual'
 import { Badge } from './ui'
 
 // ── Types ─────────────────────────────────────────────────────
@@ -152,10 +153,16 @@ function ToothSVG({
   labelOverride?: string
 }) {
   const meta = conditionMeta[condition]
-  const isUpper = number <= 28 || (number >= 51 && number <= 65)
-  const isMolar = number % 10 >= 6
-  const isPremolar = number % 10 >= 4 && number % 10 <= 5
-  const isAnterior = number % 10 <= 3
+  // Derived in lib/toothVisual so the chart and anything else that needs
+  // to know what kind of tooth this is agree by construction. The inline
+  // `number % 10` versions that used to live here were a second source
+  // of truth, and they got primary teeth wrong: 54 is a primary molar,
+  // not a premolar.
+  const kind = toothKind(number)
+  const isUpper = isUpperTooth(number)
+  const isMolar = kind === 'molar'
+  const isPremolar = kind === 'premolar'
+  const isAnterior = kind === 'canine' || kind === 'incisor'
 
   // Colors based on condition
   const fillColors: Record<ToothCondition, string> = {
@@ -205,7 +212,51 @@ function ToothSVG({
     return fillColors[sc.condition] || fillColor
   }
 
-  if (condition === 'missing' || condition === 'extraction') {
+  const shape = toothShape(condition)
+  const a11yTitle = toothVisualLabel(number, condition)
+  // COMP-22 / COMP-106: a crowned tooth is drawn as a solid cap, and a
+  // root-treated one with obturated canals. Colour alone said "this
+  // tooth is orange"; shape says "this tooth has been treated".
+  const rootFilled = hasRootFilling(condition)
+  const crowned = hasCrownCap(condition)
+
+  // COMP-20 / COMP-106: an implant is not a tooth in another colour, it
+  // is a threaded post in the bone. Drawn as its own geometry so an arch
+  // can be read by shape before colour.
+  if (shape === 'implant') {
+    const threads = [26, 30, 34, 38, 42]
+    return (
+      <svg width={size} height={size * 1.2} viewBox="0 0 48 56" onClick={onClick} className="cursor-pointer transition-all" style={dropShadowStyle} role="img" aria-label={a11yTitle}>
+        <title>{a11yTitle}</title>
+        {/* Abutment: the part above the gum that carries the crown. */}
+        <path d="M 17 8 L 31 8 L 29 20 L 19 20 Z" fill={crowned ? strokeColor : fillColor} stroke={strokeColor} strokeWidth={sw} strokeLinejoin="round" />
+        <ellipse cx="21" cy="11" rx="3" ry="1.6" fill="white" opacity="0.4" />
+        {/* Neck */}
+        <rect x="20" y="20" width="8" height="4" rx="1" fill={crowned ? strokeColor : fillColor} stroke={strokeColor} strokeWidth={sw} />
+        {/* Body, tapering to an apex the way a real fixture does. */}
+        <path d="M 19 24 L 29 24 L 26 46 Q 24 49, 22 46 Z" fill={crowned ? strokeColor : fillColor} stroke={strokeColor} strokeWidth={sw} strokeLinejoin="round" />
+        {/* Threads — the single detail that makes it read as a screw. */}
+        {threads.map((y, idx) => (
+          <line
+            key={y}
+            x1={19.6 + idx * 0.6}
+            y1={y}
+            x2={28.4 - idx * 0.6}
+            y2={y + 2}
+            stroke={strokeColor}
+            strokeWidth="1"
+            strokeLinecap="round"
+            opacity="0.75"
+          />
+        ))}
+        <text x="24" y="54" textAnchor="middle" fontSize="9" fill={strokeColor} fontWeight="700">
+          {labelOverride || toPersianDigits(number)}
+        </text>
+      </svg>
+    )
+  }
+
+  if (shape === 'absent') {
     return (
       <svg width={size} height={size * 1.2} viewBox="0 0 48 56" onClick={onClick} className="cursor-pointer transition-all" style={dropShadowStyle}>
         <g opacity="0.4">
@@ -230,14 +281,14 @@ function ToothSVG({
           d="M 14 28 Q 12 40, 16 48 M 34 28 Q 36 40, 32 48"
           fill="none"
           stroke={strokeColor}
-          strokeWidth={sw}
+          strokeWidth={rootFilled ? sw * 2.2 : sw}
           strokeLinecap="round"
-          opacity="0.5"
+          opacity={rootFilled ? 0.95 : 0.5}
         />
         {/* Crown outline */}
         <path
           d="M 8 14 Q 6 8, 12 6 L 36 6 Q 42 8, 40 14 L 40 26 Q 38 30, 34 28 L 14 28 Q 10 30, 8 26 Z"
-          fill={fillColor}
+          fill={crowned ? strokeColor : fillColor}
           stroke={strokeColor}
           strokeWidth={sw}
           strokeLinejoin="round"
@@ -266,11 +317,11 @@ function ToothSVG({
     return (
       <svg width={size} height={size * 1.2} viewBox="0 0 48 56" onClick={onClick} className="cursor-pointer transition-all" style={dropShadowStyle}>
         {/* Root */}
-        <path d="M 20 28 Q 18 42, 22 48 M 28 28 Q 30 42, 26 48" fill="none" stroke={strokeColor} strokeWidth={sw} strokeLinecap="round" opacity="0.5" />
+        <path d="M 20 28 Q 18 42, 22 48 M 28 28 Q 30 42, 26 48" fill="none" stroke={strokeColor} strokeWidth={rootFilled ? sw * 2.2 : sw} strokeLinecap="round" opacity={rootFilled ? 0.95 : 0.5} />
         {/* Crown */}
         <path
           d="M 12 12 Q 10 6, 16 5 L 32 5 Q 38 6, 36 12 L 36 26 Q 34 30, 30 28 L 18 28 Q 14 30, 12 26 Z"
-          fill={fillColor}
+          fill={crowned ? strokeColor : fillColor}
           stroke={strokeColor}
           strokeWidth={sw}
           strokeLinejoin="round"
@@ -288,7 +339,7 @@ function ToothSVG({
     )
   } else {
     // Anterior (incisor/canine): single root, narrow crown
-    const isCanine = number % 10 === 3
+    const isCanine = kind === 'canine'
     return (
       <svg width={size} height={size * 1.2} viewBox="0 0 48 56" onClick={onClick} className="cursor-pointer transition-all" style={dropShadowStyle}>
         {/* Root */}
@@ -296,15 +347,15 @@ function ToothSVG({
           d={isCanine ? "M 24 28 Q 22 44, 24 50" : "M 20 28 Q 18 44, 22 50 M 28 28 Q 30 44, 26 50"}
           fill="none"
           stroke={strokeColor}
-          strokeWidth={sw}
+          strokeWidth={rootFilled ? sw * 2.2 : sw}
           strokeLinecap="round"
-          opacity="0.5"
+          opacity={rootFilled ? 0.95 : 0.5}
         />
         {/* Crown */}
         {isCanine ? (
           <path
             d="M 16 8 Q 14 4, 20 3 L 28 3 Q 34 4, 32 8 L 30 28 Q 24 32, 18 28 Z"
-            fill={fillColor}
+            fill={crowned ? strokeColor : fillColor}
             stroke={strokeColor}
             strokeWidth={sw}
             strokeLinejoin="round"
@@ -312,7 +363,7 @@ function ToothSVG({
         ) : (
           <path
             d="M 14 6 Q 12 3, 18 2 L 30 2 Q 36 3, 34 6 L 32 28 Q 24 31, 16 28 Z"
-            fill={fillColor}
+            fill={crowned ? strokeColor : fillColor}
             stroke={strokeColor}
             strokeWidth={sw}
             strokeLinejoin="round"
