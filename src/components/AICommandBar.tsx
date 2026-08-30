@@ -1,6 +1,6 @@
 // AICommandBar.tsx — Persian natural language command bar with voice input
 // Recognizes colloquial Persian commands and routes to the right page or action
-import { useState, useRef, useEffect, useCallback } from 'react'
+import { useState, useRef, useEffect, useCallback, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Sparkles, X, ArrowRight, Mic, MicOff, Search } from 'lucide-react'
 import { h } from '../lib/haptics'
@@ -9,6 +9,8 @@ import { createPatient, createAppointment, fetchDoctors, fetchUnits } from '../l
 import { toPersianDigits } from '../lib/persianDate'
 import { CLINIC_ID } from '../lib/supabase'
 import { showToast } from './ui'
+import { rankResults, parseQuery, groupByKind, flattenGroups, KIND_LABELS } from '../lib/globalSearch'
+import type { GlobalResult, SearchableRecord } from '../lib/globalSearch'
 
 interface CommandMatch {
   intent: string
@@ -134,12 +136,13 @@ export default function AICommandBar() {
   const [open, setOpen] = useState(false)
   const [input, setInput] = useState('')
   const [result, setResult] = useState<CommandMatch | null>(null)
-  const [noMatch, setNoMatch] = useState(false)
   const [listening, setListening] = useState(false)
   const [executing, setExecuting] = useState(false)
   const inputRef = useRef<HTMLInputElement>(null)
   const recognitionRef = useRef<any>(null)
   const navigate = useNavigate()
+  const [records, setRecords] = useState<SearchableRecord[]>([])
+  const [activeIndex, setActiveIndex] = useState(0)
 
   useEffect(() => {
     if (open && inputRef.current) {
@@ -147,12 +150,99 @@ export default function AICommandBar() {
     }
   }, [open])
 
+  // Ctrl/Cmd+K from anywhere. Bound on the window rather than a wrapper
+  // so it works no matter which page or field currently has focus.
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') {
+        e.preventDefault()
+        h.tap()
+        setOpen((v) => !v)
+      }
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [])
+
+  // Build the searchable index when the bar opens, not on mount: this
+  // reads several tables and most sessions never open the bar at all.
+  //
+  // Rebuilt on every open rather than cached for the session. Caching
+  // meant a patient registered five minutes ago could not be found until
+  // the page was reloaded — a search that silently misses a record is
+  // worse than a search that takes an extra 100ms. The previous list is
+  // left in place while the rebuild runs, so results stay usable.
+  useEffect(() => {
+    if (!open) return
+    let cancelled = false
+    void (async () => {
+      const [patients, appointments, treatments, labOrders] = await Promise.all([
+        db.patients.toArray(), db.appointments.toArray(),
+        db.treatments.toArray(), db.lab_orders.toArray(),
+      ])
+      if (cancelled) return
+      const nameOf = (pid: string) => {
+        const p = patients.find((x) => x.id === pid)
+        return p ? `${p.first_name} ${p.last_name}` : 'بیمار نامشخص'
+      }
+      const idx: SearchableRecord[] = [
+        ...patients.filter((p) => p.is_active !== false).map((p) => ({
+          kind: 'patient' as const, id: p.id,
+          title: `${p.first_name} ${p.last_name}`,
+          subtitle: p.phone || p.national_id || null,
+          route: `/patients/${p.id}`,
+          keywords: [p.national_id, p.phone, p.file_number != null ? String(p.file_number) : null],
+        })),
+        ...appointments.map((a) => ({
+          kind: 'appointment' as const, id: a.id,
+          title: nameOf(a.patient_id),
+          subtitle: a.date ? `${a.date} ${a.start_time || ''}`.trim() : null,
+          route: '/appointments',
+        })),
+        ...treatments.map((t) => ({
+          kind: 'treatment' as const, id: t.id,
+          title: t.procedure_name || 'درمان',
+          subtitle: nameOf(t.patient_id),
+          route: '/treatments',
+          keywords: [t.tooth_number],
+        })),
+        ...labOrders.map((l) => ({
+          kind: 'labOrder' as const, id: l.id,
+          title: l.work_type || 'کار لابراتوار',
+          subtitle: nameOf(l.patient_id),
+          route: '/laboratory',
+        })),
+      ]
+      setRecords(idx)
+    })()
+    return () => { cancelled = true }
+  }, [open])
+
+  // Ranking is derived, never stored. Storing it meant a query typed
+  // while the index was still loading stayed stuck on "no match" after
+  // the records arrived, because nothing re-ran the ranking.
+  const groups = useMemo(() => {
+    const { kind, text } = parseQuery(input)
+    if (!text) return []
+    return groupByKind(rankResults(text, records, { kind }))
+  }, [input, records])
+
+  // Arrow keys must walk the painted order, not the raw score order —
+  // see flattenGroups for why those two differ.
+  const displayResults = useMemo(() => flattenGroups(groups), [groups])
+
+  const noMatch = input.trim().length > 0 && !result && displayResults.length === 0
+
   const handleParse = useCallback((text: string) => {
     setInput(text)
-    if (!text.trim()) { setResult(null); setNoMatch(false); return }
-    const match = parseCommand(text, navigate, () => {})
-    if (match) { setResult(match); setNoMatch(false) }
-    else { setResult(null); setNoMatch(true) }
+    setActiveIndex(0)
+    if (!text.trim()) { setResult(null); return }
+    // A command still wins when one is recognised — "بیمار جدید اضافه کن"
+    // is an instruction, not a search for a patient named "جدید". An
+    // explicit "بیمار:" prefix means the user asked for a search, so no
+    // command is attempted in that case.
+    const { kind } = parseQuery(text)
+    setResult(kind ? null : parseCommand(text, navigate, () => {}))
   }, [navigate])
 
   const handleExecute = async () => {
@@ -172,19 +262,41 @@ export default function AICommandBar() {
       setOpen(false)
       setInput('')
       setResult(null)
-      setNoMatch(false)
     }
   }
 
+  const openResult = (r: GlobalResult) => {
+    h.confirm()
+    navigate(r.route)
+    setOpen(false)
+    // Clearing the input is enough to clear the list — it is derived.
+    setInput('')
+    setResult(null)
+  }
+
   const handleKeyDown = (e: React.KeyboardEvent) => {
+    // Arrow keys walk the result list. Guarded on length so the keys keep
+    // their normal caret behaviour when there is nothing to walk.
+    if (displayResults.length > 0 && (e.key === 'ArrowDown' || e.key === 'ArrowUp')) {
+      e.preventDefault()
+      setActiveIndex((i) => {
+        const next = e.key === 'ArrowDown' ? i + 1 : i - 1
+        return (next + displayResults.length) % displayResults.length
+      })
+      return
+    }
     if (e.key === 'Enter') {
+      // Fall back to the first row: the list can shrink under the cursor
+      // when a background index rebuild lands mid-typing, and Enter on a
+      // stale index must never open nothing.
+      const target = displayResults[activeIndex] ?? displayResults[0]
+      if (target) { openResult(target); return }
       if (result) handleExecute()
     }
     if (e.key === 'Escape') {
       setOpen(false)
       setInput('')
       setResult(null)
-      setNoMatch(false)
     }
   }
 
@@ -239,7 +351,10 @@ export default function AICommandBar() {
         aria-label="دستیار هوشمند"
       >
         <Sparkles size={16} className="animate-pulse" />
-        دستیار هوشمند
+        جستجو و دستیار
+        {/* A shortcut nobody knows about does not exist, so it is shown
+            on the trigger. Hidden on touch, where there is no keyboard. */}
+        <kbd className="hidden sm:inline text-[10px] px-1.5 py-0.5 rounded bg-white/20 font-mono">Ctrl K</kbd>
       </button>
     )
   }
@@ -265,7 +380,7 @@ export default function AICommandBar() {
               value={input}
               onChange={(e) => handleParse(e.target.value)}
               onKeyDown={handleKeyDown}
-              placeholder="چه کاری انجام دهم؟ مثلا: بیمار جدید اضافه کن..."
+              placeholder="جستجو یا دستور… مثلا: احمدی — یا — بیمار جدید اضافه کن"
               className="flex-1 text-sm font-medium text-slate-800 bg-transparent outline-none placeholder:text-slate-400"
             />
             {/* Voice button */}
@@ -277,7 +392,7 @@ export default function AICommandBar() {
               {listening ? <MicOff size={18} /> : <Mic size={18} />}
             </button>
             <button
-              onClick={() => { h.cancel(); setOpen(false); setInput(''); setResult(null); setNoMatch(false) }}
+              onClick={() => { h.cancel(); setOpen(false); setInput(''); setResult(null) }}
               className="p-2 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-all-smooth"
             >
               <X size={18} />
@@ -318,8 +433,40 @@ export default function AICommandBar() {
               </button>
             )}
 
+            {/* Record results — sectioned by kind so a patient and a
+                treatment with the same name stay distinguishable. */}
+            {displayResults.length > 0 && (
+              <div className="max-h-[45vh] overflow-y-auto">
+                {groups.map((group) => (
+                  <div key={group.kind}>
+                    <div className="px-4 py-1.5 text-xs font-medium text-slate-400 bg-slate-50">
+                      {KIND_LABELS[group.kind]}
+                    </div>
+                    {group.items.map((r) => {
+                      const active = displayResults[activeIndex]
+                      const isActive = active?.id === r.id && active?.kind === r.kind
+                      return (
+                        <button
+                          key={`${r.kind}-${r.id}`}
+                          onClick={() => openResult(r)}
+                          onMouseEnter={() => setActiveIndex(displayResults.indexOf(r))}
+                          className={`w-full flex items-center justify-between gap-3 px-4 py-2.5 text-right transition-all-smooth ${isActive ? 'bg-primary-50' : 'hover:bg-slate-50'}`}
+                        >
+                          <div className="min-w-0">
+                            <p className="text-sm font-medium text-slate-800 truncate">{r.title}</p>
+                            {r.subtitle && <p className="text-xs text-slate-500 truncate">{r.subtitle}</p>}
+                          </div>
+                          <ArrowRight size={16} className="text-slate-300 flex-shrink-0" />
+                        </button>
+                      )
+                    })}
+                  </div>
+                ))}
+              </div>
+            )}
+
             {/* No match */}
-            {noMatch && !result && (
+            {noMatch && (
               <div className="text-center py-6">
                 <p className="text-sm text-slate-500 mb-2">دستور شما را متوجه نشدم</p>
                 <p className="text-xs text-slate-400">از پیشنهادهای زیر استفاده کنید:</p>
