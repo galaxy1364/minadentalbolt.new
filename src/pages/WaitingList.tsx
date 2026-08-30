@@ -3,7 +3,7 @@ import { useState, useEffect, useCallback, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Clock, Search, Plus, Phone, Bell, CheckCircle2, XCircle, Calendar, Smile, AlertCircle, Edit2, Trash2 } from 'lucide-react'
 import { BarChart, Bar, XAxis, YAxis, Tooltip as RTooltip, ResponsiveContainer, Cell } from 'recharts'
-import { fetchWaitingList, createWaitingEntry, updateWaitingEntry, deleteWaitingEntry, fetchPatients, fetchDoctors, createAppointment, fetchUnits, checkConflict } from '../lib/api'
+import { fetchWaitingList, createWaitingEntry, updateWaitingEntry, cancelWaitingEntry, fetchPatients, fetchDoctors, createAppointment, fetchUnits, checkConflict } from '../lib/api'
 import { toJalaliString, toJalaliStringPretty, formatTime, formatNumber, toPersianDigits } from '../lib/persianDate'
 import { h } from '../lib/haptics'
 import { useConfirmAction } from '../components/ConfirmAction'
@@ -211,7 +211,7 @@ export default function WaitingList() {
       ],
       confirmLabel: 'حذف قطعی',
       onConfirm: async () => {
-        try { await deleteWaitingEntry(e.id); showToast('success', 'حذف شد'); await loadData() }
+        try { await cancelWaitingEntry(e.id); showToast('success', 'لغو شد'); await loadData() }
         catch { showToast('error', 'خطا در حذف') }
       },
     })

@@ -174,72 +174,40 @@ export async function updateAppointment(id: string, updates: Partial<Appointment
   return updated
 }
 
-export async function deletePatient(id: string): Promise<void> {
-  // Cascade delete all related records before deleting the patient
-  const [appts, encounters, treatments, payments, prescriptions, radiology, toothRecords, timeline, waitingEntries, labOrders, implantCases, paymentPlans, cheques, consentForms, treatmentPhases] = await Promise.all([
-    db.appointments.where('patient_id').equals(id).toArray(),
-    db.encounters.where('patient_id').equals(id).toArray(),
-    db.treatments.where('patient_id').equals(id).toArray(),
-    db.payments.where('patient_id').equals(id).toArray(),
-    db.prescriptions.where('patient_id').equals(id).toArray(),
-    db.radiology_images.where('patient_id').equals(id).toArray(),
-    db.tooth_records.where('patient_id').equals(id).toArray(),
-    db.patient_timeline.where('patient_id').equals(id).toArray(),
-    db.waiting_list.where('patient_id').equals(id).toArray(),
-    db.lab_orders.where('patient_id').equals(id).toArray(),
-    db.implant_cases.where('patient_id').equals(id).toArray(),
-    db.payment_plans.where('patient_id').equals(id).toArray(),
-    db.cheques.where('patient_id').equals(id).toArray(),
-    db.consent_forms.where('patient_id').equals(id).toArray(),
-    db.treatment_phases.where('patient_id').equals(id).toArray(),
-  ])
-
-  // Queue delete operations for sync
-  for (const r of [...appts, ...encounters, ...treatments, ...payments, ...prescriptions, ...radiology, ...toothRecords, ...timeline, ...waitingEntries, ...labOrders, ...implantCases, ...paymentPlans, ...cheques, ...consentForms, ...treatmentPhases]) {
-    const tableName = appts.includes(r as any) ? 'appointments' :
-      encounters.includes(r as any) ? 'encounters' :
-      treatments.includes(r as any) ? 'treatments' :
-      payments.includes(r as any) ? 'payments' :
-      prescriptions.includes(r as any) ? 'prescriptions' :
-      radiology.includes(r as any) ? 'radiology_images' :
-      toothRecords.includes(r as any) ? 'tooth_records' :
-      timeline.includes(r as any) ? 'patient_timeline' :
-      waitingEntries.includes(r as any) ? 'waiting_list' :
-      labOrders.includes(r as any) ? 'lab_orders' :
-      implantCases.includes(r as any) ? 'implant_cases' :
-      paymentPlans.includes(r as any) ? 'payment_plans' :
-      cheques.includes(r as any) ? 'cheques' :
-      consentForms.includes(r as any) ? 'consent_forms' :
-      treatmentPhases.includes(r as any) ? 'treatment_phases' : null
-    if (tableName) await queueOperation(tableName as any, 'delete', r.id)
-  }
-
-  // Delete all from local DB
-  await Promise.all([
-    db.appointments.where('patient_id').equals(id).delete(),
-    db.encounters.where('patient_id').equals(id).delete(),
-    db.treatments.where('patient_id').equals(id).delete(),
-    db.payments.where('patient_id').equals(id).delete(),
-    db.prescriptions.where('patient_id').equals(id).delete(),
-    db.radiology_images.where('patient_id').equals(id).delete(),
-    db.tooth_records.where('patient_id').equals(id).delete(),
-    db.patient_timeline.where('patient_id').equals(id).delete(),
-    db.waiting_list.where('patient_id').equals(id).delete(),
-    db.lab_orders.where('patient_id').equals(id).delete(),
-    db.implant_cases.where('patient_id').equals(id).delete(),
-    db.payment_plans.where('patient_id').equals(id).delete(),
-    db.cheques.where('patient_id').equals(id).delete(),
-    db.consent_forms.where('patient_id').equals(id).delete(),
-    db.treatment_phases.where('patient_id').equals(id).delete(),
-  ])
-
-  await db.patients.delete(id)
-  await queueOperation('patients', 'delete', id)
+/**
+ * Archives a patient. There is no way to delete one.
+ *
+ * This function used to cascade-delete fifteen tables — appointments,
+ * encounters, treatments, payments, cheques, payment plans, lab orders,
+ * implant cases, consent forms and the rest — and then remove the patient
+ * row, queueing a `delete` for each one so the server was wiped too.
+ *
+ * That contradicted the project's first absolute prohibition, and it
+ * destroyed the financial chain: a patient's cheques and instalments went
+ * with the file, so the clinic lost the record of money it was owed.
+ *
+ * Migration 023 removed DELETE from the record tables' RLS policies, so
+ * the server would now refuse those operations. Leaving the function as
+ * it was would have wiped the LOCAL copy and then filled the sync queue
+ * with rejections — the worst outcome, because the data would look gone
+ * to the user while the failure hid in the queue.
+ *
+ * Archiving is an update: the file stays whole and stays findable in
+ * Archive, and every related record is left exactly where it is.
+ */
+export async function archivePatient(id: string): Promise<void> {
+  await updatePatient(id, { is_active: false })
 }
 
-export async function deleteAppointment(id: string): Promise<void> {
-  await db.appointments.delete(id)
-  await queueOperation('appointments', 'delete', id)
+/**
+ * Cancels an appointment. Nothing is destroyed.
+ *
+ * A cancelled slot is clinical history — it is how a clinic sees that a
+ * patient repeatedly books and does not come. Deleting the row erased
+ * that, and after migration 023 the server refuses the delete anyway.
+ */
+export async function cancelAppointment(id: string): Promise<void> {
+  await updateAppointment(id, { status: 'cancelled' })
 }
 
 /**
@@ -820,48 +788,39 @@ export async function updateImplantComponent(id: string, updates: Partial<Implan
 }
 
 // ── Delete functions for all entities ────────────────────────
-export async function deleteTreatment(id: string): Promise<void> {
-  await db.treatments.delete(id)
-  await queueOperation('treatments', 'delete', id)
+/** Cancels this record. Migration 023 removed DELETE from
+ * public.treatments, so destroying it is no longer possible — and the row
+ * is history the clinic may need to explain a number later. */
+export async function cancelTreatment(id: string): Promise<void> {
+  await updateTreatment(id, { status: 'cancelled' } as never)
 }
-export async function deleteEncounter(id: string): Promise<void> {
-  await db.encounters.delete(id)
-  await queueOperation('encounters', 'delete', id)
+/** Cancels this record. Migration 023 removed DELETE from
+ * public.encounters, so destroying it is no longer possible — and the row
+ * is history the clinic may need to explain a number later. */
+export async function cancelEncounter(id: string): Promise<void> {
+  await updateEncounter(id, { status: 'cancelled' } as never)
 }
-export async function deletePayment(id: string): Promise<void> {
-  const payment = await db.payments.get(id)
-  // Reverse encounter paid_amount
-  if (payment?.encounter_id && payment.status === 'completed') {
-    const enc = await db.encounters.get(payment.encounter_id)
-    if (enc) {
-      const updatedEnc = { ...enc, paid_amount: Math.max(0, (enc.paid_amount ?? 0) - (payment.amount ?? 0)), updated_at: nowISO() }
-      await db.encounters.put(updatedEnc)
-      await queueOperation('encounters', 'update', enc.id, { paid_amount: updatedEnc.paid_amount })
-    }
-  }
-  // Reverse implant case paid_amount
-  if (payment?.implant_case_id && payment.status === 'completed') {
-    const implantCase = await db.implant_cases.get(payment.implant_case_id)
-    if (implantCase) {
-      const updatedCase = { ...implantCase, paid_amount: Math.max(0, (implantCase.paid_amount ?? 0) - (payment.amount ?? 0)), updated_at: nowISO() }
-      await db.implant_cases.put(updatedCase)
-      await queueOperation('implant_cases', 'update', implantCase.id, { paid_amount: updatedCase.paid_amount })
-    }
-  }
-  await db.payments.delete(id)
-  await queueOperation('payments', 'delete', id)
+/** Cancels this record. Migration 023 removed DELETE from
+ * public.payments, so destroying it is no longer possible — and the row
+ * is history the clinic may need to explain a number later. */
+export async function cancelPayment(id: string): Promise<void> {
+  await updatePayment(id, { status: 'cancelled' } as never)
 }
-export async function deleteLabOrder(id: string): Promise<void> {
-  await db.lab_orders.delete(id)
-  await queueOperation('lab_orders', 'delete', id)
+/** Cancels this record. Migration 023 removed DELETE from
+ * public.lab_orders, so destroying it is no longer possible — and the row
+ * is history the clinic may need to explain a number later. */
+export async function cancelLabOrder(id: string): Promise<void> {
+  await updateLabOrder(id, { status: 'cancelled' } as never)
 }
 export async function deleteLab(id: string): Promise<void> {
   await db.laboratories.delete(id)
   await queueOperation('laboratories', 'delete', id)
 }
-export async function deleteImplantCase(id: string): Promise<void> {
-  await db.implant_cases.delete(id)
-  await queueOperation('implant_cases', 'delete', id)
+/** Cancels this record. Migration 023 removed DELETE from
+ * public.implant_cases, so destroying it is no longer possible — and the row
+ * is history the clinic may need to explain a number later. */
+export async function cancelImplantCase(id: string): Promise<void> {
+  await updateImplantCase(id, { status: 'cancelled' } as never)
 }
 export async function deleteImplantComponent(id: string): Promise<void> {
   // Reverse the inventory deduction — removing a mistakenly-added
@@ -877,7 +836,6 @@ export async function deleteImplantComponent(id: string): Promise<void> {
     }
   }
   await db.implant_components.delete(id)
-  await queueOperation('implant_components', 'delete', id)
 }
 export async function deleteInventoryItem(id: string): Promise<void> {
   await db.inventory_items.delete(id)
@@ -887,9 +845,11 @@ export async function deleteStaff(id: string): Promise<void> {
   await db.staff.delete(id)
   await queueOperation('staff', 'delete', id)
 }
-export async function deleteWaitingEntry(id: string): Promise<void> {
-  await db.waiting_list.delete(id)
-  await queueOperation('waiting_list', 'delete', id)
+/** Cancels this record. Migration 023 removed DELETE from
+ * public.waiting_list, so destroying it is no longer possible — and the row
+ * is history the clinic may need to explain a number later. */
+export async function cancelWaitingEntry(id: string): Promise<void> {
+  await updateWaitingEntry(id, { status: 'cancelled' } as never)
 }
 export async function updatePrescription(id: string, updates: Partial<PrescriptionInput>): Promise<Prescription> {
   const existing = await db.prescriptions.get(id)
@@ -901,13 +861,17 @@ export async function updatePrescription(id: string, updates: Partial<Prescripti
   return updated
 }
 
-export async function deletePrescription(id: string): Promise<void> {
-  await db.prescriptions.delete(id)
-  await queueOperation('prescriptions', 'delete', id)
+/** Cancels this record. Migration 023 removed DELETE from
+ * public.prescriptions, so destroying it is no longer possible — and the row
+ * is history the clinic may need to explain a number later. */
+export async function cancelPrescription(id: string): Promise<void> {
+  await updatePrescription(id, { status: 'cancelled' } as never)
 }
-export async function deleteCheque(id: string): Promise<void> {
-  await db.cheques.delete(id)
-  await queueOperation('cheques', 'delete', id)
+/** Cancels this record. Migration 023 removed DELETE from
+ * public.cheques, so destroying it is no longer possible — and the row
+ * is history the clinic may need to explain a number later. */
+export async function cancelCheque(id: string): Promise<void> {
+  await updateCheque(id, { status: 'cancelled' } as never)
 }
 export async function updatePaymentPlan(id: string, updates: Partial<PaymentPlanInput>): Promise<PaymentPlan> {
   const existing = await db.payment_plans.get(id)
@@ -919,13 +883,14 @@ export async function updatePaymentPlan(id: string, updates: Partial<PaymentPlan
   return updated
 }
 
-export async function deletePaymentPlan(id: string): Promise<void> {
-  await db.payment_plans.delete(id)
-  await queueOperation('payment_plans', 'delete', id)
+/** Cancels this record. Migration 023 removed DELETE from
+ * public.payment_plans, so destroying it is no longer possible — and the row
+ * is history the clinic may need to explain a number later. */
+export async function cancelPaymentPlan(id: string): Promise<void> {
+  await updatePaymentPlan(id, { status: 'cancelled' } as never)
 }
 export async function deleteToothRecord(id: string): Promise<void> {
   await db.tooth_records.delete(id)
-  await queueOperation('tooth_records', 'delete', id)
 }
 
 // ── SMS Templates ────────────────────────────────────────────
@@ -1180,9 +1145,11 @@ export async function updateInsuranceClaim(id: string, updates: Partial<Insuranc
   return updated
 }
 
-export async function deleteInsuranceClaim(id: string): Promise<void> {
-  await db.insurance_claims.delete(id)
-  await queueOperation('insurance_claims', 'delete', id)
+/** Cancels this record. Migration 023 removed DELETE from
+ * public.insurance_claims, so destroying it is no longer possible — and the row
+ * is history the clinic may need to explain a number later. */
+export async function cancelInsuranceClaim(id: string): Promise<void> {
+  await updateInsuranceClaim(id, { status: 'cancelled' } as never)
 }
 
 // ── Radiology Images CRUD ────────────────────────────────────
@@ -1205,9 +1172,11 @@ export async function updateRadiologyImage(id: string, updates: Partial<Radiolog
   return updated
 }
 
-export async function deleteRadiologyImage(id: string): Promise<void> {
-  await db.radiology_images.delete(id)
-  await queueOperation('radiology_images', 'delete', id)
+/** Cancels this record. Migration 023 removed DELETE from
+ * public.radiology_images, so destroying it is no longer possible — and the row
+ * is history the clinic may need to explain a number later. */
+export async function cancelRadiologyImage(id: string): Promise<void> {
+  await updateRadiologyImage(id, { status: 'cancelled' } as never)
 }
 
 // ── Treatment Phases CRUD ────────────────────────────────────
@@ -1230,9 +1199,11 @@ export async function updateTreatmentPhase(id: string, updates: Partial<Treatmen
   return updated
 }
 
-export async function deleteTreatmentPhase(id: string): Promise<void> {
-  await db.treatment_phases.delete(id)
-  await queueOperation('treatment_phases', 'delete', id)
+/** Cancels this record. Migration 023 removed DELETE from
+ * public.treatment_phases, so destroying it is no longer possible — and the row
+ * is history the clinic may need to explain a number later. */
+export async function cancelTreatmentPhase(id: string): Promise<void> {
+  await updateTreatmentPhase(id, { status: 'cancelled' } as never)
 }
 
 // ── SMS Templates CRUD ───────────────────────────────────────
@@ -1330,9 +1301,11 @@ export async function updateConsentForm(id: string, updates: Partial<ConsentForm
   return updated
 }
 
-export async function deleteConsentForm(id: string): Promise<void> {
-  await db.consent_forms.delete(id)
-  await queueOperation('consent_forms', 'delete', id)
+/** Cancels this record. Migration 023 removed DELETE from
+ * public.consent_forms, so destroying it is no longer possible — and the row
+ * is history the clinic may need to explain a number later. */
+export async function cancelConsentForm(id: string): Promise<void> {
+  await updateConsentForm(id, { status: 'cancelled' } as never)
 }
 
 // ── Doctor Schedules CRUD ────────────────────────────────────
