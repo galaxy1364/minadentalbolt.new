@@ -3,6 +3,7 @@ import { InsurancePanel } from '../components/InsurancePanel'
 import { PatientAlerts } from '../components/PatientAlerts'
 import { buildPatientAlerts, alertChips } from '../lib/patientAlerts'
 import { buildDoctorLedger } from '../lib/doctorLedger'
+import { phasePlanProgress, phaseSchedule, validatePhase, nextPhaseNumber, comparePhaseCostToTreatments } from '../lib/phases'
 import { useState, useEffect, useCallback } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { ArrowRight, Edit2, Phone, Mail, MapPin, Calendar, CreditCard, Activity, FileText, Image as ImageIcon, Shield, Pill, Smile, Award, AlertCircle, Clock, CheckCircle2, Layers, Plus, Trash2, FileSignature, Printer, Bone, FlaskConical, Stethoscope } from 'lucide-react'
@@ -447,7 +448,27 @@ export default function PatientDetail() {
     }
     if (phaseForm.start_date && !isValidDate(phaseForm.start_date)) { showToast('error', 'تاریخ شروع نامعتبر است — دوباره از تقویم انتخاب کنید'); return }
     if (phaseForm.end_date && !isValidDate(phaseForm.end_date)) { showToast('error', 'تاریخ پایان نامعتبر است — دوباره از تقویم انتخاب کنید'); return }
-    const nextNumber = editingPhase ? editingPhase.phase_number : (phases.length > 0 ? Math.max(...phases.map((p) => p.phase_number)) + 1 : 1)
+    const nextNumber = editingPhase ? editingPhase.phase_number : nextPhaseNumber(phases)
+
+    // A required rule must block, never merely warn. Duplicate numbers
+    // and an end date before the start were previously accepted, and
+    // both make every duration and overdue count downstream meaningless.
+    const phaseErrors = validatePhase(
+      {
+        phase_number: nextNumber,
+        title: phaseForm.title,
+        status: phaseForm.status,
+        estimated_cost: phaseForm.estimated_cost ? Number(phaseForm.estimated_cost) : null,
+        actual_cost: phaseForm.actual_cost ? Number(phaseForm.actual_cost) : null,
+        estimated_duration_days: phaseForm.estimated_duration_days ? Number(phaseForm.estimated_duration_days) : null,
+        start_date: phaseForm.start_date || null,
+        end_date: phaseForm.end_date || null,
+      },
+      // The row being edited is not its own duplicate.
+      phases.filter((p) => p.id !== editingPhase?.id),
+    )
+    if (phaseErrors.length) { showToast('error', phaseErrors[0]); return }
+
     const payload = {
       patient_id: id, doctor_id: phaseForm.doctor_id || null,
       phase_number: nextNumber, title: phaseForm.title, description: phaseForm.description || null,
@@ -1200,9 +1221,15 @@ export default function PatientDetail() {
   // ===========================================================================
 
   const renderPhases = () => {
-    const totalEstimated = phases.reduce((s, p) => s + (p.estimated_cost || 0), 0)
-    const totalActual = phases.reduce((s, p) => s + (p.actual_cost || 0), 0)
-    const completedCount = phases.filter((p) => p.status === 'completed').length
+    // Figures come from the tested helper. The inline versions counted
+    // cancelled phases as live, so a plan whose only remaining phase had
+    // been cancelled could never reach 100%.
+    const todayStr = new Date().toISOString().slice(0, 10)
+    const prog = phasePlanProgress(phases)
+    const totalEstimated = prog.estimatedCost
+    const totalActual = prog.actualCost
+    const completedCount = prog.completed
+    const costCheck = comparePhaseCostToTreatments(phases, treatments)
 
     return (
       <div className="space-y-4">
@@ -1210,7 +1237,7 @@ export default function PatientDetail() {
           <div>
             <p className="text-sm font-bold text-slate-800 dark:text-slate-100">طرح درمان مرحله‌ای</p>
             <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
-              {phases.length > 0 ? `${toPersianDigits(completedCount)} از ${toPersianDigits(phases.length)} فاز تکمیل شده` : 'هنوز فازی تعریف نشده'}
+              {prog.total > 0 ? `${toPersianDigits(completedCount)} از ${toPersianDigits(prog.total)} فاز تکمیل شده — ${toPersianDigits(prog.percent)}٪` : 'هنوز فازی تعریف نشده'}
             </p>
           </div>
           <Button variant="primary" size="sm" onClick={openCreatePhase}><Plus size={14} className="inline ml-1" /> افزودن فاز</Button>
@@ -1229,6 +1256,15 @@ export default function PatientDetail() {
           </div>
         )}
 
+        {/* Reported, never corrected: a plan part-executed legitimately
+            sits below its estimate, so this is information rather than
+            an error. */}
+        {phases.length > 0 && !costCheck.ok && (
+          <p className="text-xs text-amber-700">
+            ⚠ {costCheck.message} ({formatCurrency(Math.abs(costCheck.difference))} ت اختلاف)
+          </p>
+        )}
+
         {phases.length === 0 ? (
           <EmptyState icon={<Layers size={40} />} title="فاز درمانی ثبت نشده" description="برای طرح‌های درمانی چندمرحله‌ای (مثلاً فاز۱: کشیدن، فاز۲: ایمپلنت، فاز۳: روکش) فازها را اینجا تعریف کنید" />
         ) : (
@@ -1244,6 +1280,14 @@ export default function PatientDetail() {
                     </div>
                     {i < phases.length - 1 && <div className="w-0.5 flex-1 bg-slate-200 dark:bg-slate-700 my-1" />}
                   </div>
+                  {(() => {
+                    const sched = phaseSchedule(p, todayStr)
+                    if (sched.timing === 'overdue') {
+                      return <Badge color="error">{toPersianDigits(Math.abs(sched.daysRemaining ?? 0))} روز تأخیر</Badge>
+                    }
+                    if (sched.timing === 'due_today') return <Badge color="warning">امروز موعد</Badge>
+                    return null
+                  })()}
                   <Card className="flex-1 p-3.5 mb-1">
                     <div className="flex items-start justify-between gap-2">
                       <div className="min-w-0">
