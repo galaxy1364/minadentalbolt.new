@@ -227,6 +227,23 @@ export interface LabOrder {
   sent_at: string | null
   received_at: string | null
   notes: string | null
+  // ── Physical tracking (MOD-FEAT-009) ─────────────────────────────────
+  // Where the case physically sits once it is back at the clinic. Split
+  // into three parts because that is how shelving is actually labelled;
+  // a single free-text field turns into inconsistent scribbles.
+  shelf: string | null
+  shelf_number: string | null
+  shelf_space: string | null
+  /** Chase reminder, deliberately earlier than `deadline`: staff need to
+   * ring the lab a few days ahead, not discover the miss on the day. */
+  alarm_date: string | null
+  /** The lab has finished. Distinct from `delivered` — a finished case
+   * sitting on a shelf uncollected is exactly what gets forgotten. */
+  work_done: boolean | null
+  /** Handed to the patient. */
+  delivered: boolean | null
+  /** Whether leftover material went back to the lab. */
+  material_returned: boolean | null
   created_at: string
   updated_at: string
 }
