@@ -5,6 +5,7 @@ import { CreditCard, Plus, Search, DollarSign, TrendingUp, Wallet, Calendar, Cal
 import { BarChart, Bar, XAxis, YAxis, Tooltip as RTooltip, ResponsiveContainer, PieChart, Pie, Cell as RCell } from 'recharts'
 import { fetchPayments, createPayment, updatePayment, fetchEncounters, fetchCheques, createCheque, updateCheque, fetchPaymentPlans, createPaymentPlan, updatePaymentPlan, updateInstallment, fetchPatients, fetchExpenses, createExpense, updateExpense, deleteExpense, fetchTreatments, fetchImplantCases } from '../lib/api'
 import { buildSchedule, splitAmount, planProgress, reconcilePlan } from '../lib/installments'
+import { checkOverpayment } from '../lib/finance'
 import { toJalaliString, toJalaliStringPretty, formatCurrency, formatNumber, toPersianDigits, toEnglishDigits } from '../lib/persianDate'
 import { h } from '../lib/haptics'
 import { useConfirmAction } from '../components/ConfirmAction'
@@ -350,9 +351,16 @@ export default function Billing() {
     confirmAction({
       type: 'create',
       title: 'ثبت پرداخت',
-      warning: fin && fin.balance <= 0
-        ? '⚠ این بیمار از قبل تسویه‌حساب کامل دارد — مطمئن شوید این پرداخت تکراری نیست'
-        : undefined,
+      // The old warning only fired once the balance was ALREADY zero, so
+      // a payment taking an account from 12.5m owed to 6.5m in credit
+      // passed in silence. Found in the live database: one patient with
+      // 22.5m billable and 42.5m recorded as paid, never flagged.
+      // Warns, does not block — paying ahead is real.
+      warning: (() => {
+        const over = checkOverpayment(Number(paymentForm.amount) || 0, fin?.balance ?? 0)
+        if (!over.message) return undefined
+        return `⚠ ${over.message} (${formatCurrency(over.excess)} ت اضافه)`
+      })(),
       fields: [
         { label: 'بیمار', value: patient ? `${patient.first_name} ${patient.last_name}` : '-', highlight: true },
         { label: 'مبلغ', value: `${formatCurrency(Number(paymentForm.amount))} ت` },

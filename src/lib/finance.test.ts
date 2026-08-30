@@ -8,7 +8,7 @@
  * هر تست یک حالت واقعی کلینیک را پوشش می‌دهد، نه یک حالت ساختگی.
  */
 import { describe, it, expect } from 'vitest'
-import { calcPatientBalance, calcAllPatientBalances } from './finance'
+import { calcPatientBalance, calcAllPatientBalances, checkOverpayment } from './finance'
 import type { Payment, Treatment } from '../types'
 
 // سازنده‌های کمکی — فقط فیلدهای مؤثر بر محاسبه را می‌سازند
@@ -172,5 +172,35 @@ describe('پرداخت ایمپلنت نباید دوبار شمرده شود', 
     const r = calcPatientBalance([pay('p1', 400_000)], [treat('p1', 1_000_000)])
     expect(r.paid).toBe(400_000)
     expect(r.balance).toBe(600_000)
+  })
+})
+
+const calcOver = (amount: number, remaining: number) => checkOverpayment(amount, remaining)
+
+describe('checkOverpayment', () => {
+  it('stays quiet for a payment within the balance', () => {
+    expect(calcOver(500_000, 1_000_000).message).toBeNull()
+  })
+
+  it('stays quiet when the payment settles the balance exactly', () => {
+    expect(calcOver(1_000_000, 1_000_000).excess).toBe(0)
+  })
+
+  it('reports the excess when a payment overshoots a real balance', () => {
+    // The live database had a patient with 22,500,000 billable and
+    // 42,500,000 paid, and nothing had ever warned anyone.
+    const r = calcOver(19_000_000, 12_500_000)
+    expect(r.excess).toBe(6_500_000)
+    expect(r.message).toContain('بیشتر')
+  })
+
+  it('says the whole amount is surplus when nothing is owed', () => {
+    const r = calcOver(5_000_000, 0)
+    expect(r.excess).toBe(5_000_000)
+    expect(r.message).toContain('بدهی ندارد')
+  })
+
+  it('treats an already-credit account the same way', () => {
+    expect(calcOver(1_000_000, -500_000).excess).toBe(1_500_000)
   })
 })

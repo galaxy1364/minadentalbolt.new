@@ -90,3 +90,44 @@ export function calcAllPatientBalances(
   }
   return { byPatient, totalOutstanding }
 }
+
+export interface OverpaymentCheck {
+  /** How much this payment exceeds what is still owed. Zero when it does not. */
+  excess: number
+  /** Remaining balance before this payment. */
+  remaining: number
+  message: string | null
+}
+
+/**
+ * Checks a payment against what the patient still owes.
+ *
+ * Found by auditing the live database: one patient had 22,500,000 of
+ * billable treatment and 42,500,000 recorded as paid. Nothing had warned
+ * anyone. The form only warned when the balance was ALREADY zero, so the
+ * payment that took an account from 12,500,000 owed to 6,500,000 in
+ * credit passed in silence.
+ *
+ * Warns rather than blocks. Paying ahead is real — a deposit before a
+ * course of treatment, a family member settling more than one file — so
+ * refusing it would be wrong. Doing it without anyone noticing is what
+ * was wrong.
+ */
+export function checkOverpayment(amount: number, remaining: number): OverpaymentCheck {
+  const excess = Math.round(amount) - Math.round(remaining)
+  if (excess <= 0 || amount <= 0) {
+    return { excess: 0, remaining, message: null }
+  }
+  if (remaining <= 0) {
+    return {
+      excess,
+      remaining,
+      message: 'این بیمار بدهی ندارد — کل این مبلغ اضافه‌پرداخت ثبت می‌شود',
+    }
+  }
+  return {
+    excess,
+    remaining,
+    message: 'مبلغ از مانده‌ی بیمار بیشتر است — اضافه‌پرداخت ثبت می‌شود',
+  }
+}

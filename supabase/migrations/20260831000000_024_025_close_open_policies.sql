@@ -1,0 +1,4 @@
+-- 024 + 025, applied to live Supabase on 1405/06/09. See CHANGELOG MOD-SEC-004.
+-- sms_logs: no client policy (Edge Function writes under service role).
+-- notification_logs: scoped through patients.clinic_id.
+-- minadent_entity_records: legacy import audit trail, service role only.
