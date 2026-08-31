@@ -69,6 +69,22 @@ export function toJalaliStringPretty(dateStr: string): string {
   return toPersianDigits(`${jd} ${persianMonths[jm - 1]} ${jy}`)
 }
 
+/**
+ * MOD-FIX-018: the compact date, for reading.
+ *
+ * Three date renderers, one purpose each — keeping them apart is what stops
+ * the next person guessing:
+ *   • toJalaliString      «1405/06/09»  — key/compare/export. Latin, always.
+ *   • toJalaliShort       «۱۴۰۵/۰۶/۰۹»  — same shape for a table or a chip.
+ *   • toJalaliStringPretty «۹ شهریور ۱۴۰۵» — prose, where there is room.
+ *
+ * Display sites used to call toJalaliString directly, so a Persian-digit
+ * clock and a Latin-digit date sat on the same row.
+ */
+export function toJalaliShort(dateStr: string): string {
+  return toPersianDigits(toJalaliString(dateStr))
+}
+
 export function getJalaliMonthYear(dateStr: string): { year: number; month: number } {
   const d = new Date(dateStr)
   if (isNaN(d.getTime())) return getJalaliMonthYear(new Date().toISOString().slice(0, 10))

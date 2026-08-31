@@ -27,6 +27,7 @@ import insurance from '../pages/Insurance.tsx?raw'
 import prescriptions from '../pages/Prescriptions.tsx?raw'
 import appointments from '../pages/Appointments.tsx?raw'
 import patientDetail from '../pages/PatientDetail.tsx?raw'
+import treatments from '../pages/Treatments.tsx?raw'
 
 /** هر صفحه‌ای که پنجره‌ی تأیید نشان می‌دهد. */
 const PAGES: [string, string][] = [
@@ -34,6 +35,10 @@ const PAGES: [string, string][] = [
   ['PersonalFinance', personalFinance], ['Billing', billing], ['Settings', settings],
   ['Laboratory', laboratory], ['Insurance', insurance], ['Prescriptions', prescriptions],
   ['Appointments', appointments], ['PatientDetail', patientDetail],
+  // MOD-FIX-019: Treatments was missing from this list, which is the only
+  // reason MOD-UI-011 could fix twelve pages and leave two red bins behind
+  // on the thirteenth. A guard that does not cover a file cannot defend it.
+  ['Treatments', treatments],
 ]
 
 describe('پنجره‌ی تأیید نوع «حذف» ندارد', () => {
@@ -79,5 +84,49 @@ describe('برچسب دکمه با کاری که می‌کند می‌خواند
       const lying = titles.filter((t) => t.includes('حذف') && !t.includes('نیست'))
       expect(lying, `${name} عنوان حذف‌دار دارد`).toEqual([])
     }
+  })
+})
+
+describe('MOD-FIX-019 | آیکون هم مثل متن باید راست بگوید', () => {
+  /**
+   * تست MOD-UI-011 فقط `type: 'delete'` و متن‌ها را می‌پایید. آیکون را نه —
+   * پس `Treatments` می‌توانست پنجره‌ی درست «لغو ویزیت» را باز کند و روی
+   * ردیف هنوز سطل زباله‌ی قرمز نشان بدهد. کاربر آیکون را زودتر از عنوان
+   * پنجره می‌بیند.
+   */
+  const CANCEL_HANDLERS = ['handleCancelEncounter', 'handleCancelTreatment']
+
+  /** The whole <button…>…</button>, icon included — not just its opening tag. */
+  const buttonsFor = (handler: string) => {
+    const re = new RegExp(`<button[^>]*onClick=\\{\\(\\) => ${handler}\\([^)]*\\)\\}[\\s\\S]*?</button>`, 'g')
+    return [...treatments.matchAll(re)].map((m) => m[0])
+  }
+
+  it('دکمه‌های لغو در Treatments سطل زباله نشان نمی‌دهند', () => {
+    for (const handler of CANCEL_HANDLERS) {
+      const buttons = buttonsFor(handler)
+      expect(buttons.length, `${handler} هیچ دکمه‌ای ندارد — نام عوض شده؟`).toBeGreaterThan(0)
+      for (const b of buttons) {
+        expect(b, `${handler} هنوز سطل زباله دارد`).not.toContain('Trash2')
+      }
+    }
+  })
+
+  it('هر دکمه‌ی لغو نام قابل خواندن دارد', () => {
+    // بدون برچسب، دکمه فقط یک آیکون است: نه صفحه‌خوان می‌فهمد نه تست.
+    for (const handler of CANCEL_HANDLERS) {
+      const buttons = buttonsFor(handler)
+      expect(buttons.length, `${handler} هیچ دکمه‌ای ندارد`).toBeGreaterThan(0)
+      for (const b of buttons) {
+        expect(b, `${handler} بدون aria-label است`).toContain('aria-label')
+      }
+    }
+  })
+
+  it('هیچ هندلری در Treatments اسم «Delete» ندارد', () => {
+    // اسم داخلی هم بخشی از همان دروغ است: هرکس بعداً این تابع را ببیند
+    // فکر می‌کند واقعاً حذف می‌کند و رفتار را به همان سمت می‌برد.
+    expect(treatments).not.toContain('handleDeleteEncounter')
+    expect(treatments).not.toContain('handleDeleteTreatment')
   })
 })

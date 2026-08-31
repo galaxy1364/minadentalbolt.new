@@ -8,7 +8,7 @@ import {
   formatShelfLocation, validateShelf, alarmInfo, suggestAlarmDate,
   readyForDelivery, sortByUrgency, summariseLab, deliveryPatch,
 } from '../lib/labShelf'
-import { toJalaliString, toJalaliStringPretty, formatCurrency, toPersianDigits } from '../lib/persianDate'
+import { toJalaliString, toJalaliStringPretty, formatCurrency, toPersianDigits, toJalaliShort} from '../lib/persianDate'
 import { h } from '../lib/haptics'
 import { useConfirmAction } from '../components/ConfirmAction'
 import type { LabOrder, Laboratory, Patient, Doctor, Treatment } from '../types'
@@ -441,10 +441,10 @@ export default function Laboratory() {
         { label: 'بیمار', value: patient ? `${patient.first_name} ${patient.last_name}` : '-', highlight: true },
         { label: 'لابراتوار', value: lab?.name || '-' },
         { label: 'نوع کار', value: workTypes.find((w) => w.value === orderForm.work_type)?.label || orderForm.work_type },
-        { label: 'موعد', value: orderForm.deadline ? toJalaliString(orderForm.deadline) : '-' },
+        { label: 'موعد', value: orderForm.deadline ? toJalaliShort(orderForm.deadline) : '-' },
         { label: 'هزینه', value: orderForm.cost ? `${formatCurrency(Number(orderForm.cost))} ت` : '-' },
         { label: 'مکان قفسه', value: formatShelfLocation({ shelf: orderForm.shelf, shelf_number: orderForm.shelf_number, shelf_space: orderForm.shelf_space }) || '-' },
-        { label: 'یادآور', value: orderForm.alarm_date ? toJalaliString(orderForm.alarm_date) : '-' },
+        { label: 'یادآور', value: orderForm.alarm_date ? toJalaliShort(orderForm.alarm_date) : '-' },
       ],
       confirmLabel: editingOrder ? 'ذخیره' : 'ثبت سفارش',
       onConfirm: async () => {

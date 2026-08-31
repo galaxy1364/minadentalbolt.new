@@ -8,7 +8,7 @@ import { describe, it, expect } from 'vitest'
 import {
   toJalaliString, isJalaliLeapYear, jalaliToGregorian,
   toPersianDigits, toEnglishDigits, formatCurrency, todayLocalISO,
-  getJalaliDateInfo, toJalaliStringPretty,
+  getJalaliDateInfo, toJalaliStringPretty, toJalaliShort,
 } from './persianDate'
 
 describe('تبدیل میلادی ↔ شمسی', () => {
@@ -127,6 +127,35 @@ describe('MOD-FIX-014 | تاریخ خوانا با رقم فارسی نوشته 
   })
 
   it('قالب ماشینی دست‌نخورده می‌ماند — کلید مقایسه است، نه متن', () => {
+    expect(toJalaliString('2026-08-31')).toBe('1405/06/09')
+  })
+})
+
+describe('MOD-FIX-018 | تاریخ فشرده‌ی نمایشی', () => {
+  /**
+   * سه تابع تاریخ، هرکدام یک کار: کلید، نمایش فشرده، نمایش خوانا. این
+   * تست مرزشان را قفل می‌کند، چون همین مرز بود که گم شد و صفحه‌ها تاریخ
+   * لاتین کنار ساعت فارسی نشان دادند.
+   */
+  it('همان قالب toJalaliString را با رقم فارسی می‌دهد', () => {
+    expect(toJalaliShort('2026-08-31')).toBe('۱۴۰۵/۰۶/۰۹')
+  })
+
+  it('طولش با نسخه‌ی لاتین یکی است — چیدمان جدول جابه‌جا نمی‌شود', () => {
+    expect(toJalaliShort('2026-08-31')).toHaveLength(toJalaliString('2026-08-31').length)
+  })
+
+  it('هیچ رقم لاتینی باقی نمی‌ماند', () => {
+    expect(toJalaliShort('2026-03-21')).not.toMatch(/[0-9]/)
+  })
+
+  it('تاریخ خالی یا نامعتبر همچنان رشته‌ی خالی است', () => {
+    expect(toJalaliShort('')).toBe('')
+    expect(toJalaliShort('نه-یک-تاریخ')).toBe('')
+  })
+
+  it('قالب کلید دست‌نخورده می‌ماند', () => {
+    // getHoliday() و PersianCalendar با همین رشته مقایسه می‌کنند.
     expect(toJalaliString('2026-08-31')).toBe('1405/06/09')
   })
 })

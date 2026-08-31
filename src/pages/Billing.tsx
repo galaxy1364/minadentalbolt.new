@@ -9,7 +9,7 @@ import { BarChart, Bar, XAxis, YAxis, Tooltip as RTooltip, ResponsiveContainer, 
 import { fetchPayments, createPayment, updatePayment, fetchEncounters, fetchCheques, createCheque, updateCheque, fetchPaymentPlans, createPaymentPlan, updatePaymentPlan, updateInstallment, fetchPatients, fetchExpenses, createExpense, updateExpense, deactivateExpense, fetchTreatments, fetchImplantCases, fetchDoctors } from '../lib/api'
 import { buildSchedule, splitAmount, planProgress, reconcilePlan } from '../lib/installments'
 import { checkOverpayment } from '../lib/finance'
-import { toJalaliString, toJalaliStringPretty, formatCurrency, formatNumber, toPersianDigits, toEnglishDigits } from '../lib/persianDate'
+import { toJalaliString, toJalaliStringPretty, formatCurrency, formatNumber, toPersianDigits, toEnglishDigits, toJalaliShort} from '../lib/persianDate'
 import { h } from '../lib/haptics'
 import { useConfirmAction } from '../components/ConfirmAction'
 import { Payment, Encounter, Cheque, PaymentPlan, PaymentPlanWithRelations, Patient, Expense, Treatment, ImplantCase, Installment } from '../types'
@@ -374,7 +374,7 @@ export default function Billing() {
         { label: 'مبلغ', value: `${formatCurrency(Number(paymentForm.amount))} ت` },
         ...(paymentForm.discountPercent && Number(paymentForm.discountPercent) > 0 ? [{ label: 'تخفیف اعمال‌شده', value: `${toPersianDigits(paymentForm.discountPercent)}٪` }] : []),
         { label: 'روش', value: paymentMethods.find((m) => m.value === paymentForm.payment_method)?.label || paymentForm.payment_method },
-        { label: 'تاریخ', value: toJalaliString(paymentForm.payment_date) },
+        { label: 'تاریخ', value: toJalaliShort(paymentForm.payment_date) },
       ],
       confirmLabel: 'ثبت',
       onConfirm: async () => {
@@ -407,7 +407,7 @@ export default function Billing() {
         { label: 'بیمار', value: patient ? `${patient.first_name} ${patient.last_name}` : '-', highlight: true },
         { label: 'مبلغ', value: `${formatCurrency(Number(chequeForm.amount))} ت` },
         { label: 'بانک', value: chequeForm.bank_name || '-' },
-        { label: 'سررسید', value: toJalaliString(chequeForm.due_date) },
+        { label: 'سررسید', value: toJalaliShort(chequeForm.due_date) },
       ],
       confirmLabel: 'ثبت چک',
       onConfirm: async () => {
@@ -603,7 +603,7 @@ export default function Billing() {
       title: 'پرداخت قسط',
       fields: [
         { label: 'قسط', value: `قسط ${toPersianDigits(installment.installment_number)} — ${formatCurrency(installment.amount)} ت`, highlight: true },
-        { label: 'تاریخ', value: toJalaliString(new Date().toISOString().slice(0, 10)) },
+        { label: 'تاریخ', value: toJalaliShort(new Date().toISOString().slice(0, 10)) },
       ],
       confirmLabel: 'تایید پرداخت',
       onConfirm: async () => {
@@ -1128,7 +1128,7 @@ export default function Billing() {
                       <span className="text-error-600 font-medium">{toPersianDigits(prog.overdueCount)} قسط سررسید گذشته</span>
                     )}
                     {prog.nextDue && (
-                      <span className="text-slate-500">قسط بعدی: {toJalaliString(prog.nextDue)}</span>
+                      <span className="text-slate-500">قسط بعدی: {toJalaliShort(prog.nextDue)}</span>
                     )}
                   </div>
                   {!check.ok && (
@@ -1289,7 +1289,7 @@ export default function Billing() {
                     <tr key={e.id} className="border-b border-slate-50 hover:bg-slate-50 transition-all-smooth">
                       <td className="px-4 py-3 font-medium text-slate-800">{e.category}</td>
                       <td className="px-4 py-3 text-error-600 font-bold">{formatCurrency(e.amount)} ت</td>
-                      <td className="px-4 py-3 text-slate-600">{e.date ? toJalaliString(e.date) : '-'}</td>
+                      <td className="px-4 py-3 text-slate-600">{e.date ? toJalaliShort(e.date) : '-'}</td>
                       <td className="px-4 py-3 text-slate-500 max-w-[200px] truncate">{e.description || '-'}</td>
                       <td className="px-4 py-3">
                         <button onClick={() => openEditExpense(e)} aria-label="ویرایش هزینه" className="text-slate-400 hover:text-primary-600 hover:bg-primary-50 p-1.5 rounded-lg transition-colors"><Edit2 size={15} /></button>

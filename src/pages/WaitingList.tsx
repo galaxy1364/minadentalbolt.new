@@ -4,7 +4,7 @@ import { useNavigate } from 'react-router-dom'
 import { Clock, Search, Plus, Phone, Bell, CheckCircle2, XCircle, Calendar, Smile, AlertCircle, Edit2, Trash2 } from 'lucide-react'
 import { BarChart, Bar, XAxis, YAxis, Tooltip as RTooltip, ResponsiveContainer, Cell } from 'recharts'
 import { fetchWaitingList, createWaitingEntry, updateWaitingEntry, cancelWaitingEntry, fetchPatients, fetchDoctors, createAppointment, fetchUnits, checkConflict } from '../lib/api'
-import { toJalaliString, toJalaliStringPretty, formatTime, formatNumber, toPersianDigits } from '../lib/persianDate'
+import { toJalaliString, toJalaliStringPretty, formatTime, formatNumber, toPersianDigits, toJalaliShort} from '../lib/persianDate'
 import { h } from '../lib/haptics'
 import { useConfirmAction } from '../components/ConfirmAction'
 import { WaitingListEntry, WaitingListEntryWithRelations, Patient, Doctor, Unit } from '../types'
@@ -426,7 +426,7 @@ export default function WaitingList() {
                       {e.preferred_date && (
                         <span className="flex items-center gap-1">
                           <Calendar size={12} />
-                          {toJalaliString(e.preferred_date)}
+                          {toJalaliShort(e.preferred_date)}
                           {e.preferred_time && ` - ${formatTime(e.preferred_time)}`}
                         </span>
                       )}
