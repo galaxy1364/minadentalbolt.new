@@ -6,3 +6,10 @@ dist/
 # Never commit secrets — see MOD-SEC-002
 .env
 .env.local
+
+# Playwright
+test-results/
+playwright-report/
+
+# E2E credentials — never commit
+.env.e2e
