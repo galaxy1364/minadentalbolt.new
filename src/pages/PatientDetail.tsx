@@ -73,14 +73,19 @@ const paymentStatuses: { value: string; label: string; color: string }[] = [
   { value: 'failed', label: 'ناموفق', color: 'error' },
 ]
 
+// MOD-FEAT-019: keys match the event_type values api.ts actually writes.
+// The previous map listed 'appointment', 'treatment', 'payment',
+// 'prescription' and 'encounter' — none of which was ever written by
+// anything, because the timeline had a single writer. Keeping unwritten
+// keys alongside the real ones just invites the next person to pick the
+// wrong one.
 const timelineIcons: Record<string, React.ReactNode> = {
   patient_created: <Smile size={16} />,
-  appointment: <Calendar size={16} />,
-  treatment: <Activity size={16} />,
-  payment: <CreditCard size={16} />,
-  prescription: <Pill size={16} />,
-  radiology: <ImageIcon size={16} />,
-  encounter: <FileText size={16} />,
+  appointment_created: <Calendar size={16} />,
+  encounter_created: <FileText size={16} />,
+  treatment_created: <Activity size={16} />,
+  lab_order_created: <FlaskConical size={16} />,
+  implant_case_created: <Bone size={16} />,
   default: <Clock size={16} />,
 }
 

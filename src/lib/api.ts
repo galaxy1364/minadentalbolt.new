@@ -1,5 +1,6 @@
 // Minadent - Offline-first API layer
 // All reads come from local IndexedDB (instant). All writes go to local DB + sync queue.
+import { toJalaliString } from './persianDate'
 import { supabase, CLINIC_ID } from './supabase'
 import { db } from './db'
 import type { PatientPolicy } from './insurance'
@@ -161,6 +162,8 @@ export async function createAppointment(a: AppointmentInput): Promise<Appointmen
   }
   await db.appointments.put(appt)
   await queueOperation('appointments', 'insert', id, appt)
+  await logToTimeline(appt.patient_id, 'appointment_created', 'نوبت جدید',
+    `نوبت ${toJalaliString(appt.date)} ساعت ${appt.start_time || '-'}`, id)
   return appt
 }
 
@@ -256,6 +259,8 @@ export async function createEncounter(e: EncounterInput): Promise<Encounter> {
   const enc: Encounter = { ...rest, id, clinic_id: CLINIC_ID, created_at: nowISO(), updated_at: nowISO(), sync_version: 1 }
   await db.encounters.put(enc)
   await queueOperation('encounters', 'insert', id, enc)
+  await logToTimeline(enc.patient_id, 'encounter_created', 'ویزیت',
+    enc.chief_complaint ? `ویزیت باز شد — ${enc.chief_complaint}` : 'ویزیت باز شد', id)
   return enc
 }
 
@@ -286,6 +291,8 @@ export async function createTreatment(t: TreatmentInput): Promise<Treatment> {
   const treatment: Treatment = { ...rest, id, clinic_id: CLINIC_ID, created_at: nowISO(), updated_at: nowISO(), sync_version: 1 }
   await db.treatments.put(treatment)
   await queueOperation('treatments', 'insert', id, treatment)
+  await logToTimeline(treatment.patient_id, 'treatment_created', 'درمان ثبت شد',
+    `${treatment.procedure_name || 'رویه'}${treatment.tooth_number ? ` — دندان ${treatment.tooth_number}` : ''}`, id)
   return treatment
 }
 
@@ -374,6 +381,8 @@ export async function createLabOrder(l: LabOrderInput): Promise<LabOrder> {
   const order: LabOrder = { ...rest, id, clinic_id: CLINIC_ID, created_at: nowISO(), updated_at: nowISO() }
   await db.lab_orders.put(order)
   await queueOperation('lab_orders', 'insert', id, order)
+  await logToTimeline(order.patient_id, 'lab_order_created', 'سفارش لابراتوار',
+    `${order.work_type || 'سفارش'}${order.tooth_number ? ` — دندان ${order.tooth_number}` : ''}`, id)
   return order
 }
 
@@ -442,17 +451,58 @@ export async function fetchTimeline(patientId: string): Promise<PatientTimeline[
   return items.sort((a, b) => (b.event_date || '').localeCompare(a.event_date || ''))
 }
 
-export async function addTimelineEntry(patientId: string, eventType: string, title: string, description?: string): Promise<PatientTimeline> {
+export async function addTimelineEntry(
+  patientId: string,
+  eventType: string,
+  title: string,
+  description?: string,
+  referenceId?: string | null,
+): Promise<PatientTimeline> {
   const id = uid()
   const entry: PatientTimeline = {
     id, clinic_id: CLINIC_ID, patient_id: patientId,
     event_type: eventType, title, description: description ?? null,
-    reference_id: null, metadata: null,
+    reference_id: referenceId ?? null, metadata: null,
     event_date: nowISO(), created_at: nowISO(),
   }
   await db.patient_timeline.put(entry)
   await queueOperation('patient_timeline', 'insert', id, entry)
   return entry
+}
+
+/**
+ * MOD-FEAT-019 | نوشتن رویداد روی تایم‌لاین بیمار
+ *
+ * Until now addTimelineEntry had exactly one caller — patient
+ * registration — so every timeline showed one line and then nothing,
+ * forever. Appointments, visits, treatments, lab cases and implants all
+ * happened without leaving a trace on the one screen that is meant to be
+ * the patient's history.
+ *
+ * These hooks sit here rather than in the pages deliberately. A page is a
+ * path, and a path can be forgotten — that is exactly how the visit total
+ * drifted (MOD-FIX-008) and how editing a treatment stopped reaching the
+ * lab (MOD-FIX-007). Every route into these records already passes
+ * through these functions, so a future screen gets the timeline for free.
+ *
+ * A timeline entry is a record OF something, never the thing itself, so
+ * failing to write one must not take the real record down with it.
+ * Losing a history line is bad; losing the treatment it describes is not
+ * acceptable. Hence the swallow.
+ */
+async function logToTimeline(
+  patientId: string | null | undefined,
+  eventType: string,
+  title: string,
+  description: string,
+  referenceId: string,
+): Promise<void> {
+  if (!patientId) return
+  try {
+    await addTimelineEntry(patientId, eventType, title, description, referenceId)
+  } catch {
+    /* intentionally swallowed — see the note above */
+  }
 }
 
 // ── Waiting List ─────────────────────────────────────────────
@@ -743,6 +793,8 @@ export async function createImplantCase(c: ImplantCaseInput): Promise<ImplantCas
   const ic: ImplantCase = { ...rest, is_active: (rest as any).is_active ?? true, id, clinic_id: CLINIC_ID, created_at: nowISO(), updated_at: nowISO() }
   await db.implant_cases.put(ic)
   await queueOperation('implant_cases', 'insert', id, ic)
+  await logToTimeline(ic.patient_id, 'implant_case_created', 'مورد ایمپلنت',
+    `ایمپلنت${ic.tooth_number ? ` دندان ${ic.tooth_number}` : ''} ثبت شد`, id)
   return ic
 }
 
