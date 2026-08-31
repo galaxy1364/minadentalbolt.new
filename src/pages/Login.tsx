@@ -17,7 +17,7 @@ function normalizeIranPhone(raw: string): string | null {
 }
 
 export default function Login() {
-  const { signIn } = useAuth()
+  const { signIn, notice } = useAuth()
   const [mode, setMode] = useState<Mode>('email')
   const [email, setEmail] = useState('')
   const [phone, setPhone] = useState('')
@@ -154,6 +154,13 @@ export default function Login() {
 
               {error && (
                 <p className="text-sm text-error-600 bg-error-50 dark:bg-error-900/20 dark:text-error-400 rounded-lg px-3 py-2">{error}</p>
+              )}
+              {/* MOD-FIX-009: a session that ended for a reason other than
+                  a bad password used to end in silence — the login screen
+                  simply came back. Shown separately from `error` because
+                  it survives across the sign-out that produced it. */}
+              {notice && !error && (
+                <p className="text-sm text-warning-700 bg-warning-50 dark:bg-warning-900/20 dark:text-warning-400 rounded-lg px-3 py-2">{notice}</p>
               )}
               {resetSent && (
                 <p className="text-sm text-success-700 bg-success-50 dark:bg-success-900/20 dark:text-success-400 rounded-lg px-3 py-2 flex items-center gap-1.5">

@@ -2,6 +2,7 @@
 import { useState, useEffect, useCallback, useMemo } from 'react'
 import { Users, Search, Plus, Phone, Mail, Calendar, DollarSign, Smile, Briefcase, Edit2, Trash2, Stethoscope, Calculator, Award, TrendingUp, Percent, UserCheck, ChevronDown, ChevronUp, Shield, Lock, Unlock, RotateCcw } from 'lucide-react'
 import { PieChart, Pie, Cell, Tooltip as RTooltip, ResponsiveContainer } from 'recharts'
+import { staffSaveMessage, LoginOutcome } from '../lib/staffSaveOutcome'
 import { fetchStaff, createStaff, updateStaff, fetchEncounters, fetchLabOrders, fetchTreatments, createExpense, fetchDoctors, fetchStaffLoginStatuses, setStaffLoginActive } from '../lib/api'
 import { CLINIC_ID, supabase } from '../lib/supabase'
 import { toJalaliString, toJalaliStringPretty, formatCurrency, formatNumber, toPersianDigits } from '../lib/persianDate'
@@ -349,19 +350,25 @@ export default function Staff() {
         setSaving(true)
         try {
           let savedStaff
+          // MOD-FIX-009: the outcome toast is deliberately NOT fired here.
+          // Saving staff and creating their login are two writes, and
+          // announcing the first one succeeded — before the second is
+          // even attempted — is what made a failed account look fine.
+          const saveMode: 'created' | 'updated' = editingId ? 'updated' : 'created'
+          let loginOutcome: LoginOutcome = 'not_requested'
+          let loginFailureReason = ''
+
           if (editingId) {
             savedStaff = await updateStaff(editingId, payload)
-            showToast('success', 'پرسنل با موفقیت ویرایش شد')
           } else {
             savedStaff = await createStaff(payload)
-            showToast('success', 'پرسنل با موفقیت اضافه شد')
           }
 
           if (formData.create_login) {
             if (!formData.email && !formData.phone) {
-              showToast('error', 'برای ساخت حساب ورود، ایمیل یا موبایل لازم است')
+              loginOutcome = 'failed'; loginFailureReason = 'ایمیل یا موبایل وارد نشده بود'
             } else if (!formData.login_password || formData.login_password.length < 6) {
-              showToast('error', 'رمز عبور موقت باید حداقل ۶ کاراکتر باشد')
+              loginOutcome = 'failed'; loginFailureReason = 'رمز عبور موقت باید حداقل ۶ کاراکتر باشد'
             } else {
               try {
                 // If this staff member is a doctor, syncDoctorRecordForStaff
@@ -400,14 +407,17 @@ export default function Staff() {
                   throw new Error(serverMessage)
                 }
                 if (inviteData?.error) throw new Error(inviteData.error)
-                showToast('success', 'حساب ورود ساخته شد')
+                loginOutcome = 'created'
               } catch (inviteErr) {
                 console.error('Error creating login:', inviteErr)
-                const msg = inviteErr instanceof Error ? inviteErr.message : ''
-                showToast('error', msg ? `خطا در ساخت حساب ورود: ${msg}` : 'خطا در ساخت حساب ورود')
+                loginOutcome = 'failed'
+                loginFailureReason = inviteErr instanceof Error ? inviteErr.message : ''
               }
             }
           }
+
+          const outcome = staffSaveMessage(saveMode, loginOutcome, loginFailureReason)
+          showToast(outcome.type, outcome.text)
 
           setModalOpen(false)
           loadData()

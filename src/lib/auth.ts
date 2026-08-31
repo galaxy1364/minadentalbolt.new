@@ -19,6 +19,15 @@ interface AuthState {
   loading: boolean
   signIn: (email: string, password: string) => Promise<{ error: string | null }>
   signOut: () => Promise<void>
+  /**
+   * MOD-FIX-009: why the last session ended, when it ended for a reason
+   * the password was not responsible for. A suspended account was signed
+   * straight back out with no message at all, so the login screen simply
+   * reappeared — indistinguishable from a wrong password, and impossible
+   * to diagnose from the phone.
+   */
+  notice: string | null
+  clearNotice: () => void
 }
 
 const AuthContext = createContext<AuthState | null>(null)
@@ -27,6 +36,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [session, setSession] = useState<Session | null>(null)
   const [profile, setProfile] = useState<StaffProfile | null>(null)
   const [loading, setLoading] = useState(true)
+  const [notice, setNotice] = useState<string | null>(null)
 
   async function loadProfile(userId: string) {
     const { data, error } = await supabase.from('users').select('id, clinic_id, full_name, role, doctor_id, is_active').eq('id', userId).maybeSingle()
@@ -38,16 +48,24 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       // them in, which is what happened before this check existed.
       await supabase.auth.signOut()
       setProfile(null)
+      setNotice('دسترسی این حساب غیرفعال شده است — با مدیر کلینیک تماس بگیرید')
       currentActor.name = null
       currentActor.role = null
       return
     }
     if (!error && data) {
       setProfile(data as StaffProfile)
+      setNotice(null)
       currentActor.name = (data as StaffProfile).full_name
       currentActor.role = (data as StaffProfile).role
     } else {
+      // The password was accepted but this user has no row in `users`,
+      // so they have no clinic and no role. canAccess() correctly limits
+      // them to the dashboard, but without a word of explanation the app
+      // just looks broken. This happens when invite-staff creates the
+      // auth user and then fails to insert the profile row.
       setProfile(null)
+      setNotice('حساب شما به هیچ کلینیکی وصل نیست — با مدیر کلینیک تماس بگیرید')
       currentActor.name = null
       currentActor.role = null
     }
@@ -96,6 +114,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [])
 
   async function signIn(identifier: string, password: string) {
+    setNotice(null)
     const isPhone = identifier.startsWith('+')
     const { error } = isPhone
       ? await supabase.auth.signInWithPassword({ phone: identifier, password })
@@ -119,7 +138,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }
 
   return createElement(AuthContext.Provider, {
-    value: { session, user: session?.user ?? null, profile, loading, signIn, signOut },
+    value: { session, user: session?.user ?? null, profile, loading, signIn, signOut, notice, clearNotice: () => setNotice(null) },
   }, children)
 }
 
