@@ -113,6 +113,27 @@ export interface OverpaymentCheck {
  * refusing it would be wrong. Doing it without anyone noticing is what
  * was wrong.
  */
+/**
+ * MOD-FIX-008 | جمع مالی یک ویزیت
+ *
+ * `encounters.total_amount` is a stored, denormalised copy of "what this
+ * visit costs". Four different places changed a visit's treatments and
+ * only two of them wrote that field back, each with its own arithmetic —
+ * one recomputed from scratch, the other added a delta to the stored
+ * value. Editing a price or cancelling a treatment updated neither, so
+ * the stored figure drifted away from reality and stayed there.
+ *
+ * The filter matches calcPatientBalance() deliberately: a cancelled
+ * treatment is not billable, so it must not appear in a visit's total
+ * either. Two numbers describing the same money disagreeing is worse
+ * than either of them being wrong on its own.
+ */
+export function calcEncounterTotal(treatments: Treatment[], encounterId: string): number {
+  return treatments
+    .filter((t) => t.encounter_id === encounterId && t.status !== 'cancelled')
+    .reduce((sum, t) => sum + (t.total_price || 0), 0)
+}
+
 export function checkOverpayment(amount: number, remaining: number): OverpaymentCheck {
   const excess = Math.round(amount) - Math.round(remaining)
   if (excess <= 0 || amount <= 0) {

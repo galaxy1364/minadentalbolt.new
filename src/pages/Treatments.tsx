@@ -26,6 +26,7 @@ import { ModuleHeader, ModuleStatCard, ReorderableStatGrid } from '../components
 import { useConfirmAction } from '../components/ConfirmAction'
 import { h } from '../lib/haptics'
 import { findLinkedLabOrder, decideLabHandoff } from '../lib/labHandoff'
+import { calcEncounterTotal } from '../lib/finance'
 import DentalChart from '../components/DentalChart'
 import { CurrencyInput } from '../components/CurrencyInput'
 import { logError } from '../lib/errorLog'
@@ -246,12 +247,7 @@ export default function Treatments() {
       setBulkModalOpen(false)
       setBasket([])
 
-      if (bulkEncounterId) {
-        const existing = treatments
-          .filter((t) => t.encounter_id === bulkEncounterId && t.status !== 'cancelled')
-          .reduce((s, t) => s + (t.total_price || 0), 0)
-        await updateEncounter(bulkEncounterId, { total_amount: existing + newTotal } as never)
-      }
+      if (bulkEncounterId) await syncEncounterTotal(bulkEncounterId)
       await loadData()
     } catch (err) {
       logError(err, 'react', 'handleSaveBulk')
@@ -783,6 +779,7 @@ export default function Treatments() {
           if (editingTreat) {
             await updateTreatment(editingTreat.id, payload)
             await applyLabAction()
+            await syncEncounterTotal(treatEncounterId)
             showToast('success', `درمان ویرایش شد${labMessage}`)
           } else {
             await createTreatment(payload)
@@ -802,12 +799,11 @@ export default function Treatments() {
             // already correctly derived from treatments.total_price via
             // calcPatientBalance() — no separate record needed until
             // the patient actually pays through Billing → ثبت پرداخت.
-            // Update encounter total
-            const encTreatments = treatments.filter((t) => t.encounter_id === treatEncounterId && t.status !== 'cancelled')
-            const newTotal = encTreatments.reduce((s, t) => s + (t.total_price || 0), 0) + total
-            await updateEncounter(treatEncounterId, { total_amount: newTotal } as any)
+            const encounterTotal = await syncEncounterTotal(treatEncounterId)
             if (treatForm.go_to_billing) {
-              navigate('/billing', { state: { openPaymentForPatientId: treatPatientId, suggestedAmount: newTotal, fromEncounterId: treatEncounterId } })
+              // Billing is handed the freshly recomputed figure, not a
+              // locally accumulated one — it prefills the payment amount.
+              navigate('/billing', { state: { openPaymentForPatientId: treatPatientId, suggestedAmount: encounterTotal, fromEncounterId: treatEncounterId } })
               return
             }
           }
@@ -821,6 +817,19 @@ export default function Treatments() {
         finally { setSavingTreat(false) }
       },
     })
+  }
+
+  /**
+   * MOD-FIX-008: every path that changes a visit's treatments ends here.
+   * It re-reads the treatments rather than adjusting the stored figure by
+   * a delta, because a delta is only correct if every previous write was
+   * correct — and two of the four paths never wrote at all.
+   */
+  const syncEncounterTotal = async (encounterId: string): Promise<number> => {
+    const fresh = await fetchTreatments()
+    const total = calcEncounterTotal(fresh as unknown as Treatment[], encounterId)
+    await updateEncounter(encounterId, { total_amount: total } as any)
+    return total
   }
 
   const handleDeleteTreatment = (t: Treatment) => {
@@ -849,6 +858,7 @@ export default function Treatments() {
         try {
           await updateTreatment(t.id, { status: 'cancelled' })
           if (linkedOrder) await updateLabOrder(linkedOrder.id, { status: 'cancelled' })
+          if (t.encounter_id) await syncEncounterTotal(t.encounter_id)
           showToast('success', linkedOrder ? 'درمان لغو و سفارش لابراتوار مرتبط لغو شد' : 'درمان لغو شد — در پرونده باقی ماند')
           await loadData()
         }
