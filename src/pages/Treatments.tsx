@@ -27,6 +27,7 @@ import { useConfirmAction } from '../components/ConfirmAction'
 import { h } from '../lib/haptics'
 import { findLinkedLabOrder, decideLabHandoff } from '../lib/labHandoff'
 import { calcEncounterTotal } from '../lib/finance'
+import { startingStepIndex, toothStepMode, seededSummary } from '../lib/treatmentWizardFlow'
 import DentalChart from '../components/DentalChart'
 import { CurrencyInput } from '../components/CurrencyInput'
 import { logError } from '../lib/errorLog'
@@ -1158,7 +1159,7 @@ export default function Treatments() {
             {/* Dental Chart */}
             <div>
               <h4 className="text-xs font-bold text-slate-500 mb-3 uppercase tracking-wider flex items-center gap-1.5"><Smile size={14} /> چارت دندانی (پالمر)</h4>
-              <DentalChart toothRecords={toothRecords} treatments={encounterTreatments} onUpdateTooth={handleUpdateTooth} onToothSelect={(toothNum) => setLastSelectedTooth(toothNum)} onAddTreatment={(toothNum) => { if (!detailEnc) return; setTreatEncounterId(detailEnc.id); setTreatPatientId(detailEnc.patient_id); setEditingTreat(null); setTreatWizardStep(0); setTreatForm({ procedure_code: '', procedure_name: '', procedure_category: '', tooth_number: toothNum, tooth_surface: '', quantity: '1', unit_price: '', discount: '', total_price: '', status: 'planned', notes: '', has_lab: false, lab_id: '', lab_cost: '', lab_work_type: '', lab_material: '', lab_shade: '', go_to_billing: false }); setTreatModalOpen(true) }} />
+              <DentalChart toothRecords={toothRecords} treatments={encounterTreatments} onUpdateTooth={handleUpdateTooth} onToothSelect={(toothNum) => setLastSelectedTooth(toothNum)} onAddTreatment={(toothNum) => { if (!detailEnc) return; setTreatEncounterId(detailEnc.id); setTreatPatientId(detailEnc.patient_id); setEditingTreat(null); /* MOD-FEAT-021: the tooth came from the chart, so the wizard opens past the question it already answers */ setTreatWizardStep(startingStepIndex({ toothNumber: toothNum })); setTreatForm({ procedure_code: '', procedure_name: '', procedure_category: '', tooth_number: toothNum, tooth_surface: '', quantity: '1', unit_price: '', discount: '', total_price: '', status: 'planned', notes: '', has_lab: false, lab_id: '', lab_cost: '', lab_work_type: '', lab_material: '', lab_shade: '', go_to_billing: false }); setTreatModalOpen(true) }} />
             </div>
 
             {/* Treatments list */}
@@ -1261,8 +1262,44 @@ export default function Treatments() {
         saving={savingTreat}
         steps={[
           {
-            label: 'رویه درمانی',
-            validate: () => (!treatForm.procedure_name.trim() ? 'نام رویه الزامی است' : null),
+            label: 'دندان و سطح',
+            validate: () => (!treatForm.tooth_number ? 'انتخاب دندان الزامی است' : null),
+            content: (
+              <>
+                {/* MOD-FEAT-021: a tooth tapped on the chart is shown as
+                    settled, not asked again. It stays visible and
+                    changeable — a wizard silently carrying an invisible
+                    tooth is how the wrong tooth gets billed. */}
+                {toothStepMode({ toothNumber: treatForm.tooth_number, isEditing: !!editingTreat }) === 'confirm' ? (
+                  <div className="flex items-center justify-between gap-3 rounded-xl border border-primary-200 bg-primary-50 dark:bg-primary-900/20 px-4 py-3">
+                    <span className="text-sm font-bold text-primary-800 dark:text-primary-300">
+                      {seededSummary(
+                        { toothNumber: toPersianDigits(treatForm.tooth_number), toothSurface: treatForm.tooth_surface },
+                        (v) => ({ occlusal: 'اکلوزال', mesial: 'مزیال', distal: 'دیستال', buccal: 'باکال', lingual: 'لینگوال' }[v] || v),
+                      )}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => { h.tap(); setTreatForm((p) => ({ ...p, tooth_number: '' })) }}
+                      className="text-xs font-semibold text-primary-700 dark:text-primary-400 hover:underline shrink-0"
+                    >
+                      تغییر دندان
+                    </button>
+                  </div>
+                ) : (
+                  <PalmerToothPicker value={treatForm.tooth_number} onChange={(v) => setTreatForm((p) => ({ ...p, tooth_number: v }))} />
+                )}
+                <Select label="سطح دندان" value={treatForm.tooth_surface} onChange={(v) => setTreatForm((p) => ({ ...p, tooth_surface: v }))} options={[
+                    { value: 'occlusal', label: 'اکلوزال' }, { value: 'mesial', label: 'مزیال' },
+                    { value: 'distal', label: 'دیستال' }, { value: 'buccal', label: 'باکال' },
+                    { value: 'lingual', label: 'لینگوال' },
+                  ]} placeholder="انتخاب سطح..." />
+              </>
+            ),
+          },
+          {
+            label: 'رویه و هزینه',
+            validate: () => (!treatForm.procedure_name.trim() ? 'نام رویه الزامی است' : (!treatForm.unit_price || Number(treatForm.unit_price) <= 0) ? 'قیمت واحد الزامی است' : null),
             content: (
               <>
                 <div>
@@ -1314,20 +1351,6 @@ export default function Treatments() {
                   </select>
                 </div>
                 <Input label="نام رویه (دستی)" value={treatForm.procedure_name} onChange={(v) => setTreatForm((p) => ({ ...p, procedure_name: v }))} placeholder="نام رویه درمانی" />
-              </>
-            ),
-          },
-          {
-            label: 'دندان و هزینه',
-            validate: () => (!treatForm.tooth_number ? 'انتخاب دندان الزامی است' : (!treatForm.unit_price || Number(treatForm.unit_price) <= 0) ? 'قیمت واحد الزامی است' : null),
-            content: (
-              <>
-                <PalmerToothPicker value={treatForm.tooth_number} onChange={(v) => setTreatForm((p) => ({ ...p, tooth_number: v }))} />
-                <Select label="سطح دندان" value={treatForm.tooth_surface} onChange={(v) => setTreatForm((p) => ({ ...p, tooth_surface: v }))} options={[
-                    { value: 'occlusal', label: 'اکلوزال' }, { value: 'mesial', label: 'مزیال' },
-                    { value: 'distal', label: 'دیستال' }, { value: 'buccal', label: 'باکال' },
-                    { value: 'lingual', label: 'لینگوال' },
-                  ]} placeholder="انتخاب سطح..." />
                 <div className="grid grid-cols-3 gap-3">
                   <Input label="تعداد" value={treatForm.quantity} onChange={(v) => setTreatForm((p) => ({ ...p, quantity: v }))} type="number" dir="ltr" />
                   <div>
