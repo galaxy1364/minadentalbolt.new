@@ -142,9 +142,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, children)
 }
 
-function mapAuthError(message: string, status?: number): string {
+export function mapAuthError(message: string, status?: number): string {
   if (/invalid login credentials/i.test(message)) return 'ایمیل یا رمز عبور اشتباه است'
   if (/email not confirmed/i.test(message)) return 'ایمیل شما هنوز تایید نشده است'
+  // MOD-FIX-010: the server logs showed real attempts failing with
+  // 422 phone_provider_disabled. Phone sign-in is switched off in the
+  // Supabase project (it needs an SMS provider, which this clinic does
+  // not have yet), so the phone tab cannot succeed no matter what is
+  // typed. Saying so beats the generic message, which sent the user
+  // back to retype a password that was never the problem.
+  if (/phone.*disabled|phone_provider_disabled/i.test(message)) {
+    return 'ورود با شماره موبایل هنوز فعال نیست — با ایمیل وارد شوید'
+  }
   // Supabase returns 429 when too many attempts hit the same account or
   // IP in a short window. Retrying immediately makes it worse, so say
   // that plainly rather than inviting another attempt.
