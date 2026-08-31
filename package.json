@@ -12,7 +12,8 @@
     "verify": "node scripts/sync-sw-version.mjs && tsc --noEmit && vitest run && vite build",
     "e2e": "playwright test",
     "e2e:ui": "playwright test --ui",
-    "e2e:install": "playwright install --with-deps chromium"
+    "e2e:install": "playwright install --with-deps chromium",
+    "unverified": "node scripts/unverified.mjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.45.4",
