@@ -22,7 +22,8 @@ import { toJalaliString, toJalaliStringPretty, formatCurrency, formatNumber, toP
 import { Encounter, EncounterWithRelations, Treatment, Procedure, Patient, Doctor, Laboratory, ToothRecord, LabOrder, InsuranceClaim } from '../types'
 import { Card, Button, Badge, Spinner, EmptyState, Tabs, Input, Select, Textarea, Modal, Wizard, showToast } from '../components/ui'
 import { PersianDateInput } from '../components/PersianDateInput'
-import { PalmerToothPicker } from '../components/PalmerToothPicker'
+// MOD-FEAT-024: the same arch the chart draws, instead of a separate row of numbers.
+import { ToothArchSelect } from '../components/ToothArchSelect'
 import { ModuleHeader, ModuleStatCard, ReorderableStatGrid } from '../components/ModuleHeader'
 import { useConfirmAction } from '../components/ConfirmAction'
 import { h } from '../lib/haptics'
@@ -1303,7 +1304,7 @@ export default function Treatments() {
                     </button>
                   </div>
                 ) : (
-                  <PalmerToothPicker value={treatForm.tooth_number} onChange={(v) => setTreatForm((p) => ({ ...p, tooth_number: v }))} />
+                  <ToothArchSelect value={treatForm.tooth_number} onChange={(v) => setTreatForm((p) => ({ ...p, tooth_number: v }))} />
                 )}
                 <Select label="سطح دندان" value={treatForm.tooth_surface} onChange={(v) => setTreatForm((p) => ({ ...p, tooth_surface: v }))} options={[
                     { value: 'occlusal', label: 'اکلوزال' }, { value: 'mesial', label: 'مزیال' },
@@ -1547,7 +1548,7 @@ export default function Treatments() {
           )}
 
           <Card className="p-4 space-y-3">
-            <PalmerToothPicker value={bulkTooth} onChange={setBulkTooth} />
+            <ToothArchSelect value={bulkTooth} onChange={setBulkTooth} />
             <div className="flex items-end gap-2">
               <div className="flex-1">
                 <Select

@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import { surfaceSectors, mesialOnRight, centreLetter } from './surfaceGlyph'
-import type { ToothSurface } from '../components/DentalChart'
+import type { ToothSurface } from './toothConditions'
 
 const ALL: ToothSurface[] = ['mesial', 'distal', 'buccal', 'lingual', 'occlusal']
 

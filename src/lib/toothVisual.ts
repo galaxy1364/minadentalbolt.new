@@ -16,7 +16,7 @@
 // condition added to the union without a drawing decision should be
 // caught here, not discovered on an arch that renders wrong.
 
-import type { ToothCondition } from '../components/DentalChart'
+import type { ToothCondition } from './toothConditions'
 
 /** The three fundamentally different things that can occupy a socket. */
 export type ToothShape =

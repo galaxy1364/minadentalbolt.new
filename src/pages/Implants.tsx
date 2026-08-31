@@ -14,7 +14,8 @@ import { useConfirmAction } from '../components/ConfirmAction'
 import { ImplantCase, ImplantCaseWithRelations, ImplantComponent, Patient, Doctor } from '../types'
 import { Wizard, Card, Button, Input, Select, Textarea, Badge, Spinner, EmptyState, showToast } from '../components/ui'
 import { PersianDateInput } from '../components/PersianDateInput'
-import { PalmerToothPicker } from '../components/PalmerToothPicker'
+// MOD-FEAT-024: the same arch the chart draws, instead of a separate row of numbers.
+import { ToothArchSelect } from '../components/ToothArchSelect'
 import { readChartHandoff } from '../lib/chartHandoff'
 import { ModuleHeader, ModuleStatCard, ReorderableStatGrid } from '../components/ModuleHeader'
 import { CurrencyInput } from '../components/CurrencyInput'
@@ -990,7 +991,7 @@ export default function Implants() {
                   <Select label="پزشک" value={caseForm.doctor_id} onChange={(v) => setCaseForm({ ...caseForm, doctor_id: v })} options={doctorOptions} placeholder="انتخاب پزشک" />
                 )}
                 <div className="grid grid-cols-2 gap-3">
-                  <PalmerToothPicker label="دندان *" value={caseForm.tooth_number} onChange={(v) => setCaseForm({ ...caseForm, tooth_number: v })} allowPrimary={false} />
+                  <ToothArchSelect label="دندان *" value={caseForm.tooth_number} onChange={(v) => setCaseForm({ ...caseForm, tooth_number: v })} allowPrimary={false} />
                   <PersianDateInput label="تاریخ جراحی" value={caseForm.surgery_date} onChange={(v) => setCaseForm({ ...caseForm, surgery_date: v })} />
                 </div>
               </>

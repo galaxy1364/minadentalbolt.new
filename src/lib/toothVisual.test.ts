@@ -3,7 +3,7 @@ import {
   toothShape, hasRootFilling, hasCrownCap, toothKind,
   isUpperTooth, toothVisualLabel,
 } from './toothVisual'
-import type { ToothCondition } from '../components/DentalChart'
+import type { ToothCondition } from './toothConditions'
 
 /**
  * Every member of the union.

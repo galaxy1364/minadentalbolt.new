@@ -1,63 +1,105 @@
 // @vitest-environment jsdom
 /**
- * MOD-TEST-001 | اولین تست تعاملی واقعی
+ * MOD-FEAT-024 | تست تعاملی انتخابگر دندان
  *
- * تا امروز هر تستی در این پروژه منطق خالص را می‌سنجید. هیچ‌کدام کامپوننت
- * را رندر نمی‌کرد و روی چیزی کلیک نمی‌کرد — و دقیقاً به همین دلیل بود که
- * هر رفع UI در CHANGELOG با «تأیید بصری انجام نشده» تمام می‌شد.
+ * این تست قبلاً روی `PalmerToothPicker` بود — یک ردیف دکمه‌ی عددی که
+ * فقط در فرم‌ها استفاده می‌شد، در حالی که ویزیت دندان‌های تصویری چارت را
+ * نشان می‌داد. دو زبان برای یک کار.
  *
- * این فایل ثابت می‌کند بخشی از آن شکاف قابل بستن است: کامپوننت واقعاً در
- * jsdom رندر می‌شود، کلیک واقعی رخ می‌دهد، و نتیجه بررسی می‌شود.
- *
- * آنچه این روش می‌گیرد: ساختار، برچسب‌ها، رفتار کلیک، شرطی‌ها.
- * آنچه نمی‌گیرد: چیدمان، تداخل عناصر، رنگ، اسکرول، لمس روی صفحه‌ی واقعی.
- * jsdom چیزی را «نمایش» نمی‌دهد؛ فقط DOM را می‌سازد.
+ * حالا یک انتخابگر بیشتر وجود ندارد و همین‌جا تست می‌شود: رندر واقعی،
+ * کلیک واقعی، بررسی DOM.
  */
-import { describe, it, expect, vi } from 'vitest'
+import { describe, it, expect, vi, afterEach } from 'vitest'
 import { render, screen, cleanup } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { afterEach } from 'vitest'
-import { PalmerToothPicker } from '../components/PalmerToothPicker'
+import { ToothArchSelect } from '../components/ToothArchSelect'
 
 afterEach(cleanup)
 
-describe('انتخابگر دندان پالمر — تعامل واقعی', () => {
-  it('هر دو قوس دائمی رندر می‌شوند', () => {
-    render(<PalmerToothPicker value="" onChange={() => {}} />)
+describe('انتخابگر دندان — تعامل واقعی', () => {
+  it('هر دو فک رندر می‌شوند', () => {
+    render(<ToothArchSelect value="" onChange={() => {}} />)
     expect(screen.getByText('فک بالا')).toBeDefined()
     expect(screen.getByText('فک پایین')).toBeDefined()
   })
 
-  it('🔴 کلیک روی یک دندان، شماره‌ی FDI درست را برمی‌گرداند', () => {
+  it('🔴 هر ۳۲ دندان دائمی قابل انتخاب‌اند', () => {
+    render(<ToothArchSelect value="" onChange={() => {}} />)
+    expect(screen.getAllByRole('button', { name: /^دندان (UR|UL|LL|LR)/ })).toHaveLength(32)
+  })
+
+  it('🔴 کلیک روی یک دندان، شماره‌ی FDI آن را برمی‌گرداند', () => {
     const onChange = vi.fn()
-    render(<PalmerToothPicker value="" onChange={onChange} />)
-    // MOD-FEAT-023: برچسب‌ها حالا فارسی‌اند. این تست وقتی لاتین بودند
-    // آن را گرفت — و همان ایراد در همین جلسه رفع شد.
-    const eights = screen.getAllByText('۸')
-    expect(eights.length).toBeGreaterThan(0)
-    eights[0].click()
-    expect(onChange).toHaveBeenCalledTimes(1)
-    expect(['18', '28', '38', '48']).toContain(onChange.mock.calls[0][0])
+    render(<ToothArchSelect value="" onChange={onChange} />)
+    screen.getByRole('button', { name: 'دندان LL۸' }).click()
+    expect(onChange).toHaveBeenCalledWith('38')
   })
 
-  it('دندان انتخاب‌شده در DOM قابل تشخیص است', () => {
-    const { container } = render(<PalmerToothPicker value="18" onChange={() => {}} />)
-    const selected = container.querySelectorAll('.bg-primary-600, [class*="bg-primary-6"]')
-    expect(selected.length).toBeGreaterThan(0)
+  it('🔴 برچسب‌ها پالمرند، نه FDI — همان چیزی که مهدی دید', () => {
+    render(<ToothArchSelect value="" onChange={() => {}} />)
+    expect(screen.getByRole('button', { name: 'دندان UR۱' })).toBeDefined()
+    expect(screen.queryByRole('button', { name: 'دندان ۱۱' })).toBeNull()
   })
 
-  it('🔴 خط وسط دقیقاً یکی است — همان باگ MOD-FIX-006 روی DOM واقعی', async () => {
-    // تست منطقی قبلاً این را ثابت کرده بود؛ این بار روی خروجی رندرشده.
-    const { container } = render(<PalmerToothPicker value="" onChange={() => {}} />)
-    const dividers = container.querySelectorAll('.w-px')
-    // یک خط برای فک بالا، یک خط برای فک پایین.
-    expect(dividers.length).toBe(2)
+  it('دندان انتخاب‌شده با کلمه هم اعلام می‌شود', () => {
+    // روی قوسِ اسکرول‌شونده، دندان انتخابی ممکن است بیرون از دید باشد.
+    render(<ToothArchSelect value="38" onChange={() => {}} />)
+    expect(screen.getByText('انتخاب‌شده: LL۸')).toBeDefined()
   })
 
-  it('🔴 در حالت دندان شیری هم خط وسط هست', async () => {
+  it('بدون انتخاب، صریح می‌گوید چیزی انتخاب نشده', () => {
+    render(<ToothArchSelect value="" onChange={() => {}} />)
+    expect(screen.getByText('دندانی انتخاب نشده')).toBeDefined()
+  })
+
+  it('🔴 خط وسط دقیقاً یکی در هر فک است', () => {
+    const { container } = render(<ToothArchSelect value="" onChange={() => {}} />)
+    expect(container.querySelectorAll('.w-px').length).toBe(2)
+  })
+
+  it('🔴 حالت دندان شیری هم خط وسط دارد و ۲۰ دندان', async () => {
     const user = userEvent.setup()
-    const { container } = render(<PalmerToothPicker value="" onChange={() => {}} />)
+    const { container } = render(<ToothArchSelect value="" onChange={() => {}} />)
     await user.click(screen.getByText('دندان شیری'))
     expect(container.querySelectorAll('.w-px').length).toBe(2)
+    expect(screen.getAllByRole('button', { name: /^دندان (UR|UL|LL|LR)/ })).toHaveLength(20)
+  })
+
+  it('عوض کردن دائمی/شیری، انتخاب قبلی را پاک می‌کند', async () => {
+    // دندان ۳۸ در قوس شیری وجود ندارد؛ نگه‌داشتنش یعنی ارجاع به چیزی
+    // که روی صفحه نیست.
+    const onChange = vi.fn()
+    const user = userEvent.setup()
+    render(<ToothArchSelect value="38" onChange={onChange} />)
+    await user.click(screen.getByText('دندان شیری'))
+    expect(onChange).toHaveBeenCalledWith('')
+  })
+})
+
+/** قفل ساختاری: یک انتخابگر، همه‌جا. */
+import treatments from '../pages/Treatments.tsx?raw'
+import laboratory from '../pages/Laboratory.tsx?raw'
+import implants from '../pages/Implants.tsx?raw'
+import chart from '../components/DentalChart.tsx?raw'
+
+describe('🔴 یک انتخابگر دندان در تمام برنامه', () => {
+  const PAGES: [string, string][] = [
+    ['Treatments', treatments], ['Laboratory', laboratory], ['Implants', implants],
+  ]
+
+  it('هر سه فرم از قوس مشترک استفاده می‌کنند', () => {
+    for (const [name, src] of PAGES) {
+      expect(src, name).toContain('ToothArchSelect')
+    }
+  })
+
+  it('انتخابگر عددی جداگانه دیگر وجود ندارد', () => {
+    for (const [name, src] of PAGES) {
+      expect(src, `${name} هنوز PalmerToothPicker دارد`).not.toContain('<PalmerToothPicker')
+    }
+  })
+
+  it('چارت و فرم‌ها یک تصویر دندان دارند', () => {
+    expect(chart).toContain("from './ToothGlyph'")
   })
 })

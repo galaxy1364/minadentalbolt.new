@@ -23,7 +23,7 @@
 // record, so the side is derived from the FDI number rather than
 // assumed.
 
-import type { ToothSurface } from '../components/DentalChart'
+import type { ToothSurface } from './toothConditions'
 
 export interface SurfaceSector {
   surface: ToothSurface

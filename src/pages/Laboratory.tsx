@@ -14,7 +14,8 @@ import { useConfirmAction } from '../components/ConfirmAction'
 import type { LabOrder, Laboratory, Patient, Doctor, Treatment } from '../types'
 import { Wizard, Card, Button, Input, Select, Textarea, Badge, Spinner, EmptyState, showToast } from '../components/ui'
 import { PersianDateInput } from '../components/PersianDateInput'
-import { PalmerToothPicker } from '../components/PalmerToothPicker'
+// MOD-FEAT-024: the same arch the chart draws, instead of a separate row of numbers.
+import { ToothArchSelect } from '../components/ToothArchSelect'
 import { readChartHandoff } from '../lib/chartHandoff'
 import { useLocation } from 'react-router-dom'
 import { ModuleHeader, ModuleStatCard, ReorderableStatGrid } from '../components/ModuleHeader'
@@ -1115,7 +1116,7 @@ export default function Laboratory() {
                   )
                 })()}
                 <div className="grid grid-cols-2 gap-3">
-                  <PalmerToothPicker value={orderForm.tooth_number} onChange={(v) => setOrderForm((p) => ({ ...p, tooth_number: v }))} allowPrimary={false} />
+                  <ToothArchSelect value={orderForm.tooth_number} onChange={(v) => setOrderForm((p) => ({ ...p, tooth_number: v }))} allowPrimary={false} />
                   <Input label="رنگ" value={orderForm.shade} onChange={(v) => setOrderForm((p) => ({ ...p, shade: v }))} placeholder="مثال: A2" dir="ltr" />
                 </div>
                 <Select label="جنس" value={orderForm.material} onChange={(v) => setOrderForm((p) => ({ ...p, material: v }))} options={materials} />
