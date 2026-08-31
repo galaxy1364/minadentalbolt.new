@@ -77,3 +77,41 @@ export function toothLabelWithWord(value: string | number | null | undefined, fa
   const label = toothLabel(value)
   return label ? `دندان ${label}` : fallback
 }
+
+/**
+ * MOD-FIX-013 | نام فارسی سمت و فک دندان
+ *
+ * گزارش مهدی: «بالایی میشه بالا راست بیمار، پایینی میشه پایین چپ بیمار.»
+ *
+ * The quadrant prefix is an abbreviation a dentist reads fluently, but it
+ * is also the exact thing that was silently mirrored — and a wrong `UL`
+ * looks just as plausible as a right one. Spelling the side out next to
+ * the code means a flip is readable at a glance instead of needing to be
+ * decoded.
+ *
+ * «بیمار» is in the wording on purpose: right and left in a dental chart
+ * are always the patient's, never the viewer's, and that is precisely the
+ * confusion that produced the bug.
+ */
+export function toothSideLabel(value: string | number | null | undefined): string {
+  const q = toothQuadrantOf(value)
+  if (!q) return ''
+  const jaw = q === 'UR' || q === 'UL' ? 'بالا' : 'پایین'
+  const side = q === 'UR' || q === 'LR' ? 'راست' : 'چپ'
+  return `${jaw} ${side} بیمار`
+}
+
+/** ربع یک مقدار خام (رشته یا عدد)، یا null اگر دندان معتبری نباشد. */
+export function toothQuadrantOf(value: string | number | null | undefined): Quadrant | null {
+  const label = toothLabel(value)
+  const prefix = label.slice(0, 2)
+  return prefix === 'UR' || prefix === 'UL' || prefix === 'LL' || prefix === 'LR' ? prefix : null
+}
+
+/** «UR۱ — بالا راست بیمار» */
+export function toothFullLabel(value: string | number | null | undefined): string {
+  const label = toothLabel(value)
+  if (!label) return ''
+  const side = toothSideLabel(value)
+  return side ? `${label} — ${side}` : label
+}

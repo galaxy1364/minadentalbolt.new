@@ -136,3 +136,77 @@ describe('🔴 هیچ صفحه‌ای عدد خام دندان چاپ نمی‌�
     }
   })
 })
+
+/**
+ * MOD-FIX-013 | سمت بیمار
+ *
+ * گزارش مهدی: «بالایی میشه بالا راست بیمار، پایینی میشه پایین چپ بیمار.»
+ * او دندانی را زد که در چارت سمت چپِ صفحه بود و انتظار «راست بیمار» داشت؛
+ * برنامه گفت UL. کل قوس آینه بود.
+ */
+import { toothSideLabel, toothFullLabel, toothQuadrantOf } from './toothLabel'
+import { upperRow, lowerRow } from './palmerArch'
+import archSource from '../components/ToothArchSelect.tsx?raw'
+import chartSource from '../components/DentalChart.tsx?raw'
+
+describe('🔴 راست و چپ همیشه مالِ بیمار است', () => {
+  it('ربع بالا راست، «بالا راست بیمار» خوانده می‌شود', () => {
+    expect(toothSideLabel(11)).toBe('بالا راست بیمار')
+  })
+
+  it('ربع بالا چپ', () => {
+    expect(toothSideLabel(21)).toBe('بالا چپ بیمار')
+  })
+
+  it('ربع پایین چپ — همان که مهدی زد', () => {
+    expect(toothSideLabel(31)).toBe('پایین چپ بیمار')
+  })
+
+  it('ربع پایین راست', () => {
+    expect(toothSideLabel(41)).toBe('پایین راست بیمار')
+  })
+
+  it('کلمه‌ی «بیمار» همیشه هست — راست و چپ هرگز مالِ بیننده نیست', () => {
+    for (const fdi of [18, 28, 38, 48]) {
+      expect(toothSideLabel(fdi)).toContain('بیمار')
+    }
+  })
+
+  it('برچسب کامل، کد و سمت را با هم می‌دهد', () => {
+    expect(toothFullLabel(11)).toBe('UR۱ — بالا راست بیمار')
+  })
+
+  it('دندان شیری هم سمت دارد', () => {
+    expect(toothSideLabel(51)).toBe('بالا راست بیمار')
+    expect(toothSideLabel(71)).toBe('پایین چپ بیمار')
+  })
+
+  it('مقدار نامعتبر سمت جعلی نمی‌سازد', () => {
+    expect(toothSideLabel('پل')).toBe('')
+    expect(toothQuadrantOf(null)).toBeNull()
+    expect(toothFullLabel('')).toBe('')
+  })
+})
+
+describe('🔴 قوس آینه نمی‌شود', () => {
+  it('ردیف بالا از راستِ بیمار شروع می‌شود و به چپِ بیمار می‌رسد', () => {
+    // چارت طوری کشیده می‌شود که انگار روبه‌روی بیمار ایستاده‌ای، پس
+    // راستِ بیمار در سمت چپِ صفحه است — همان قراردادی که رقیب هم دارد.
+    const first = toothQuadrantOf(upperRow[0].fdi)
+    const last = toothQuadrantOf(upperRow[upperRow.length - 1].fdi)
+    expect(first).toBe('UR')
+    expect(last).toBe('UL')
+  })
+
+  it('ردیف پایین هم همین‌طور', () => {
+    expect(toothQuadrantOf(lowerRow[0].fdi)).toBe('LR')
+    expect(toothQuadrantOf(lowerRow[lowerRow.length - 1].fdi)).toBe('LL')
+  })
+
+  it('ردیف‌های قوس با dir="ltr" رندر می‌شوند', () => {
+    // بدون این، flex در پوسته‌ی RTL برنامه آیتم اول را سمت راست می‌گذارد
+    // و کل دهان برعکس می‌شود — علت دقیق همان باگ.
+    expect(archSource).toContain('dir="ltr"')
+    expect(chartSource.match(/dir="ltr" className="flex items-center gap-1/g)?.length).toBe(4)
+  })
+})

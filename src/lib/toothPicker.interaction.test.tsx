@@ -41,10 +41,28 @@ describe('انتخابگر دندان — تعامل واقعی', () => {
     expect(screen.queryByRole('button', { name: 'دندان ۱۱' })).toBeNull()
   })
 
-  it('دندان انتخاب‌شده با کلمه هم اعلام می‌شود', () => {
+  it('دندان انتخاب‌شده با کلمه و سمت اعلام می‌شود', () => {
     // روی قوسِ اسکرول‌شونده، دندان انتخابی ممکن است بیرون از دید باشد.
     render(<ToothArchSelect value="38" onChange={() => {}} />)
-    expect(screen.getByText('انتخاب‌شده: LL۸')).toBeDefined()
+    expect(screen.getByText('انتخاب‌شده: LL۸ — پایین چپ بیمار')).toBeDefined()
+  })
+
+  it('🔴 ترتیب روی صفحه از راستِ بیمار به چپِ بیمار است', () => {
+    // MOD-FIX-013: با dir="ltr" ترتیب DOM همان ترتیب دیداری است، پس
+    // این تست واقعاً چیدمان را می‌سنجد نه فقط داده را.
+    render(<ToothArchSelect value="" onChange={() => {}} />)
+    const names = screen.getAllByRole('button', { name: /^دندان (UR|UL|LL|LR)/ })
+      .map((b) => b.getAttribute('aria-label'))
+    expect(names[0]).toBe('دندان UR۸')
+    expect(names[15]).toBe('دندان UL۸')
+    expect(names[16]).toBe('دندان LR۸')
+    expect(names[31]).toBe('دندان LL۸')
+  })
+
+  it('🔴 هر دو نیمه با نام سمت بیمار برچسب خورده‌اند', () => {
+    render(<ToothArchSelect value="" onChange={() => {}} />)
+    expect(screen.getAllByText('راست بیمار')).toHaveLength(2)
+    expect(screen.getAllByText('چپ بیمار')).toHaveLength(2)
   })
 
   it('بدون انتخاب، صریح می‌گوید چیزی انتخاب نشده', () => {

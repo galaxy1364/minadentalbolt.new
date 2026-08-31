@@ -17,7 +17,7 @@
  */
 import { useState } from 'react'
 import { ToothGlyph } from './ToothGlyph'
-import { toothLabel } from '../lib/toothLabel'
+import { toothLabel, toothFullLabel } from '../lib/toothLabel'
 import { upperRow, lowerRow, upperRowPrimary, lowerRowPrimary, isMidlineStart } from '../lib/palmerArch'
 import type { ToothEntry } from '../lib/palmerArch'
 import type { ToothCondition, ToothSurfaceCondition } from '../lib/toothConditions'
@@ -50,7 +50,14 @@ export function ToothArchSelect({
   const selected = Number(value)
 
   const renderRow = (row: ToothEntry[]) => (
-    <div className="flex items-end gap-0.5 dock-scroll overflow-x-auto pb-1">
+    /* MOD-FIX-013: dir="ltr" is the whole fix for the mirrored arch.
+       A dental chart is drawn as if you are facing the patient, so the
+       patient's RIGHT belongs on the viewer's LEFT. The row data is
+       already in that order (UR8…UR1 | UL1…UL8), but the container
+       inherited dir="rtl" from the app shell, and an RTL flex row lays
+       its first item on the right — flipping the entire mouth. Mehdi
+       tapped what he read as the patient's upper right and got UL1. */
+    <div dir="ltr" className="flex items-end gap-0.5 dock-scroll overflow-x-auto pb-1">
       {row.map((t, i) => (
         <div key={t.fdi} className="flex items-end shrink-0">
           {/* Same midline rule as the numeric picker — one divider, at the
@@ -98,18 +105,28 @@ export function ToothArchSelect({
       </div>
 
       <div className="rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 p-2 space-y-1">
-        <p className="text-[10px] text-center text-slate-400">فک بالا</p>
+        {/* Spelled out, because "UR" and "UL" are exactly the pair that was
+            silently swapped and neither looks wrong on its own. */}
+        <div dir="ltr" className="flex items-center justify-between px-1 text-[10px] text-slate-400">
+          <span>راست بیمار</span>
+          <span className="font-medium">فک بالا</span>
+          <span>چپ بیمار</span>
+        </div>
         {renderRow(upper)}
         <div className="h-px bg-slate-200 dark:bg-slate-600 my-1" />
         {renderRow(lower)}
-        <p className="text-[10px] text-center text-slate-400">فک پایین</p>
+        <div dir="ltr" className="flex items-center justify-between px-1 text-[10px] text-slate-400">
+          <span>راست بیمار</span>
+          <span className="font-medium">فک پایین</span>
+          <span>چپ بیمار</span>
+        </div>
       </div>
 
       {/* The chosen tooth is stated in words as well as highlighted. On a
           scrolling arch the selected tooth can be off-screen, and a form
           that shows no answer at all reads as though nothing was chosen. */}
       <p className="mt-1.5 text-xs text-slate-600 dark:text-slate-300">
-        {value ? `انتخاب‌شده: ${toothLabel(value)}` : 'دندانی انتخاب نشده'}
+        {value ? `انتخاب‌شده: ${toothFullLabel(value)}` : 'دندانی انتخاب نشده'}
       </p>
     </div>
   )

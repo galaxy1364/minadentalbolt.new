@@ -647,7 +647,7 @@ export default function DentalChart({ toothRecords, treatments, onUpdateTooth, o
               what a handwritten diagram showed this should look like
               instead: one unbroken row, scrolling horizontally if it
               doesn't fit rather than breaking into two lines. */}
-          <div className="flex items-center gap-1 overflow-x-auto dock-scroll px-1 py-1">
+          <div dir="ltr" className="flex items-center gap-1 overflow-x-auto dock-scroll px-1 py-1">
             {renderQuadrant(upperRight)}
             {/* Explicit sibling elements right at the midline, in a fixed
                 DOM order — was previously rendered from inside
@@ -672,7 +672,7 @@ export default function DentalChart({ toothRecords, treatments, onUpdateTooth, o
         {/* Lower Jaw */}
         <div>
           <p className="text-xs text-slate-400 mb-3 text-center font-medium">فک پایین (ماندیبول)</p>
-          <div className="flex items-center gap-1 overflow-x-auto dock-scroll px-1 py-1">
+          <div dir="ltr" className="flex items-center gap-1 overflow-x-auto dock-scroll px-1 py-1">
             {renderQuadrant(lowerRight)}
             <div className="flex items-center gap-1 shrink-0">
               <span className="text-2xl font-bold text-slate-400 select-none">{palmerSymbols.lowerRight}</span>
@@ -689,7 +689,7 @@ export default function DentalChart({ toothRecords, treatments, onUpdateTooth, o
         <div className="bg-amber-50/30 rounded-2xl border border-amber-100 p-4 md:p-6">
           <p className="text-xs text-amber-600 mb-3 text-center font-medium">دندان‌های شیری</p>
           <div className="mb-4">
-            <div className="flex items-center gap-1 overflow-x-auto dock-scroll px-1 py-1">
+            <div dir="ltr" className="flex items-center gap-1 overflow-x-auto dock-scroll px-1 py-1">
               {renderQuadrant(primaryUpperRight)}
               <div className="flex items-center gap-1 shrink-0">
                 <span className="text-xl font-bold text-amber-500 select-none">{palmerSymbols.primaryUpperRight}</span>
@@ -700,7 +700,7 @@ export default function DentalChart({ toothRecords, treatments, onUpdateTooth, o
             </div>
           </div>
           <div>
-            <div className="flex items-center gap-1 overflow-x-auto dock-scroll px-1 py-1">
+            <div dir="ltr" className="flex items-center gap-1 overflow-x-auto dock-scroll px-1 py-1">
               {renderQuadrant(primaryLowerRight)}
               <div className="flex items-center gap-1 shrink-0">
                 <span className="text-xl font-bold text-amber-500 select-none">{palmerSymbols.primaryLowerRight}</span>
