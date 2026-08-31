@@ -456,14 +456,26 @@ function ToothDetailPanel({
   onClose,
   onUpdate,
   onAddTreatment,
+  onAddLabOrder,
+  onAddImplantCase,
 }: {
   tooth: ToothData
   onClose: () => void
   onUpdate: (condition: ToothCondition, surfaceConditions: ToothSurfaceCondition[], notes: string) => void
-  onAddTreatment?: (toothNumber: string) => void
+  onAddTreatment?: (toothNumber: string, surface?: string | null) => void
+  /** MOD-FEAT-022: the chart is the natural starting point for lab work
+   *  and implants too, not only treatments. */
+  onAddLabOrder?: (toothNumber: string, surface?: string | null) => void
+  onAddImplantCase?: (toothNumber: string, surface?: string | null) => void
 }) {
   const [condition, setCondition] = useState<ToothCondition>(tooth.condition)
   const [surfaceConditions, setSurfaceConditions] = useState<ToothSurfaceCondition[]>(tooth.surfaces)
+
+  // MOD-FEAT-022: the first surface the user has actually marked as
+  // something other than healthy. That is the surface they came here
+  // about, and carrying it forward is what stops the next form asking
+  // for it a second time.
+  const firstSurface = surfaceConditions.find((sc) => sc.condition && sc.condition !== 'healthy')?.surface || null
   const [notes, setNotes] = useState(tooth.notes || '')
   const [activeSurface, setActiveSurface] = useState<ToothSurface | null>(null)
 
@@ -658,14 +670,43 @@ function ToothDetailPanel({
             ذخیره تغییرات
           </button>
 
-          {/* Add treatment for this tooth */}
-          {onAddTreatment && (
-            <button
-              onClick={() => { onAddTreatment(String(tooth.number)); onClose() }}
-              className="w-full py-3 rounded-xl bg-accent-50 text-accent-700 font-medium text-sm hover:bg-accent-100 transition-all-smooth flex items-center justify-center gap-1.5 border border-accent-200"
-            >
-              <Plus size={16} /> افزودن درمان برای دندان {toPersianDigits(tooth.number)}
-            </button>
+          {/* The surface the user just marked here, carried onward so the
+              next form doesn't ask for it again. */}
+          {/* MOD-FEAT-022: three doors out of a tooth, not one. Lab work
+              and implants used to be reachable only by opening their own
+              module and picking the same tooth again from a blank Palmer
+              picker. The surface goes along too, so what was just recorded
+              here isn't asked for a second time. */}
+          {(onAddTreatment || onAddLabOrder || onAddImplantCase) && (
+            <div className="space-y-2">
+              <p className="text-[11px] text-slate-500 dark:text-slate-400">
+                برای دندان {toPersianDigits(tooth.number)}:
+              </p>
+              {onAddTreatment && (
+                <button
+                  onClick={() => { onAddTreatment(String(tooth.number), firstSurface); onClose() }}
+                  className="w-full py-3 rounded-xl bg-accent-50 text-accent-700 font-medium text-sm hover:bg-accent-100 transition-all-smooth flex items-center justify-center gap-1.5 border border-accent-200"
+                >
+                  <Plus size={16} /> افزودن درمان
+                </button>
+              )}
+              {onAddLabOrder && (
+                <button
+                  onClick={() => { onAddLabOrder(String(tooth.number), firstSurface); onClose() }}
+                  className="w-full py-3 rounded-xl bg-primary-50 text-primary-700 font-medium text-sm hover:bg-primary-100 transition-all-smooth flex items-center justify-center gap-1.5 border border-primary-200"
+                >
+                  <Plus size={16} /> سفارش لابراتوار
+                </button>
+              )}
+              {onAddImplantCase && (
+                <button
+                  onClick={() => { onAddImplantCase(String(tooth.number), firstSurface); onClose() }}
+                  className="w-full py-3 rounded-xl bg-slate-100 text-slate-700 font-medium text-sm hover:bg-slate-200 transition-all-smooth flex items-center justify-center gap-1.5 border border-slate-300"
+                >
+                  <Plus size={16} /> مورد ایمپلنت
+                </button>
+              )}
+            </div>
           )}
         </div>
       </div>
@@ -679,7 +720,11 @@ interface DentalChartProps {
   toothRecords: ToothRecord[]
   treatments: Treatment[]
   onUpdateTooth: (toothNumber: string, data: { is_missing: boolean; is_implant: boolean; notes: string; condition?: string; surfaces?: string }) => void
-  onAddTreatment?: (toothNumber: string) => void
+  onAddTreatment?: (toothNumber: string, surface?: string | null) => void
+  /** MOD-FEAT-022: the chart is the natural starting point for lab work
+   *  and implants too, not only treatments. */
+  onAddLabOrder?: (toothNumber: string, surface?: string | null) => void
+  onAddImplantCase?: (toothNumber: string, surface?: string | null) => void
   /** Fires every time a tooth gets clicked/selected on the chart — lets
    * the parent remember "the last tooth someone actually pointed at"
    * so the general '+ درمان جدید' button (not the per-tooth one, which

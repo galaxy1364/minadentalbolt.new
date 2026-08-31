@@ -14,6 +14,7 @@ import { ImplantCase, ImplantCaseWithRelations, ImplantComponent, Patient, Docto
 import { Wizard, Card, Button, Input, Select, Textarea, Badge, Spinner, EmptyState, showToast } from '../components/ui'
 import { PersianDateInput } from '../components/PersianDateInput'
 import { PalmerToothPicker } from '../components/PalmerToothPicker'
+import { readChartHandoff } from '../lib/chartHandoff'
 import { ModuleHeader, ModuleStatCard, ReorderableStatGrid } from '../components/ModuleHeader'
 import { CurrencyInput } from '../components/CurrencyInput'
 
@@ -208,12 +209,16 @@ export default function Implants() {
   // straight into a new case instead of leaving staff to re-find the
   // patient and start from a blank form.
   useEffect(() => {
+    // MOD-FEAT-022: also accepts a tooth handed over from the dental
+    // chart, so the tooth the dentist just tapped is not asked for again
+    // in this module's own Palmer picker.
+    const handoff = readChartHandoff(location.state)
     const state = location.state as { quickStartPatientId?: string; quickStartDoctorId?: string } | null
     if (!state?.quickStartPatientId) return
     setEditingCase(null)
     setCaseWizardStep(0)
     setCaseForm({
-      patient_id: state.quickStartPatientId, doctor_id: state.quickStartDoctorId || '', tooth_number: '', brand: '', custom_brand: '', model: '', diameter: '', length: '',
+      patient_id: state.quickStartPatientId, doctor_id: state.quickStartDoctorId || '', tooth_number: handoff?.toothNumber || '', brand: '', custom_brand: '', model: '', diameter: '', length: '',
       surgery_date: '', bone_graft: false, bone_graft_cost: '', gbr: false, membrane_used: false, extraction_needed: false,
       sinus_lift: false, sinus_lift_cost: '', immediate_loading: false,
       total_cost: '', paid_amount: '', warranty_years: '', notes: '',

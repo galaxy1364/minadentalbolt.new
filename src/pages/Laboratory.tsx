@@ -14,6 +14,8 @@ import type { LabOrder, Laboratory, Patient, Doctor, Treatment } from '../types'
 import { Wizard, Card, Button, Input, Select, Textarea, Badge, Spinner, EmptyState, showToast } from '../components/ui'
 import { PersianDateInput } from '../components/PersianDateInput'
 import { PalmerToothPicker } from '../components/PalmerToothPicker'
+import { readChartHandoff } from '../lib/chartHandoff'
+import { useLocation } from 'react-router-dom'
 import { ModuleHeader, ModuleStatCard, ReorderableStatGrid } from '../components/ModuleHeader'
 import { CurrencyInput } from '../components/CurrencyInput'
 
@@ -115,6 +117,7 @@ export default function Laboratory() {
 
   // Order modal
   const [orderModalOpen, setOrderModalOpen] = useState(false)
+  const location = useLocation()
   const [orderWizardStep, setOrderWizardStep] = useState(0)
   const [editingOrder, setEditingOrder] = useState<LabOrder | null>(null)
   const [savingOrder, setSavingOrder] = useState(false)
@@ -314,16 +317,35 @@ export default function Laboratory() {
   // Handlers
   // ===========================================================================
 
-  const openCreateOrderModal = () => {
+  /**
+   * MOD-FEAT-022: opens the order form already knowing the tooth, the
+   * patient and the doctor when the dentist came here from the chart.
+   * Before this, lab work could only be started from a blank form where
+   * the same tooth had to be found again in a separate Palmer picker.
+   */
+  // MOD-FEAT-022: arriving from the dental chart opens the order form with
+  // the tooth already chosen. Guarded on labs being loaded so the lab
+  // dropdown isn't empty when the form appears.
+  useEffect(() => {
+    const handoff = readChartHandoff(location.state)
+    if (!handoff || labs.length === 0) return
+    openCreateOrderModal({ toothNumber: handoff.toothNumber, patientId: handoff.patientId, doctorId: handoff.doctorId })
+    setOrderModalOpen(true)
+    // Clearing history state stops the form reopening on every back-navigation.
+    window.history.replaceState({}, '')
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [location.state, labs.length])
+
+  const openCreateOrderModal = (seed?: { toothNumber: string; patientId: string; doctorId: string | null }) => {
     h.tap()
     setEditingOrder(null)
     setOrderWizardStep(0)
     setOrderForm({
       lab_id: labs.length > 0 ? labs[0].id : '',
-      patient_id: '',
-      doctor_id: '',
+      patient_id: seed?.patientId || '',
+      doctor_id: seed?.doctorId || '',
       work_type: 'crown', custom_work_type: '',
-      tooth_number: '',
+      tooth_number: seed?.toothNumber || '',
       shade: '',
       material: 'zirconia',
       deadline: '',

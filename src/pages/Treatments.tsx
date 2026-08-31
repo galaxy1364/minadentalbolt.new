@@ -28,6 +28,7 @@ import { h } from '../lib/haptics'
 import { findLinkedLabOrder, decideLabHandoff } from '../lib/labHandoff'
 import { calcEncounterTotal } from '../lib/finance'
 import { startingStepIndex, toothStepMode, seededSummary } from '../lib/treatmentWizardFlow'
+import { buildChartHandoff } from '../lib/chartHandoff'
 import DentalChart from '../components/DentalChart'
 import { CurrencyInput } from '../components/CurrencyInput'
 import { logError } from '../lib/errorLog'
@@ -1159,7 +1160,21 @@ export default function Treatments() {
             {/* Dental Chart */}
             <div>
               <h4 className="text-xs font-bold text-slate-500 mb-3 uppercase tracking-wider flex items-center gap-1.5"><Smile size={14} /> چارت دندانی (پالمر)</h4>
-              <DentalChart toothRecords={toothRecords} treatments={encounterTreatments} onUpdateTooth={handleUpdateTooth} onToothSelect={(toothNum) => setLastSelectedTooth(toothNum)} onAddTreatment={(toothNum) => { if (!detailEnc) return; setTreatEncounterId(detailEnc.id); setTreatPatientId(detailEnc.patient_id); setEditingTreat(null); /* MOD-FEAT-021: the tooth came from the chart, so the wizard opens past the question it already answers */ setTreatWizardStep(startingStepIndex({ toothNumber: toothNum })); setTreatForm({ procedure_code: '', procedure_name: '', procedure_category: '', tooth_number: toothNum, tooth_surface: '', quantity: '1', unit_price: '', discount: '', total_price: '', status: 'planned', notes: '', has_lab: false, lab_id: '', lab_cost: '', lab_work_type: '', lab_material: '', lab_shade: '', go_to_billing: false }); setTreatModalOpen(true) }} />
+              <DentalChart toothRecords={toothRecords} treatments={encounterTreatments} onUpdateTooth={handleUpdateTooth} onToothSelect={(toothNum) => setLastSelectedTooth(toothNum)} onAddTreatment={(toothNum, surface) => { if (!detailEnc) return; setTreatEncounterId(detailEnc.id); setTreatPatientId(detailEnc.patient_id); setEditingTreat(null); /* MOD-FEAT-021: the tooth came from the chart, so the wizard opens past the question it already answers */ setTreatWizardStep(startingStepIndex({ toothNumber: toothNum })); setTreatForm({ procedure_code: '', procedure_name: '', procedure_category: '', tooth_number: toothNum, tooth_surface: surface || '', quantity: '1', unit_price: '', discount: '', total_price: '', status: 'planned', notes: '', has_lab: false, lab_id: '', lab_cost: '', lab_work_type: '', lab_material: '', lab_shade: '', go_to_billing: false }); setTreatModalOpen(true) }}
+                onAddLabOrder={(toothNum, surface) => {
+                  // MOD-FEAT-022: lab work now starts where the dentist is
+                  // looking, instead of in a blank Palmer picker two screens
+                  // away.
+                  if (!detailEnc) return
+                  const handoff = buildChartHandoff('lab', { toothNumber: toothNum, surface, patientId: detailEnc.patient_id, doctorId: detailEnc.doctor_id })
+                  if (handoff) navigate(handoff.path, { state: handoff.state })
+                }}
+                onAddImplantCase={(toothNum, surface) => {
+                  if (!detailEnc) return
+                  const handoff = buildChartHandoff('implant', { toothNumber: toothNum, surface, patientId: detailEnc.patient_id, doctorId: detailEnc.doctor_id })
+                  if (handoff) navigate(handoff.path, { state: handoff.state })
+                }}
+              />
             </div>
 
             {/* Treatments list */}
