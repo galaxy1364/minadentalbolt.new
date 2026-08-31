@@ -1115,11 +1115,16 @@ export default function Laboratory() {
                     </div>
                   )
                 })()}
+                {/* MOD-FIX-012: the arch gets the full width. It used to share a
+                    two-column row with the shade field, which left the whole
+                    dental arch squeezed into half a phone screen — unusable
+                    for the one thing this step exists to do. Shade and
+                    material are short fields and pair naturally below it. */}
+                <ToothArchSelect value={orderForm.tooth_number} onChange={(v) => setOrderForm((p) => ({ ...p, tooth_number: v }))} allowPrimary={false} />
                 <div className="grid grid-cols-2 gap-3">
-                  <ToothArchSelect value={orderForm.tooth_number} onChange={(v) => setOrderForm((p) => ({ ...p, tooth_number: v }))} allowPrimary={false} />
                   <Input label="رنگ" value={orderForm.shade} onChange={(v) => setOrderForm((p) => ({ ...p, shade: v }))} placeholder="مثال: A2" dir="ltr" />
+                  <Select label="جنس" value={orderForm.material} onChange={(v) => setOrderForm((p) => ({ ...p, material: v }))} options={materials} />
                 </div>
-                <Select label="جنس" value={orderForm.material} onChange={(v) => setOrderForm((p) => ({ ...p, material: v }))} options={materials} />
               </>
             ),
           },

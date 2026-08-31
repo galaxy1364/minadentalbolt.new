@@ -103,3 +103,52 @@ describe('🔴 یک انتخابگر دندان در تمام برنامه', () 
     expect(chart).toContain("from './ToothGlyph'")
   })
 })
+
+/**
+ * MOD-FIX-012 | قوس دندان نباید در ستون باریک بنشیند
+ *
+ * گزارش مهدی روی فرم لابراتوار: «یه نصف صفحه واسه چارت گذاشته که اشتباهه
+ * — چارت باید همون جای رنگ رو برداره و کلا بشه چارت مثل همون چارت اصلی.»
+ *
+ * قوس در `grid grid-cols-2` کنار فیلد «رنگ» بود و نصف عرض گوشی می‌گرفت؛
+ * انتخاب یکی از شانزده دندان در آن عرض عملاً ممکن نبود. ایمپلنت هم همین
+ * ایراد را داشت (کنار «تاریخ جراحی»).
+ *
+ * jsdom عرض واقعی را نمی‌سنجد، پس این تست به‌جای اندازه، **ساختار** را
+ * قفل می‌کند: قوس نباید فرزند مستقیم یک ردیف چندستونی باشد.
+ */
+import laboratoryRaw from '../pages/Laboratory.tsx?raw'
+import implantsRaw from '../pages/Implants.tsx?raw'
+import treatmentsRaw from '../pages/Treatments.tsx?raw'
+
+describe('🔴 قوس دندان تمام عرض می‌گیرد', () => {
+  const PAGES: [string, string][] = [
+    ['Laboratory', laboratoryRaw], ['Implants', implantsRaw], ['Treatments', treatmentsRaw],
+  ]
+
+  /** آیا خط قبلِ قوس، یک ردیف چندستونی باز کرده است؟ */
+  function archInsideGrid(src: string): boolean {
+    const lines = src.split('\n')
+    return lines.some((line, i) => {
+      if (!line.includes('<ToothArchSelect')) return false
+      const before = lines.slice(Math.max(0, i - 2), i).join(' ')
+      return /grid-cols-[2-9]/.test(before)
+    })
+  }
+
+  it('در هیچ صفحه‌ای داخل ردیف چندستونی نیست', () => {
+    for (const [name, src] of PAGES) {
+      expect(archInsideGrid(src), `${name}: قوس در ستون باریک است`).toBe(false)
+    }
+  })
+
+  it('فرم لابراتوار همچنان رنگ و جنس را دارد', () => {
+    // جابه‌جایی نباید فیلدی را از قلم بیندازد.
+    expect(laboratoryRaw).toContain('label="رنگ"')
+    expect(laboratoryRaw).toContain('label="جنس"')
+  })
+
+  it('فرم ایمپلنت همچنان تاریخ جراحی را دارد', () => {
+    expect(implantsRaw).toContain('label="تاریخ جراحی"')
+  })
+})

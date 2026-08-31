@@ -990,10 +990,11 @@ export default function Implants() {
                 ) : (
                   <Select label="پزشک" value={caseForm.doctor_id} onChange={(v) => setCaseForm({ ...caseForm, doctor_id: v })} options={doctorOptions} placeholder="انتخاب پزشک" />
                 )}
-                <div className="grid grid-cols-2 gap-3">
-                  <ToothArchSelect label="دندان *" value={caseForm.tooth_number} onChange={(v) => setCaseForm({ ...caseForm, tooth_number: v })} allowPrimary={false} />
-                  <PersianDateInput label="تاریخ جراحی" value={caseForm.surgery_date} onChange={(v) => setCaseForm({ ...caseForm, surgery_date: v })} />
-                </div>
+                {/* MOD-FIX-012: full width, for the same reason as the lab
+                    form — half a screen is not enough to pick a tooth from
+                    an arch of sixteen. */}
+                <ToothArchSelect label="دندان *" value={caseForm.tooth_number} onChange={(v) => setCaseForm({ ...caseForm, tooth_number: v })} allowPrimary={false} />
+                <PersianDateInput label="تاریخ جراحی" value={caseForm.surgery_date} onChange={(v) => setCaseForm({ ...caseForm, surgery_date: v })} />
               </>
             ),
           },
