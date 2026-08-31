@@ -159,6 +159,19 @@ export interface Payment {
    * encounters.paid_amount. Independent of encounter_id: a payment is
    * attributed to at most one of the two, never both. */
   implant_case_id: string | null
+  /**
+   * MOD-FEAT-020: the treatment this money was for. Tooth number and the
+   * treating doctor are read from the treatment rather than copied here —
+   * copying would create a second source of truth that drifts the moment
+   * the treatment is edited.
+   */
+  treatment_id: string | null
+  /**
+   * Only for payments that belong to no single treatment (a general
+   * deposit against a doctor's work). When treatment_id is set, the
+   * treatment's own doctor is authoritative.
+   */
+  doctor_id: string | null
   amount: number
   payment_method: string
   reference: string | null

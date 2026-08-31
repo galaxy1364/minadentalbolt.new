@@ -1,10 +1,11 @@
 // Billing.tsx - Persian RTL Dental Clinic Billing & Payments Management
 import { useState, useEffect, useCallback, useMemo } from 'react'
 import { buildPrintDocument } from '../lib/printDocument'
+import { resolveAttribution, attributableTreatments, treatmentRemaining } from '../lib/paymentAttribution'
 import { useNavigate, useLocation } from 'react-router-dom'
 import { CreditCard, Plus, Search, DollarSign, TrendingUp, Wallet, Calendar, CalendarClock, CheckCircle2, AlertCircle, Edit2, Filter, Receipt, Banknote, Clock, Trash2, Printer } from 'lucide-react'
 import { BarChart, Bar, XAxis, YAxis, Tooltip as RTooltip, ResponsiveContainer, PieChart, Pie, Cell as RCell } from 'recharts'
-import { fetchPayments, createPayment, updatePayment, fetchEncounters, fetchCheques, createCheque, updateCheque, fetchPaymentPlans, createPaymentPlan, updatePaymentPlan, updateInstallment, fetchPatients, fetchExpenses, createExpense, updateExpense, deactivateExpense, fetchTreatments, fetchImplantCases } from '../lib/api'
+import { fetchPayments, createPayment, updatePayment, fetchEncounters, fetchCheques, createCheque, updateCheque, fetchPaymentPlans, createPaymentPlan, updatePaymentPlan, updateInstallment, fetchPatients, fetchExpenses, createExpense, updateExpense, deactivateExpense, fetchTreatments, fetchImplantCases, fetchDoctors } from '../lib/api'
 import { buildSchedule, splitAmount, planProgress, reconcilePlan } from '../lib/installments'
 import { checkOverpayment } from '../lib/finance'
 import { toJalaliString, toJalaliStringPretty, formatCurrency, formatNumber, toPersianDigits, toEnglishDigits } from '../lib/persianDate'
@@ -70,6 +71,8 @@ export default function Billing() {
   const [payments, setPayments] = useState<Payment[]>([])
   const [encounters, setEncounters] = useState<Encounter[]>([])
   const [treatments, setTreatments] = useState<Treatment[]>([])
+  // MOD-FEAT-020: needed to turn a payment's doctor_id into a name.
+  const [doctors, setDoctors] = useState<{ id: string; name: string | null }[]>([])
   const [implantCases, setImplantCases] = useState<ImplantCase[]>([])
   const [cheques, setCheques] = useState<Cheque[]>([])
   const [paymentPlans, setPaymentPlans] = useState<PaymentPlanWithRelations[]>([])
@@ -101,6 +104,7 @@ export default function Billing() {
     patient_id: '',
     encounter_id: '',
     implant_case_id: '',
+    treatment_id: '',
     amount: '',
     discountPercent: '',
     payment_method: '',
@@ -182,7 +186,7 @@ export default function Billing() {
   const loadData = useCallback(async () => {
     setLoading(true)
     try {
-      const [pays, encs, chqs, plans, pats, exps, trts, implCases, cashSess] = await Promise.all([
+      const [pays, encs, chqs, plans, pats, exps, trts, implCases, cashSess, docs] = await Promise.all([
         fetchPayments(),
         fetchEncounters(),
         fetchCheques(),
@@ -192,6 +196,7 @@ export default function Billing() {
         fetchTreatments(),
         fetchImplantCases(),
         fetchCashRegisterSessions(),
+        fetchDoctors(),
       ])
       setPayments(pays)
       setEncounters(encs)
@@ -201,6 +206,7 @@ export default function Billing() {
       setExpenses(exps)
       setTreatments(trts)
       setImplantCases(implCases)
+      setDoctors(docs as never)
       setCashSessions(cashSess)
       setOpenSession(cashSess.find((s) => s.status === 'open') || null)
     } catch (err) {
@@ -376,6 +382,8 @@ export default function Billing() {
           await createPayment({
             patient_id: paymentForm.patient_id, encounter_id: paymentForm.encounter_id || null,
             implant_case_id: paymentForm.implant_case_id || null,
+            treatment_id: paymentForm.treatment_id || null,
+            doctor_id: treatments.find((t) => t.id === paymentForm.treatment_id)?.doctor_id || null,
             amount: Number(paymentForm.amount), payment_method: paymentForm.payment_method,
             reference: paymentForm.reference || null, notes: paymentForm.notes || null,
             status: paymentForm.status, payment_date: paymentForm.payment_date, created_by: null,
@@ -719,6 +727,13 @@ export default function Billing() {
         <div class="amount">${formatCurrency(p.amount)} تومان</div>
         <table>
           <tr><td>بیمار</td><td>${getPatientName(p.patient_id)}</td></tr>
+          ${(() => {
+            const a = resolveAttribution(p, treatments as never, doctors as never)
+            const rows: string[] = []
+            if (a.procedureName) rows.push(`<tr><td>بابت</td><td>${a.procedureName}${a.toothNumber ? ` — دندان ${toPersianDigits(a.toothNumber)}` : ''}</td></tr>`)
+            if (a.doctorName) rows.push(`<tr><td>پزشک</td><td>دکتر ${a.doctorName}</td></tr>`)
+            return rows.join('')
+          })()}
           <tr><td>روش پرداخت</td><td>${methodMeta.label}</td></tr>
           <tr><td>تاریخ</td><td>${toJalaliStringPretty(p.payment_date)}</td></tr>
           ${p.reference ? `<tr><td>شماره مرجع</td><td dir="ltr">${p.reference}</td></tr>` : ''}
@@ -767,6 +782,12 @@ export default function Billing() {
                     <div>
                       <p className="text-sm font-bold text-slate-800">{formatCurrency(p.amount)} تومان</p>
                       <p className="text-xs text-slate-500">{getPatientName(p.patient_id)} - {methodMeta.label} - {toJalaliStringPretty(p.payment_date)}</p>
+                      {/* MOD-FEAT-020: shown for every payment, including the
+                          older ones that predate attribution — «بابت مشخص
+                          نشده» is information, not noise: it marks exactly
+                          which rows still need a human to say what they were
+                          for. */}
+                      <p className="text-[11px] text-slate-400 mt-0.5">{resolveAttribution(p, treatments as never, doctors as never).label}</p>
                     </div>
                   </div>
                   <div className="flex items-center gap-2">
@@ -1359,6 +1380,17 @@ export default function Billing() {
   const encounterOptions = encounters.filter((e) => e.patient_id === paymentForm.patient_id).map((e) => ({ value: e.id, label: `ویزیت ${toJalaliStringPretty(e.encounter_date)}` }))
   const implantCaseOptions = implantCases.filter((c) => c.patient_id === paymentForm.patient_id).map((c) => ({ value: c.id, label: `پرونده ایمپلنت - ${formatCurrency(c.total_cost || 0)} ت` }))
 
+  // MOD-FEAT-020: «بابت کدام درمان». Each option carries the tooth and the
+  // remaining amount, because the two questions asked at the desk are
+  // always "which tooth is this for" and "how much is still owed on it".
+  const patientTreatmentIds = treatments.filter((t) => t.patient_id === paymentForm.patient_id).map((t) => t.id)
+  const treatmentOptions = attributableTreatments(treatments as never, patientTreatmentIds, paymentForm.treatment_id || null)
+    .map((t) => {
+      const remaining = treatmentRemaining(t, payments as never)
+      const tooth = t.tooth_number ? ` — دندان ${toPersianDigits(t.tooth_number)}` : ''
+      return { value: t.id, label: `${t.procedure_name || 'رویه'}${tooth} — مانده ${formatCurrency(remaining)} ت` }
+    })
+
   const renderPaymentModal = () => (
     <Wizard
       open={paymentModalOpen}
@@ -1413,6 +1445,29 @@ export default function Billing() {
               })()}
               {paymentForm.patient_id && encounterOptions.length > 0 && (
                 <Select label="ویزیت مرتبط" value={paymentForm.encounter_id} onChange={(v) => setPaymentForm((p) => ({ ...p, encounter_id: v, implant_case_id: v ? '' : p.implant_case_id }))} options={encounterOptions} placeholder="بدون ویزیت" />
+              )}
+              {/* MOD-FEAT-020: without this the ledger could say who paid and
+                  how much, but never what for — leaving "which tooth was
+                  this, and whose work?" unanswerable. Shown on its own
+                  condition: a patient can have treatments recorded outside
+                  any visit this form knows about. */}
+              {paymentForm.patient_id && treatmentOptions.length > 0 && (
+                <Select
+                  label="بابت کدام درمان"
+                  value={paymentForm.treatment_id}
+                  onChange={(v) => {
+                    const t = treatments.find((x) => x.id === v)
+                    setPaymentForm((p) => ({
+                      ...p,
+                      treatment_id: v,
+                      // Following the treatment keeps the payment on the same
+                      // visit as the work it settles.
+                      encounter_id: t?.encounter_id || p.encounter_id,
+                    }))
+                  }}
+                  options={treatmentOptions}
+                  placeholder="بابت مشخص نشده"
+                />
               )}
               {paymentForm.patient_id && implantCaseOptions.length > 0 && (
                 <Select label="پرونده ایمپلنت مرتبط" value={paymentForm.implant_case_id} onChange={(v) => setPaymentForm((p) => ({ ...p, implant_case_id: v, encounter_id: v ? '' : p.encounter_id }))} options={implantCaseOptions} placeholder="بدون پرونده ایمپلنت" />
