@@ -9,43 +9,12 @@
 // Palmer, per the explicit "فقط سیستم پالمر" requirement.
 import { useState, useEffect } from 'react'
 import { h } from '../lib/haptics'
-
-interface ToothEntry { fdi: number; palmer: string; side: 'راست' | 'چپ'; jaw: 'بالا' | 'پایین' }
-
-const upperRow: ToothEntry[] = [
-  { fdi: 18, palmer: '8', side: 'راست', jaw: 'بالا' }, { fdi: 17, palmer: '7', side: 'راست', jaw: 'بالا' },
-  { fdi: 16, palmer: '6', side: 'راست', jaw: 'بالا' }, { fdi: 15, palmer: '5', side: 'راست', jaw: 'بالا' },
-  { fdi: 14, palmer: '4', side: 'راست', jaw: 'بالا' }, { fdi: 13, palmer: '3', side: 'راست', jaw: 'بالا' },
-  { fdi: 12, palmer: '2', side: 'راست', jaw: 'بالا' }, { fdi: 11, palmer: '1', side: 'راست', jaw: 'بالا' },
-  { fdi: 21, palmer: '1', side: 'چپ', jaw: 'بالا' }, { fdi: 22, palmer: '2', side: 'چپ', jaw: 'بالا' },
-  { fdi: 23, palmer: '3', side: 'چپ', jaw: 'بالا' }, { fdi: 24, palmer: '4', side: 'چپ', jaw: 'بالا' },
-  { fdi: 25, palmer: '5', side: 'چپ', jaw: 'بالا' }, { fdi: 26, palmer: '6', side: 'چپ', jaw: 'بالا' },
-  { fdi: 27, palmer: '7', side: 'چپ', jaw: 'بالا' }, { fdi: 28, palmer: '8', side: 'چپ', jaw: 'بالا' },
-]
-const lowerRow: ToothEntry[] = [
-  { fdi: 48, palmer: '8', side: 'راست', jaw: 'پایین' }, { fdi: 47, palmer: '7', side: 'راست', jaw: 'پایین' },
-  { fdi: 46, palmer: '6', side: 'راست', jaw: 'پایین' }, { fdi: 45, palmer: '5', side: 'راست', jaw: 'پایین' },
-  { fdi: 44, palmer: '4', side: 'راست', jaw: 'پایین' }, { fdi: 43, palmer: '3', side: 'راست', jaw: 'پایین' },
-  { fdi: 42, palmer: '2', side: 'راست', jaw: 'پایین' }, { fdi: 41, palmer: '1', side: 'راست', jaw: 'پایین' },
-  { fdi: 31, palmer: '1', side: 'چپ', jaw: 'پایین' }, { fdi: 32, palmer: '2', side: 'چپ', jaw: 'پایین' },
-  { fdi: 33, palmer: '3', side: 'چپ', jaw: 'پایین' }, { fdi: 34, palmer: '4', side: 'چپ', jaw: 'پایین' },
-  { fdi: 35, palmer: '5', side: 'چپ', jaw: 'پایین' }, { fdi: 36, palmer: '6', side: 'چپ', jaw: 'پایین' },
-  { fdi: 37, palmer: '7', side: 'چپ', jaw: 'پایین' }, { fdi: 38, palmer: '8', side: 'چپ', jaw: 'پایین' },
-]
-const upperRowPrimary: ToothEntry[] = [
-  { fdi: 55, palmer: 'E', side: 'راست', jaw: 'بالا' }, { fdi: 54, palmer: 'D', side: 'راست', jaw: 'بالا' },
-  { fdi: 53, palmer: 'C', side: 'راست', jaw: 'بالا' }, { fdi: 52, palmer: 'B', side: 'راست', jaw: 'بالا' },
-  { fdi: 51, palmer: 'A', side: 'راست', jaw: 'بالا' }, { fdi: 61, palmer: 'A', side: 'چپ', jaw: 'بالا' },
-  { fdi: 62, palmer: 'B', side: 'چپ', jaw: 'بالا' }, { fdi: 63, palmer: 'C', side: 'چپ', jaw: 'بالا' },
-  { fdi: 64, palmer: 'D', side: 'چپ', jaw: 'بالا' }, { fdi: 65, palmer: 'E', side: 'چپ', jaw: 'بالا' },
-]
-const lowerRowPrimary: ToothEntry[] = [
-  { fdi: 85, palmer: 'E', side: 'راست', jaw: 'پایین' }, { fdi: 84, palmer: 'D', side: 'راست', jaw: 'پایین' },
-  { fdi: 83, palmer: 'C', side: 'راست', jaw: 'پایین' }, { fdi: 82, palmer: 'B', side: 'راست', jaw: 'پایین' },
-  { fdi: 81, palmer: 'A', side: 'راست', jaw: 'پایین' }, { fdi: 71, palmer: 'A', side: 'چپ', jaw: 'پایین' },
-  { fdi: 72, palmer: 'B', side: 'چپ', jaw: 'پایین' }, { fdi: 73, palmer: 'C', side: 'چپ', jaw: 'پایین' },
-  { fdi: 74, palmer: 'D', side: 'چپ', jaw: 'پایین' }, { fdi: 75, palmer: 'E', side: 'چپ', jaw: 'پایین' },
-]
+// The arch rows and the midline rule live in lib so they are reachable
+// from a test without rendering React — see MOD-FIX-006.
+import {
+  ToothEntry, isMidlineStart,
+  upperRow, lowerRow, upperRowPrimary, lowerRowPrimary,
+} from '../lib/palmerArch'
 
 interface PalmerToothPickerProps {
   label?: string
@@ -68,7 +37,6 @@ export function PalmerToothPicker({ label = 'دندان (پالمر)', value, on
 
   const ToothButton = ({ t }: { t: ToothEntry }) => {
     const isSelected = selectedFdi === t.fdi
-    const isMidline = t.palmer === '1' || t.palmer === 'A'
     return (
       <button
         type="button"
@@ -77,7 +45,7 @@ export function PalmerToothPicker({ label = 'دندان (پالمر)', value, on
           isSelected
             ? 'bg-primary-600 text-white shadow-md scale-110 z-10'
             : 'bg-white dark:bg-slate-700 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-600 hover:border-primary-300'
-        } ${isMidline ? 'mr-1' : ''}`}
+        }`}
       >
         {t.palmer}
       </button>
@@ -105,17 +73,19 @@ export function PalmerToothPicker({ label = 'دندان (پالمر)', value, on
             handwritten diagram showing exactly this: "87654321 | 12345678"
             as ONE unbroken line with a single divider at the real
             midline, scrolling left/right if it doesn't fit rather than
-            wrapping to a second line. flex-wrap previously let the browser
-            break the row wherever it needed to for the screen width, which
-            could land that break at a completely different point than the
-            actual midline — making the divider itself land in the wrong
-            place depending on screen size. dock-scroll hides the
-            scrollbar; nothing here can silently misplace the divider
-            anymore since there's no wrap point to get it wrong. */}
+            wrapping to a second line.
+
+            MOD-FIX-006: the divider used to be placed by matching
+            `palmer === '1'`, which is true for BOTH central incisors — so
+            two dividers were drawn and tooth 1 sat alone in its own
+            compartment ("… 2 | 1 | 1 2 …"). The same rule drew nothing at
+            all in the primary dentition, where the label is 'A'.
+            isMidlineStart() keys off the راست→چپ boundary instead, which
+            is the midline by definition in either dentition. */}
         <div className="flex items-center gap-0.5 overflow-x-auto dock-scroll px-1 py-1">
           {upper.map((t, i) => (
             <div key={t.fdi} className="flex items-center shrink-0">
-              {i > 0 && t.palmer === '1' && <div className="w-px h-7 bg-slate-300 dark:bg-slate-500 mx-2 shrink-0" />}
+              {isMidlineStart(upper, i) && <div className="w-px h-7 bg-slate-300 dark:bg-slate-500 mx-2 shrink-0" />}
               <ToothButton t={t} />
             </div>
           ))}
@@ -124,7 +94,7 @@ export function PalmerToothPicker({ label = 'دندان (پالمر)', value, on
         <div className="flex items-center gap-0.5 overflow-x-auto dock-scroll px-1 py-1">
           {lower.map((t, i) => (
             <div key={t.fdi} className="flex items-center shrink-0">
-              {i > 0 && t.palmer === '1' && <div className="w-px h-7 bg-slate-300 dark:bg-slate-500 mx-2 shrink-0" />}
+              {isMidlineStart(lower, i) && <div className="w-px h-7 bg-slate-300 dark:bg-slate-500 mx-2 shrink-0" />}
               <ToothButton t={t} />
             </div>
           ))}
