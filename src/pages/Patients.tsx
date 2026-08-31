@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { Plus, Search, Edit2, Phone, Filter, Users, Award, AlertCircle, Smile, FileText, User, Trash2, Heart, Shield, MapPin } from 'lucide-react'
 import { fetchPatients, createPatient, updatePatient, fetchDoctors, fetchPayments, fetchTreatments, fetchImplantCases, peekNextFileNumber } from '../lib/api'
 import { toJalaliStringPretty, formatCurrency, toPersianDigits } from '../lib/persianDate'
+import { validatePatientIdentity, findNationalIdDuplicate, duplicateNationalIdMessage } from '../lib/patientIdentity'
 import { Patient, Doctor, Payment, Treatment, ImplantCase } from '../types'
 import { Modal, Card, Button, Input, Select, Textarea, Spinner, EmptyState, showToast, HighlightText, SkeletonList } from '../components/ui'
 import { PatientPhotoUpload } from '../components/PatientPhotoUpload'
@@ -192,15 +193,15 @@ export default function Patients() {
 
   // ── Preview + Confirm for create/edit ──
   const handleSave = () => {
-    if (!formData.first_name.trim() || !formData.last_name.trim()) { h.error(); showToast('error', 'نام و نام خانوادگی الزامی است'); return }
-    // Phone is used everywhere downstream — SMS reminders, appointment
-    // confirmations, the whole notification system assumes every
-    // patient has one. Letting it be skipped meant some patients could
-    // silently never receive any reminder/alarm the rest of the app
-    // promises, with no visible sign anything was missing.
-    if (!formData.phone.trim()) { h.error(); showToast('error', 'شماره تلفن الزامی است — پایه‌ی یادآوری‌ها و پیامک‌هاست'); return }
-    if (!formData.national_id.trim()) { h.error(); showToast('error', 'کد ملی الزامی است'); return }
-    if (!formData.phone2.trim()) { h.error(); showToast('error', 'شماره منزل الزامی است'); return }
+    // MOD-FIX-017: the rule lives in lib/patientIdentity.ts so the edit
+    // form in PatientDetail enforces exactly the same one. It used to
+    // enforce only the name, which let both the mobile and the national ID
+    // be cleared from an existing record.
+    const identityError = validatePatientIdentity({
+      first_name: formData.first_name, last_name: formData.last_name,
+      phone: formData.phone, national_id: formData.national_id, phone2: formData.phone2,
+    })
+    if (identityError) { h.error(); showToast('error', identityError); return }
 
     const vipMeta = getVipMeta(Number(formData.vip_level) || 0)
     const genderLabel = formData.gender ? (formData.gender === 'male' ? 'آقا' : 'خانم') : '—'
@@ -217,13 +218,11 @@ export default function Patients() {
     const dupPhone = formData.phone
       ? patients.find((p) => p.phone === formData.phone.trim() && p.id !== editingPatient?.id)
       : null
-    const dupNationalId = formData.national_id
-      ? patients.find((p) => p.national_id === formData.national_id.trim() && p.id !== editingPatient?.id)
-      : null
+    const dupNationalId = findNationalIdDuplicate(formData.national_id, patients, editingPatient?.id)
 
     if (dupNationalId) {
       h.error()
-      showToast('error', `این کد ملی قبلاً برای «${dupNationalId.first_name} ${dupNationalId.last_name}» ثبت شده — کد ملی نمی‌تواند تکراری باشد`)
+      showToast('error', duplicateNationalIdMessage(dupNationalId))
       return
     }
 
@@ -552,8 +551,8 @@ export default function Patients() {
               <h4 className="text-xs font-bold text-slate-500 mb-3 uppercase tracking-wider">اطلاعات شخصی</h4>
               <PatientPhotoUpload value={formData.avatar_url} onChange={(url) => setFormData((p) => ({ ...p, avatar_url: url }))} />
               <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mt-3">
-                <Input label="نام" value={formData.first_name} onChange={(v) => setFormData((p) => ({ ...p, first_name: v }))} placeholder="نام" />
-                <Input label="نام خانوادگی" value={formData.last_name} onChange={(v) => setFormData((p) => ({ ...p, last_name: v }))} placeholder="نام خانوادگی" />
+                <Input label="نام *" value={formData.first_name} onChange={(v) => setFormData((p) => ({ ...p, first_name: v }))} placeholder="نام" />
+                <Input label="نام خانوادگی *" value={formData.last_name} onChange={(v) => setFormData((p) => ({ ...p, last_name: v }))} placeholder="نام خانوادگی" />
                 <Input label="کد ملی *" value={formData.national_id} onChange={(v) => setFormData((p) => ({ ...p, national_id: v }))} placeholder="کد ملی" dir="ltr" />
                 <Input label="تلفن *" value={formData.phone} onChange={(v) => setFormData((p) => ({ ...p, phone: v }))} placeholder="09xxxxxxxxx" dir="ltr" />
                 <Input label="شماره منزل *" value={formData.phone2} onChange={(v) => setFormData((p) => ({ ...p, phone2: v }))} placeholder="تلفن ثابت منزل" dir="ltr" />

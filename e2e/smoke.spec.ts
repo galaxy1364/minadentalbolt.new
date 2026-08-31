@@ -17,13 +17,27 @@ test('برنامه بالا می‌آید و صفحه‌ی ورود را نشا�
   await page.goto('/')
   await expect(page.locator('body')).toBeVisible()
 
-  // Either the login screen or a signed-in shell — both mean the bundle
-  // parsed and React mounted. A white screen means it didn't.
-  await expect(page.getByText(/مینادنت|ورود|رمز عبور/).first()).toBeVisible({ timeout: 15_000 })
+  // MOD-TEST-004: this used to be getByText(/مینادنت|ورود|رمز عبور/), which
+  // passed on the "پیکربندی سرور ناقص است" screen — the sentence there is
+  // «بنابراین ورود به حساب ممکن نیست», so /ورود/ matched an *error page* and
+  // the smoke test reported a healthy app. That is the exact failure mode
+  // this file exists to catch, so assert on the form itself: a real login
+  // screen has a password box and a submit button, an error screen has
+  // neither.
+  await expect(page.locator('input[type="password"]')).toBeVisible({ timeout: 15_000 })
+  await expect(page.getByRole('button', { name: /ورود/ })).toBeVisible()
 
   // A crash during mount used to show as a blank page with the real cause
   // only in the console.
-  const fatal = consoleErrors.filter((e) => !/favicon|Download the React DevTools/i.test(e))
+  //
+  // Third-party noise is filtered, and so is the offline-degradation path:
+  // a runner with no network can't reach the font CDN or Supabase, and the
+  // app is *designed* to keep working then (see lib/supabase.ts). Treating
+  // that as a failure made this test red in exactly the environment it was
+  // written for — CI without secrets — which is how a smoke test gets
+  // ignored. Anything else still fails the build.
+  const ignorable = /favicon|Download the React DevTools|ERR_(TUNNEL_CONNECTION_FAILED|FAILED|INTERNET_DISCONNECTED|NAME_NOT_RESOLVED)|VITE_SUPABASE_ANON_KEY is not set|Failed to load resource/i
+  const fatal = consoleErrors.filter((e) => !ignorable.test(e))
   expect(fatal, `خطای کنسول هنگام بارگذاری:\n${fatal.join('\n')}`).toEqual([])
 })
 
@@ -43,11 +57,42 @@ test('هیچ چیزی از عرض گوشی بیرون نمی‌زند', async ({
   await page.waitForLoadState('networkidle')
 
   const overflow = await page.evaluate(() => {
-    const w = document.documentElement.clientWidth
-    return [...document.querySelectorAll('*')]
-      .filter((el) => el.getBoundingClientRect().right > w + 2)
-      .slice(0, 5)
-      .map((el) => `${el.tagName}.${(el.className || '').toString().slice(0, 60)}`)
+    const de = document.documentElement
+    const w = de.clientWidth
+    // An element sticking out past the viewport is only a bug if the *page*
+    // has to scroll to reach it. Two shapes are legitimate and must not
+    // fail here: content that is deliberately wide and scrolls inside its
+    // own box (the dental arch, wide tables), and decoration positioned
+    // off-canvas inside a clipping box (the login screen's blurred blobs
+    // sit at `right: -15%` under `overflow-hidden`). Any overflowX other
+    // than `visible` means an ancestor already contains the child.
+    const isContained = (el: Element) => {
+      for (let p = el.parentElement; p; p = p.parentElement) {
+        if (getComputedStyle(p).overflowX !== 'visible') return true
+      }
+      return false
+    }
+    return {
+      scrollWidth: de.scrollWidth,
+      clientWidth: w,
+      offenders: [...document.querySelectorAll('body *')]
+        .filter((el) => {
+          const r = el.getBoundingClientRect()
+          if (r.width === 0 || r.height === 0) return false
+          if (getComputedStyle(el).position === 'fixed') return false
+          return (r.right > w + 2 || r.left < -2) && !isContained(el)
+        })
+        .slice(0, 5)
+        .map((el) => `${el.tagName}.${(el.className || '').toString().slice(0, 60)}`),
+    }
   })
-  expect(overflow, `عناصری که از عرض صفحه بیرون زده‌اند:\n${overflow.join('\n')}`).toEqual([])
+
+  expect(
+    overflow.offenders,
+    `عناصری که از عرض صفحه بیرون زده‌اند:\n${overflow.offenders.join('\n')}`,
+  ).toEqual([])
+  expect(
+    overflow.scrollWidth,
+    `صفحه ${overflow.scrollWidth - overflow.clientWidth} پیکسل افقی اسکرول می‌خورد`,
+  ).toBeLessThanOrEqual(overflow.clientWidth + 1)
 })

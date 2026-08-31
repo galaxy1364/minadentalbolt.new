@@ -52,12 +52,21 @@ export function toJalaliString(dateStr: string): string {
   return `${jy}/${String(jm).padStart(2, '0')}/${String(jd).padStart(2, '0')}`
 }
 
+/**
+ * MOD-FIX-014: the human-readable date. Used on the dashboard, calendar,
+ * lab orders, patient file and the printed receipt — all of which sit
+ * beside counters and clocks written in Persian digits, so Latin digits
+ * here produced «9 شهریور 1405 — ۲۲:۴۰» on one line.
+ *
+ * toJalaliString() deliberately keeps Latin digits: its output is compared
+ * and stored, not read.
+ */
 export function toJalaliStringPretty(dateStr: string): string {
   if (!dateStr) return ''
   const d = new Date(dateStr)
   if (isNaN(d.getTime())) return ''
   const [jy, jm, jd] = toJalali(d.getFullYear(), d.getMonth() + 1, d.getDate())
-  return `${jd} ${persianMonths[jm - 1]} ${jy}`
+  return toPersianDigits(`${jd} ${persianMonths[jm - 1]} ${jy}`)
 }
 
 export function getJalaliMonthYear(dateStr: string): { year: number; month: number } {

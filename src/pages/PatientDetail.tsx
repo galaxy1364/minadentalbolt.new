@@ -9,7 +9,7 @@ import { phasePlanProgress, phaseSchedule, validatePhase, nextPhaseNumber, compa
 import { useState, useEffect, useCallback } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { ArrowRight, Edit2, Phone, Mail, MapPin, Calendar, CreditCard, Activity, FileText, Image as ImageIcon, Shield, Pill, Smile, Award, AlertCircle, Clock, CheckCircle2, Layers, Plus, Trash2, FileSignature, Printer, Bone, FlaskConical, Stethoscope } from 'lucide-react'
-import { fetchPatient, updatePatient, fetchTimeline, fetchTreatments, fetchAppointments, fetchPayments, fetchToothRecords, createToothRecord, updateToothRecord, fetchPrescriptions, fetchRadiologyImages, fetchEncounters, fetchDoctors, fetchImplantCases, fetchTreatmentPhases, createTreatmentPhase, updateTreatmentPhase, fetchConsentForms, createConsentForm, updateConsentForm, fetchLabOrders, updateTreatment } from '../lib/api'
+import { fetchPatient, fetchPatients, updatePatient, fetchTimeline, fetchTreatments, fetchAppointments, fetchPayments, fetchToothRecords, createToothRecord, updateToothRecord, fetchPrescriptions, fetchRadiologyImages, fetchEncounters, fetchDoctors, fetchImplantCases, fetchTreatmentPhases, createTreatmentPhase, updateTreatmentPhase, fetchConsentForms, createConsentForm, updateConsentForm, fetchLabOrders, updateTreatment } from '../lib/api'
 import { toJalaliString, toJalaliStringPretty, formatCurrency, toPersianDigits, formatTime } from '../lib/persianDate'
 import { calcPatientBalance } from '../lib/finance'
 import { Patient, Doctor, PatientTimeline, Treatment, Appointment, Payment, ToothRecord, Prescription, RadiologyImage, Encounter, ImplantCase, TreatmentPhase, ConsentForm, LabOrder } from '../types'
@@ -22,6 +22,7 @@ import { calculateAge } from '../lib/patientUtils'
 import { db } from '../lib/db'
 import type { AuditLogEntry } from '../lib/db'
 import DentalChart from '../components/DentalChart'
+import { validatePatientIdentity, findNationalIdDuplicate, duplicateNationalIdMessage } from '../lib/patientIdentity'
 import { CurrencyInput } from '../components/CurrencyInput'
 
 // ============================================================================
@@ -298,8 +299,24 @@ export default function PatientDetail() {
 
   const handleSavePatient = async () => {
     if (!patient) return
-    if (!formData.first_name.trim() || !formData.last_name.trim()) {
-      showToast('error', 'نام و نام خانوادگی الزامی است')
+    // MOD-FIX-017: this used to check the name only, so an existing record
+    // could have its mobile and national ID cleared and saved — the two
+    // fields the create form refuses to be without, and the ones SMS
+    // reminders and duplicate detection depend on. Same rule, one place.
+    const identityError = validatePatientIdentity({
+      first_name: formData.first_name, last_name: formData.last_name,
+      phone: formData.phone, national_id: formData.national_id, phone2: formData.phone2,
+    })
+    if (identityError) {
+      showToast('error', identityError)
+      return
+    }
+    // Read the roster at save time rather than holding it in state: this
+    // check runs once per save, and a stale in-memory list is exactly how a
+    // duplicate slips through.
+    const duplicate = findNationalIdDuplicate(formData.national_id, await fetchPatients(), patient.id)
+    if (duplicate) {
+      showToast('error', duplicateNationalIdMessage(duplicate))
       return
     }
     setSaving(true)
@@ -346,11 +363,21 @@ export default function PatientDetail() {
     if (!patient) return
     try {
       const existing = toothRecords.find((r) => r.tooth_number === toothNumber)
-      const payload = { is_missing: data.is_missing, is_implant: data.is_implant, notes: data.notes } as any
+      // MOD-FIX-016: same drop as Treatments.tsx — this handler even named
+      // condition/surfaces in its parameter type and then built a payload
+      // without them, so no path in the app ever persisted a tooth's
+      // diagnosis.
+      const payload = {
+        is_missing: data.is_missing,
+        is_implant: data.is_implant,
+        notes: data.notes,
+        condition: data.condition ?? null,
+        surfaces: data.surfaces ?? null,
+      }
       if (existing) {
         await updateToothRecord(existing.id, payload)
       } else {
-        await createToothRecord({ patient_id: patient.id, tooth_number: toothNumber, ...payload } as any)
+        await createToothRecord({ patient_id: patient.id, tooth_number: toothNumber, ...payload })
       }
       showToast('success', 'رکورد دندان ذخیره شد')
       await loadTabData()
@@ -1813,11 +1840,11 @@ export default function PatientDetail() {
           <div>
             <h4 className="text-xs font-bold text-slate-500 mb-3 uppercase tracking-wider">اطلاعات شخصی</h4>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-              <Input label="نام" value={formData.first_name} onChange={(v) => setFormData((p) => ({ ...p, first_name: v }))} />
-              <Input label="نام خانوادگی" value={formData.last_name} onChange={(v) => setFormData((p) => ({ ...p, last_name: v }))} />
-              <Input label="کد ملی" value={formData.national_id} onChange={(v) => setFormData((p) => ({ ...p, national_id: v }))} dir="ltr" />
-              <Input label="تلفن" value={formData.phone} onChange={(v) => setFormData((p) => ({ ...p, phone: v }))} dir="ltr" />
-              <Input label="شماره منزل" value={formData.phone2} onChange={(v) => setFormData((p) => ({ ...p, phone2: v }))} dir="ltr" />
+              <Input label="نام *" value={formData.first_name} onChange={(v) => setFormData((p) => ({ ...p, first_name: v }))} />
+              <Input label="نام خانوادگی *" value={formData.last_name} onChange={(v) => setFormData((p) => ({ ...p, last_name: v }))} />
+              <Input label="کد ملی *" value={formData.national_id} onChange={(v) => setFormData((p) => ({ ...p, national_id: v }))} dir="ltr" />
+              <Input label="تلفن *" value={formData.phone} onChange={(v) => setFormData((p) => ({ ...p, phone: v }))} dir="ltr" />
+              <Input label="شماره منزل *" value={formData.phone2} onChange={(v) => setFormData((p) => ({ ...p, phone2: v }))} dir="ltr" />
               <Input label="ایمیل" type="email" value={formData.email} onChange={(v) => setFormData((p) => ({ ...p, email: v }))} dir="ltr" />
               <PersianDateInput label="تاریخ تولد" value={formData.birth_date} onChange={(v) => setFormData((p) => ({ ...p, birth_date: v }))} />
               <Select label="جنسیت" value={formData.gender} onChange={(v) => setFormData((p) => ({ ...p, gender: v }))} options={genderOptions} placeholder="انتخاب کنید" />

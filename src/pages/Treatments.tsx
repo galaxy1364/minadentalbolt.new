@@ -873,14 +873,27 @@ export default function Treatments() {
 
   // ── Tooth chart update handler ────────────────────────────────
 
-  const handleUpdateTooth = async (toothNumber: string, data: { is_missing: boolean; is_implant: boolean; notes: string; condition?: string }) => {
+  const handleUpdateTooth = async (toothNumber: string, data: { is_missing: boolean; is_implant: boolean; notes: string; condition?: string; surfaces?: string }) => {
     if (!detailEnc) return
     try {
       const existing = toothRecords.find((r) => r.tooth_number === toothNumber && r.patient_id === detailEnc.patient_id)
+      // MOD-FIX-016: condition and surfaces were dropped here. The panel
+      // collected them, DentalChart forwarded them, and this line wrote
+      // only is_missing/is_implant/notes — so marking a tooth «پوسیدگی» on
+      // the occlusal surface gave a success haptic and stored nothing. The
+      // `as any` is what let it past strict mode; without it the compiler
+      // now insists every column is accounted for.
+      const payload = {
+        is_missing: data.is_missing,
+        is_implant: data.is_implant,
+        notes: data.notes,
+        condition: data.condition ?? null,
+        surfaces: data.surfaces ?? null,
+      }
       if (existing) {
-        await updateToothRecord(existing.id, { is_missing: data.is_missing, is_implant: data.is_implant, notes: data.notes } as any)
+        await updateToothRecord(existing.id, payload)
       } else {
-        await createToothRecord({ patient_id: detailEnc.patient_id, tooth_number: toothNumber, is_missing: data.is_missing, is_implant: data.is_implant, notes: data.notes } as any)
+        await createToothRecord({ patient_id: detailEnc.patient_id, tooth_number: toothNumber, ...payload })
       }
       h.success()
       const recs = await fetchToothRecords(detailEnc.patient_id)

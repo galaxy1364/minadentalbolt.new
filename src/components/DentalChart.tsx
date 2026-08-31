@@ -572,7 +572,23 @@ export default function DentalChart({ toothRecords, treatments, onUpdateTooth, o
         return (
           <div
             key={num}
+            // A tooth was a bare clickable <div>: no role, no name, no
+            // keyboard path. That made it invisible to assistive tech and
+            // to the one test written to catch the mirrored-arch bug —
+            // clinic-flow looked for [aria-label^="دندان "], which matched
+            // nothing, so MOD-FIX-013's regression guard never ran.
+            role="button"
+            tabIndex={0}
+            aria-label={`دندان ${num}`}
+            aria-pressed={selectedTooth?.number === num}
             onClick={() => { setSelectedTooth(data); onToothSelect?.(String(num)) }}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault()
+                setSelectedTooth(data)
+                onToothSelect?.(String(num))
+              }
+            }}
             className={`relative rounded-lg p-0.5 cursor-pointer transition-all-smooth hover:bg-slate-100 shrink-0 ${selectedTooth?.number === num ? 'bg-primary-50 ring-2 ring-primary-300' : ''} ${data.isPlannedOnly ? 'opacity-60' : ''}`}
           >
             <ToothSVG

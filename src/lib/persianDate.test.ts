@@ -8,7 +8,7 @@ import { describe, it, expect } from 'vitest'
 import {
   toJalaliString, isJalaliLeapYear, jalaliToGregorian,
   toPersianDigits, toEnglishDigits, formatCurrency, todayLocalISO,
-  getJalaliDateInfo,
+  getJalaliDateInfo, toJalaliStringPretty,
 } from './persianDate'
 
 describe('تبدیل میلادی ↔ شمسی', () => {
@@ -99,5 +99,34 @@ describe('todayLocalISO — باگ نیمه‌شب', () => {
     const now = new Date()
     const localExpected = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`
     expect(todayLocalISO()).toBe(localExpected)
+  })
+})
+
+describe('MOD-FIX-014 | تاریخ خوانا با رقم فارسی نوشته می‌شود', () => {
+  /**
+   * `toJalaliStringPretty` تاریخ را برای **خواندن** می‌سازد و در ۱۶ جای
+   * برنامه استفاده می‌شود — داشبورد، تقویم، لابراتوار، پرونده‌ی بیمار و
+   * حتی **رسید چاپی**. ولی رقم لاتین برمی‌گرداند، درحالی‌که کنار همان
+   * متن، ساعت و شمارنده با رقم فارسی نوشته می‌شوند. نتیجه روی صفحه:
+   * «9 شهریور 1405 — ۲۲:۴۰».
+   *
+   * `toJalaliString` عمداً دست‌نخورده می‌ماند: خروجی‌اش (۱۴۰۵/۰۶/۰۹) کلید
+   * و مقدار مقایسه است، نه متن نمایشی.
+   */
+  it('روز و سال با رقم فارسی می‌آیند', () => {
+    expect(toJalaliStringPretty('2026-08-31')).toBe('۹ شهریور ۱۴۰۵')
+  })
+
+  it('هیچ رقم لاتینی باقی نمی‌ماند', () => {
+    expect(toJalaliStringPretty('2026-03-21')).not.toMatch(/[0-9]/)
+  })
+
+  it('تاریخ خالی همچنان رشته‌ی خالی است', () => {
+    expect(toJalaliStringPretty('')).toBe('')
+    expect(toJalaliStringPretty('نه-یک-تاریخ')).toBe('')
+  })
+
+  it('قالب ماشینی دست‌نخورده می‌ماند — کلید مقایسه است، نه متن', () => {
+    expect(toJalaliString('2026-08-31')).toBe('1405/06/09')
   })
 })
