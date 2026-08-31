@@ -25,6 +25,7 @@ import { PalmerToothPicker } from '../components/PalmerToothPicker'
 import { ModuleHeader, ModuleStatCard, ReorderableStatGrid } from '../components/ModuleHeader'
 import { useConfirmAction } from '../components/ConfirmAction'
 import { h } from '../lib/haptics'
+import { findLinkedLabOrder, decideLabHandoff } from '../lib/labHandoff'
 import DentalChart from '../components/DentalChart'
 import { CurrencyInput } from '../components/CurrencyInput'
 import { logError } from '../lib/errorLog'
@@ -739,26 +740,57 @@ export default function Treatments() {
       onConfirm: async () => {
         setSavingTreat(true)
         try {
+          // MOD-FIX-007: the lab hand-off is decided the same way whether
+          // this is a new treatment or an edit. It used to live only in
+          // the "new" branch, so ticking «ارسال به لابراتوار» while
+          // editing saved lab_id on the treatment — which is what draws
+          // the «لابراتوار» chip — without ever telling the lab. The
+          // screen said the case was out; the Laboratory module had never
+          // heard of it.
+          const nextLabId = treatForm.has_lab && treatForm.lab_id ? treatForm.lab_id : null
+          const existingOrder = editingTreat
+            ? findLinkedLabOrder(labOrders, { encounter_id: editingTreat.encounter_id, lab_id: editingTreat.lab_id, tooth_number: editingTreat.tooth_number })
+            : undefined
+          const labAction = decideLabHandoff(editingTreat?.lab_id ?? null, nextLabId, !!existingOrder)
+
+          const sendToLab = async () => {
+            await createLabOrder({
+              lab_id: nextLabId, patient_id: treatPatientId,
+              doctor_id: payload.doctor_id, encounter_id: treatEncounterId,
+              work_type: treatForm.lab_work_type || treatForm.procedure_name,
+              tooth_number: treatForm.tooth_number || null,
+              cost: treatForm.lab_cost ? Number(treatForm.lab_cost) : null,
+              status: 'pending',
+              shade: treatForm.lab_shade || null,
+              material: treatForm.lab_material || null, deadline: null,
+              received_at: null, notes: treatForm.notes || null,
+            } as any)
+          }
+
+          const applyLabAction = async () => {
+            if (labAction === 'cancel' || labAction === 'replace') {
+              if (existingOrder) await updateLabOrder(existingOrder.id, { status: 'cancelled' })
+            }
+            if (labAction === 'create' || labAction === 'replace') await sendToLab()
+          }
+
+          const labMessage =
+            labAction === 'create' ? ' + سفارش لابراتوار ثبت شد'
+            : labAction === 'replace' ? ' + سفارش لابراتوار به آزمایشگاه جدید منتقل شد'
+            : labAction === 'cancel' ? ' + سفارش لابراتوار لغو شد'
+            : ''
+
           if (editingTreat) {
             await updateTreatment(editingTreat.id, payload)
-            showToast('success', 'درمان ویرایش شد')
+            await applyLabAction()
+            showToast('success', `درمان ویرایش شد${labMessage}`)
           } else {
-            const newTreat = await createTreatment(payload)
-            // If has lab, create lab order + payment simultaneously
-            if (treatForm.has_lab && treatForm.lab_id) {
-              await createLabOrder({
-                lab_id: treatForm.lab_id, patient_id: treatPatientId,
-                doctor_id: payload.doctor_id, encounter_id: treatEncounterId,
-                work_type: treatForm.lab_work_type || treatForm.procedure_name,
-                tooth_number: treatForm.tooth_number || null,
-                cost: treatForm.lab_cost ? Number(treatForm.lab_cost) : null,
-                status: 'pending',
-                shade: treatForm.lab_shade || null,
-                material: treatForm.lab_material || null, deadline: null,
-                received_at: null, notes: treatForm.notes || null,
-              } as any)
-              showToast('success', 'درمان + سفارش لابراتوار ثبت شد')
-            }
+            await createTreatment(payload)
+            await applyLabAction()
+            // Every save gets confirmation now. Previously a treatment
+            // saved without a lab produced no toast at all, so the only
+            // signal it worked was the modal closing.
+            showToast('success', `درمان ثبت شد${labMessage}`)
             // NOTE: intentionally NOT auto-creating a "payment" here. A
             // Payment record must represent money actually received —
             // creating one with status:'pending' for the full treatment
@@ -800,9 +832,9 @@ export default function Treatments() {
     // touching that order leaves it orphaned: the lab could keep working
     // on (and billing for) physical work for a treatment that's no
     // longer active, so cancel it in the same step too.
-    const linkedOrder = t.lab_id
-      ? labOrders.find((o) => o.encounter_id === t.encounter_id && o.lab_id === t.lab_id && o.status !== 'cancelled' && o.status !== 'delivered')
-      : null
+    // Shared with the save path (MOD-FIX-007) so the two can't disagree
+    // about which order belongs to which treatment.
+    const linkedOrder = findLinkedLabOrder(labOrders, t) || null
 
     confirmAction({
       type: 'status', title: 'لغو درمان',
