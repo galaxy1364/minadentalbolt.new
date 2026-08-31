@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo } from 'react'
+import { toothLabel, toothLabelWithWord } from '../lib/toothLabel'
 import { useNavigate } from 'react-router-dom'
 import { Archive as ArchiveIcon, Search, Users, IdCard, RotateCcw, User, Building2, Syringe, FlaskConical, Settings2 } from 'lucide-react'
 import { fetchPatients, fetchStaff, updatePatient, updateStaff, fetchInsuranceCompanies, updateInsuranceCompany, fetchImplantCases, updateImplantCase, fetchLabs, updateLab,
@@ -358,7 +359,7 @@ export default function Archive() {
                     <HighlightText text={c.patient ? `${c.patient.first_name} ${c.patient.last_name}` : 'بیمار حذف‌شده'} query={search} />
                   </p>
                   <p className="text-[11px] text-slate-400">
-                    {c.brand || 'بدون برند'} — دندان {toPersianDigits(c.tooth_number || '-')} — {formatCurrency(c.total_cost || 0)} ت — آرشیو از {toJalaliStringPretty(c.updated_at)}
+                    {c.brand || 'بدون برند'} — دندان {toothLabel(c.tooth_number) || '-'} — {formatCurrency(c.total_cost || 0)} ت — آرشیو از {toJalaliStringPretty(c.updated_at)}
                   </p>
                 </div>
                 <Button size="sm" variant="secondary" onClick={() => handleRestoreImplantCase(c)}>

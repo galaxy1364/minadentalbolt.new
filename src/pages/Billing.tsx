@@ -1,5 +1,6 @@
 // Billing.tsx - Persian RTL Dental Clinic Billing & Payments Management
 import { useState, useEffect, useCallback, useMemo } from 'react'
+import { toothLabel } from '../lib/toothLabel'
 import { buildPrintDocument } from '../lib/printDocument'
 import { resolveAttribution, attributableTreatments, treatmentRemaining } from '../lib/paymentAttribution'
 import { useNavigate, useLocation } from 'react-router-dom'
@@ -730,7 +731,7 @@ export default function Billing() {
           ${(() => {
             const a = resolveAttribution(p, treatments as never, doctors as never)
             const rows: string[] = []
-            if (a.procedureName) rows.push(`<tr><td>بابت</td><td>${a.procedureName}${a.toothNumber ? ` — دندان ${toPersianDigits(a.toothNumber)}` : ''}</td></tr>`)
+            if (a.procedureName) rows.push(`<tr><td>بابت</td><td>${a.procedureName}${a.toothNumber ? ` — دندان ${toothLabel(a.toothNumber)}` : ''}</td></tr>`)
             if (a.doctorName) rows.push(`<tr><td>پزشک</td><td>دکتر ${a.doctorName}</td></tr>`)
             return rows.join('')
           })()}
@@ -1387,7 +1388,7 @@ export default function Billing() {
   const treatmentOptions = attributableTreatments(treatments as never, patientTreatmentIds, paymentForm.treatment_id || null)
     .map((t) => {
       const remaining = treatmentRemaining(t, payments as never)
-      const tooth = t.tooth_number ? ` — دندان ${toPersianDigits(t.tooth_number)}` : ''
+      const tooth = t.tooth_number ? ` — دندان ${toothLabel(t.tooth_number)}` : ''
       return { value: t.id, label: `${t.procedure_name || 'رویه'}${tooth} — مانده ${formatCurrency(remaining)} ت` }
     })
 

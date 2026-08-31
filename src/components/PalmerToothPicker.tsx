@@ -8,6 +8,7 @@
 // everywhere, but every part of the UI a doctor sees/taps is 100%
 // Palmer, per the explicit "فقط سیستم پالمر" requirement.
 import { useState, useEffect } from 'react'
+import { toPersianDigits } from '../lib/persianDate'
 import { h } from '../lib/haptics'
 // The arch rows and the midline rule live in lib so they are reachable
 // from a test without rendering React — see MOD-FIX-006.
@@ -47,7 +48,7 @@ export function PalmerToothPicker({ label = 'دندان (پالمر)', value, on
             : 'bg-white dark:bg-slate-700 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-600 hover:border-primary-300'
         }`}
       >
-        {t.palmer}
+        {toPersianDigits(t.palmer)}
       </button>
     )
   }

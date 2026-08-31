@@ -31,9 +31,9 @@ describe('انتخابگر دندان پالمر — تعامل واقعی', () 
   it('🔴 کلیک روی یک دندان، شماره‌ی FDI درست را برمی‌گرداند', () => {
     const onChange = vi.fn()
     render(<PalmerToothPicker value="" onChange={onChange} />)
-    // ⚠️ برچسب‌ها با رقم لاتین رندر می‌شوند، نه فارسی. این تست همان‌طور
-    // که هست واقعیت را ثبت می‌کند؛ ناهماهنگی‌اش در CHANGELOG ثبت شد.
-    const eights = screen.getAllByText('8')
+    // MOD-FEAT-023: برچسب‌ها حالا فارسی‌اند. این تست وقتی لاتین بودند
+    // آن را گرفت — و همان ایراد در همین جلسه رفع شد.
+    const eights = screen.getAllByText('۸')
     expect(eights.length).toBeGreaterThan(0)
     eights[0].click()
     expect(onChange).toHaveBeenCalledTimes(1)

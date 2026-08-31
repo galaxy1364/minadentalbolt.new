@@ -1,5 +1,6 @@
 // PatientDetail.tsx - Persian RTL Dental Clinic Patient Detail Page
 import { InsurancePanel } from '../components/InsurancePanel'
+import { toothLabel } from '../lib/toothLabel'
 import { buildPrintDocument } from '../lib/printDocument'
 import { PatientAlerts } from '../components/PatientAlerts'
 import { buildPatientAlerts, alertChips } from '../lib/patientAlerts'
@@ -406,8 +407,8 @@ export default function PatientDetail() {
     setEditingPhase(null)
     setPhaseWizardStep(0)
     setPhaseForm({
-      doctor_id: '', title: prefillToothNumber ? `درمان دندان ${toPersianDigits(prefillToothNumber)}` : '', description: '',
-      procedures: prefillToothNumber ? `دندان ${toPersianDigits(prefillToothNumber)}` : '',
+      doctor_id: '', title: prefillToothNumber ? `درمان دندان ${toothLabel(prefillToothNumber)}` : '', description: '',
+      procedures: prefillToothNumber ? `دندان ${toothLabel(prefillToothNumber)}` : '',
       estimated_cost: '', actual_cost: '', estimated_duration_days: '', status: 'planned', start_date: '', end_date: '',
     })
     setPhaseModalOpen(true)
@@ -1093,7 +1094,7 @@ export default function PatientDetail() {
           <Card key={group.tooth} className={`p-4 ${group.allDone ? 'opacity-70' : ''}`}>
             <div className="flex items-center justify-between mb-3 flex-wrap gap-2">
               <h4 className="text-sm font-bold text-slate-800 flex items-center gap-2">
-                {group.tooth === 'عمومی' ? 'درمان‌های عمومی' : `دندان ${toPersianDigits(group.tooth)}`}
+                {group.tooth === 'عمومی' ? 'درمان‌های عمومی' : `دندان ${toothLabel(group.tooth)}`}
                 {group.allDone && <CheckCircle2 size={16} className="text-success-600" />}
               </h4>
               {!group.allDone && (

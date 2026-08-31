@@ -17,6 +17,7 @@
  */
 
 import { toPersianDigits } from './persianDate'
+import { toothLabel } from './toothLabel'
 
 export interface TreatmentRef {
   id: string
@@ -93,7 +94,7 @@ export function resolveAttribution(
   // Persian digits, like every other number the app shows. A tooth
   // number rendered in Latin next to Persian prices is the kind of small
   // inconsistency that makes a clinic record look machine-generated.
-  if (toothNumber) parts.push(`دندان ${toPersianDigits(toothNumber)}`)
+  if (toothNumber) parts.push(`دندان ${toothLabel(toothNumber)}`)
   if (doctorName) parts.push(`دکتر ${doctorName}`)
 
   return {

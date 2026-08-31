@@ -1,6 +1,7 @@
 // DentalChart.tsx — Professional interactive dental chart with SVG tooth shapes
 // Supports: FDI numbering, surfaces, conditions, treatment history, primary teeth
 import { useState, useMemo, useEffect } from 'react'
+import { toothLabel } from '../lib/toothLabel'
 import { createPortal } from 'react-dom'
 import { Smile, Plus, Activity, AlertCircle, Clock, Grid3x3 } from 'lucide-react'
 import { h } from '../lib/haptics'
@@ -531,7 +532,7 @@ function ToothDetailPanel({
               </span>
             </div>
             <div>
-              <h3 className="text-base font-bold text-slate-800">دندان {toPersianDigits(tooth.number)}</h3>
+              <h3 className="text-base font-bold text-slate-800">دندان {toothLabel(tooth.number)}</h3>
               <p className="text-xs text-slate-500">{conditionMeta[condition].label}</p>
             </div>
           </div>
@@ -680,7 +681,7 @@ function ToothDetailPanel({
           {(onAddTreatment || onAddLabOrder || onAddImplantCase) && (
             <div className="space-y-2">
               <p className="text-[11px] text-slate-500 dark:text-slate-400">
-                برای دندان {toPersianDigits(tooth.number)}:
+                برای دندان {toothLabel(tooth.number)}:
               </p>
               {onAddTreatment && (
                 <button
@@ -837,24 +838,16 @@ export default function DentalChart({ toothRecords, treatments, onUpdateTooth, o
   }
 
   /**
-   * برچسب دندان با پیشوند ربع (UR/UL/LR/LL).
+   * MOD-FEAT-023: the label now comes from src/lib/toothLabel.ts.
    *
-   * چرا: در نماد پالمر خالص، هر ربع دوباره از ۱ شماره‌گذاری می‌شود،
-   * بنابراین چهار دندان مختلف همگی «۱» نامیده می‌شوند و در کنار هم
-   * روی صفحه، جفتِ «۱ ۱» وسط چارت به‌طور مکرر به‌عنوان تکرار یا
-   * خطا خوانده می‌شد. رقیب (مینادنت.ir) دقیقاً همین را با پیشوند
-   * ربع حل کرده و در بررسی ویدیوی واقعی برنامه‌شان تأیید شد.
-   *
-   * FDI: رقم اول ربع را می‌دهد — ۱=بالا راست، ۲=بالا چپ،
-   * ۳=پایین چپ، ۴=پایین راست. دندان‌های شیری (۵۱-۸۵) با همان
-   * ترتیب، چهار واحد بالاتر شماره‌گذاری می‌شوند.
+   * It used to be defined right here, inside the component, which meant
+   * no other screen could reach it — so treatments, payments, lab orders
+   * and receipts all printed the raw FDI number instead. The chart said
+   * «UR1» and the payment said «دندان ۱۱» for the same tooth. Its own
+   * test copied this function rather than importing it, which was the
+   * clearest possible sign it was in the wrong file.
    */
-  const getToothLabel = (fdiNumber: number): string => {
-    const rawQuadrant = Math.floor(fdiNumber / 10)
-    const quadrant = rawQuadrant >= 5 ? rawQuadrant - 4 : rawQuadrant
-    const prefix = quadrant === 1 ? 'UR' : quadrant === 2 ? 'UL' : quadrant === 3 ? 'LL' : 'LR'
-    return `${prefix}${fdiToPalmer(fdiNumber)}`
-  }
+  const getToothLabel = (fdiNumber: number): string => toothLabel(fdiNumber)
 
   /** COMP-103 — the five-surface target under each tooth.
    *

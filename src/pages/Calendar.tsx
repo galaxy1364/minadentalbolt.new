@@ -3,6 +3,7 @@
 // implant surgery dates into one place, per the user's explicit request
 // for this to be "مغز برنامه" (the brain of the app).
 import { useState, useEffect, useMemo } from 'react'
+import { toothLabel, toothLabelWithWord } from '../lib/toothLabel'
 import { useNavigate } from 'react-router-dom'
 import { Calendar as CalIcon, Clock, FlaskConical, Layers, Bone, User, Users, CalendarPlus, DollarSign, BellRing } from 'lucide-react'
 import { fetchAppointments, fetchLabOrders, fetchTreatmentPhases, fetchImplantCases, fetchPatients } from '../lib/api'
@@ -91,7 +92,7 @@ export default function CalendarPage() {
       events.push({
         id: `implant-${c.id}`, date: c.surgery_date, type: 'implant_surgery',
         title: `جراحی ایمپلنت — ${patientName(c.patient_id)}`,
-        subtitle: `دندان ${c.tooth_number ? toPersianDigits(c.tooth_number) : '-'}`, status: c.stage || undefined, patientId: c.patient_id,
+        subtitle: `دندان ${c.tooth_number ? toothLabel(c.tooth_number) : '-'}`, status: c.stage || undefined, patientId: c.patient_id,
       })
     }
     return events

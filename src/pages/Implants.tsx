@@ -1,5 +1,6 @@
 // Implants.tsx - Persian RTL Dental Clinic Implant Cases Management
 import { useState, useEffect, useCallback, useMemo } from 'react'
+import { toothLabel, toothLabelWithWord } from '../lib/toothLabel'
 import { useNavigate, useLocation } from 'react-router-dom'
 import { Smile, Plus, Search, Edit2, Eye, Filter, Package, Calendar, DollarSign, ShieldCheck, AlertTriangle, CheckCircle2, Clock, Activity, Layers, CalendarClock, ScanLine, Archive, Ban } from 'lucide-react'
 import { downloadICSReminder } from '../lib/icsReminder'
@@ -796,7 +797,7 @@ export default function Implants() {
                         <button
                           onClick={() => downloadICSReminder({
                             title: `جراحی ایمپلنت — ${patientName(c)}`,
-                            description: `دندان ${c.tooth_number ? toPersianDigits(c.tooth_number) : '-'}`,
+                            description: `دندان ${c.tooth_number ? toothLabel(c.tooth_number) : '-'}`,
                             dueDate: c.surgery_date!,
                             filename: `implant-surgery-reminder-${c.id}.ics`,
                           })}

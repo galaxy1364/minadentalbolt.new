@@ -18,6 +18,7 @@
 // within a week, which makes it worse than no list.
 
 import { phaseSchedule } from './phases'
+import { toothLabel } from './toothLabel'
 import type { PhaseLike } from './phases'
 import { stageIndex } from './implants'
 
@@ -122,7 +123,7 @@ export function findStalledImplants(
       kind: 'implant_stalled',
       key: `implant:${c.id}`,
       patientId: c.patient_id ?? null,
-      title: `ایمپلنت دندان ${c.tooth_number || '—'}`,
+      title: `ایمپلنت دندان ${toothLabel(c.tooth_number) || '—'}`,
       detail: `${since} روز در همین مرحله مانده`,
       daysLate: since - patience,
     })

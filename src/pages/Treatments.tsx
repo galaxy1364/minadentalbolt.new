@@ -1,5 +1,6 @@
 // Treatments.tsx — Full Treatment Management with Encounter creation, Dental Chart, Billing & Lab referral
 import { useState, useEffect, useCallback, useMemo } from 'react'
+import { toothLabel, toothLabelWithWord } from '../lib/toothLabel'
 import { useNavigate, useLocation } from 'react-router-dom'
 import {
   Activity, ClipboardList, Stethoscope, Search, Eye, Smile, Plus, Edit2, Trash2, Layers,
@@ -1193,7 +1194,7 @@ export default function Treatments() {
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2">
                           <p className="font-medium text-sm text-slate-800 truncate">{t.procedure_name || 'رویه'}</p>
-                          {t.tooth_number && <Badge color="slate">دندان {toPersianDigits(t.tooth_number)}</Badge>}
+                          {t.tooth_number && <Badge color="slate">دندان {toothLabel(t.tooth_number)}</Badge>}
                           {t.lab_id && <Badge color="accent"><FlaskConical size={10} /> لابراتوار</Badge>}
                         </div>
                         <p className="text-xs text-slate-500 mt-0.5">
@@ -1581,7 +1582,7 @@ export default function Treatments() {
                       <div className="min-w-0">
                         <p className="text-sm font-medium text-slate-800 truncate">{i.procedureName}</p>
                         <p className="text-xs text-slate-500">
-                          {i.toothNumber ? `دندان ${toPersianDigits(i.toothNumber)}` : 'درمان عمومی'}
+                          {i.toothNumber ? `دندان ${toothLabel(i.toothNumber)}` : 'درمان عمومی'}
                         </p>
                       </div>
                       <button

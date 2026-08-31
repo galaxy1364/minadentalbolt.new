@@ -1,5 +1,6 @@
 // Laboratory.tsx - Persian RTL Dental Clinic Laboratory Management
 import { useState, useEffect, useCallback, useMemo } from 'react'
+import { toothLabel, toothLabelWithWord } from '../lib/toothLabel'
 import { FlaskConical, Plus, Search, Clock, CheckCircle2, AlertCircle, Edit2, Trash2, Phone, Filter, TrendingUp, Package, CalendarClock, ChevronLeft, RotateCcw } from 'lucide-react'
 import { downloadICSReminder } from '../lib/icsReminder'
 import { fetchLabOrders, createLabOrder, updateLabOrder, fetchLabs, createLab, updateLab, fetchPatients, fetchDoctors, fetchTreatments, updateTreatment } from '../lib/api'
@@ -649,7 +650,7 @@ export default function Laboratory() {
                   </button>
                   <p className="text-xs text-slate-500 mt-0.5">
                     {o.work_type || 'کار لابراتوار'}
-                    {o.tooth_number && <span> — دندان {toPersianDigits(o.tooth_number)}</span>}
+                    {o.tooth_number && <span> — دندان {toothLabel(o.tooth_number)}</span>}
                   </p>
                 </div>
                 <div className="flex items-center gap-2 flex-wrap">

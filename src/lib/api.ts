@@ -1,6 +1,7 @@
 // Minadent - Offline-first API layer
 // All reads come from local IndexedDB (instant). All writes go to local DB + sync queue.
 import { toJalaliString } from './persianDate'
+import { toothLabel } from './toothLabel'
 import { supabase, CLINIC_ID } from './supabase'
 import { db } from './db'
 import type { PatientPolicy } from './insurance'
@@ -292,7 +293,7 @@ export async function createTreatment(t: TreatmentInput): Promise<Treatment> {
   await db.treatments.put(treatment)
   await queueOperation('treatments', 'insert', id, treatment)
   await logToTimeline(treatment.patient_id, 'treatment_created', 'درمان ثبت شد',
-    `${treatment.procedure_name || 'رویه'}${treatment.tooth_number ? ` — دندان ${treatment.tooth_number}` : ''}`, id)
+    `${treatment.procedure_name || 'رویه'}${treatment.tooth_number ? ` — دندان ${toothLabel(treatment.tooth_number)}` : ''}`, id)
   return treatment
 }
 
@@ -382,7 +383,7 @@ export async function createLabOrder(l: LabOrderInput): Promise<LabOrder> {
   await db.lab_orders.put(order)
   await queueOperation('lab_orders', 'insert', id, order)
   await logToTimeline(order.patient_id, 'lab_order_created', 'سفارش لابراتوار',
-    `${order.work_type || 'سفارش'}${order.tooth_number ? ` — دندان ${order.tooth_number}` : ''}`, id)
+    `${order.work_type || 'سفارش'}${order.tooth_number ? ` — دندان ${toothLabel(order.tooth_number)}` : ''}`, id)
   return order
 }
 
@@ -794,7 +795,7 @@ export async function createImplantCase(c: ImplantCaseInput): Promise<ImplantCas
   await db.implant_cases.put(ic)
   await queueOperation('implant_cases', 'insert', id, ic)
   await logToTimeline(ic.patient_id, 'implant_case_created', 'مورد ایمپلنت',
-    `ایمپلنت${ic.tooth_number ? ` دندان ${ic.tooth_number}` : ''} ثبت شد`, id)
+    `ایمپلنت${ic.tooth_number ? ` دندان ${toothLabel(ic.tooth_number)}` : ''} ثبت شد`, id)
   return ic
 }
 
