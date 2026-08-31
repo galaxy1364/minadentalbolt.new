@@ -283,17 +283,17 @@ export default function Inventory() {
   const handleDelete = (item: InventoryItemWithRelations) => {
     h.warning()
     confirmAction({
-      type: 'delete',
-      title: 'حذف اقلام',
+      type: 'status',
+      title: 'غیرفعال کردن کالا',
       warning: 'این عملیات قابل بازگشت نیست',
       fields: [
         { label: 'نام', value: item.name, highlight: true },
         { label: 'تعداد فعلی', value: toPersianDigits(item.quantity ?? 0) },
       ],
-      confirmLabel: 'حذف قطعی',
+      confirmLabel: 'غیرفعال کن',
       onConfirm: async () => {
         try { await deactivateInventoryItem(item.id); showToast('success', 'غیرفعال شد'); await loadData() }
-        catch { showToast('error', 'خطا در حذف') }
+        catch { showToast('error', 'خطا در غیرفعال‌سازی') }
       },
     })
   }

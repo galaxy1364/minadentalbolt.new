@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react'
 import { createPortal } from 'react-dom'
 import {
-  Check, X, AlertTriangle, Loader2, Trash2, Edit2, Plus, Eye,
+  Check, X, AlertTriangle, Loader2, Edit2, Plus, Eye,
   ChevronLeft, ShieldCheck, Sparkles, Zap,
 } from 'lucide-react'
 import { h, startContinuousHaptic, stopContinuousHaptic } from '../lib/haptics'
@@ -12,7 +12,12 @@ import { h, startContinuousHaptic, stopContinuousHaptic } from '../lib/haptics'
 // iOS 27 liquid-glass aesthetic with morphing transitions
 // ─────────────────────────────────────────────────────────────────
 
-export type ConfirmActionType = 'create' | 'edit' | 'delete' | 'status'
+// MOD-UI-011: there is deliberately no 'delete' variant. The project
+// permanently deletes nothing — src/lib/api.ts contains zero delete
+// calls — so a dialog that shows a red bin and promises a permanent
+// operation was describing something the app cannot do. Removing the
+// variant makes that lie unrepresentable rather than merely corrected.
+export type ConfirmActionType = 'create' | 'edit' | 'status'
 
 export interface PreviewField {
   label: string
@@ -33,7 +38,6 @@ export interface ConfirmActionConfig {
 const typeMeta = {
   create: { icon: <Plus size={26} />, color: 'from-teal-500 to-teal-700', bg: 'bg-teal-50', text: 'text-teal-700', ring: 'ring-teal-200', label: 'ثبت جدید' },
   edit:   { icon: <Edit2 size={26} />, color: 'from-sky-500 to-sky-700', bg: 'bg-sky-50', text: 'text-sky-700', ring: 'ring-sky-200', label: 'ویرایش' },
-  delete: { icon: <Trash2 size={26} />, color: 'from-rose-500 to-rose-700', bg: 'bg-rose-50', text: 'text-rose-700', ring: 'ring-rose-200', label: 'حذف' },
   status: { icon: <Check size={26} />, color: 'from-emerald-500 to-emerald-700', bg: 'bg-emerald-50', text: 'text-emerald-700', ring: 'ring-emerald-200', label: 'تغییر وضعیت' },
 }
 
@@ -249,9 +253,7 @@ export function ConfirmAction({ config, onClose }: { config: ConfirmActionConfig
               </div>
               <p className="text-sm font-bold text-slate-800 mb-1">تایید نهایی</p>
               <p className="text-xs text-slate-500 leading-relaxed max-w-[260px]">
-                {config.type === 'delete'
-                  ? 'برای اجرای قطعی این عملیات، دکمه را نگه دارید'
-                  : 'برای ثبت قطعی، دکمه را فشار داده و نگه دارید'}
+                برای ثبت قطعی، دکمه را فشار داده و نگه دارید
               </p>
             </div>
 

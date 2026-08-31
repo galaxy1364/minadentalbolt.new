@@ -235,7 +235,7 @@ export default function Insurance() {
     }
 
     confirmAction({
-      type: 'delete',
+      type: 'status',
       title: 'غیرفعال کردن شرکت بیمه',
       warning: 'این عملیات قابل بازگشت نیست',
       fields: [{ label: 'نام', value: c.name, highlight: true }],

@@ -1221,10 +1221,10 @@ export default function Billing() {
   const handleDeleteExpense = (e: Expense) => {
     h.tap()
     confirmAction({
-      type: 'delete',
-      title: 'حذف هزینه',
+      type: 'status',
+      title: 'غیرفعال کردن هزینه',
       fields: [{ label: 'دسته‌بندی', value: e.category, highlight: true }, { label: 'مبلغ', value: `${formatCurrency(e.amount)} ت` }],
-      confirmLabel: 'تایید حذف',
+      confirmLabel: 'غیرفعال کن',
       onConfirm: async () => { await deactivateExpense(e.id); showToast('success', 'غیرفعال شد'); loadData() },
     })
   }
@@ -1271,7 +1271,7 @@ export default function Billing() {
                       <td className="px-4 py-3 text-slate-500 max-w-[200px] truncate">{e.description || '-'}</td>
                       <td className="px-4 py-3">
                         <button onClick={() => openEditExpense(e)} aria-label="ویرایش هزینه" className="text-slate-400 hover:text-primary-600 hover:bg-primary-50 p-1.5 rounded-lg transition-colors"><Edit2 size={15} /></button>
-                        <button onClick={() => handleDeleteExpense(e)} aria-label="حذف هزینه" className="text-slate-400 hover:text-error-600 hover:bg-error-50 p-1.5 rounded-lg transition-colors"><Trash2 size={15} /></button>
+                        <button onClick={() => handleDeleteExpense(e)} aria-label="غیرفعال کردن هزینه" className="text-slate-400 hover:text-error-600 hover:bg-error-50 p-1.5 rounded-lg transition-colors"><Trash2 size={15} /></button>
                       </td>
                     </tr>
                   ))}

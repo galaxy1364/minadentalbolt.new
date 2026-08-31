@@ -1,7 +1,7 @@
 // Implants.tsx - Persian RTL Dental Clinic Implant Cases Management
 import { useState, useEffect, useCallback, useMemo } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
-import { Smile, Plus, Search, Edit2, Eye, Filter, Package, Calendar, DollarSign, ShieldCheck, AlertTriangle, CheckCircle2, Clock, Activity, Layers, Trash2, CalendarClock, ScanLine } from 'lucide-react'
+import { Smile, Plus, Search, Edit2, Eye, Filter, Package, Calendar, DollarSign, ShieldCheck, AlertTriangle, CheckCircle2, Clock, Activity, Layers, CalendarClock, ScanLine, Archive, Ban } from 'lucide-react'
 import { downloadICSReminder } from '../lib/icsReminder'
 import { fetchImplantCases, createImplantCase, updateImplantCase, createImplantComponent, deactivateImplantComponent, fetchPatients, fetchDoctors, createExpense, fetchInventoryItems } from '../lib/api'
 import { calcSurgeryShare, canMoveStage, validateImplantCase, caseFinancials } from '../lib/implants'
@@ -341,17 +341,17 @@ export default function Implants() {
   const handleDeleteComponent = (comp: ImplantComponent) => {
     h.tap()
     confirmAction({
-      type: 'delete',
-      title: 'حذف کامپوننت',
+      type: 'status',
+      title: 'غیرفعال کردن کامپوننت',
       warning: 'اگر این هزینه در محاسبه‌ی سهم جراح لحاظ می‌شد، بعد از حذف دوباره محاسبه می‌شود',
       fields: [
         { label: 'نوع', value: getComponentTypeLabel(comp.component_type), highlight: true },
         { label: 'هزینه', value: comp.cost != null ? `${formatCurrency(comp.cost)} ت` : '-' },
       ],
-      confirmLabel: 'تایید حذف',
+      confirmLabel: 'غیرفعال کن',
       onConfirm: async () => {
-        try { await deactivateImplantComponent(comp.id); showToast('success', 'کامپوننت حذف شد'); await loadData() }
-        catch { showToast('error', 'خطا در حذف') }
+        try { await deactivateImplantComponent(comp.id); showToast('success', 'کامپوننت غیرفعال شد'); await loadData() }
+        catch { showToast('error', 'خطا در غیرفعال‌سازی') }
       },
     })
   }
@@ -860,7 +860,7 @@ export default function Implants() {
                             {comp.cost != null && <span className="text-[11px] text-slate-500 dark:text-slate-400 shrink-0">{formatCurrency(comp.cost)} ت</span>}
                             {comp.brand && <span className="text-[11px] text-slate-400 truncate">{comp.brand}</span>}
                           </div>
-                          <button onClick={() => handleDeleteComponent(comp)} aria-label="حذف کامپوننت" className="shrink-0 p-1 rounded-lg text-slate-400 hover:text-error-600 hover:bg-error-50 transition-colors"><Trash2 size={12} /></button>
+                          <button onClick={() => handleDeleteComponent(comp)} aria-label="غیرفعال کردن کامپوننت" className="shrink-0 p-1 rounded-lg text-slate-400 hover:text-error-600 hover:bg-error-50 transition-colors"><Ban size={12} /></button>
                         </div>
                       ))}
                     </div>
@@ -940,8 +940,8 @@ export default function Implants() {
                     }}
                     className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-error-50 text-error-600 text-xs hover:bg-error-100 transition-all-smooth"
                   >
-                    <Trash2 size={12} />
-                    حذف
+                    <Archive size={12} />
+                    آرشیو
                   </button>
                   <button
                     onClick={() => navigate(`/patients/${c.patient_id}`)}

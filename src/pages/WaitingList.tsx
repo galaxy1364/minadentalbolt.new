@@ -202,17 +202,17 @@ export default function WaitingList() {
   const handleDelete = (e: WaitingListEntryWithRelations) => {
     h.warning()
     confirmAction({
-      type: 'delete',
-      title: 'حذف از لیست انتظار',
+      type: 'status',
+      title: 'لغو از لیست انتظار',
       warning: 'این عملیات قابل بازگشت نیست',
       fields: [
         { label: 'بیمار', value: patientName(e), highlight: true },
         { label: 'دلیل', value: e.reason || '-' },
       ],
-      confirmLabel: 'حذف قطعی',
+      confirmLabel: 'تایید لغو',
       onConfirm: async () => {
         try { await cancelWaitingEntry(e.id); showToast('success', 'لغو شد'); await loadData() }
-        catch { showToast('error', 'خطا در حذف') }
+        catch { showToast('error', 'خطا در لغو') }
       },
     })
   }

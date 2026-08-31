@@ -438,7 +438,7 @@ export default function Laboratory() {
   const handleDeleteOrder = (order: LabOrder) => {
     h.warning()
     confirmAction({
-      type: 'delete',
+      type: 'status',
       title: 'لغو سفارش',
       warning: 'این عملیات قابل بازگشت نیست',
       fields: [

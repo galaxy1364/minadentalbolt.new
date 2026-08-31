@@ -2,7 +2,7 @@
 // Deliberately separate from Billing.tsx (clinic business finances) —
 // this tracks the owner's personal financial obligations.
 import { useState, useEffect, useMemo } from 'react'
-import { PiggyBank, Plus, Landmark, Home, Banknote, HandCoins, Trash2, Edit2, CalendarClock } from 'lucide-react'
+import { PiggyBank, Plus, Landmark, Home, Banknote, HandCoins, Edit2, CalendarClock, Ban } from 'lucide-react'
 import {
   fetchPersonalFinanceItems, createPersonalFinanceItem, updatePersonalFinanceItem, cancelPersonalFinanceItem,
 } from '../lib/api'
@@ -132,14 +132,14 @@ export default function PersonalFinance() {
   const handleDelete = (item: PersonalFinanceItem) => {
     h.tap()
     confirmAction({
-      type: 'delete',
-      title: 'حذف مورد مالی',
+      type: 'status',
+      title: 'لغو مورد مالی',
       warning: 'این عملیات قابل بازگشت نیست',
       fields: [{ label: 'عنوان', value: item.title, highlight: true }],
       confirmLabel: 'تایید حذف',
       onConfirm: async () => {
         await cancelPersonalFinanceItem(item.id)
-        showToast('success', 'حذف شد')
+        showToast('success', 'لغو شد — در سوابق باقی ماند')
         await loadData()
       },
     })
@@ -273,7 +273,7 @@ export default function PersonalFinance() {
                     </button>
                   )}
                   <button onClick={() => openEdit(item)} className="text-xs text-primary-600 hover:underline"><Edit2 size={11} className="inline ml-0.5" /> ویرایش</button>
-                  <button onClick={() => handleDelete(item)} className="text-xs text-error-500 hover:underline"><Trash2 size={11} className="inline ml-0.5" /> حذف</button>
+                  <button onClick={() => handleDelete(item)} className="text-xs text-error-500 hover:underline"><Ban size={11} className="inline ml-0.5" /> لغو</button>
                 </div>
               </Card>
             )

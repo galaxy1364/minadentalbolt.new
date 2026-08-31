@@ -1303,7 +1303,7 @@ export default function PatientDetail() {
                     </div>
                     <div className="flex gap-2 mt-2.5 pt-2.5 border-t border-slate-100 dark:border-slate-700">
                       <button onClick={() => openEditPhase(p)} className="text-xs text-primary-600 hover:underline">ویرایش</button>
-                      <button onClick={() => handleDeletePhase(p)} className="text-xs text-error-500 hover:underline">حذف</button>
+                      <button onClick={() => handleDeletePhase(p)} className="text-xs text-error-500 hover:underline">لغو</button>
                     </div>
                   </Card>
                 </div>
@@ -1349,7 +1349,7 @@ export default function PatientDetail() {
                 <div className="flex gap-2 mt-2.5 pt-2.5 border-t border-slate-100 dark:border-slate-700">
                   <button onClick={() => handlePrintConsent(c)} className="flex items-center gap-1 text-xs text-primary-600 hover:underline"><Printer size={12} /> چاپ</button>
                   <button onClick={() => openEditConsent(c)} className="text-xs text-slate-500 hover:underline">ویرایش</button>
-                  <button onClick={() => handleDeleteConsent(c)} className="text-xs text-error-500 hover:underline">حذف</button>
+                  <button onClick={() => handleDeleteConsent(c)} className="text-xs text-error-500 hover:underline">آرشیو</button>
                 </div>
               </Card>
             )

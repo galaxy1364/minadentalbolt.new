@@ -303,7 +303,7 @@ export default function Settings() {
     } catch { showToast('error', 'خطا در ذخیره') } finally { setSavingDoctor(false) }
   }
   const handleDeleteDoctor = (d: Doctor) => {
-    confirmAction({ type: 'delete', title: 'غیرفعال کردن پزشک', fields: [{ label: 'تخصص', value: d.specialty || '', highlight: true }], confirmLabel: 'غیرفعال کن', onConfirm: async () => { await deactivateDoctor(d.id); showToast('success', 'غیرفعال شد'); loadData() } })
+    confirmAction({ type: 'status', title: 'غیرفعال کردن پزشک', fields: [{ label: 'تخصص', value: d.specialty || '', highlight: true }], confirmLabel: 'غیرفعال کن', onConfirm: async () => { await deactivateDoctor(d.id); showToast('success', 'غیرفعال شد'); loadData() } })
   }
 
   // ── Unit handlers ──
@@ -320,7 +320,7 @@ export default function Settings() {
     } catch { showToast('error', 'خطا در ذخیره') } finally { setSavingUnit(false) }
   }
   const handleDeleteUnit = (u: Unit) => {
-    confirmAction({ type: 'delete', title: 'غیرفعال کردن یونیت', fields: [{ label: 'نام', value: u.name || '', highlight: true }], confirmLabel: 'غیرفعال کن', onConfirm: async () => { await deactivateUnit(u.id); showToast('success', 'غیرفعال شد'); loadData() } })
+    confirmAction({ type: 'status', title: 'غیرفعال کردن یونیت', fields: [{ label: 'نام', value: u.name || '', highlight: true }], confirmLabel: 'غیرفعال کن', onConfirm: async () => { await deactivateUnit(u.id); showToast('success', 'غیرفعال شد'); loadData() } })
   }
 
   // ── Procedure handlers ──
@@ -337,7 +337,7 @@ export default function Settings() {
     } catch { showToast('error', 'خطا در ذخیره') } finally { setSavingProc(false) }
   }
   const handleDeleteProc = (p: Procedure) => {
-    confirmAction({ type: 'delete', title: 'غیرفعال کردن رویه', fields: [{ label: 'نام', value: p.name, highlight: true }, { label: 'کد', value: p.code }], confirmLabel: 'غیرفعال کن', onConfirm: async () => { await deactivateProcedure(p.id); showToast('success', 'غیرفعال شد'); loadData() } })
+    confirmAction({ type: 'status', title: 'غیرفعال کردن رویه', fields: [{ label: 'نام', value: p.name, highlight: true }, { label: 'کد', value: p.code }], confirmLabel: 'غیرفعال کن', onConfirm: async () => { await deactivateProcedure(p.id); showToast('success', 'غیرفعال شد'); loadData() } })
   }
 
   // ── Package handlers ──
@@ -354,7 +354,7 @@ export default function Settings() {
     } catch { showToast('error', 'خطا در ذخیره') } finally { setSavingPkg(false) }
   }
   const handleDeletePkg = (p: TreatmentPackage) => {
-    confirmAction({ type: 'delete', title: 'غیرفعال کردن پکیج', fields: [{ label: 'نام', value: p.name, highlight: true }], confirmLabel: 'غیرفعال کن', onConfirm: async () => { await deactivateTreatmentPackage(p.id); showToast('success', 'غیرفعال شد'); loadData() } })
+    confirmAction({ type: 'status', title: 'غیرفعال کردن پکیج', fields: [{ label: 'نام', value: p.name, highlight: true }], confirmLabel: 'غیرفعال کن', onConfirm: async () => { await deactivateTreatmentPackage(p.id); showToast('success', 'غیرفعال شد'); loadData() } })
   }
 
   // ── Category handlers ──
@@ -371,7 +371,7 @@ export default function Settings() {
     } catch { showToast('error', 'خطا در ذخیره') } finally { setSavingCat(false) }
   }
   const handleDeleteCat = (c: InventoryCategory) => {
-    confirmAction({ type: 'delete', title: 'غیرفعال کردن دسته‌بندی', fields: [{ label: 'نام', value: c.name, highlight: true }], confirmLabel: 'غیرفعال کن', onConfirm: async () => { await deactivateInventoryCategory(c.id); showToast('success', 'غیرفعال شد'); loadData() } })
+    confirmAction({ type: 'status', title: 'غیرفعال کردن دسته‌بندی', fields: [{ label: 'نام', value: c.name, highlight: true }], confirmLabel: 'غیرفعال کن', onConfirm: async () => { await deactivateInventoryCategory(c.id); showToast('success', 'غیرفعال شد'); loadData() } })
   }
 
   // ── Generic CRUD list renderer ──
@@ -1071,8 +1071,8 @@ function RbacMatrixTab() {
   const handleDeleteRole = (role: { key: string; label: string }) => {
     h.warning()
     confirmAction({
-      type: 'delete',
-      title: 'حذف نقش سفارشی',
+      type: 'status',
+      title: 'غیرفعال کردن نقش سفارشی',
       warning: 'این عملیات قابل بازگشت نیست. کارکنانی که این نقش به آن‌ها اختصاص داده شده، تا تغییر نقش‌شان فقط به داشبورد دسترسی خواهند داشت.',
       fields: [{ label: 'نقش', value: role.label, highlight: true }],
       confirmLabel: 'غیرفعال کن',

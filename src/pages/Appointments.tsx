@@ -665,7 +665,7 @@ export default function Appointments() {
                           <span className={`status-pill ${sm.bg} ${sm.color}`}>{sm.label}</span>
                         </div>
                       </div>
-                      <button onClick={(e) => { e.stopPropagation(); handleDelete(appt) }} aria-label="حذف نوبت" className="p-1.5 rounded-lg bg-error-50 text-error-500 press-scale">
+                      <button onClick={(e) => { e.stopPropagation(); handleDelete(appt) }} aria-label="لغو نوبت" className="p-1.5 rounded-lg bg-error-50 text-error-500 press-scale">
                         <Trash2 size={14} />
                       </button>
                     </div>
@@ -745,7 +745,7 @@ export default function Appointments() {
                         <CheckCircle2 size={16} />
                       </button>
                     )}
-                    <button onClick={() => handleDelete(appt)} aria-label="حذف نوبت" className="p-1.5 rounded-lg bg-error-50 text-error-500 hover:bg-error-100 transition-all-smooth press-scale" title="حذف">
+                    <button onClick={() => handleDelete(appt)} aria-label="لغو نوبت" className="p-1.5 rounded-lg bg-error-50 text-error-500 hover:bg-error-100 transition-all-smooth press-scale" title="لغو">
                       <Trash2 size={16} />
                     </button>
                   </div>

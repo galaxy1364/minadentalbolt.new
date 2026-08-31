@@ -1,7 +1,7 @@
 // Prescriptions.tsx - Persian RTL Dental Clinic Prescriptions Management
 import { useState, useEffect, useCallback, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Pill, FileText, Search, Plus, Eye, Trash2, Edit2, TrendingUp, Smile, Printer } from 'lucide-react'
+import { Pill, FileText, Search, Plus, Eye, Edit2, TrendingUp, Smile, Printer, Ban } from 'lucide-react'
 import { AreaChart, Area, XAxis, YAxis, Tooltip as RTooltip, ResponsiveContainer } from 'recharts'
 import { fetchPrescriptions, createPrescription, updatePrescription, fetchPatients, fetchDoctors } from '../lib/api'
 import { toJalaliString, toJalaliStringPretty, getJalaliMonthYear, formatCurrency, formatNumber, toPersianDigits, persianMonths } from '../lib/persianDate'
@@ -407,7 +407,7 @@ export default function Prescriptions() {
                   <div className="flex items-center gap-2">
                     <button onClick={() => openEditModal(p)} className="text-slate-500 hover:text-slate-700 text-xs flex items-center gap-1"><Edit2 size={14} /> ویرایش</button>
                     <button onClick={() => handlePrint(p)} className="text-primary-600 hover:text-primary-700 text-xs flex items-center gap-1"><Printer size={14} /> چاپ</button>
-                    <button onClick={() => handleDelete(p)} className="text-error-500 hover:text-error-700 text-xs flex items-center gap-1"><Trash2 size={14} /> حذف</button>
+                    <button onClick={() => handleDelete(p)} className="text-error-500 hover:text-error-700 text-xs flex items-center gap-1"><Ban size={14} /> لغو</button>
                     <button onClick={() => navigate(`/patients/${p.patient_id}`)} className="text-primary-600 hover:text-primary-700 text-xs flex items-center gap-1"><Eye size={14} /> پرونده</button>
                   </div>
                 </div>
