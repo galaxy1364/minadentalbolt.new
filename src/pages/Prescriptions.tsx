@@ -1,5 +1,6 @@
 // Prescriptions.tsx - Persian RTL Dental Clinic Prescriptions Management
 import { useState, useEffect, useCallback, useMemo } from 'react'
+import { buildPrintDocument } from '../lib/printDocument'
 import { useNavigate } from 'react-router-dom'
 import { Pill, FileText, Search, Plus, Eye, Edit2, TrendingUp, Smile, Printer, Ban } from 'lucide-react'
 import { AreaChart, Area, XAxis, YAxis, Tooltip as RTooltip, ResponsiveContainer } from 'recharts'
@@ -182,8 +183,7 @@ export default function Prescriptions() {
     const items = medicationsList(p)
     const win = window.open('', '_blank', 'width=650,height=800')
     if (!win) { showToast('error', 'اجازه‌ی باز کردن پنجره‌ی چاپ داده نشد'); return }
-    win.document.write(`<!DOCTYPE html><html dir="rtl" lang="fa"><head><meta charset="utf-8"><title>نسخه — ${patientName(p)}</title>
-      <style>
+    const rxStyles = `
         body { font-family: Tahoma, Arial, sans-serif; padding: 32px; color: #1e293b; }
         .header { text-align: center; border-bottom: 2px solid #0d9488; padding-bottom: 16px; margin-bottom: 24px; }
         .header h1 { color: #0d9488; margin: 0 0 4px; font-size: 22px; }
@@ -195,8 +195,8 @@ export default function Prescriptions() {
         .notes { border-top: 1px solid #e2e8f0; padding-top: 12px; font-size: 13px; color: #475569; }
         .footer { margin-top: 40px; display: flex; justify-content: space-between; font-size: 12px; color: #94a3b8; }
         @media print { body { padding: 12px; } }
-      </style>
-      </head><body>
+      `
+    const rxBody = `
         <div class="header"><h1>کلینیک دندانپزشکی مینا</h1><p>نسخه‌ی دارویی</p></div>
         <div class="meta">
           <span><b>بیمار:</b> ${patientName(p)}</span>
@@ -211,10 +211,10 @@ export default function Prescriptions() {
         </table>
         ${p.notes ? `<div class="notes"><b>یادداشت:</b> ${p.notes}</div>` : ''}
         <div class="footer"><span>مینادنت — سیستم مدیریت کلینیک</span><span>امضا و مهر پزشک</span></div>
-      </body></html>`)
+      `
+    win.document.write(buildPrintDocument({ title: `نسخه — ${patientName(p)}`, styles: rxStyles, bodyHtml: rxBody }))
     win.document.close()
     win.focus()
-    setTimeout(() => win.print(), 300)
   }
 
   // ===========================================================================

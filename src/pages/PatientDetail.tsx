@@ -1,5 +1,6 @@
 // PatientDetail.tsx - Persian RTL Dental Clinic Patient Detail Page
 import { InsurancePanel } from '../components/InsurancePanel'
+import { buildPrintDocument } from '../lib/printDocument'
 import { PatientAlerts } from '../components/PatientAlerts'
 import { buildPatientAlerts, alertChips } from '../lib/patientAlerts'
 import { buildDoctorLedger } from '../lib/doctorLedger'
@@ -618,8 +619,11 @@ export default function PatientDetail() {
 
     const rows = (items: string) => items || `<tr><td colspan="5" style="text-align:center;color:#94a3b8;padding:10px;">موردی ثبت نشده</td></tr>`
 
-    win.document.write(`<!DOCTYPE html><html dir="rtl" lang="fa"><head><meta charset="utf-8"><title>پرونده‌ی کامل بیمار — ${patient.first_name} ${patient.last_name}</title>
-      <style>
+    // MOD-FIX-011: the shell supplies the back / print / share controls.
+    // Inside an installed PWA this window is the entire screen, so a
+    // document with no controls of its own leaves no way back.
+    const chartTitle = `پرونده‌ی کامل بیمار — ${patient.first_name} ${patient.last_name}`
+    const chartStyles = `
         body { font-family: Tahoma, Arial, sans-serif; padding: 28px; color: #1e293b; line-height: 1.7; font-size: 13px; }
         .header { text-align: center; border-bottom: 2px solid #0d9488; padding-bottom: 14px; margin-bottom: 20px; }
         .header h1 { color: #0d9488; margin: 0 0 4px; font-size: 20px; }
@@ -634,8 +638,8 @@ export default function PatientDetail() {
         .balance-box b { color: #0d9488; }
         .footer { margin-top: 30px; text-align: center; color: #94a3b8; font-size: 11px; }
         @media print { body { padding: 10px; } .section { page-break-inside: avoid; } }
-      </style>
-      </head><body>
+      `
+    const chartBody = `
         <div class="header"><h1>کلینیک دندانپزشکی مینادنت</h1><p>پرونده‌ی کامل بیمار — تاریخ چاپ: ${toJalaliStringPretty(new Date().toISOString())}</p></div>
 
         <div class="meta-grid">
@@ -683,18 +687,28 @@ export default function PatientDetail() {
         </div>
 
         <div class="footer">این سند به‌صورت خودکار از سامانه‌ی مدیریت کلینیک مینادنت تولید شده است.</div>
-      </body></html>`)
+      `
+    // Plain-text summary for «ارسال برای بیمار». Deliberately short: a
+    // whole chart pasted into a message is unreadable, and a patient
+    // record is not something to scatter across chat apps by default.
+    const shareText = [
+      `کلینیک دندانپزشکی مینادنت`,
+      `بیمار: ${patient.first_name} ${patient.last_name}`,
+      `پرونده: ${patient.file_number || '—'}`,
+      `تعداد درمان: ${toPersianDigits(sortedTreatments.length)}`,
+      `مانده‌حساب: ${formatCurrency(patientBalance)} ت`,
+    ].join('\n')
+
+    win.document.write(buildPrintDocument({ title: chartTitle, styles: chartStyles, bodyHtml: chartBody, shareText }))
     win.document.close()
     win.focus()
-    setTimeout(() => win.print(), 300)
   }
 
   const handlePrintConsent = (c: ConsentForm) => {
     const doc = doctors.find((d) => d.id === c.doctor_id)
     const win = window.open('', '_blank', 'width=650,height=850')
     if (!win) { showToast('error', 'اجازه‌ی باز کردن پنجره‌ی چاپ داده نشد'); return }
-    win.document.write(`<!DOCTYPE html><html dir="rtl" lang="fa"><head><meta charset="utf-8"><title>فرم رضایت‌نامه</title>
-      <style>
+    const consentStyles = `
         body { font-family: Tahoma, Arial, sans-serif; padding: 32px; color: #1e293b; line-height: 1.9; }
         .header { text-align: center; border-bottom: 2px solid #0d9488; padding-bottom: 16px; margin-bottom: 24px; }
         .header h1 { color: #0d9488; margin: 0 0 4px; font-size: 22px; }
@@ -705,8 +719,8 @@ export default function PatientDetail() {
         .sign-row { display: flex; justify-content: space-between; margin-top: 60px; font-size: 13px; }
         .sign-box { width: 45%; border-top: 1px solid #94a3b8; padding-top: 6px; text-align: center; color: #64748b; }
         @media print { body { padding: 12px; } }
-      </style>
-      </head><body>
+      `
+    const consentBody = `
         <div class="header"><h1>کلینیک دندانپزشکی مینا</h1><p>فرم رضایت‌نامه‌ی آگاهانه‌ی درمان</p></div>
         <div class="meta">
           <span><b>بیمار:</b> ${patient ? `${patient.first_name} ${patient.last_name}` : '-'}</span>
@@ -721,10 +735,10 @@ export default function PatientDetail() {
           <div class="sign-box">امضای بیمار / ولی بیمار</div>
           <div class="sign-box">امضا و مهر پزشک</div>
         </div>
-      </body></html>`)
+      `
+    win.document.write(buildPrintDocument({ title: 'فرم رضایت‌نامه', styles: consentStyles, bodyHtml: consentBody }))
     win.document.close()
     win.focus()
-    setTimeout(() => win.print(), 300)
   }
 
   // ===========================================================================

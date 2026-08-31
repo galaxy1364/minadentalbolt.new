@@ -1,5 +1,6 @@
 // Billing.tsx - Persian RTL Dental Clinic Billing & Payments Management
 import { useState, useEffect, useCallback, useMemo } from 'react'
+import { buildPrintDocument } from '../lib/printDocument'
 import { useNavigate, useLocation } from 'react-router-dom'
 import { CreditCard, Plus, Search, DollarSign, TrendingUp, Wallet, Calendar, CalendarClock, CheckCircle2, AlertCircle, Edit2, Filter, Receipt, Banknote, Clock, Trash2, Printer } from 'lucide-react'
 import { BarChart, Bar, XAxis, YAxis, Tooltip as RTooltip, ResponsiveContainer, PieChart, Pie, Cell as RCell } from 'recharts'
@@ -701,8 +702,7 @@ export default function Billing() {
     const methodMeta = paymentMethods.find((m) => m.value === p.payment_method) || paymentMethods[0]
     const win = window.open('', '_blank', 'width=550,height=700')
     if (!win) { showToast('error', 'اجازه‌ی باز کردن پنجره‌ی چاپ داده نشد'); return }
-    win.document.write(`<!DOCTYPE html><html dir="rtl" lang="fa"><head><meta charset="utf-8"><title>رسید پرداخت</title>
-      <style>
+    const receiptStyles = `
         body { font-family: Tahoma, Arial, sans-serif; padding: 32px; color: #1e293b; }
         .header { text-align: center; border-bottom: 2px solid #0d9488; padding-bottom: 16px; margin-bottom: 24px; }
         .header h1 { color: #0d9488; margin: 0 0 4px; font-size: 22px; }
@@ -713,8 +713,8 @@ export default function Billing() {
         td:first-child { color: #64748b; font-weight: bold; width: 40%; }
         .footer { margin-top: 40px; display: flex; justify-content: space-between; font-size: 12px; color: #94a3b8; }
         @media print { body { padding: 12px; } }
-      </style>
-      </head><body>
+      `
+    const receiptBody = `
         <div class="header"><h1>کلینیک دندانپزشکی مینا</h1><p>رسید پرداخت</p></div>
         <div class="amount">${formatCurrency(p.amount)} تومان</div>
         <table>
@@ -724,10 +724,10 @@ export default function Billing() {
           ${p.reference ? `<tr><td>شماره مرجع</td><td dir="ltr">${p.reference}</td></tr>` : ''}
         </table>
         <div class="footer"><span>مینادنت — سیستم مدیریت کلینیک</span><span>مهر و امضا</span></div>
-      </body></html>`)
+      `
+    win.document.write(buildPrintDocument({ title: 'رسید پرداخت', styles: receiptStyles, bodyHtml: receiptBody, shareText: `رسید پرداخت — مینادنت\nبیمار: ${getPatientName(p.patient_id)}\nمبلغ: ${formatCurrency(p.amount)} ت\nتاریخ: ${toJalaliStringPretty(p.payment_date)}` }))
     win.document.close()
     win.focus()
-    setTimeout(() => win.print(), 300)
   }
 
   const renderPaymentsTab = () => (
