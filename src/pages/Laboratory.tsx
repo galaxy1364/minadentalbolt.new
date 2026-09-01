@@ -2,6 +2,7 @@
 import { useState, useEffect, useCallback, useMemo } from 'react'
 import { SurfaceSelect } from '../components/SurfaceSelect'
 import { formatSurfaces } from '../lib/toothSurfaces'
+import { clinicMilestones, nextClinicAction } from '../lib/labClinicMilestones'
 import { PatientSelect } from '../components/PatientSelect'
 import { toothLabel, toothLabelWithWord } from '../lib/toothLabel'
 import { FlaskConical, Plus, Search, Clock, CheckCircle2, AlertCircle, Edit2, Trash2, Phone, Filter, TrendingUp, Package, CalendarClock, ChevronLeft, RotateCcw } from 'lucide-react'
@@ -20,27 +21,19 @@ import { PersianDateInput } from '../components/PersianDateInput'
 // MOD-FEAT-024: the same arch the chart draws, instead of a separate row of numbers.
 import { ToothArchSelect } from '../components/ToothArchSelect'
 import { readChartHandoff } from '../lib/chartHandoff'
-import { useLocation } from 'react-router-dom'
+import { useLocation, useNavigate } from 'react-router-dom'
 import { ModuleHeader, ModuleStatCard, ReorderableStatGrid } from '../components/ModuleHeader'
 import { CurrencyInput } from '../components/CurrencyInput'
 
-// ============================================================================
-// Constants
-// ============================================================================
+// MOD-FEAT-034: the laboratory's internal pipeline — impression, courier,
+// CAD/CAM, firing, QC, ready — used to live here and drive the clinic's
+// progress bar. Every one of those steps happens inside the lab's
+// building, where a clinic can neither observe nor act. The vocabulary
+// belongs to a lab-side account and was removed rather than left unused.
+//
+// The `stage` column is untouched in the database, so nothing recorded is
+// lost and the lab account can pick it up as-is.
 
-// Basic foundation for a lab-order pipeline tracker — a defined
-// sequence independent of the coarser `status` field. Not yet a full
-// visual multi-column tracker (that's future-upgrade scope), just a
-// compact progress bar + one-tap advance, so the underlying data
-// model and workflow exist now and can be built on later.
-const LAB_STAGES: { key: string; label: string }[] = [
-  { key: 'scan_impression', label: 'قالب‌گیری/اسکن' },
-  { key: 'sent_to_courier', label: 'ارسال به پیک' },
-  { key: 'cad_cam_design', label: 'طراحی CAD/CAM' },
-  { key: 'firing_layering', label: 'پخت و پرسلن‌گذاری' },
-  { key: 'quality_control', label: 'کنترل کیفی' },
-  { key: 'ready_delivery', label: 'آماده تحویل' },
-]
 
 const labOrderStatuses: { value: string; label: string; color: string }[] = [
   { value: 'ordered', label: 'سفارش داده شده', color: 'slate' },
@@ -123,6 +116,7 @@ export default function Laboratory() {
   // Order modal
   const [orderModalOpen, setOrderModalOpen] = useState(false)
   const location = useLocation()
+  const appointmentNav = useNavigate()
   const [orderWizardStep, setOrderWizardStep] = useState(0)
   const [editingOrder, setEditingOrder] = useState<LabOrder | null>(null)
   const [savingOrder, setSavingOrder] = useState(false)
@@ -526,35 +520,44 @@ export default function Laboratory() {
     })
   }
 
-  // Advances a lab order to the next pipeline stage (basic foundation
-  // for the fuller step-tracker) — no confirm dialog needed since this
-  // is a low-stakes, easily-reversible progress note, not a status
-  // change with real consequences.
-  const advanceStage = async (order: LabOrder) => {
-    const idx = LAB_STAGES.findIndex((s) => s.key === order.stage)
-    if (idx === -1 || idx >= LAB_STAGES.length - 1) return
-    h.select()
+  /**
+   * MOD-FEAT-034 | یک گام از زنجیره‌ی مطب
+   *
+   * Each step writes the one fact it represents, rather than nudging an
+   * opaque `stage` string forward. That keeps the record answerable —
+   * «کِی رسید؟» has a date, not a position in a list.
+   *
+   * Booking is deliberately not automated here: choosing a slot is the
+   * appointment module's job and involves the doctor's schedule. This
+   * hands over to it instead of inventing a time.
+   */
+  const advanceClinicStep = async (order: LabOrder, step: string) => {
+    h.tap()
+    const today = new Date().toISOString().slice(0, 10)
     try {
-      const updates: Record<string, unknown> = { stage: LAB_STAGES[idx + 1].key }
-      // Real 'sent to lab' timestamp — set once, the first time the case
-      // leaves the initial scan/impression stage (i.e. it's actually
-      // gone out), never overwritten on later stage advances.
-      if (idx === 0 && !order.sent_at) updates.sent_at = new Date().toISOString()
-      // Keep the coarse `status` field (which Dashboard's active/overdue
-      // count reads) from silently drifting behind the pipeline stage.
-      // Advancing past the first stage means work has genuinely started,
-      // so a still-'ordered' order should read as 'in_progress' — without
-      // this, Dashboard could show an order stuck at 'سفارش داده‌شده'
-      // even after it's most of the way through production.
-      // Deliberately NOT auto-setting 'delivered' at the final stage:
-      // that status represents the physical handoff to the clinic/patient,
-      // a real-world event distinct from the lab finishing its work, and
-      // should stay a manual action.
-      if (order.status === 'ordered') updates.status = 'in_progress'
-      await updateLabOrder(order.id, updates as any)
+      if (step === 'sent') {
+        await updateLabOrder(order.id, { sent_at: today, status: 'ordered' } as never)
+        showToast('success', 'ارسال به لابراتوار ثبت شد')
+      } else if (step === 'arrived') {
+        await updateLabOrder(order.id, { received_at: today, work_done: true } as never)
+        showToast('success', 'رسیدن کار به مطب ثبت شد')
+      } else if (step === 'booked') {
+        // The clinic still has to pick a slot, so this opens the module
+        // that owns that decision rather than guessing one.
+        appointmentNav('/appointments', {
+          state: { quickStartPatientId: order.patient_id, quickStartDoctorId: order.doctor_id, labOrderId: order.id },
+        })
+        return
+      } else if (step === 'delivered') {
+        await updateLabOrder(order.id, { delivered: true, status: 'delivered' } as never)
+        showToast('success', 'تحویل به بیمار ثبت شد')
+      }
       await loadData()
-    } catch { showToast('error', 'خطا در به‌روزرسانی مرحله') }
+    } catch {
+      showToast('error', 'خطا در ثبت این گام')
+    }
   }
+
 
   const openEditLab = (lab: Laboratory) => {
     h.tap()
@@ -758,21 +761,41 @@ export default function Laboratory() {
 
         {/* Pipeline stage progress — basic foundation, one tap to
             advance; only shown for orders still actively in the shop */}
+        {/* MOD-FEAT-034: the clinic's chain, not the laboratory's.
+            LAB_STAGES — impression, courier, CAD/CAM, firing, QC — all
+            happen inside the lab's building. A clinic cannot observe or
+            act on any of them; they belong to a lab-side account that
+            does not exist yet. What a receptionist tracks is: did we send
+            it, when is it due, did it arrive, is the patient booked, is
+            it handed over. */}
         {order.status !== 'delivered' && order.status !== 'cancelled' && (
           <div className="mb-3">
-            <div className="flex items-center gap-1 mb-1.5">
-              {LAB_STAGES.map((s, i) => {
-                const currentIdx = LAB_STAGES.findIndex((x) => x.key === order.stage)
-                return <div key={s.key} className={`flex-1 h-1.5 rounded-full ${i <= currentIdx ? 'bg-primary-500' : 'bg-slate-200 dark:bg-slate-600'}`} />
-              })}
+            <div dir="ltr" className="flex items-center gap-1 mb-1.5">
+              {clinicMilestones(order).map((m) => (
+                <div
+                  key={m.key}
+                  title={m.label}
+                  className={`flex-1 h-1.5 rounded-full ${m.done ? 'bg-primary-500' : 'bg-slate-200 dark:bg-slate-600'}`}
+                />
+              ))}
             </div>
             <div className="flex items-center justify-between">
-              <span className="text-[11px] text-slate-500">مرحله: {LAB_STAGES.find((s) => s.key === order.stage)?.label || LAB_STAGES[0].label}</span>
-              {order.stage !== 'ready_delivery' && (
-                <button onClick={() => advanceStage(order)} className="text-[11px] text-primary-600 font-bold flex items-center gap-0.5">
-                  گام بعدی <ChevronLeft size={12} />
-                </button>
-              )}
+              <span className="text-[11px] text-slate-500">
+                {(() => {
+                  const done = clinicMilestones(order).filter((m) => m.done)
+                  return done.length ? done[done.length - 1].label : 'هنوز ارسال نشده'
+                })()}
+              </span>
+              {/* One action, not four. A card offering every possible next
+                  step is a card nobody acts on. */}
+              {(() => {
+                const next = nextClinicAction(order)
+                return next ? (
+                  <button onClick={() => advanceClinicStep(order, next.key)} className="text-[11px] text-primary-600 font-bold flex items-center gap-0.5">
+                    {next.label} <ChevronLeft size={12} />
+                  </button>
+                ) : null
+              })()}
             </div>
           </div>
         )}

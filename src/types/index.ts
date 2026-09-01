@@ -229,6 +229,8 @@ export interface LabOrder {
    * برای اینله و اونله و ونیر، مهم‌ترین مشخصه بعد از خود دندان است.
    */
   tooth_surface: string | null
+  /** MOD-FEAT-034: نوبتی که برای تحویل کار به بیمار گذاشته شده. */
+  delivery_appointment_id: string | null
   shade: string | null
   material: string | null
   deadline: string | null
