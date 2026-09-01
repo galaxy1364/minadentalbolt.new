@@ -581,7 +581,6 @@ export default function DentalChart({ toothRecords, treatments, onUpdateTooth, o
               surfaces={data.surfaces}
               size={36}
               selected={selectedTooth?.number === num}
-              labelOverride={getToothLabel(num)}
             />
             {data.isPlannedOnly && (
               <span className="absolute -top-0.5 -left-0.5 w-3 h-3 rounded-full bg-warning-400 border border-white flex items-center justify-center" title="برنامه‌ریزی‌شده — هنوز انجام نشده">

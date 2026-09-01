@@ -41,10 +41,14 @@ describe('انتخابگر دندان — تعامل واقعی', () => {
     expect(screen.queryByRole('button', { name: 'دندان 11' })).toBeNull()
   })
 
-  it('دندان انتخاب‌شده با کلمه و سمت اعلام می‌شود', () => {
+  it('دندان انتخاب‌شده با نشانه و سمت اعلام می‌شود', () => {
     // روی قوسِ اسکرول‌شونده، دندان انتخابی ممکن است بیرون از دید باشد.
+    // MOD-FEAT-033: نشانه حالا یک SVG کشیده‌شده است نه یک کاراکتر، پس
+    // متن تکه‌تکه است و برچسب دسترس‌پذیری‌اش سنجیده می‌شود.
     render(<ToothArchSelect value="38" onChange={() => {}} />)
-    expect(screen.getByText('انتخاب‌شده: ┌۸ — پایین چپ بیمار')).toBeDefined()
+    expect(screen.getByText('انتخاب‌شده:')).toBeDefined()
+    expect(screen.getByText('پایین چپ بیمار')).toBeDefined()
+    expect(screen.getByRole('img', { name: 'دندان LL۸' })).toBeDefined()
   })
 
   it('🔴 ترتیب روی صفحه از راستِ بیمار به چپِ بیمار است', () => {

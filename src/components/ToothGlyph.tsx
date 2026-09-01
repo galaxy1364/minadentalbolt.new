@@ -22,6 +22,46 @@ import { toPersianDigits } from '../lib/persianDate'
 import { conditionMeta } from '../lib/toothConditions'
 import type { ToothCondition, ToothSurface, ToothSurfaceCondition } from '../lib/toothConditions'
 
+
+/**
+ * MOD-FEAT-033 | براکت پالمر داخل خودِ گلیف دندان
+ *
+ * The label used to be a single `<text>` holding a box-drawing character
+ * beside the digit. That made its size a font decision and its arms too
+ * short to read as a bracket at 40px. Drawing the two strokes here keeps
+ * the proportions the same on every tooth and at every size.
+ *
+ * قاعده (نقاشی مهدی): خط افقی = صفحه‌ی اکلوزال — زیر دندان بالا، روی
+ * دندان پایین. خط عمودی = خط وسط دهان.
+ */
+function PalmerLabel({ fdi, cx, cy, color }: { fdi: number; cx: number; cy: number; color: string }) {
+  const q = Math.floor(fdi / 10)
+  const quadrant = q >= 5 ? q - 4 : q
+  if (quadrant < 1 || quadrant > 4) return null
+
+  const upper = quadrant === 1 || quadrant === 2
+  const verticalOnRight = quadrant === 1 || quadrant === 4
+  const n = fdi % 10
+  const symbol = fdi >= 51 && fdi <= 85
+    ? ({ 1: 'A', 2: 'B', 3: 'C', 4: 'D', 5: 'E' } as Record<number, string>)[n] || String(n)
+    : toPersianDigits(String(n))
+
+  const halfW = 7
+  const halfH = 5.5
+  const lineY = upper ? cy + halfH : cy - halfH
+  const lineX = verticalOnRight ? cx + halfW : cx - halfW
+  const textX = verticalOnRight ? cx - 1.5 : cx + 1.5
+  const textY = upper ? cy + 3 : cy + 4
+
+  return (
+    <g>
+      <line x1={cx - halfW} y1={lineY} x2={cx + halfW} y2={lineY} stroke={color} strokeWidth="1.1" strokeLinecap="square" />
+      <line x1={lineX} y1={cy - halfH} x2={lineX} y2={cy + halfH} stroke={color} strokeWidth="1.1" strokeLinecap="square" />
+      <text x={textX} y={textY} textAnchor="middle" fontSize="8.5" fill={color} fontWeight="700">{symbol}</text>
+    </g>
+  )
+}
+
 export function ToothGlyph({
   number,
   condition,
@@ -29,7 +69,6 @@ export function ToothGlyph({
   size = 48,
   onClick,
   selected,
-  labelOverride,
 }: {
   number: number
   condition: ToothCondition
@@ -37,7 +76,6 @@ export function ToothGlyph({
   size?: number
   onClick?: () => void
   selected?: boolean
-  labelOverride?: string
 }) {
   const meta = conditionMeta[condition]
   // Derived in lib/toothVisual so the chart and anything else that needs
@@ -156,9 +194,7 @@ export function ToothGlyph({
             opacity="0.75"
           />
         ))}
-        <text x="24" y="54" textAnchor="middle" fontSize="9" fill={strokeColor} fontWeight="700">
-          {labelOverride || toPersianDigits(number)}
-        </text>
+        <PalmerLabel fdi={number} cx={24} cy={51} color={strokeColor} />
       </svg>
     )
   }
@@ -171,9 +207,7 @@ export function ToothGlyph({
             ✕
           </text>
         </g>
-        <text x="24" y="50" textAnchor="middle" fontSize="9" fill="#94a3b8" fontWeight="600">
-          {labelOverride || toPersianDigits(number)}
-        </text>
+        <PalmerLabel fdi={number} cx={24} cy={47} color="#94a3b8" />
       </svg>
     )
   }
@@ -221,9 +255,7 @@ export function ToothGlyph({
         <path d="M 12 24 L 36 24 L 34 28 L 14 28 Z" fill={getSurfaceFill('buccal')} stroke="none" opacity={hasSurface('buccal') ? 0.9 : 0} />
         <path d="M 12 8 L 36 8 L 36 11 L 12 11 Z" fill={getSurfaceFill('lingual')} stroke="none" opacity={hasSurface('lingual') ? 0.9 : 0} />
         {/* Number */}
-        <text x="24" y="50" textAnchor="middle" fontSize="9" fill={strokeColor} fontWeight="700">
-          {labelOverride || toPersianDigits(number)}
-        </text>
+        <PalmerLabel fdi={number} cx={24} cy={47} color={strokeColor} />
       </svg>
     )
   } else if (isPremolar) {
@@ -250,9 +282,7 @@ export function ToothGlyph({
         {/* 2 cusps */}
         <circle cx="18" cy="13" r="2" fill={getSurfaceFill('occlusal')} stroke={strokeColor} strokeWidth="0.5" opacity="0.5" />
         <circle cx="30" cy="13" r="2" fill={getSurfaceFill('occlusal')} stroke={strokeColor} strokeWidth="0.5" opacity="0.5" />
-        <text x="24" y="50" textAnchor="middle" fontSize="9" fill={strokeColor} fontWeight="700">
-          {labelOverride || toPersianDigits(number)}
-        </text>
+        <PalmerLabel fdi={number} cx={24} cy={47} color={strokeColor} />
       </svg>
     )
   } else {
@@ -324,9 +354,7 @@ export function ToothGlyph({
         />
         {/* Lingual surface (back) */}
         <path d="M 18 8 Q 24 12, 30 8" fill="none" stroke={hasSurface('lingual') ? getSurfaceFill('lingual') : strokeColor} strokeWidth={hasSurface('lingual') ? 2.5 : 0.8} opacity={hasSurface('lingual') ? 0.9 : 0.4} />
-        <text x="24" y="50" textAnchor="middle" fontSize="9" fill={strokeColor} fontWeight="700">
-          {labelOverride || toPersianDigits(number)}
-        </text>
+        <PalmerLabel fdi={number} cx={24} cy={47} color={strokeColor} />
       </svg>
     )
   }

@@ -17,7 +17,8 @@
  */
 import { useState } from 'react'
 import { ToothGlyph } from './ToothGlyph'
-import { toothLabel, toothFullLabel } from '../lib/toothLabel'
+import { toothLabel, toothSideLabel } from '../lib/toothLabel'
+import { PalmerMark } from './PalmerMark'
 import { upperRow, lowerRow, upperRowPrimary, lowerRowPrimary, isMidlineStart } from '../lib/palmerArch'
 import type { ToothEntry } from '../lib/palmerArch'
 import type { ToothCondition, ToothSurfaceCondition } from '../lib/toothConditions'
@@ -79,7 +80,6 @@ export function ToothArchSelect({
               surfaces={conditions?.[t.fdi]?.surfaces ?? []}
               size={40}
               selected={selected === t.fdi}
-              labelOverride={toothLabel(t.fdi)}
             />
           </button>
         </div>
@@ -125,8 +125,19 @@ export function ToothArchSelect({
       {/* The chosen tooth is stated in words as well as highlighted. On a
           scrolling arch the selected tooth can be off-screen, and a form
           that shows no answer at all reads as though nothing was chosen. */}
-      <p className="mt-1.5 text-xs text-slate-600 dark:text-slate-300">
-        {value ? `انتخاب‌شده: ${toothFullLabel(value)}` : 'دندانی انتخاب نشده'}
+      {/* MOD-FEAT-033: the drawn bracket rather than the box-drawing
+          character, so the confirmation line shows the same shape the
+          chart does instead of a smaller lookalike. */}
+      <p className="mt-1.5 flex items-center gap-1.5 text-xs text-slate-600 dark:text-slate-300">
+        {value ? (
+          <>
+            <span>انتخاب‌شده:</span>
+            <PalmerMark fdi={value} size={22} />
+            <span>{toothSideLabel(value)}</span>
+          </>
+        ) : (
+          'دندانی انتخاب نشده'
+        )}
       </p>
     </div>
   )
