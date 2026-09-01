@@ -112,3 +112,60 @@ describe('🔴 گلیف دندان براکت را می‌کشد', () => {
     expect(glyph).not.toContain('labelOverride')
   })
 })
+
+/**
+ * MOD-FEAT-033 (v1.211) | برچسب بزرگ‌تر، و فضای اختصاصی خودش
+ *
+ * «شکل بزرگ‌تر و عدد عین خود عکس شود.»
+ *
+ * برچسب پیش از این روی همان بومِ ۵۶ واحدی کشیده می‌شد و **روی ریشه‌ی
+ * دندان** می‌افتاد — ایرادی که ماه‌ها در فهرست دیده‌نشده‌ها بود. بوم به
+ * ۶۸ واحد رسید تا برچسب نوار خودش را داشته باشد، و همان تغییر جا برای
+ * بزرگ‌تر شدنش باز کرد.
+ */
+import { ToothGlyph } from '../components/ToothGlyph'
+
+describe('🔴 برچسب داخل گلیف، نوار اختصاصی دارد', () => {
+  const glyphLines = (fdi: number) => {
+    cleanup()
+    const { container } = render(
+      <ToothGlyph number={fdi} condition="healthy" surfaces={[]} size={40} />,
+    )
+    const all = [...container.querySelectorAll('line')].slice(-2)
+    return {
+      hy: Number(all[0].getAttribute('y1')),
+      vx: Number(all[1].getAttribute('x1')),
+      digitY: Number(container.querySelector('text')!.getAttribute('y')),
+      viewBox: container.querySelector('svg')!.getAttribute('viewBox'),
+    }
+  }
+
+  it('بوم بلندتر شد تا برچسب روی ریشه نیفتد', () => {
+    expect(glyphLines(11).viewBox).toBe('0 0 48 68')
+  })
+
+  it('🔴 هیچ خطی از بوم بیرون نمی‌زند', () => {
+    // خطی که روی لبه بیفتد بریده می‌شود و براکت ناقص دیده می‌شود.
+    for (const fdi of [11, 21, 31, 41, 18, 28, 38, 48]) {
+      const { hy, vx, digitY } = glyphLines(fdi)
+      expect(hy, `${fdi} افقی`).toBeGreaterThan(0)
+      expect(hy, `${fdi} افقی`).toBeLessThan(68)
+      expect(vx, `${fdi} عمودی`).toBeGreaterThan(0)
+      expect(vx, `${fdi} عمودی`).toBeLessThan(48)
+      expect(digitY, `${fdi} رقم`).toBeLessThan(68)
+    }
+  })
+
+  it('دندان بالا خطش پایین‌تر از دندان پایین است', () => {
+    // چون خط، صفحه‌ی اکلوزال است: زیر بالایی‌ها، روی پایینی‌ها.
+    expect(glyphLines(11).hy).toBeGreaterThan(glyphLines(41).hy)
+  })
+
+  it('رقم داخل گلیف دیده می‌شود', () => {
+    cleanup()
+    const { container } = render(
+      <ToothGlyph number={38} condition="healthy" surfaces={[]} size={40} />,
+    )
+    expect(container.querySelector('text')!.textContent).toBe('۸')
+  })
+})

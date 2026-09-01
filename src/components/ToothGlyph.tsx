@@ -46,18 +46,23 @@ function PalmerLabel({ fdi, cx, cy, color }: { fdi: number; cx: number; cy: numb
     ? ({ 1: 'A', 2: 'B', 3: 'C', 4: 'D', 5: 'E' } as Record<number, string>)[n] || String(n)
     : toPersianDigits(String(n))
 
-  const halfW = 7
-  const halfH = 5.5
+  // MOD-FEAT-033 (v1.211): «شکل بزرگ‌تر و عدد عین خود عکس شود». At the
+  // previous size the digit was ~7px on a phone and the arms read as a
+  // tick rather than a bracket. The canvas grew from 56 to 68 units to
+  // give the label its own band, which also ends a long-standing overlap
+  // with the tooth root — the label used to be drawn on top of it.
+  const halfW = 10
+  const halfH = 8
   const lineY = upper ? cy + halfH : cy - halfH
   const lineX = verticalOnRight ? cx + halfW : cx - halfW
-  const textX = verticalOnRight ? cx - 1.5 : cx + 1.5
-  const textY = upper ? cy + 3 : cy + 4
+  const textX = verticalOnRight ? cx - 2 : cx + 2
+  const textY = upper ? cy + 4.5 : cy + 6.5
 
   return (
     <g>
       <line x1={cx - halfW} y1={lineY} x2={cx + halfW} y2={lineY} stroke={color} strokeWidth="1.1" strokeLinecap="square" />
       <line x1={lineX} y1={cy - halfH} x2={lineX} y2={cy + halfH} stroke={color} strokeWidth="1.1" strokeLinecap="square" />
-      <text x={textX} y={textY} textAnchor="middle" fontSize="8.5" fill={color} fontWeight="700">{symbol}</text>
+      <text x={textX} y={textY} textAnchor="middle" fontSize="13" fill={color} fontWeight="700">{symbol}</text>
     </g>
   )
 }
@@ -171,7 +176,7 @@ export function ToothGlyph({
   if (shape === 'implant') {
     const threads = [26, 30, 34, 38, 42]
     return (
-      <svg width={size} height={size * 1.2} viewBox="0 0 48 56" onClick={onClick} className="cursor-pointer transition-all" style={dropShadowStyle} role="img" aria-label={a11yTitle}>
+      <svg width={size} height={size * 1.42} viewBox="0 0 48 68" onClick={onClick} className="cursor-pointer transition-all" style={dropShadowStyle} role="img" aria-label={a11yTitle}>
         <title>{a11yTitle}</title>
         {/* Abutment: the part above the gum that carries the crown. */}
         <path d="M 17 8 L 31 8 L 29 20 L 19 20 Z" fill={crowned ? strokeColor : fillColor} stroke={strokeColor} strokeWidth={sw} strokeLinejoin="round" />
@@ -194,20 +199,20 @@ export function ToothGlyph({
             opacity="0.75"
           />
         ))}
-        <PalmerLabel fdi={number} cx={24} cy={51} color={strokeColor} />
+        <PalmerLabel fdi={number} cx={24} cy={58} color={strokeColor} />
       </svg>
     )
   }
 
   if (shape === 'absent') {
     return (
-      <svg width={size} height={size * 1.2} viewBox="0 0 48 56" onClick={onClick} className="cursor-pointer transition-all" style={dropShadowStyle}>
+      <svg width={size} height={size * 1.42} viewBox="0 0 48 68" onClick={onClick} className="cursor-pointer transition-all" style={dropShadowStyle}>
         <g opacity="0.4">
           <text x="24" y="30" textAnchor="middle" fontSize="14" fill="#94a3b8" fontWeight="bold">
             ✕
           </text>
         </g>
-        <PalmerLabel fdi={number} cx={24} cy={47} color="#94a3b8" />
+        <PalmerLabel fdi={number} cx={24} cy={58} color="#94a3b8" />
       </svg>
     )
   }
@@ -216,7 +221,7 @@ export function ToothGlyph({
   if (isMolar) {
     // Molar: wide crown with multiple cusps
     return (
-      <svg width={size} height={size * 1.2} viewBox="0 0 48 56" onClick={onClick} className="cursor-pointer transition-all" style={dropShadowStyle}>
+      <svg width={size} height={size * 1.42} viewBox="0 0 48 68" onClick={onClick} className="cursor-pointer transition-all" style={dropShadowStyle}>
         {/* Root */}
         <path
           d="M 14 28 Q 12 40, 16 48 M 34 28 Q 36 40, 32 48"
@@ -255,13 +260,13 @@ export function ToothGlyph({
         <path d="M 12 24 L 36 24 L 34 28 L 14 28 Z" fill={getSurfaceFill('buccal')} stroke="none" opacity={hasSurface('buccal') ? 0.9 : 0} />
         <path d="M 12 8 L 36 8 L 36 11 L 12 11 Z" fill={getSurfaceFill('lingual')} stroke="none" opacity={hasSurface('lingual') ? 0.9 : 0} />
         {/* Number */}
-        <PalmerLabel fdi={number} cx={24} cy={47} color={strokeColor} />
+        <PalmerLabel fdi={number} cx={24} cy={58} color={strokeColor} />
       </svg>
     )
   } else if (isPremolar) {
     // Premolar: smaller crown, 2 cusps
     return (
-      <svg width={size} height={size * 1.2} viewBox="0 0 48 56" onClick={onClick} className="cursor-pointer transition-all" style={dropShadowStyle}>
+      <svg width={size} height={size * 1.42} viewBox="0 0 48 68" onClick={onClick} className="cursor-pointer transition-all" style={dropShadowStyle}>
         {/* Root */}
         <path d="M 20 28 Q 18 42, 22 48 M 28 28 Q 30 42, 26 48" fill="none" stroke={strokeColor} strokeWidth={rootFilled ? sw * 2.2 : sw} strokeLinecap="round" opacity={rootFilled ? 1 : 0.85} />
         {/* Crown */}
@@ -282,14 +287,14 @@ export function ToothGlyph({
         {/* 2 cusps */}
         <circle cx="18" cy="13" r="2" fill={getSurfaceFill('occlusal')} stroke={strokeColor} strokeWidth="0.5" opacity="0.5" />
         <circle cx="30" cy="13" r="2" fill={getSurfaceFill('occlusal')} stroke={strokeColor} strokeWidth="0.5" opacity="0.5" />
-        <PalmerLabel fdi={number} cx={24} cy={47} color={strokeColor} />
+        <PalmerLabel fdi={number} cx={24} cy={58} color={strokeColor} />
       </svg>
     )
   } else {
     // Anterior (incisor/canine): single root, narrow crown
     const isCanine = kind === 'canine'
     return (
-      <svg width={size} height={size * 1.2} viewBox="0 0 48 56" onClick={onClick} className="cursor-pointer transition-all" style={dropShadowStyle}>
+      <svg width={size} height={size * 1.42} viewBox="0 0 48 68" onClick={onClick} className="cursor-pointer transition-all" style={dropShadowStyle}>
         {/* Root */}
         <path
           d={isCanine ? "M 24 28 Q 22 44, 24 50" : "M 20 28 Q 18 44, 22 50 M 28 28 Q 30 44, 26 50"}
@@ -354,7 +359,7 @@ export function ToothGlyph({
         />
         {/* Lingual surface (back) */}
         <path d="M 18 8 Q 24 12, 30 8" fill="none" stroke={hasSurface('lingual') ? getSurfaceFill('lingual') : strokeColor} strokeWidth={hasSurface('lingual') ? 2.5 : 0.8} opacity={hasSurface('lingual') ? 0.9 : 0.4} />
-        <PalmerLabel fdi={number} cx={24} cy={47} color={strokeColor} />
+        <PalmerLabel fdi={number} cx={24} cy={58} color={strokeColor} />
       </svg>
     )
   }
