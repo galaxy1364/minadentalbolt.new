@@ -159,3 +159,60 @@ describe('MOD-FIX-018 | تاریخ فشرده‌ی نمایشی', () => {
     expect(toJalaliString('2026-08-31')).toBe('1405/06/09')
   })
 })
+
+describe('MOD-FIX-020 | محافظ تبدیل شمسی به میلادی', () => {
+  /**
+   * محافظ قبلی فقط `Number.isFinite` را می‌سنجید. ولی jalaali-js هرگز
+   * خروجی غیرمتناهی نمی‌دهد — ورودی بی‌معنا را بی‌صدا به تاریخِ **معتبرِ
+   * اشتباه** تبدیل می‌کند. این تست‌ها همان درِ باز را می‌بندند.
+   */
+  it('تاریخ درست، رشته‌ی میلادی می‌دهد', () => {
+    expect(jalaliToGregorian(1405, 6, 9)).toBe('2026-08-31')
+    expect(jalaliToGregorian(1405, 1, 1)).toBe('2026-03-21')
+  })
+
+  it('ماه صفر رد می‌شود — نه اینکه تاریخ اشتباه بدهد', () => {
+    // قبلاً: toGregorian(1405, 0, 15) → 2026-03-04، بدون هیچ خطایی.
+    expect(jalaliToGregorian(1405, 0, 15)).toBeNull()
+    expect(jalaliToGregorian(1405, 0, 0)).toBeNull()
+  })
+
+  it('روز صفر رد می‌شود', () => {
+    // قبلاً: toGregorian(1405, 1, 0) → 2026-03-20.
+    expect(jalaliToGregorian(1405, 1, 0)).toBeNull()
+  })
+
+  it('ماه و روز خارج از بازه رد می‌شوند', () => {
+    expect(jalaliToGregorian(1405, 13, 1)).toBeNull()
+    expect(jalaliToGregorian(1405, 1, 32)).toBeNull()
+  })
+
+  it('مقادیر منفی رد می‌شوند', () => {
+    expect(jalaliToGregorian(-1, -1, -1)).toBeNull()
+    expect(jalaliToGregorian(1405, -6, 9)).toBeNull()
+    expect(jalaliToGregorian(1405, 6, -9)).toBeNull()
+  })
+
+  it('NaN و اعشار رد می‌شوند', () => {
+    expect(jalaliToGregorian(NaN, 6, 9)).toBeNull()
+    expect(jalaliToGregorian(1405, NaN, 9)).toBeNull()
+    expect(jalaliToGregorian(1405.5, 6, 9)).toBeNull()
+    expect(jalaliToGregorian(Infinity, 6, 9)).toBeNull()
+  })
+
+  it('سال بی‌معنا برای یک کلینیک رد می‌شود', () => {
+    // jalaali-js تا سال -۶۱ را قبول می‌کند؛ هیچ نوبتی آنجا نیست.
+    expect(jalaliToGregorian(0, 6, 9)).toBeNull()
+    expect(jalaliToGregorian(9999, 6, 9)).toBeNull()
+  })
+
+  it('هر خروجی غیرِ null، دقیقاً قالب YYYY-MM-DD است', () => {
+    // همان چیزی که ستون `date` پستگرس می‌پذیرد. "2-00-02" اینجا رد می‌شود.
+    for (let m = 1; m <= 12; m++) {
+      for (const d of [1, 15, 29]) {
+        const out = jalaliToGregorian(1405, m, d)
+        expect(out, `1405/${m}/${d}`).toMatch(/^\d{4}-\d{2}-\d{2}$/)
+      }
+    }
+  })
+})

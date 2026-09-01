@@ -217,6 +217,7 @@ export function getHoliday(jalaliDateStr: string): string | null {
   // why they're prefixed as approximate rather than presented as fact.
   try {
     const gregorian = jalaliToGregorian(Number(year), Number(month), Number(day))
+    if (!gregorian) return null
     const computed = getLunarHoliday(gregorian)
     return computed ? `${computed} (تقریبی)` : null
   } catch {
@@ -239,27 +240,45 @@ export function getGregorianHolidays(year: number, month: number): Map<string, s
       const holiday = getHoliday(jalaliStr)
       if (holiday) {
         const gregStr = jalaliToGregorian(year, month, day)
-        result.set(gregStr, holiday)
+        if (gregStr) result.set(gregStr, holiday)
       }
     }
   }
   return result
 }
 
-export function jalaliToGregorian(jy: number, jm: number, jd: number): string {
-  // Defensive guard: jalaali-js throws on non-finite input (e.g. NaN
-  // year/month, which is exactly what produced a real corrupted
-  // "N-0a-0N"-style date saved to a patient's treatment phase before
-  // this file's toGregorian was replaced with jalaali-js). Falling
-  // back to today instead of letting a malformed string reach a
-  // Postgres `date` column (which silently gets stuck failing to sync
-  // forever) or crashing the calendar outright.
+/**
+ * MOD-FIX-020 | تبدیل شمسی به میلادی — یا تاریخ درست، یا `null`
+ *
+ * محافظ قبلی فقط `Number.isFinite` را می‌سنجید. مسئله این است که
+ * jalaali-js **هرگز** خروجی غیرمتناهی نمی‌دهد؛ خطر واقعی جای دیگری است:
+ * ورودی بی‌معنا را بی‌صدا به یک تاریخ **معتبرِ اشتباه** تبدیل می‌کند.
+ *
+ *   toGregorian(1405, 0, 15)  →  2026-03-04    ← ماه صفر، بدون هیچ خطایی
+ *   toGregorian(1405, 1, 32)  →  2026-04-21    ← روز ۳۲
+ *
+ * پس ورودی هم باید سنجیده شود، نه فقط خروجی.
+ *
+ * و برگشت بی‌صدا به «امروز» — کاری که این تابع قبلاً می‌کرد — تور ایمنی
+ * است نه راه‌حل: نوبتِ ثبت‌شده روی تاریخ اشتباه، به‌اندازه‌ی سینکِ شکسته
+ * بد است، فقط دیرتر معلوم می‌شود. `null` صدازننده را مجبور می‌کند تصمیم
+ * بگیرد.
+ */
+export function jalaliToGregorian(jy: number, jm: number, jd: number): string | null {
+  // A Jalali date the clinic could plausibly hold. jalaali-js accepts
+  // years down to -61, which is never a real appointment.
+  if (!Number.isInteger(jy) || jy < 1 || jy > 1700) return null
+  if (!Number.isInteger(jm) || jm < 1 || jm > 12) return null
+  if (!Number.isInteger(jd) || jd < 1 || jd > 31) return null
+
   try {
     const [gy, gm, gd] = toGregorian(jy, jm, jd)
-    if (!Number.isFinite(gy) || !Number.isFinite(gm) || !Number.isFinite(gd)) throw new Error('non-finite result')
+    if (!Number.isFinite(gy) || gy < 1900 || gy > 2200) return null
+    if (!Number.isFinite(gm) || gm < 1 || gm > 12) return null
+    if (!Number.isFinite(gd) || gd < 1 || gd > 31) return null
     return `${gy}-${String(gm).padStart(2, '0')}-${String(gd).padStart(2, '0')}`
   } catch {
-    return new Date().toISOString().slice(0, 10)
+    return null
   }
 }
 

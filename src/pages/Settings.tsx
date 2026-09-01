@@ -20,6 +20,7 @@ import {
   fetchRolePermissions, fetchCustomRoles, setRolePermission, createCustomRole, deactivateCustomRole, loadRolePermissionOverrides,
 } from '../lib/api'
 import { db, TABLE_NAMES } from '../lib/db'
+import { classifySyncFailure } from '../lib/syncErrors'
 import { syncNow, subscribeSync, SyncStatus, getFailedSyncEntries, retryFailedEntry, retryAllFailedEntries, discardFailedEntry } from '../lib/sync'
 import { toJalaliString, toJalaliStringPretty, formatCurrency, formatNumber, toPersianDigits } from '../lib/persianDate'
 import { supabase } from '../lib/supabase'
@@ -1421,7 +1422,12 @@ function FailedSyncTab() {
           {entries.length > 0 && <Button size="sm" variant="primary" onClick={handleRetryAll} disabled={busyId !== null}>تلاش مجدد همه</Button>}
         </div>
         <p className="text-xs text-slate-500 dark:text-slate-400 mb-4">
-          این‌ها تغییراتی هستند که بعد از ۱۰ بار تلاش به سرور ابری نرسیدند — روی همین دستگاه محفوظ مانده‌اند و <b>هرگز خودکار پاک نمی‌شوند</b>. معمولاً با اتصال اینترنت بهتر و «تلاش مجدد» حل می‌شود.
+          {/* MOD-FIX-020: این جمله قبلاً به همه می‌گفت «معمولاً با اتصال
+              اینترنت بهتر و تلاش مجدد حل می‌شود». برای رکوردی که سرور
+              به‌خاطر خودِ داده پس زده، تلاش مجدد هرگز جواب نمی‌دهد — فقط
+              شمارنده را بالا می‌برد. راهنمایی حالا برای هر رکورد، از روی
+              خطای واقعی‌اش ساخته می‌شود. */}
+          این‌ها تغییراتی هستند که بعد از ۱۰ بار تلاش به سرور ابری نرسیدند — روی همین دستگاه محفوظ مانده‌اند و <b>هرگز خودکار پاک نمی‌شوند</b>. راهنمای هر رکورد زیر خودش نوشته شده.
         </p>
         {loading ? (
           <Spinner size={20} />
@@ -1443,11 +1449,28 @@ function FailedSyncTab() {
                   </div>
                   <Badge color="error">{toPersianDigits(entry.retry_count)} بار تلاش</Badge>
                 </div>
+                {(() => {
+                  const advice = classifySyncFailure({ message: entry.last_error || '' })
+                  return (
+                    <div className="mt-2 p-2 rounded-lg bg-white/70 dark:bg-slate-900/40">
+                      <p className="text-[11px] font-bold text-slate-700 dark:text-slate-200">{advice.title}</p>
+                      <p className="text-[11px] text-slate-500 dark:text-slate-400 leading-relaxed mt-0.5">{advice.advice}</p>
+                    </div>
+                  )
+                })()}
                 {expandedId === entry.id && (
                   <pre className="text-[10px] text-slate-500 dark:text-slate-400 mt-2 whitespace-pre-wrap break-all bg-white dark:bg-slate-900 rounded-lg p-2 max-h-[160px] overflow-y-auto">{JSON.stringify(entry.data, null, 2)}</pre>
                 )}
                 <div className="flex gap-2 mt-2">
-                  <Button size="sm" variant="primary" onClick={() => entry.id && handleRetry(entry.id)} disabled={busyId !== null}>
+                  {/* A retry that provably cannot succeed is not offered as
+                      the primary action — it only raises the counter and
+                      teaches the user that the panel lies. */}
+                  <Button
+                    size="sm"
+                    variant={classifySyncFailure({ message: entry.last_error || '' }).retryable ? 'primary' : 'secondary'}
+                    onClick={() => entry.id && handleRetry(entry.id)}
+                    disabled={busyId !== null}
+                  >
                     {busyId === entry.id ? <Spinner size={14} /> : 'تلاش مجدد'}
                   </Button>
                   <Button size="sm" variant="secondary" onClick={() => handleCopy(entry)}><Copy size={13} className="inline ml-1" /> کپی داده</Button>
