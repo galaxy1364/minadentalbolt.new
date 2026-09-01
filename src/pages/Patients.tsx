@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useMemo } from 'react'
+import { PatientDebtBar } from '../components/PatientDebtBar'
 import { useNavigate } from 'react-router-dom'
 import { Plus, Search, Edit2, Phone, Filter, Users, Award, AlertCircle, Smile, FileText, User, Trash2, Heart, Shield, MapPin } from 'lucide-react'
 import { fetchPatients, createPatient, updatePatient, fetchDoctors, fetchPayments, fetchTreatments, fetchImplantCases, peekNextFileNumber } from '../lib/api'
@@ -499,11 +500,15 @@ export default function Patients() {
                     >
                       <Trash2 size={14} />
                     </button>
+                    {/* MOD-FEAT-027: the amount, not just the word. «بدهکار»
+                        alone made the row say someone owes money without
+                        saying how much — and gave no way to act on it. The
+                        chip is now the shortcut. */}
                     {fin.totalCost > 0 ? (
                       fin.balance <= 0 ? (
                         <span className="status-pill bg-success-100 text-success-700">تسویه</span>
                       ) : (
-                        <span className="status-pill bg-error-100 text-error-700">بدهکار</span>
+                        <PatientDebtBar patientId={patient.id} balance={fin} variant="compact" />
                       )
                     ) : (
                       <span className="status-pill bg-slate-100 text-slate-500">بدون تراکنش</span>

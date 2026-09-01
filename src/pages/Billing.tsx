@@ -790,6 +790,20 @@ export default function Billing() {
                           which rows still need a human to say what they were
                           for. */}
                       <p className="text-[11px] text-slate-400 mt-0.5">{resolveAttribution(p, treatments as never, doctors as never).label}</p>
+                      {/* MOD-FEAT-027: «فقط پرداختی نیست — مقدار بدهی هم
+                          باید قید بشه». A payment row that shows only what
+                          came in cannot answer the question actually being
+                          asked at the desk: is this patient settled now? */}
+                      {(() => {
+                        const bal = patientBalancesMap.get(p.patient_id)?.balance ?? 0
+                        return bal > 0 ? (
+                          <p className="text-[11px] font-bold text-error-600 mt-0.5">
+                            مانده‌حساب این بیمار: {formatCurrency(bal)} ت
+                          </p>
+                        ) : (
+                          <p className="text-[11px] text-success-600 mt-0.5">این بیمار تسویه است</p>
+                        )
+                      })()}
                     </div>
                   </div>
                   <div className="flex items-center gap-2">

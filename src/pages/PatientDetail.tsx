@@ -1,5 +1,6 @@
 // PatientDetail.tsx - Persian RTL Dental Clinic Patient Detail Page
 import { InsurancePanel } from '../components/InsurancePanel'
+import { PatientDebtBar } from '../components/PatientDebtBar'
 import { toothLabel } from '../lib/toothLabel'
 import { buildPrintDocument } from '../lib/printDocument'
 import { PatientAlerts } from '../components/PatientAlerts'
@@ -832,6 +833,16 @@ export default function PatientDetail() {
             <Button variant="secondary" onClick={() => setEditModalOpen(true)}>
               <Edit2 size={16} /> ویرایش
             </Button>
+          </div>
+          {/* MOD-FEAT-027: the balance was already computed on this page and
+              shown only inside the printed record. Putting it in the header
+              with a route to payment means the number a receptionist acts on
+              is the same one they are looking at. */}
+          <div className="mt-3">
+            <PatientDebtBar
+              patientId={patient.id}
+              balance={{ balance: patientBalance, paid: totalPaid, totalCost: totalTreatmentCost }}
+            />
           </div>
         </div>
       </Card>
