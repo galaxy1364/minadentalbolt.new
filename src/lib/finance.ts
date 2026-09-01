@@ -1,4 +1,4 @@
-import type { Payment, Treatment } from '../types'
+import type { Payment, Treatment, Cheque } from '../types'
 
 /** Minimal shape needed from an implant case — accepts the full
  * ImplantCase/ImplantCaseWithRelations type too since both satisfy this. */
@@ -151,4 +151,31 @@ export function checkOverpayment(amount: number, remaining: number): Overpayment
     remaining,
     message: 'مبلغ از مانده‌ی بیمار بیشتر است — اضافه‌پرداخت ثبت می‌شود',
   }
+}
+
+/**
+ * MOD-UI-012 | چک‌هایی که هنوز پول نشده‌اند
+ *
+ * تعریفش پیش از این فقط داخل `Billing.tsx` زندگی می‌کرد، پس فهرست
+ * بیماران نمی‌توانست همان عدد را نشان بدهد بدون کپی کردن شرط — و کپی
+ * یعنی دو تعریف که روزی از هم می‌افتند.
+ *
+ * چکِ **ضمانت** عمداً بیرون است: وثیقه‌ی مانده‌ی یک طرح پرداخت است، نه
+ * یک واریزِ برنامه‌ریزی‌شده. شمردنش یعنی همان بدهی دو بار دیده شود —
+ * یک بار در مانده‌ی بیمار و یک بار به‌عنوان پول در راه.
+ */
+export function pendingCheques(cheques: Cheque[]): Cheque[] {
+  return cheques.filter((c) => c.purpose !== 'guarantee' && (c.status === 'pending' || c.status === 'deposited'))
+}
+
+/** چک‌های در جریانِ هر بیمار، برای نمایش کنار نامش در فهرست. */
+export function pendingChequesByPatient(cheques: Cheque[]): Map<string, { count: number; amount: number }> {
+  const map = new Map<string, { count: number; amount: number }>()
+  for (const c of pendingCheques(cheques)) {
+    const row = map.get(c.patient_id) || { count: 0, amount: 0 }
+    row.count += 1
+    row.amount += c.amount || 0
+    map.set(c.patient_id, row)
+  }
+  return map
 }

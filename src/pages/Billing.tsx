@@ -8,7 +8,7 @@ import { CreditCard, Plus, Search, DollarSign, TrendingUp, Wallet, Calendar, Cal
 import { BarChart, Bar, XAxis, YAxis, Tooltip as RTooltip, ResponsiveContainer, PieChart, Pie, Cell as RCell } from 'recharts'
 import { fetchPayments, createPayment, updatePayment, fetchEncounters, fetchCheques, createCheque, updateCheque, fetchPaymentPlans, createPaymentPlan, updatePaymentPlan, updateInstallment, fetchPatients, fetchExpenses, createExpense, updateExpense, deactivateExpense, fetchTreatments, fetchImplantCases, fetchDoctors } from '../lib/api'
 import { buildSchedule, splitAmount, planProgress, reconcilePlan } from '../lib/installments'
-import { checkOverpayment } from '../lib/finance'
+import { checkOverpayment, pendingCheques as pendingChequesList} from '../lib/finance'
 import { toJalaliString, toJalaliStringPretty, formatCurrency, formatNumber, toPersianDigits, toEnglishDigits, toJalaliShort} from '../lib/persianDate'
 import { h } from '../lib/haptics'
 import { useConfirmAction } from '../components/ConfirmAction'
@@ -272,7 +272,7 @@ export default function Billing() {
     // that balance is already counted once in outstandingBalance via the
     // plan's installments, so including the guarantee cheque here too
     // would double-count the same debt as if it were separate incoming cash.
-    const pendingCheques = cheques.filter((c) => c.purpose !== 'guarantee' && (c.status === 'pending' || c.status === 'deposited'))
+    const pendingCheques = pendingChequesList(cheques)
     const pendingChequeAmount = pendingCheques.reduce((sum, c) => sum + c.amount, 0)
     const totalExpenses = expenses.reduce((sum, e) => sum + (e.amount || 0), 0)
 

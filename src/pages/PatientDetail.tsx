@@ -1949,8 +1949,40 @@ export default function PatientDetail() {
       {/* Header */}
       {renderHeader()}
 
-      {/* Tabs */}
-      <Tabs tabs={tabs} active={activeTab} onChange={setActiveTab} />
+      {/* Tabs + the pay action.
+          MOD-UI-013: «پرداخت» عمداً **بیرون** از <Tabs> است. Tabs یک
+          کامپوننت مشترک بین ۱۴ صفحه است و تب یعنی «همین صفحه را جور دیگری
+          ببین» — این یک **اقدام** است که صفحه را عوض می‌کند. اگر داخل همان
+          ردیف نشسته بود، کاربر آن را تب پانزدهم می‌دید و انتظار داشت
+          چیزی زیرش باز شود.
+          پس: جداکننده‌ی عمودی، رنگِ پر (نه چیپ خاکستری)، و آیکون
+          متفاوت — تا در یک نگاه «دکمه» خوانده شود نه «تب». */}
+      <div className="flex items-center gap-2">
+        <div className="flex-1 min-w-0">
+          <Tabs tabs={tabs} active={activeTab} onChange={setActiveTab} />
+        </div>
+        {patientBalance > 0 && (
+          <>
+            <div className="w-px self-stretch bg-slate-200 dark:bg-slate-600 shrink-0" aria-hidden />
+            <button
+              onClick={() => {
+                h.tap()
+                // Billing.tsx:230 این قرارداد را از قبل می‌پذیرد و فرم را
+                // پرشده باز می‌کند — فرم دوم ساخته نمی‌شود.
+                navigate('/billing', {
+                  state: { openPaymentForPatientId: patient.id, suggestedAmount: Math.round(patientBalance) },
+                })
+              }}
+              aria-label={`ثبت پرداخت برای ${patient.first_name} ${patient.last_name} — مانده ${formatCurrency(patientBalance)} تومان`}
+              className="shrink-0 flex items-center gap-1.5 px-4 py-2 rounded-xl bg-error-600 text-white text-sm font-bold shadow-ios hover:bg-error-700 transition-all-smooth press-scale whitespace-nowrap"
+            >
+              <CreditCard size={16} />
+              پرداخت
+              <span dir="ltr" className="font-mono text-xs opacity-90">{formatCurrency(patientBalance)}</span>
+            </button>
+          </>
+        )}
+      </div>
 
       {/* Tab Content */}
       {activeTab === 'overview' && renderOverview()}
