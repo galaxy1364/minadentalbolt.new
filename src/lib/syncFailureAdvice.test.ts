@@ -23,6 +23,19 @@ describe('خطای داده — تلاش مجدد جواب نمی‌دهد', () 
     expect(a.advice).toMatch(/اصلاح/)
   })
 
+  it('کاربر را به دکمه‌ی «اصلاح و ارسال» می‌فرستد', () => {
+    // منتقل‌شده از dateSanitise.test.ts هنگام یکی‌شدن دو طبقه‌بند.
+    const a = classifySyncFailure({ message: 'date/time field value out of range: "2-00-02"' })
+    expect(a.advice).toContain('اصلاح و ارسال')
+    expect(a.advice).not.toContain('اتصال بهتر')
+  })
+
+  it('خطاهایی که main هم غیرقابل‌تلاش‌مجدد می‌دانست، همچنان هستند', () => {
+    for (const message of ['invalid input syntax for type uuid', 'violates foreign key constraint']) {
+      expect(classifySyncFailure({ message }).retryable, message).toBe(false)
+    }
+  })
+
   it('کدهای ۲۲xxx و ۲۳xxx پستگرس خطای داده‌اند', () => {
     for (const code of ['22008', '22007', '23502', '23505', '23503']) {
       expect(classifySyncFailure({ code, message: 'x' }).retryable, code).toBe(false)

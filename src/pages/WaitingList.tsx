@@ -1,5 +1,6 @@
 // WaitingList.tsx - Persian RTL Dental Clinic Waiting List Management
 import { useState, useEffect, useCallback, useMemo } from 'react'
+import { PatientSelect } from '../components/PatientSelect'
 import { useNavigate } from 'react-router-dom'
 import { Clock, Search, Plus, Phone, Bell, CheckCircle2, XCircle, Calendar, Smile, AlertCircle, Edit2, Trash2 } from 'lucide-react'
 import { BarChart, Bar, XAxis, YAxis, Tooltip as RTooltip, ResponsiveContainer, Cell } from 'recharts'
@@ -141,10 +142,6 @@ export default function WaitingList() {
     })
     return Object.entries(counts).map(([name, count]) => ({ name, count }))
   }, [entries])
-
-  const patientOptions = useMemo(() => {
-    return patients.map((p) => ({ value: p.id, label: `${p.first_name} ${p.last_name}` }))
-  }, [patients])
 
   const doctorOptions = useMemo(() => {
     return doctors.filter((d) => d.is_active).map((d) => ({ value: d.id, label: d.name || d.specialty || 'پزشک' }))
@@ -542,7 +539,7 @@ export default function WaitingList() {
             validate: () => (!formData.patient_id ? 'انتخاب بیمار الزامی است' : null),
             content: (
               <>
-                <Select label="بیمار *" value={formData.patient_id} onChange={(v) => setFormData({ ...formData, patient_id: v })} options={patientOptions} placeholder="انتخاب بیمار" />
+                <PatientSelect required value={formData.patient_id} onChange={(v) => setFormData({ ...formData, patient_id: v })} patients={patients} />
                 <Select label="پزشک" value={formData.doctor_id} onChange={(v) => setFormData({ ...formData, doctor_id: v })} options={doctorOptions} placeholder="انتخاب پزشک" />
               </>
             ),

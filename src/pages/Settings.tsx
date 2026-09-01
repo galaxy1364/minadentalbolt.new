@@ -21,7 +21,7 @@ import {
 } from '../lib/api'
 import { db, TABLE_NAMES } from '../lib/db'
 import { classifySyncFailure } from '../lib/syncErrors'
-import { syncNow, subscribeSync, SyncStatus, getFailedSyncEntries, retryFailedEntry, retryAllFailedEntries, discardFailedEntry } from '../lib/sync'
+import { syncNow, subscribeSync, SyncStatus, getFailedSyncEntries, retryFailedEntry, retryAllFailedEntries, discardFailedEntry, repairAndRetryEntry } from '../lib/sync'
 import { toJalaliString, toJalaliStringPretty, formatCurrency, formatNumber, toPersianDigits } from '../lib/persianDate'
 import { supabase } from '../lib/supabase'
 import {
@@ -1384,6 +1384,27 @@ function FailedSyncTab() {
   const load = () => { getFailedSyncEntries().then((e) => { setEntries(e); setLoading(false) }) }
   useEffect(() => { load() }, [])
 
+  /**
+   * MOD-FIX-015: clears the values Postgres rejected and re-queues. The
+   * cleared field names are named back to the user, because an empty
+   * delivery date they know about is recoverable and one they don't is
+   * just a different kind of lost.
+   */
+  const handleRepair = async (id: number) => {
+    setBusyId(id)
+    try {
+      const cleared = await repairAndRetryEntry(id)
+      showToast('success', cleared.length
+        ? `اصلاح شد و دوباره فرستاده شد — این فیلدها پاک شدند: ${cleared.join('، ')}`
+        : 'اصلاح شد و دوباره فرستاده شد')
+      await load()
+    } catch {
+      showToast('error', 'اصلاح ناموفق بود')
+    } finally {
+      setBusyId(null)
+    }
+  }
+
   const handleRetry = async (id: number) => {
     setBusyId(id)
     await retryFailedEntry(id)
@@ -1422,11 +1443,10 @@ function FailedSyncTab() {
           {entries.length > 0 && <Button size="sm" variant="primary" onClick={handleRetryAll} disabled={busyId !== null}>تلاش مجدد همه</Button>}
         </div>
         <p className="text-xs text-slate-500 dark:text-slate-400 mb-4">
-          {/* MOD-FIX-020: این جمله قبلاً به همه می‌گفت «معمولاً با اتصال
-              اینترنت بهتر و تلاش مجدد حل می‌شود». برای رکوردی که سرور
-              به‌خاطر خودِ داده پس زده، تلاش مجدد هرگز جواب نمی‌دهد — فقط
-              شمارنده را بالا می‌برد. راهنمایی حالا برای هر رکورد، از روی
-              خطای واقعی‌اش ساخته می‌شود. */}
+          {/* این جمله قبلاً به همه می‌گفت «معمولاً با اتصال اینترنت بهتر و
+              تلاش مجدد حل می‌شود». برای رکوردی که سرور به‌خاطر خودِ داده پس
+              زده، تلاش مجدد هرگز جواب نمی‌دهد — فقط شمارنده را بالا می‌برد.
+              راهنمایی حالا برای هر رکورد، از روی خطای واقعی‌اش ساخته می‌شود. */}
           این‌ها تغییراتی هستند که بعد از ۱۰ بار تلاش به سرور ابری نرسیدند — روی همین دستگاه محفوظ مانده‌اند و <b>هرگز خودکار پاک نمی‌شوند</b>. راهنمای هر رکورد زیر خودش نوشته شده.
         </p>
         {loading ? (
@@ -1440,7 +1460,21 @@ function FailedSyncTab() {
           </div>
         ) : (
           <div className="space-y-2">
-            {entries.map((entry) => (
+            {entries.map((entry) => {
+              // MOD-FIX-021 + MOD-FIX-015 (main): both branches solved the
+              // same complaint — «تلاش مجدد» was advised even for a value
+              // the server had already rejected. Merged rather than kept
+              // side by side: two classifiers would be exactly the «دو مسیر
+              // برای یک مقصد» the standard forbids.
+              //
+              // classifySyncFailure wins the classification because it tells
+              // a permission failure apart from a data one — isRetryableError
+              // called RLS non-retryable too, and then offered to "clear the
+              // invalid date", which has nothing to do with a policy denial.
+              // main's repairAndRetryEntry wins the *action*: it is the only
+              // path that actually fixes the stuck row.
+              const advice = classifySyncFailure({ message: entry.last_error || '' })
+              return (
               <div key={entry.id} className="p-3 rounded-xl bg-error-50 dark:bg-error-900/10 border border-error-100 dark:border-error-800">
                 <div className="flex items-center justify-between gap-2 cursor-pointer" onClick={() => setExpandedId(expandedId === entry.id ? null : (entry.id ?? null))}>
                   <div className="min-w-0">
@@ -1449,15 +1483,10 @@ function FailedSyncTab() {
                   </div>
                   <Badge color="error">{toPersianDigits(entry.retry_count)} بار تلاش</Badge>
                 </div>
-                {(() => {
-                  const advice = classifySyncFailure({ message: entry.last_error || '' })
-                  return (
-                    <div className="mt-2 p-2 rounded-lg bg-white/70 dark:bg-slate-900/40">
-                      <p className="text-[11px] font-bold text-slate-700 dark:text-slate-200">{advice.title}</p>
-                      <p className="text-[11px] text-slate-500 dark:text-slate-400 leading-relaxed mt-0.5">{advice.advice}</p>
-                    </div>
-                  )
-                })()}
+                <div className="mt-2 p-2 rounded-lg bg-white/70 dark:bg-slate-900/40">
+                  <p className="text-[11px] font-bold text-slate-700 dark:text-slate-200">{advice.title}</p>
+                  <p className="text-[11px] text-slate-500 dark:text-slate-400 leading-relaxed mt-0.5">{advice.advice}</p>
+                </div>
                 {expandedId === entry.id && (
                   <pre className="text-[10px] text-slate-500 dark:text-slate-400 mt-2 whitespace-pre-wrap break-all bg-white dark:bg-slate-900 rounded-lg p-2 max-h-[160px] overflow-y-auto">{JSON.stringify(entry.data, null, 2)}</pre>
                 )}
@@ -1467,17 +1496,26 @@ function FailedSyncTab() {
                       teaches the user that the panel lies. */}
                   <Button
                     size="sm"
-                    variant={classifySyncFailure({ message: entry.last_error || '' }).retryable ? 'primary' : 'secondary'}
+                    variant={advice.retryable ? 'primary' : 'secondary'}
                     onClick={() => entry.id && handleRetry(entry.id)}
                     disabled={busyId !== null}
                   >
                     {busyId === entry.id ? <Spinner size={14} /> : 'تلاش مجدد'}
                   </Button>
+                  {/* Only a *data* failure can be repaired by clearing the
+                      bad value. Offering it on a permission failure would be
+                      the same wrong advice in a new shape. */}
+                  {advice.kind === 'data' && (
+                    <Button size="sm" variant="primary" onClick={() => entry.id && handleRepair(entry.id)} disabled={busyId !== null}>
+                      اصلاح و ارسال
+                    </Button>
+                  )}
                   <Button size="sm" variant="secondary" onClick={() => handleCopy(entry)}><Copy size={13} className="inline ml-1" /> کپی داده</Button>
                   <Button size="sm" variant="danger" onClick={() => handleDiscard(entry)}>نادیده بگیر</Button>
                 </div>
               </div>
-            ))}
+              )
+            })}
           </div>
         )}
       </Card>

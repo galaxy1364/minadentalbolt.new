@@ -224,6 +224,11 @@ export interface LabOrder {
   encounter_id: string | null
   work_type: string | null
   tooth_number: string | null
+  /**
+   * MOD-FEAT-026: کد ترکیبی سطوح به ترتیب متعارف M,O,D,B,L — مثل «MOD».
+   * برای اینله و اونله و ونیر، مهم‌ترین مشخصه بعد از خود دندان است.
+   */
+  tooth_surface: string | null
   shade: string | null
   material: string | null
   deadline: string | null
