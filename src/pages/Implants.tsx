@@ -1,5 +1,6 @@
 // Implants.tsx - Persian RTL Dental Clinic Implant Cases Management
 import { useState, useEffect, useCallback, useMemo } from 'react'
+import { PatientSelect } from '../components/PatientSelect'
 import { toothLabel, toothLabelWithWord } from '../lib/toothLabel'
 import { useNavigate, useLocation } from 'react-router-dom'
 import { Smile, Plus, Search, Edit2, Eye, Filter, Package, Calendar, DollarSign, ShieldCheck, AlertTriangle, CheckCircle2, Clock, Activity, Layers, CalendarClock, ScanLine, Archive, Ban } from 'lucide-react'
@@ -272,10 +273,6 @@ export default function Implants() {
     if (!c.doctor) return '-'
     return c.doctor.name || c.doctor.specialty || 'پزشک'
   }
-
-  const patientOptions = useMemo(() => {
-    return patients.map((p) => ({ value: p.id, label: `${p.first_name} ${p.last_name}` }))
-  }, [patients])
 
   const doctorOptions = useMemo(() => {
     return doctors.map((d) => ({ value: d.id, label: d.name || d.specialty || 'پزشک' }))
@@ -980,7 +977,7 @@ export default function Implants() {
             validate: () => (!caseForm.patient_id ? 'انتخاب بیمار الزامی است' : !caseForm.tooth_number.trim() ? 'شماره دندان الزامی است' : null),
             content: (
               <>
-                <Select label="بیمار *" value={caseForm.patient_id} onChange={(v) => setCaseForm({ ...caseForm, patient_id: v })} options={patientOptions} placeholder="انتخاب بیمار" />
+                <PatientSelect required value={caseForm.patient_id} onChange={(v) => setCaseForm({ ...caseForm, patient_id: v })} patients={patients} />
                 {doctors.filter((d) => d.is_active).length === 0 ? (
                   <div className="p-4 rounded-2xl bg-warning-50 border border-warning-200 text-center">
                     <p className="text-sm font-bold text-warning-700 mb-1">هنوز پزشکی ثبت نشده است</p>

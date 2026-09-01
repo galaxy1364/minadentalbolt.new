@@ -1,5 +1,6 @@
 // Laboratory.tsx - Persian RTL Dental Clinic Laboratory Management
 import { useState, useEffect, useCallback, useMemo } from 'react'
+import { PatientSelect } from '../components/PatientSelect'
 import { toothLabel, toothLabelWithWord } from '../lib/toothLabel'
 import { FlaskConical, Plus, Search, Clock, CheckCircle2, AlertCircle, Edit2, Trash2, Phone, Filter, TrendingUp, Package, CalendarClock, ChevronLeft, RotateCcw } from 'lucide-react'
 import { downloadICSReminder } from '../lib/icsReminder'
@@ -1012,7 +1013,6 @@ export default function Laboratory() {
   // ===========================================================================
 
   const renderOrderModal = () => {
-    const patientOptions = patients.map((p) => ({ value: p.id, label: `${p.first_name} ${p.last_name}${p.file_number ? ` - ${p.file_number}` : ''}` }))
     // Only active labs are offered for a NEW order — an inactive lab
     // shouldn't receive new work, though its past orders stay visible.
     const labOptions = labs.filter((l) => l.is_active).map((l) => ({
@@ -1048,8 +1048,7 @@ export default function Laboratory() {
                 ) : (
                   <Select label="لابراتوار" value={orderForm.lab_id} onChange={(v) => setOrderForm((p) => ({ ...p, lab_id: v }))} options={labOptions} placeholder="انتخاب لابراتوار" />
                 )}
-                <Select
-                  label="بیمار"
+                <PatientSelect
                   value={orderForm.patient_id}
                   onChange={(v) => {
                     // Real complaint from a direct walkthrough: this
@@ -1064,8 +1063,7 @@ export default function Laboratory() {
                       : null
                     setOrderForm((p) => ({ ...p, patient_id: v, tooth_number: recentTreatment ? recentTreatment.tooth_number! : p.tooth_number }))
                   }}
-                  options={patientOptions}
-                  placeholder="انتخاب بیمار"
+                  patients={patients}
                 />
                 <Select label="پزشک" value={orderForm.doctor_id} onChange={(v) => setOrderForm((p) => ({ ...p, doctor_id: v }))} options={doctorOptions} placeholder="انتخاب پزشک" />
               </>

@@ -1,5 +1,6 @@
 // Prescriptions.tsx - Persian RTL Dental Clinic Prescriptions Management
 import { useState, useEffect, useCallback, useMemo } from 'react'
+import { PatientSelect } from '../components/PatientSelect'
 import { buildPrintDocument } from '../lib/printDocument'
 import { useNavigate } from 'react-router-dom'
 import { Pill, FileText, Search, Plus, Eye, Edit2, TrendingUp, Smile, Printer, Ban } from 'lucide-react'
@@ -139,10 +140,6 @@ export default function Prescriptions() {
     }
     return months
   }, [prescriptions])
-
-  const patientOptions = useMemo(() => {
-    return patients.map((p) => ({ value: p.id, label: `${p.first_name} ${p.last_name}` }))
-  }, [patients])
 
   const doctorOptions = useMemo(() => {
     return doctors.map((d) => ({ value: d.id, label: d.name || d.specialty || 'پزشک' }))
@@ -437,7 +434,7 @@ export default function Prescriptions() {
             validate: () => (!formData.patient_id ? 'انتخاب بیمار الزامی است' : null),
             content: (
               <>
-                <Select label="بیمار *" value={formData.patient_id} onChange={(v) => setFormData({ ...formData, patient_id: v })} options={patientOptions} placeholder="انتخاب بیمار" />
+                <PatientSelect required value={formData.patient_id} onChange={(v) => setFormData({ ...formData, patient_id: v })} patients={patients} />
                 <Select label="پزشک" value={formData.doctor_id} onChange={(v) => setFormData({ ...formData, doctor_id: v })} options={doctorOptions} placeholder="انتخاب پزشک" />
               </>
             ),

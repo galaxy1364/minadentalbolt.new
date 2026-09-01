@@ -1,5 +1,6 @@
 // Billing.tsx - Persian RTL Dental Clinic Billing & Payments Management
 import { useState, useEffect, useCallback, useMemo } from 'react'
+import { PatientSelect } from '../components/PatientSelect'
 import { toothLabel } from '../lib/toothLabel'
 import { buildPrintDocument } from '../lib/printDocument'
 import { resolveAttribution, attributableTreatments, treatmentRemaining } from '../lib/paymentAttribution'
@@ -1377,7 +1378,6 @@ export default function Billing() {
   // Render: Modals
   // ===========================================================================
 
-  const patientOptions = patients.map((p) => ({ value: p.id, label: `${p.first_name} ${p.last_name}${p.file_number ? ` - ${p.file_number}` : ''}` }))
   const encounterOptions = encounters.filter((e) => e.patient_id === paymentForm.patient_id).map((e) => ({ value: e.id, label: `ویزیت ${toJalaliStringPretty(e.encounter_date)}` }))
   const implantCaseOptions = implantCases.filter((c) => c.patient_id === paymentForm.patient_id).map((c) => ({ value: c.id, label: `پرونده ایمپلنت - ${formatCurrency(c.total_cost || 0)} ت` }))
 
@@ -1408,7 +1408,7 @@ export default function Billing() {
           validate: () => (!paymentForm.patient_id ? 'انتخاب بیمار الزامی است' : (!paymentForm.amount || Number(paymentForm.amount) <= 0) ? 'مبلغ را وارد کنید' : null),
           content: (
             <>
-              <Select label="بیمار" value={paymentForm.patient_id} onChange={(v) => setPaymentForm((p) => ({ ...p, patient_id: v, encounter_id: '', implant_case_id: '' }))} options={patientOptions} placeholder="انتخاب بیمار" />
+              <PatientSelect value={paymentForm.patient_id} onChange={(v) => setPaymentForm((p) => ({ ...p, patient_id: v, encounter_id: '', implant_case_id: '' }))} patients={patients} balances={patientBalancesMap} />
               {paymentForm.patient_id && (() => {
                 const fin = patientBalancesMap.get(paymentForm.patient_id)
                 if (!fin) return null
@@ -1570,7 +1570,7 @@ export default function Billing() {
           validate: () => (!chequeForm.patient_id ? 'انتخاب بیمار الزامی است' : (!chequeForm.amount || Number(chequeForm.amount) <= 0) ? 'مبلغ را وارد کنید' : null),
           content: (
             <>
-              <Select label="بیمار" value={chequeForm.patient_id} onChange={(v) => setChequeForm((p) => ({ ...p, patient_id: v }))} options={patientOptions} placeholder="انتخاب بیمار" />
+              <PatientSelect value={chequeForm.patient_id} onChange={(v) => setChequeForm((p) => ({ ...p, patient_id: v }))} patients={patients} balances={patientBalancesMap} />
               <CurrencyInput label="مبلغ (تومان)" value={chequeForm.amount} onChange={(v) => setChequeForm((p) => ({ ...p, amount: v }))} />
               <Input label="در وجه" value={chequeForm.payee_name} onChange={(v) => setChequeForm((p) => ({ ...p, payee_name: v }))} />
             </>
@@ -1637,7 +1637,7 @@ export default function Billing() {
           validate: () => (!planForm.patient_id ? 'انتخاب بیمار الزامی است' : (!planForm.total_amount || Number(planForm.total_amount) <= 0) ? 'مبلغ کل را وارد کنید' : null),
           content: (
             <>
-              <Select label="بیمار" value={planForm.patient_id} onChange={(v) => setPlanForm((p) => ({ ...p, patient_id: v }))} options={patientOptions} placeholder="انتخاب بیمار" />
+              <PatientSelect value={planForm.patient_id} onChange={(v) => setPlanForm((p) => ({ ...p, patient_id: v }))} patients={patients} balances={patientBalancesMap} />
               <CurrencyInput label="مبلغ کل (تومان)" value={planForm.total_amount} onChange={(v) => setPlanForm((p) => ({ ...p, total_amount: v }))} />
             </>
           ),

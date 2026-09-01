@@ -4,6 +4,7 @@
 // calendar alarms (.ics export) and a lead-time setting, instead of
 // each module only surfacing its own reminders separately.
 import { useState, useEffect, useMemo } from 'react'
+import { PatientSelect } from '../components/PatientSelect'
 import { useNavigate } from 'react-router-dom'
 import { CalendarClock, Banknote, CreditCard, FlaskConical, Bone, Settings2, Bell, BellOff, Plus, StickyNote, Check, X as XIcon } from 'lucide-react'
 import { ModuleHeader } from '../components/ModuleHeader'
@@ -233,7 +234,6 @@ export default function Reminders() {
     } catch { showToast('error', 'خطا') }
   }
 
-  const patientOptions = [{ value: '', label: 'بدون بیمار مشخص' }, ...patients.map((p) => ({ value: p.id, label: `${p.first_name} ${p.last_name}` }))]
 
   return (
     <div className="space-y-4">
@@ -347,7 +347,7 @@ export default function Reminders() {
       <Modal open={modalOpen} onClose={() => setModalOpen(false)} title={editingReminder ? 'ویرایش یادآوری' : 'یادآوری دستی جدید'}>
         <div className="space-y-3 p-1">
           <p className="text-xs text-slate-500">مثلاً: «بیمار گفت بیستم ماه بعد ۵۰ میلیون تومان می‌آورد» — بدون نیاز به ثبت چک یا قسط رسمی.</p>
-          <Select label="بیمار (اختیاری)" value={form.patient_id} onChange={(v) => setForm((p) => ({ ...p, patient_id: v }))} options={patientOptions} />
+          <PatientSelect label="بیمار (اختیاری)" allowEmpty value={form.patient_id} onChange={(v) => setForm((p) => ({ ...p, patient_id: v }))} patients={patients} />
           <Input label="عنوان یادآوری" value={form.title} onChange={(v) => setForm((p) => ({ ...p, title: v }))} placeholder="مثلاً: قول پرداخت نقدی" />
           <CurrencyInput label="مبلغ (تومان، اختیاری)" value={form.amount} onChange={(v) => setForm((p) => ({ ...p, amount: v }))} />
           <PersianDateInput label="تاریخ سررسید" value={form.due_date} onChange={(v) => setForm((p) => ({ ...p, due_date: v }))} />
