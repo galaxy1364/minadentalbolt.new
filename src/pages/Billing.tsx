@@ -6,6 +6,7 @@ import { buildPrintDocument } from '../lib/printDocument'
 import { resolveAttribution, attributableTreatments, treatmentRemaining } from '../lib/paymentAttribution'
 import { useNavigate, useLocation } from 'react-router-dom'
 import { CreditCard, Plus, Search, DollarSign, TrendingUp, Wallet, Calendar, CalendarClock, CheckCircle2, AlertCircle, Edit2, Filter, Receipt, Banknote, Clock, Trash2, Printer } from 'lucide-react'
+import { ChevronDown } from 'lucide-react'
 import { BarChart, Bar, XAxis, YAxis, Tooltip as RTooltip, ResponsiveContainer, PieChart, Pie, Cell as RCell } from 'recharts'
 import { fetchPayments, createPayment, updatePayment, fetchEncounters, fetchCheques, createCheque, updateCheque, fetchPaymentPlans, createPaymentPlan, updatePaymentPlan, updateInstallment, fetchPatients, fetchExpenses, createExpense, updateExpense, deactivateExpense, fetchTreatments, fetchImplantCases, fetchDoctors } from '../lib/api'
 import { buildSchedule, splitAmount, planProgress, reconcilePlan } from '../lib/installments'
@@ -68,6 +69,8 @@ const persianMonthNames = ['فروردین', 'اردیبهشت', 'خرداد', '
 export default function Billing() {
   const { confirmAction, ConfirmActionModal } = useConfirmAction()
   const navigate = useNavigate()
+  // Closed on open: the payment list is why this page exists.
+  const [chartsOpen, setChartsOpen] = useState(false)
   const location = useLocation()
 
   const [payments, setPayments] = useState<Payment[]>([])
@@ -656,7 +659,49 @@ export default function Billing() {
   // Render: Charts
   // ===========================================================================
 
+  /**
+   * MOD-UI-012 | نمودارها جمع‌شونده و پیش‌فرض بسته
+   *
+   * گزارش مهدی: «این دو تا نمودار رو می‌خوام حالت جمع‌شونده بگذاری… در
+   * حالت عادی باید جمع باشه که ما اون نوار سرچ و چیپ و پرداختی‌ها رو
+   * اول ببینیم.»
+   *
+   * Two 220px charts sat above the search box, the tabs and the payment
+   * list — so on a phone the daily work of this page began below the
+   * fold. A chart is something you consult occasionally; a payment list
+   * is why the page is opened. The occasional thing was taking the space
+   * of the constant one.
+   *
+   * Collapsed by default rather than removed: the charts are genuinely
+   * useful, just not on every visit.
+   */
   const renderCharts = () => (
+    <Card className="p-0 overflow-hidden">
+      <button
+        type="button"
+        onClick={() => { h.tap(); setChartsOpen((o) => !o) }}
+        aria-expanded={chartsOpen}
+        className="w-full flex items-center justify-between gap-2 px-4 py-3 text-right"
+      >
+        <span className="flex items-center gap-2 text-sm font-bold text-slate-700 dark:text-slate-200">
+          <TrendingUp size={16} className="text-primary-600" />
+          نمودار درآمد و روش‌های پرداخت
+        </span>
+        <ChevronDown
+          size={18}
+          className={`text-slate-400 shrink-0 transition-transform ${chartsOpen ? 'rotate-180' : ''}`}
+        />
+      </button>
+
+      {chartsOpen && (
+        <div className="px-3 pb-3">
+          {renderChartBodies()}
+        </div>
+      )}
+    </Card>
+  )
+
+  const renderChartBodies = () => (
     <div className="grid grid-cols-1 lg:grid-cols-3 gap-3">
       {/* Revenue Chart */}
       <Card className="p-4 md:p-6 lg:col-span-2">
