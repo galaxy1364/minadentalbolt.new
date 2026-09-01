@@ -1,6 +1,6 @@
 // PatientDetail.tsx - Persian RTL Dental Clinic Patient Detail Page
 import { InsurancePanel } from '../components/InsurancePanel'
-import { PatientDebtBar } from '../components/PatientDebtBar'
+import { PatientDebtBar, PatientChequeRows } from '../components/PatientDebtBar'
 import { toothLabel } from '../lib/toothLabel'
 import { buildPrintDocument } from '../lib/printDocument'
 import { PatientAlerts } from '../components/PatientAlerts'
@@ -10,10 +10,10 @@ import { phasePlanProgress, phaseSchedule, validatePhase, nextPhaseNumber, compa
 import { useState, useEffect, useCallback } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { ArrowRight, Edit2, Phone, Mail, MapPin, Calendar, CreditCard, Activity, FileText, Image as ImageIcon, Shield, Pill, Smile, Award, AlertCircle, Clock, CheckCircle2, Layers, Plus, Trash2, FileSignature, Printer, Bone, FlaskConical, Stethoscope } from 'lucide-react'
-import { fetchPatient, updatePatient, fetchTimeline, fetchTreatments, fetchAppointments, fetchPayments, fetchToothRecords, createToothRecord, updateToothRecord, fetchPrescriptions, fetchRadiologyImages, fetchEncounters, fetchDoctors, fetchImplantCases, fetchTreatmentPhases, createTreatmentPhase, updateTreatmentPhase, fetchConsentForms, createConsentForm, updateConsentForm, fetchLabOrders, updateTreatment } from '../lib/api'
+import { fetchPatient, updatePatient, fetchTimeline, fetchTreatments, fetchAppointments, fetchPayments, fetchToothRecords, createToothRecord, updateToothRecord, fetchPrescriptions, fetchRadiologyImages, fetchEncounters, fetchDoctors, fetchImplantCases, fetchTreatmentPhases, createTreatmentPhase, updateTreatmentPhase, fetchConsentForms, createConsentForm, updateConsentForm, fetchLabOrders, updateTreatment, fetchCheques } from '../lib/api'
 import { toJalaliString, toJalaliStringPretty, formatCurrency, toPersianDigits, formatTime } from '../lib/persianDate'
 import { calcPatientBalance } from '../lib/finance'
-import { Patient, Doctor, PatientTimeline, Treatment, Appointment, Payment, ToothRecord, Prescription, RadiologyImage, Encounter, ImplantCase, TreatmentPhase, ConsentForm, LabOrder } from '../types'
+import { Patient, Doctor, PatientTimeline, Treatment, Appointment, Payment, ToothRecord, Prescription, RadiologyImage, Encounter, ImplantCase, TreatmentPhase, ConsentForm, LabOrder, Cheque } from '../types'
 import { Modal, Card, Button, Input, Select, Textarea, Badge, Spinner, EmptyState, Tabs, showToast, Wizard } from '../components/ui'
 import { PersianDateInput } from '../components/PersianDateInput'
 import { calcPlanProgress, groupByTooth, nextStatus } from '../lib/treatmentPlan'
@@ -138,6 +138,7 @@ export default function PatientDetail() {
   const [activeTab, setActiveTab] = useState('overview')
 
   // Tab data
+  const [cheques, setCheques] = useState<Cheque[]>([])
   const [timeline, setTimeline] = useState<PatientTimeline[]>([])
   const [treatments, setTreatments] = useState<Treatment[]>([])
   const [implantCases, setImplantCases] = useState<ImplantCase[]>([])
@@ -239,7 +240,7 @@ export default function PatientDetail() {
   const loadTabData = useCallback(async () => {
     if (!id) return
     try {
-      const [tl, tr, ap, pm, tr_records, pres, radio, enc, implAll, ph, cf, labAll] = await Promise.all([
+      const [tl, tr, ap, pm, tr_records, pres, radio, enc, implAll, ph, cf, labAll, chq] = await Promise.all([
         fetchTimeline(id),
         fetchTreatments(undefined, id),
         fetchAppointments(),
@@ -252,8 +253,12 @@ export default function PatientDetail() {
         fetchTreatmentPhases(id),
         fetchConsentForms(id),
         fetchLabOrders(),
+        // MOD-FEAT-028: cheques are debt until they clear, so the record
+        // has to be able to say one is in flight and when it is due.
+        fetchCheques(),
       ])
       setTimeline(tl)
+      setCheques(chq.filter((c) => c.patient_id === id))
       setTreatments(tr)
       setAppointments(ap.filter((a) => a.patient_id === id))
       setPayments(pm)
@@ -843,6 +848,7 @@ export default function PatientDetail() {
               patientId={patient.id}
               balance={{ balance: patientBalance, paid: totalPaid, totalCost: totalTreatmentCost }}
             />
+            <PatientChequeRows patientId={patient.id} cheques={cheques as never} />
           </div>
         </div>
       </Card>
