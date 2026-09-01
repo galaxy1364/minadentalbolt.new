@@ -44,14 +44,29 @@ export function PersianCalendar({ selectedDate, onDateSelect, appointments = [],
     else setViewMonth((m) => m + 1)
   }
 
-  const getGregorianForDay = (day: number): string => {
-    const [gy, gm, gd] = (() => {
-      // Convert Jalali to Gregorian using jalaliToGregorian from persianDate
-      const result = jalaliToGregorianFunc(viewYear, viewMonth, day)
-      return result
-    })()
-    return `${gy}-${String(gm).padStart(2, '0')}-${String(gd).padStart(2, '0')}`
-  }
+  /**
+   * MOD-FIX-016 | منبع «2-00-02»
+   *
+   * `jalaliToGregorian` returns a formatted ISO **string**. This code
+   * destructured it as if it were a [year, month, day] tuple, so
+   * "2026-08-31" became the characters '2', '0', '2' — and the template
+   * below reassembled them into "2-00-02".
+   *
+   * That is the exact value that sat in the sync queue for days, failing
+   * ten times against a Postgres `date` column, and the exact reason a
+   * chosen date rendered as an empty field: `new Date("2-00-02")` is
+   * Invalid Date, and `toJalaliStringPretty` returns '' for those.
+   *
+   * **Every date picked from this calendar was corrupt.** It only
+   * surfaced where the value was displayed back or sent to the server.
+   *
+   * The fix is to stop rebuilding a string that was already built. The
+   * project rule against two paths to one destination existed precisely
+   * to prevent this: the second path drifted from the first and nobody
+   * noticed because both looked plausible.
+   */
+  const getGregorianForDay = (day: number): string =>
+    jalaliToGregorianFunc(viewYear, viewMonth, day)
 
   return (
     <div className="bg-white rounded-2xl card-shadow p-4">
