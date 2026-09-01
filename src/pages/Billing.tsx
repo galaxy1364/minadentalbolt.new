@@ -5,6 +5,7 @@ import { toothLabel } from '../lib/toothLabel'
 import { buildPrintDocument } from '../lib/printDocument'
 import { resolveAttribution, attributableTreatments, treatmentRemaining } from '../lib/paymentAttribution'
 import { validateCheque, chequeModeHint } from '../lib/chequeValidation'
+import { findDuplicatePayments, duplicateWarning } from '../lib/duplicatePayment'
 import { useNavigate, useLocation } from 'react-router-dom'
 import { CreditCard, Plus, Search, DollarSign, TrendingUp, Wallet, Calendar, CalendarClock, CheckCircle2, AlertCircle, Edit2, Filter, Receipt, Banknote, Clock, Trash2, Printer } from 'lucide-react'
 import { ChevronDown } from 'lucide-react'
@@ -234,6 +235,26 @@ export default function Billing() {
   // Arrived here from a finished treatment session's 'ارسال به مالی'
   // button — carries the patient, encounter, and calculated total so
   // staff doesn't re-enter anything already known, and opens straight
+  /**
+   * MOD-FEAT-030: opens the payment form already knowing the patient and
+   * what they still owe. Shared by the cross-page hand-off below and by
+   * the shortcut on each payment card, so the amount suggested is
+   * produced in one place rather than two that can disagree.
+   */
+  const openPaymentModal = (patientId: string, amount?: number) => {
+    const owed = amount ?? patientBalancesMap.get(patientId)?.balance ?? 0
+    setPaymentForm((p) => ({
+      ...p,
+      patient_id: patientId,
+      encounter_id: '',
+      implant_case_id: '',
+      treatment_id: '',
+      amount: owed > 0 ? String(owed) : '',
+    }))
+    setPaymentWizardStep(0)
+    setPaymentModalOpen(true)
+  }
+
   // into recording the payment instead of a plain patient list.
   useEffect(() => {
     const state = location.state as { openPaymentForPatientId?: string; suggestedAmount?: number; fromEncounterId?: string } | null
@@ -865,6 +886,19 @@ export default function Billing() {
                 </div>
                 {p.notes && <p className="text-xs text-slate-400 mt-2">{p.notes}</p>}
                 <div className="flex gap-1 mt-2 pt-2 border-t border-slate-100">
+                  {/* MOD-FEAT-030: «یه پرداخت هم اضافه کن که مستقیم بزنیم
+                      بتونیم از اینجا هم پرداخت انجام بدیم». The row already
+                      knows the patient and their outstanding balance, so
+                      the next payment starts from here instead of a blank
+                      form and a dropdown. Only shown while they still owe. */}
+                  {(patientBalancesMap.get(p.patient_id)?.balance ?? 0) > 0 && (
+                    <button
+                      onClick={() => { h.tap(); openPaymentModal(p.patient_id) }}
+                      className="flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-bold text-primary-700 bg-primary-50 hover:bg-primary-100 transition-colors"
+                    >
+                      <Plus size={12} /> پرداخت جدید
+                    </button>
+                  )}
                   <button onClick={() => handlePrintReceipt(p)} className="flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs text-primary-600 hover:bg-primary-50 transition-colors"><Printer size={12} /> چاپ رسید</button>
                   <button onClick={() => {
                     h.warning()
@@ -1507,6 +1541,25 @@ export default function Billing() {
                         این بیمار تسویه‌حساب کامل دارد — قبل از ثبت پرداخت جدید مطمئن شوید که این پرداخت تکراری نیست.
                       </div>
                     )}
+                    {/* MOD-FEAT-030: the settled-patient warning above never
+                        fired for the real duplicate — that patient owed
+                        money. Two identical payments 2 minutes apart went in
+                        silently. */}
+                    {(() => {
+                      const warn = duplicateWarning(findDuplicatePayments({
+                        patient_id: paymentForm.patient_id,
+                        amount: Number(paymentForm.amount) || 0,
+                        payment_date: paymentForm.payment_date,
+                        // پرداخت ویرایش نمی‌شود، فقط لغو — پس رکوردی برای
+                        // کنار گذاشتن وجود ندارد.
+                      }, payments as never))
+                      return warn ? (
+                        <div className="flex items-start gap-1.5 mt-1 text-[11px] text-error-700 bg-error-50 px-2 py-1.5 rounded-lg">
+                          <AlertCircle size={12} className="shrink-0 mt-0.5" />
+                          <span>{warn}</span>
+                        </div>
+                      ) : null
+                    })()}
                   </div>
                 )
               })()}
