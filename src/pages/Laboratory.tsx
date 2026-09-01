@@ -1,5 +1,7 @@
 // Laboratory.tsx - Persian RTL Dental Clinic Laboratory Management
 import { useState, useEffect, useCallback, useMemo } from 'react'
+import { SurfaceSelect } from '../components/SurfaceSelect'
+import { formatSurfaces } from '../lib/toothSurfaces'
 import { PatientSelect } from '../components/PatientSelect'
 import { toothLabel, toothLabelWithWord } from '../lib/toothLabel'
 import { FlaskConical, Plus, Search, Clock, CheckCircle2, AlertCircle, Edit2, Trash2, Phone, Filter, TrendingUp, Package, CalendarClock, ChevronLeft, RotateCcw } from 'lucide-react'
@@ -152,6 +154,7 @@ export default function Laboratory() {
     doctor_id: '',
     work_type: 'crown', custom_work_type: '',
     tooth_number: '',
+    tooth_surface: '',
     shade: '',
     material: 'zirconia',
     deadline: '',
@@ -339,7 +342,7 @@ export default function Laboratory() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [location.state, labs.length])
 
-  const openCreateOrderModal = (seed?: { toothNumber: string; patientId: string; doctorId: string | null }) => {
+  const openCreateOrderModal = (seed?: { toothNumber: string; surface?: string | null; patientId: string; doctorId: string | null }) => {
     h.tap()
     setEditingOrder(null)
     setOrderWizardStep(0)
@@ -349,6 +352,7 @@ export default function Laboratory() {
       doctor_id: seed?.doctorId || '',
       work_type: 'crown', custom_work_type: '',
       tooth_number: seed?.toothNumber || '',
+      tooth_surface: seed?.surface || '',
       shade: '',
       material: 'zirconia',
       deadline: '',
@@ -372,6 +376,9 @@ export default function Laboratory() {
       patient_id: order.patient_id,
       doctor_id: order.doctor_id || '',
       work_type: isKnownWorkType ? (order.work_type || 'crown') : 'other',
+      // MOD-FEAT-026: editing an existing order must show the surfaces it
+      // already has, or saving would silently clear them.
+      tooth_surface: (order as { tooth_surface?: string | null }).tooth_surface || '',
       custom_work_type: isKnownWorkType ? '' : (order.work_type || ''),
       tooth_number: order.tooth_number || '',
       shade: order.shade || '',
@@ -416,6 +423,7 @@ export default function Laboratory() {
       doctor_id: orderForm.doctor_id || null,
       work_type: orderForm.work_type === 'other' ? (orderForm.custom_work_type.trim() || 'سایر') : orderForm.work_type,
       tooth_number: orderForm.tooth_number || null,
+      tooth_surface: formatSurfaces(orderForm.tooth_surface) || null,
       shade: orderForm.shade || null,
       material: orderForm.material || null,
       deadline: orderForm.deadline || null,
@@ -1119,6 +1127,14 @@ export default function Laboratory() {
                     for the one thing this step exists to do. Shade and
                     material are short fields and pair naturally below it. */}
                 <ToothArchSelect value={orderForm.tooth_number} onChange={(v) => setOrderForm((p) => ({ ...p, tooth_number: v }))} allowPrimary={false} />
+                {/* MOD-FEAT-026: an inlay's surfaces are the single most
+                    important fact about it after the tooth itself, and the
+                    lab order had no way to say them. */}
+                <SurfaceSelect
+                  value={orderForm.tooth_surface}
+                  onChange={(v) => setOrderForm((p) => ({ ...p, tooth_surface: v }))}
+                  hint="برای اینله و اونله و ونیر — در بقیه اختیاری"
+                />
                 <div className="grid grid-cols-2 gap-3">
                   <Input label="رنگ" value={orderForm.shade} onChange={(v) => setOrderForm((p) => ({ ...p, shade: v }))} placeholder="مثال: A2" dir="ltr" />
                   <Select label="جنس" value={orderForm.material} onChange={(v) => setOrderForm((p) => ({ ...p, material: v }))} options={materials} />

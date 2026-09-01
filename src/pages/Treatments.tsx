@@ -1,5 +1,6 @@
 // Treatments.tsx — Full Treatment Management with Encounter creation, Dental Chart, Billing & Lab referral
 import { useState, useEffect, useCallback, useMemo } from 'react'
+import { SurfaceSelect } from '../components/SurfaceSelect'
 import { toothLabel, toothLabelWithWord } from '../lib/toothLabel'
 import { useNavigate, useLocation } from 'react-router-dom'
 import {
@@ -1306,11 +1307,10 @@ export default function Treatments() {
                 ) : (
                   <ToothArchSelect value={treatForm.tooth_number} onChange={(v) => setTreatForm((p) => ({ ...p, tooth_number: v }))} />
                 )}
-                <Select label="سطح دندان" value={treatForm.tooth_surface} onChange={(v) => setTreatForm((p) => ({ ...p, tooth_surface: v }))} options={[
-                    { value: 'occlusal', label: 'اکلوزال' }, { value: 'mesial', label: 'مزیال' },
-                    { value: 'distal', label: 'دیستال' }, { value: 'buccal', label: 'باکال' },
-                    { value: 'lingual', label: 'لینگوال' },
-                  ]} placeholder="انتخاب سطح..." />
+                {/* MOD-FEAT-026: a dropdown returns one value, so «MOD» —
+                    the commonest restoration there is — could not be
+                    recorded at all. */}
+                <SurfaceSelect value={treatForm.tooth_surface} onChange={(v) => setTreatForm((p) => ({ ...p, tooth_surface: v }))} />
               </>
             ),
           },
