@@ -20,7 +20,8 @@ import {
   fetchRolePermissions, fetchCustomRoles, setRolePermission, createCustomRole, deactivateCustomRole, loadRolePermissionOverrides,
 } from '../lib/api'
 import { db, TABLE_NAMES } from '../lib/db'
-import { syncNow, subscribeSync, SyncStatus, getFailedSyncEntries, retryFailedEntry, retryAllFailedEntries, discardFailedEntry } from '../lib/sync'
+import { explainSyncError, isRetryableError } from '../lib/dateSanitise'
+import { syncNow, subscribeSync, SyncStatus, getFailedSyncEntries, retryFailedEntry, retryAllFailedEntries, discardFailedEntry, repairAndRetryEntry } from '../lib/sync'
 import { toJalaliString, toJalaliStringPretty, formatCurrency, formatNumber, toPersianDigits } from '../lib/persianDate'
 import { supabase } from '../lib/supabase'
 import {
@@ -1383,6 +1384,27 @@ function FailedSyncTab() {
   const load = () => { getFailedSyncEntries().then((e) => { setEntries(e); setLoading(false) }) }
   useEffect(() => { load() }, [])
 
+  /**
+   * MOD-FIX-015: clears the values Postgres rejected and re-queues. The
+   * cleared field names are named back to the user, because an empty
+   * delivery date they know about is recoverable and one they don't is
+   * just a different kind of lost.
+   */
+  const handleRepair = async (id: number) => {
+    setBusyId(id)
+    try {
+      const cleared = await repairAndRetryEntry(id)
+      showToast('success', cleared.length
+        ? `اصلاح شد و دوباره فرستاده شد — این فیلدها پاک شدند: ${cleared.join('، ')}`
+        : 'اصلاح شد و دوباره فرستاده شد')
+      await load()
+    } catch {
+      showToast('error', 'اصلاح ناموفق بود')
+    } finally {
+      setBusyId(null)
+    }
+  }
+
   const handleRetry = async (id: number) => {
     setBusyId(id)
     await retryFailedEntry(id)
@@ -1421,7 +1443,7 @@ function FailedSyncTab() {
           {entries.length > 0 && <Button size="sm" variant="primary" onClick={handleRetryAll} disabled={busyId !== null}>تلاش مجدد همه</Button>}
         </div>
         <p className="text-xs text-slate-500 dark:text-slate-400 mb-4">
-          این‌ها تغییراتی هستند که بعد از ۱۰ بار تلاش به سرور ابری نرسیدند — روی همین دستگاه محفوظ مانده‌اند و <b>هرگز خودکار پاک نمی‌شوند</b>. معمولاً با اتصال اینترنت بهتر و «تلاش مجدد» حل می‌شود.
+          این‌ها تغییراتی هستند که بعد از ۱۰ بار تلاش به سرور ابری نرسیدند — روی همین دستگاه محفوظ مانده‌اند و <b>هرگز خودکار پاک نمی‌شوند</b>. خطای شبکه معمولاً با اتصال بهتر و «تلاش مجدد» حل می‌شود؛ اگر مقداری در رکورد نامعتبر باشد، «تلاش مجدد» تنهایی کافی نیست.
         </p>
         {loading ? (
           <Spinner size={20} />
@@ -1440,6 +1462,11 @@ function FailedSyncTab() {
                   <div className="min-w-0">
                     <p className="text-sm font-bold text-error-700 dark:text-error-300">{OP_LABELS_FA[entry.operation]} {TABLE_LABELS_FA[entry.table_name] || entry.table_name}</p>
                     <p className="text-[11px] text-slate-400 truncate">{entry.last_error || 'خطای نامشخص'}</p>
+                    {/* MOD-FIX-015: a value error and a network error look
+                        identical here, and only one of them can be solved by
+                        pressing Retry. Two records sat stuck for days while
+                        the panel advised exactly the wrong thing. */}
+                    <p className="text-[11px] text-slate-500 mt-0.5">{explainSyncError(entry.last_error || '')}</p>
                   </div>
                   <Badge color="error">{toPersianDigits(entry.retry_count)} بار تلاش</Badge>
                 </div>
@@ -1450,6 +1477,11 @@ function FailedSyncTab() {
                   <Button size="sm" variant="primary" onClick={() => entry.id && handleRetry(entry.id)} disabled={busyId !== null}>
                     {busyId === entry.id ? <Spinner size={14} /> : 'تلاش مجدد'}
                   </Button>
+                  {!isRetryableError(entry.last_error || '') && (
+                    <Button size="sm" variant="primary" onClick={() => entry.id && handleRepair(entry.id)} disabled={busyId !== null}>
+                      اصلاح و ارسال
+                    </Button>
+                  )}
                   <Button size="sm" variant="secondary" onClick={() => handleCopy(entry)}><Copy size={13} className="inline ml-1" /> کپی داده</Button>
                   <Button size="sm" variant="danger" onClick={() => handleDiscard(entry)}>نادیده بگیر</Button>
                 </div>

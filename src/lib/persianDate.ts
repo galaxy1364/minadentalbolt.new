@@ -1,5 +1,6 @@
 import { getLunarHoliday } from './lunarHolidays'
 import { toJalaali, toGregorian as jalaaliToGregorian, isLeapJalaaliYear } from 'jalaali-js'
+import { isValidISODate } from './dateSanitise'
 
 // Jalali (Shamsi) date conversion utilities
 
@@ -248,9 +249,17 @@ export function jalaliToGregorian(jy: number, jm: number, jd: number): string {
   // Postgres `date` column (which silently gets stuck failing to sync
   // forever) or crashing the calendar outright.
   try {
+    // MOD-FIX-015: the finiteness check alone let "2-00-02" through and
+    // into a Postgres `date` column, where it stuck two records in the
+    // sync queue forever. 2 and 0 are both perfectly finite; what makes
+    // them invalid is being outside a real calendar. Validating the
+    // *output* rather than trusting the conversion is the only guard
+    // that catches a bad input this function was never given a chance
+    // to reject.
     const [gy, gm, gd] = toGregorian(jy, jm, jd)
-    if (!Number.isFinite(gy) || !Number.isFinite(gm) || !Number.isFinite(gd)) throw new Error('non-finite result')
-    return `${gy}-${String(gm).padStart(2, '0')}-${String(gd).padStart(2, '0')}`
+    const iso = `${gy}-${String(gm).padStart(2, '0')}-${String(gd).padStart(2, '0')}`
+    if (!isValidISODate(iso)) throw new Error(`conversion produced an impossible date: ${iso}`)
+    return iso
   } catch {
     return new Date().toISOString().slice(0, 10)
   }

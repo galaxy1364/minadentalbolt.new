@@ -1,4 +1,5 @@
 import { supabase, CLINIC_ID } from './supabase'
+import { sanitiseDates } from './dateSanitise'
 import { isMissingTableError } from './syncErrors'
 import { db, TABLE_NAMES, TableName, SyncQueueEntry } from './db'
 import { logAudit } from './auditLog'
@@ -223,6 +224,44 @@ export async function retryFailedEntry(id: number): Promise<void> {
   await db.sync_queue.update(id, { failed: false, retry_count: 0, last_error: undefined })
   await refreshPendingCount()
   if (typeof navigator !== 'undefined' && navigator.onLine) enqueueSync(500)
+}
+
+/**
+ * MOD-FIX-015 | اصلاح و ارسال دوباره
+ *
+ * A plain retry re-sends the same payload, which is right for a network
+ * failure and useless for a rejected value. Two real records — a lab
+ * order and a treatment phase — sat in the queue with the date
+ * "2-00-02", retried ten times and then parked, because no amount of
+ * connectivity makes month zero exist.
+ *
+ * This clears the offending dates to null and re-queues. Cleared rather
+ * than guessed: an empty delivery date gets noticed and re-entered, a
+ * silently invented one gets trusted.
+ *
+ * Returns the field names that were cleared so the screen can tell the
+ * person exactly what they need to fill in again.
+ */
+export async function repairAndRetryEntry(id: number): Promise<string[]> {
+  const entry = await db.sync_queue.get(id)
+  if (!entry) return []
+
+  const payload = entry.data as Record<string, unknown> | null
+  if (!payload || typeof payload !== 'object') {
+    await retryFailedEntry(id)
+    return []
+  }
+
+  const { cleaned, clearedFields } = sanitiseDates(payload)
+  await db.sync_queue.update(id, {
+    data: cleaned,
+    failed: false,
+    retry_count: 0,
+    last_error: undefined,
+  })
+  await refreshPendingCount()
+  if (typeof navigator !== 'undefined' && navigator.onLine) enqueueSync(500)
+  return clearedFields
 }
 
 export async function retryAllFailedEntries(): Promise<void> {
