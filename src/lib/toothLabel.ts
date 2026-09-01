@@ -74,25 +74,28 @@ function parseFdi(value: string | number | null | undefined): number | null {
  * writes an L-shaped bracket around the digit, and the shape itself
  * carries the quadrant:
  *
- *   horizontal stroke on TOP    → upper jaw
- *   horizontal stroke on BOTTOM → lower jaw
- *   vertical stroke on the side facing the MIDLINE
+ * The horizontal stroke is the OCCLUSAL PLANE, not a marker of which jaw
+ * a tooth is in. Upper teeth sit ABOVE that line, so the line is drawn
+ * BENEATH them; lower teeth sit below it, so the line is drawn ABOVE
+ * them. The vertical stroke is the midline, on the side facing it.
  *
- * Which gives, with the chart drawn facing the patient:
+ *   ۱┘  بالا راست      └۱  بالا چپ
+ *   ۱┐  پایین راست     ┌۱  پایین چپ
  *
- *   ┐۱  بالا راست     ┌۱  بالا چپ
- *   ┘۱  پایین راست    └۱  پایین چپ   ← «L1» مهدی
- *
- * The digit sits inside the bracket's corner, which is why the bracket
- * leads for left quadrants and trails for right ones.
+ * MOD-DOC-008 corrected this. The first reading had upper and lower
+ * swapped — the rule was written as "horizontal on top means upper",
+ * which sounds right and is backwards. It survived because every one of
+ * the four was wrong in the same consistent way, so nothing looked odd
+ * next to anything else. Only Mehdi's second, larger drawing showed the
+ * line's real meaning.
  */
 const PALMER_BRACKET: Record<Quadrant, { char: string; before: boolean }> = {
-  // Midline is to the right of these, so the vertical stroke goes right.
-  UR: { char: '┐', before: false },
-  LR: { char: '┘', before: false },
-  // Midline is to the left, so the vertical stroke goes left.
-  UL: { char: '┌', before: true },
-  LL: { char: '└', before: true },
+  // Upper teeth: the occlusal line runs beneath them.
+  UR: { char: '┘', before: false },
+  UL: { char: '└', before: true },
+  // Lower teeth: the line runs above them.
+  LR: { char: '┐', before: false },
+  LL: { char: '┌', before: true },
 }
 
 export function toothLabel(value: string | number | null | undefined): string {

@@ -10,14 +10,14 @@ import { toothLabel, toothCode, toothLabelWithWord, toothQuadrant, palmerSymbol 
 describe('🔴 همان دندانی که در چارت زده شد، همه‌جا همان نام را دارد', () => {
   it('🔴 FDI ۱۱ با براکت پالمر نمایش داده می‌شود، نه «۱۱»', () => {
     // MOD-FEAT-032: خط افقی بالا = فک بالا، خط عمودی راست = سمت خط وسط.
-    expect(toothLabel(11)).toBe('۱┐')
+    expect(toothLabel(11)).toBe('۱┘')
     expect(toothLabel(11)).not.toContain('11')
     // کد قابل حمل برای اسناد چاپی و خروجی، همچنان ربع‌دار است.
     expect(toothCode(11)).toBe('UR۱')
   })
 
   it('🔴 FDI ۳۸ همان «└۸» است — سبکی که مهدی خواست', () => {
-    expect(toothLabel(38)).toBe('└۸')
+    expect(toothLabel(38)).toBe('┌۸')
     expect(toothCode(38)).toBe('LL۸')
   })
 
@@ -57,8 +57,8 @@ describe('نماد پالمر', () => {
   })
 
   it('دندان شیری با حرف نمایش داده می‌شود، نه عدد', () => {
-    expect(toothLabel(51)).toBe('A┐')
-    expect(toothLabel(75)).toBe('└E')
+    expect(toothLabel(51)).toBe('A┘')
+    expect(toothLabel(75)).toBe('┌E')
     expect(toothCode(51)).toBe('URA')
   })
 })
@@ -82,7 +82,7 @@ describe('🔴 هر دندان در کل دهان نام یکتا دارد', () 
 
   it('🔴 چهار براکت، چهار ربع — هیچ دوتایی یکسان نیست', () => {
     expect([toothLabel(11), toothLabel(21), toothLabel(31), toothLabel(41)])
-      .toEqual(['۱┐', '┌۱', '└۱', '۱┘'])
+      .toEqual(['۱┘', '└۱', '┌۱', '۱┐'])
   })
 
   it('چهار «۱» چارت از هم قابل تشخیص‌اند', () => {
@@ -91,7 +91,7 @@ describe('🔴 هر دندان در کل دهان نام یکتا دارد', () 
   })
 
   it('رقم‌ها فارسی‌اند، مثل بقیه‌ی اعداد برنامه', () => {
-    expect(toothLabel(17)).toBe('۷┐')
+    expect(toothLabel(17)).toBe('۷┘')
     expect(toothLabel(17)).not.toMatch(/[0-9]/)
   })
 })
@@ -112,7 +112,7 @@ describe('ورودی نامعتبر دستکاری نمی‌شود', () => {
 
   it('نسخه‌ی کلمه‌دار برای خالی، جایگزین می‌گذارد', () => {
     expect(toothLabelWithWord(null)).toBe('—')
-    expect(toothLabelWithWord(11)).toBe('دندان ۱┐')
+    expect(toothLabelWithWord(11)).toBe('دندان ۱┘')
   })
 })
 
@@ -183,7 +183,7 @@ describe('🔴 راست و چپ همیشه مالِ بیمار است', () => {
   })
 
   it('برچسب کامل، کد و سمت را با هم می‌دهد', () => {
-    expect(toothFullLabel(11)).toBe('۱┐ — بالا راست بیمار')
+    expect(toothFullLabel(11)).toBe('۱┘ — بالا راست بیمار')
   })
 
   it('دندان شیری هم سمت دارد', () => {
@@ -222,57 +222,63 @@ describe('🔴 قوس آینه نمی‌شود', () => {
 })
 
 /**
- * MOD-FEAT-032 | دستخط مهدی به‌عنوان منبع حقیقت
+ * MOD-DOC-008 | دستخط مهدی به‌عنوان منبع حقیقت — تصحیح‌شده
  *
  * مهدی هر چهار ربع را روی کاغذ کشید و عکسش را فرستاد. چیدمان کاغذ همان
  * چیدمان چارت است — روبه‌روی بیمار — پس سمت راستِ کاغذ، چپِ بیمار است.
  *
- *   بالا چپِ کاغذ  (= بالا راست بیمار)   ۱┐  خط عمودی راستِ رقم، افقی بالا
- *   بالا راستِ کاغذ (= بالا چپ بیمار)    ┌۱  خط عمودی چپِ رقم،  افقی بالا
- *   پایین چپِ کاغذ (= پایین راست بیمار)  ۱┘  خط عمودی راستِ رقم، افقی پایین
- *   پایین راستِ کاغذ(= پایین چپ بیمار)   └۱  خط عمودی چپِ رقم،  افقی پایین
+ *   ۱┘  بالا راست       └۱  بالا چپ
+ *   ۱┐  پایین راست      ┌۱  پایین چپ
  *
- * قاعده‌ای که از کاغذ درمی‌آید و باید بماند:
- *   خط افقی → فک · خط عمودی → سمتی که رو به خط وسط دهان است
+ * قاعده‌ی واقعی، از نقاشی دوم و بزرگ‌تر:
+ *   خط افقی = **صفحه‌ی اکلوزال**، نه نشانه‌ی فک.
+ *   دندان بالا روی آن خط می‌نشیند، پس خط **زیرش** است.
+ *   دندان پایین زیر آن است، پس خط **رویش** است.
+ *   خط عمودی = خط وسط دهان، سمتی که رو به آن است.
+ *
+ * نسخه‌ی اول این تست‌ها بالا و پایین را جابه‌جا داشت، چون قاعده را
+ * «افقیِ بالا یعنی فک بالا» خوانده بودم — که درست به نظر می‌رسد و
+ * برعکس است. هر چهار مورد **به یک شکل** غلط بودند، پس هیچ‌کدام کنار
+ * دیگری عجیب نبود. فقط نقاشی دوم معنی واقعی خط را نشان داد.
  */
 describe('🔴 نگاشت براکت، مطابق دستخط مهدی', () => {
   it('هر چهار ربع دقیقاً همان‌طور که کشیده شد', () => {
-    expect(toothLabel(11)).toBe('۱┐')  // بالا راست بیمار
-    expect(toothLabel(21)).toBe('┌۱')  // بالا چپ بیمار
-    expect(toothLabel(41)).toBe('۱┘')  // پایین راست بیمار
-    expect(toothLabel(31)).toBe('└۱')  // پایین چپ بیمار
+    expect(toothLabel(11)).toBe('۱┘')  // بالا راست — خط اکلوزال زیرش
+    expect(toothLabel(21)).toBe('└۱')  // بالا چپ  — خط اکلوزال زیرش
+    expect(toothLabel(41)).toBe('۱┐')  // پایین راست — خط اکلوزال رویش
+    expect(toothLabel(31)).toBe('┌۱')  // پایین چپ  — خط اکلوزال رویش
   })
 
-  it('ربع‌های بالا، براکتشان خط افقی بالا دارد', () => {
-    // ┐ و ┌ هر دو گوشه‌ی بالا هستند.
+  it('🔴 دندان بالا، خط اکلوزال زیرش است', () => {
+    // ┘ و └ هر دو خط افقی را در پایین دارند.
     for (const fdi of [11, 18, 21, 28]) {
-      expect(toothLabel(fdi), String(fdi)).toMatch(/[┐┌]/)
+      expect(toothLabel(fdi), String(fdi)).toMatch(/[┘└]/)
     }
   })
 
-  it('ربع‌های پایین، براکتشان خط افقی پایین دارد', () => {
+  it('🔴 دندان پایین، خط اکلوزال رویش است', () => {
     for (const fdi of [31, 38, 41, 48]) {
-      expect(toothLabel(fdi), String(fdi)).toMatch(/[┘└]/)
+      expect(toothLabel(fdi), String(fdi)).toMatch(/[┐┌]/)
     }
   })
 
   it('🔴 ربع‌های راستِ بیمار، براکت بعد از رقم می‌آید', () => {
     // خط عمودی سمت خط وسط است، و برای راستِ بیمار آن سمت، راستِ رقم است.
     for (const fdi of [11, 18, 41, 48]) {
-      expect(toothLabel(fdi).slice(-1), String(fdi)).toMatch(/[┐┘]/)
+      expect(toothLabel(fdi).slice(-1), String(fdi)).toMatch(/[┘┐]/)
     }
   })
 
   it('🔴 ربع‌های چپِ بیمار، براکت قبل از رقم می‌آید', () => {
     for (const fdi of [21, 28, 31, 38]) {
-      expect(toothLabel(fdi).slice(0, 1), String(fdi)).toMatch(/[┌└]/)
+      expect(toothLabel(fdi).slice(0, 1), String(fdi)).toMatch(/[└┌]/)
     }
   })
 
   it('دندان شیری هم همین قاعده را دارد', () => {
-    expect(toothLabel(51)).toBe('A┐')
-    expect(toothLabel(61)).toBe('┌A')
-    expect(toothLabel(71)).toBe('└A')
-    expect(toothLabel(81)).toBe('A┘')
+    expect(toothLabel(51)).toBe('A┘')
+    expect(toothLabel(61)).toBe('└A')
+    expect(toothLabel(71)).toBe('┌A')
+    expect(toothLabel(81)).toBe('A┐')
   })
 })

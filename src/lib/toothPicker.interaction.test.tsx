@@ -31,20 +31,20 @@ describe('انتخابگر دندان — تعامل واقعی', () => {
   it('🔴 کلیک روی یک دندان، شماره‌ی FDI آن را برمی‌گرداند', () => {
     const onChange = vi.fn()
     render(<ToothArchSelect value="" onChange={onChange} />)
-    screen.getByRole('button', { name: 'دندان └۸' }).click()
+    screen.getByRole('button', { name: 'دندان ┌۸' }).click()
     expect(onChange).toHaveBeenCalledWith('38')
   })
 
   it('🔴 برچسب‌ها پالمرند، نه FDI — همان چیزی که مهدی دید', () => {
     render(<ToothArchSelect value="" onChange={() => {}} />)
-    expect(screen.getByRole('button', { name: 'دندان ۱┐' })).toBeDefined()
+    expect(screen.getByRole('button', { name: 'دندان ۱┘' })).toBeDefined()
     expect(screen.queryByRole('button', { name: 'دندان 11' })).toBeNull()
   })
 
   it('دندان انتخاب‌شده با کلمه و سمت اعلام می‌شود', () => {
     // روی قوسِ اسکرول‌شونده، دندان انتخابی ممکن است بیرون از دید باشد.
     render(<ToothArchSelect value="38" onChange={() => {}} />)
-    expect(screen.getByText('انتخاب‌شده: └۸ — پایین چپ بیمار')).toBeDefined()
+    expect(screen.getByText('انتخاب‌شده: ┌۸ — پایین چپ بیمار')).toBeDefined()
   })
 
   it('🔴 ترتیب روی صفحه از راستِ بیمار به چپِ بیمار است', () => {
@@ -53,10 +53,10 @@ describe('انتخابگر دندان — تعامل واقعی', () => {
     render(<ToothArchSelect value="" onChange={() => {}} />)
     const names = screen.getAllByRole('button', { name: /^دندان [۰-۹A-E┌┐└┘]/ })
       .map((b) => b.getAttribute('aria-label'))
-    expect(names[0]).toBe('دندان ۸┐')
-    expect(names[15]).toBe('دندان ┌۸')
-    expect(names[16]).toBe('دندان ۸┘')
-    expect(names[31]).toBe('دندان └۸')
+    expect(names[0]).toBe('دندان ۸┘')
+    expect(names[15]).toBe('دندان └۸')
+    expect(names[16]).toBe('دندان ۸┐')
+    expect(names[31]).toBe('دندان ┌۸')
   })
 
   it('🔴 هر دو نیمه با نام سمت بیمار برچسب خورده‌اند', () => {
