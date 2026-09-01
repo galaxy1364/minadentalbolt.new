@@ -8,7 +8,7 @@ import { describe, it, expect } from 'vitest'
 import {
   toJalaliString, isJalaliLeapYear, jalaliToGregorian,
   toPersianDigits, toEnglishDigits, formatCurrency, todayLocalISO,
-  getJalaliDateInfo,
+  getJalaliDateInfo, toJalaliStringPretty, toJalaliShort,
 } from './persianDate'
 
 describe('تبدیل میلادی ↔ شمسی', () => {
@@ -99,5 +99,120 @@ describe('todayLocalISO — باگ نیمه‌شب', () => {
     const now = new Date()
     const localExpected = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`
     expect(todayLocalISO()).toBe(localExpected)
+  })
+})
+
+describe('MOD-FIX-022 | تاریخ خوانا با رقم فارسی نوشته می‌شود', () => {
+  /**
+   * `toJalaliStringPretty` تاریخ را برای **خواندن** می‌سازد و در ۱۶ جای
+   * برنامه استفاده می‌شود — داشبورد، تقویم، لابراتوار، پرونده‌ی بیمار و
+   * حتی **رسید چاپی**. ولی رقم لاتین برمی‌گرداند، درحالی‌که کنار همان
+   * متن، ساعت و شمارنده با رقم فارسی نوشته می‌شوند. نتیجه روی صفحه:
+   * «9 شهریور 1405 — ۲۲:۴۰».
+   *
+   * `toJalaliString` عمداً دست‌نخورده می‌ماند: خروجی‌اش (۱۴۰۵/۰۶/۰۹) کلید
+   * و مقدار مقایسه است، نه متن نمایشی.
+   */
+  it('روز و سال با رقم فارسی می‌آیند', () => {
+    expect(toJalaliStringPretty('2026-08-31')).toBe('۹ شهریور ۱۴۰۵')
+  })
+
+  it('هیچ رقم لاتینی باقی نمی‌ماند', () => {
+    expect(toJalaliStringPretty('2026-03-21')).not.toMatch(/[0-9]/)
+  })
+
+  it('تاریخ خالی همچنان رشته‌ی خالی است', () => {
+    expect(toJalaliStringPretty('')).toBe('')
+    expect(toJalaliStringPretty('نه-یک-تاریخ')).toBe('')
+  })
+
+  it('قالب ماشینی دست‌نخورده می‌ماند — کلید مقایسه است، نه متن', () => {
+    expect(toJalaliString('2026-08-31')).toBe('1405/06/09')
+  })
+})
+
+describe('MOD-FIX-018 | تاریخ فشرده‌ی نمایشی', () => {
+  /**
+   * سه تابع تاریخ، هرکدام یک کار: کلید، نمایش فشرده، نمایش خوانا. این
+   * تست مرزشان را قفل می‌کند، چون همین مرز بود که گم شد و صفحه‌ها تاریخ
+   * لاتین کنار ساعت فارسی نشان دادند.
+   */
+  it('همان قالب toJalaliString را با رقم فارسی می‌دهد', () => {
+    expect(toJalaliShort('2026-08-31')).toBe('۱۴۰۵/۰۶/۰۹')
+  })
+
+  it('طولش با نسخه‌ی لاتین یکی است — چیدمان جدول جابه‌جا نمی‌شود', () => {
+    expect(toJalaliShort('2026-08-31')).toHaveLength(toJalaliString('2026-08-31').length)
+  })
+
+  it('هیچ رقم لاتینی باقی نمی‌ماند', () => {
+    expect(toJalaliShort('2026-03-21')).not.toMatch(/[0-9]/)
+  })
+
+  it('تاریخ خالی یا نامعتبر همچنان رشته‌ی خالی است', () => {
+    expect(toJalaliShort('')).toBe('')
+    expect(toJalaliShort('نه-یک-تاریخ')).toBe('')
+  })
+
+  it('قالب کلید دست‌نخورده می‌ماند', () => {
+    // getHoliday() و PersianCalendar با همین رشته مقایسه می‌کنند.
+    expect(toJalaliString('2026-08-31')).toBe('1405/06/09')
+  })
+})
+
+describe('MOD-FIX-020 | محافظ تبدیل شمسی به میلادی', () => {
+  /**
+   * محافظ قبلی فقط `Number.isFinite` را می‌سنجید. ولی jalaali-js هرگز
+   * خروجی غیرمتناهی نمی‌دهد — ورودی بی‌معنا را بی‌صدا به تاریخِ **معتبرِ
+   * اشتباه** تبدیل می‌کند. این تست‌ها همان درِ باز را می‌بندند.
+   */
+  it('تاریخ درست، رشته‌ی میلادی می‌دهد', () => {
+    expect(jalaliToGregorian(1405, 6, 9)).toBe('2026-08-31')
+    expect(jalaliToGregorian(1405, 1, 1)).toBe('2026-03-21')
+  })
+
+  it('ماه صفر رد می‌شود — نه اینکه تاریخ اشتباه بدهد', () => {
+    // قبلاً: toGregorian(1405, 0, 15) → 2026-03-04، بدون هیچ خطایی.
+    expect(jalaliToGregorian(1405, 0, 15)).toBeNull()
+    expect(jalaliToGregorian(1405, 0, 0)).toBeNull()
+  })
+
+  it('روز صفر رد می‌شود', () => {
+    // قبلاً: toGregorian(1405, 1, 0) → 2026-03-20.
+    expect(jalaliToGregorian(1405, 1, 0)).toBeNull()
+  })
+
+  it('ماه و روز خارج از بازه رد می‌شوند', () => {
+    expect(jalaliToGregorian(1405, 13, 1)).toBeNull()
+    expect(jalaliToGregorian(1405, 1, 32)).toBeNull()
+  })
+
+  it('مقادیر منفی رد می‌شوند', () => {
+    expect(jalaliToGregorian(-1, -1, -1)).toBeNull()
+    expect(jalaliToGregorian(1405, -6, 9)).toBeNull()
+    expect(jalaliToGregorian(1405, 6, -9)).toBeNull()
+  })
+
+  it('NaN و اعشار رد می‌شوند', () => {
+    expect(jalaliToGregorian(NaN, 6, 9)).toBeNull()
+    expect(jalaliToGregorian(1405, NaN, 9)).toBeNull()
+    expect(jalaliToGregorian(1405.5, 6, 9)).toBeNull()
+    expect(jalaliToGregorian(Infinity, 6, 9)).toBeNull()
+  })
+
+  it('سال بی‌معنا برای یک کلینیک رد می‌شود', () => {
+    // jalaali-js تا سال -۶۱ را قبول می‌کند؛ هیچ نوبتی آنجا نیست.
+    expect(jalaliToGregorian(0, 6, 9)).toBeNull()
+    expect(jalaliToGregorian(9999, 6, 9)).toBeNull()
+  })
+
+  it('هر خروجی غیرِ null، دقیقاً قالب YYYY-MM-DD است', () => {
+    // همان چیزی که ستون `date` پستگرس می‌پذیرد. "2-00-02" اینجا رد می‌شود.
+    for (let m = 1; m <= 12; m++) {
+      for (const d of [1, 15, 29]) {
+        const out = jalaliToGregorian(1405, m, d)
+        expect(out, `1405/${m}/${d}`).toMatch(/^\d{4}-\d{2}-\d{2}$/)
+      }
+    }
   })
 })

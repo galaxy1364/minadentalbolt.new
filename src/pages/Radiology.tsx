@@ -5,7 +5,7 @@ import { useNavigate } from 'react-router-dom'
 import { Image, Search, Filter, Eye, XCircle, Smile, Camera, Calendar, User, FileText, Download, ZoomIn, Plus, Edit2, Trash2 } from 'lucide-react'
 import { PieChart, Pie, Cell, XAxis, YAxis, Tooltip as RTooltip, ResponsiveContainer, Legend } from 'recharts'
 import { fetchRadiologyImages, fetchPatients, createRadiologyImage, updateRadiologyImage } from '../lib/api'
-import { toJalaliString, toJalaliStringPretty, formatNumber, toPersianDigits } from '../lib/persianDate'
+import { toJalaliString, toJalaliStringPretty, formatNumber, toPersianDigits, toJalaliShort} from '../lib/persianDate'
 import { RadiologyImage, Patient } from '../types'
 import { Card, Button, Badge, Spinner, EmptyState, Modal, Wizard, Input, Select, Textarea, showToast } from '../components/ui'
 import { PersianDateInput } from '../components/PersianDateInput'
@@ -97,7 +97,7 @@ export default function Radiology() {
         { label: 'بیمار', value: patientObj ? `${patientObj.first_name} ${patientObj.last_name}` : '-', highlight: true },
         { label: 'نوع تصویر', value: imageTypes.find((t) => t.value === uploadForm.image_type)?.label || uploadForm.image_type },
         { label: 'شماره دندان', value: uploadForm.tooth_number || '-' },
-        { label: 'تاریخ تصویربرداری', value: uploadForm.taken_at ? toJalaliString(uploadForm.taken_at) : '-' },
+        { label: 'تاریخ تصویربرداری', value: uploadForm.taken_at ? toJalaliShort(uploadForm.taken_at) : '-' },
       ],
       confirmLabel: editingImage ? 'ذخیره تغییرات' : 'ثبت تصویر',
       onConfirm: async () => {
@@ -347,7 +347,7 @@ export default function Radiology() {
                           {img.tooth_number ? `دندان: ${toPersianDigits(img.tooth_number)}` : '-'}
                         </span>
                         <span className="text-xs text-slate-400">
-                          {img.taken_at ? toJalaliString(img.taken_at) : toJalaliString(img.created_at)}
+                          {img.taken_at ? toJalaliShort(img.taken_at) : toJalaliShort(img.created_at)}
                         </span>
                       </div>
                       {img.description && (
@@ -448,7 +448,7 @@ export default function Radiology() {
                 </div>
                 <div className="bg-slate-50 rounded-xl p-3">
                   <p className="text-xs text-slate-400 flex items-center gap-1 mb-1"><Calendar size={12} /> تاریخ</p>
-                  <p className="text-sm font-medium text-slate-800">{selectedImage.taken_at ? toJalaliStringPretty(selectedImage.taken_at) : toJalaliString(selectedImage.created_at)}</p>
+                  <p className="text-sm font-medium text-slate-800">{selectedImage.taken_at ? toJalaliStringPretty(selectedImage.taken_at) : toJalaliShort(selectedImage.created_at)}</p>
                 </div>
               </div>
 

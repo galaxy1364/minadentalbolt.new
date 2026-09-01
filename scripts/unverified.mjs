@@ -17,7 +17,11 @@
  */
 import { readFileSync } from 'node:fs'
 
-const UNVERIFIED = /تأیید بصری انجام نشده|دیده نشده|هرگز اجرا نشده|تست نشده/
+// MOD-FIX-019: this used to require the exact phrase «تأیید بصری انجام
+// نشده», so a record writing «تأیید بصری مهدی انجام نشده» dropped out of
+// the list silently — the tracker's own version of a guard that does not
+// cover the file it is meant to defend. Allow words in between.
+const UNVERIFIED = /تأیید بصری[^\n]{0,20}انجام نشده|دیده نشده|هرگز اجرا نشده|تست نشده/
 
 const text = readFileSync(new URL('../CHANGELOG.md', import.meta.url), 'utf8')
 

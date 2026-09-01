@@ -20,7 +20,7 @@ import {
   fetchRolePermissions, fetchCustomRoles, setRolePermission, createCustomRole, deactivateCustomRole, loadRolePermissionOverrides,
 } from '../lib/api'
 import { db, TABLE_NAMES } from '../lib/db'
-import { explainSyncError, isRetryableError } from '../lib/dateSanitise'
+import { classifySyncFailure } from '../lib/syncErrors'
 import { syncNow, subscribeSync, SyncStatus, getFailedSyncEntries, retryFailedEntry, retryAllFailedEntries, discardFailedEntry, repairAndRetryEntry } from '../lib/sync'
 import { toJalaliString, toJalaliStringPretty, formatCurrency, formatNumber, toPersianDigits } from '../lib/persianDate'
 import { supabase } from '../lib/supabase'
@@ -1443,7 +1443,11 @@ function FailedSyncTab() {
           {entries.length > 0 && <Button size="sm" variant="primary" onClick={handleRetryAll} disabled={busyId !== null}>تلاش مجدد همه</Button>}
         </div>
         <p className="text-xs text-slate-500 dark:text-slate-400 mb-4">
-          این‌ها تغییراتی هستند که بعد از ۱۰ بار تلاش به سرور ابری نرسیدند — روی همین دستگاه محفوظ مانده‌اند و <b>هرگز خودکار پاک نمی‌شوند</b>. خطای شبکه معمولاً با اتصال بهتر و «تلاش مجدد» حل می‌شود؛ اگر مقداری در رکورد نامعتبر باشد، «تلاش مجدد» تنهایی کافی نیست.
+          {/* این جمله قبلاً به همه می‌گفت «معمولاً با اتصال اینترنت بهتر و
+              تلاش مجدد حل می‌شود». برای رکوردی که سرور به‌خاطر خودِ داده پس
+              زده، تلاش مجدد هرگز جواب نمی‌دهد — فقط شمارنده را بالا می‌برد.
+              راهنمایی حالا برای هر رکورد، از روی خطای واقعی‌اش ساخته می‌شود. */}
+          این‌ها تغییراتی هستند که بعد از ۱۰ بار تلاش به سرور ابری نرسیدند — روی همین دستگاه محفوظ مانده‌اند و <b>هرگز خودکار پاک نمی‌شوند</b>. راهنمای هر رکورد زیر خودش نوشته شده.
         </p>
         {loading ? (
           <Spinner size={20} />
@@ -1456,28 +1460,52 @@ function FailedSyncTab() {
           </div>
         ) : (
           <div className="space-y-2">
-            {entries.map((entry) => (
+            {entries.map((entry) => {
+              // MOD-FIX-021 + MOD-FIX-015 (main): both branches solved the
+              // same complaint — «تلاش مجدد» was advised even for a value
+              // the server had already rejected. Merged rather than kept
+              // side by side: two classifiers would be exactly the «دو مسیر
+              // برای یک مقصد» the standard forbids.
+              //
+              // classifySyncFailure wins the classification because it tells
+              // a permission failure apart from a data one — isRetryableError
+              // called RLS non-retryable too, and then offered to "clear the
+              // invalid date", which has nothing to do with a policy denial.
+              // main's repairAndRetryEntry wins the *action*: it is the only
+              // path that actually fixes the stuck row.
+              const advice = classifySyncFailure({ message: entry.last_error || '' })
+              return (
               <div key={entry.id} className="p-3 rounded-xl bg-error-50 dark:bg-error-900/10 border border-error-100 dark:border-error-800">
                 <div className="flex items-center justify-between gap-2 cursor-pointer" onClick={() => setExpandedId(expandedId === entry.id ? null : (entry.id ?? null))}>
                   <div className="min-w-0">
                     <p className="text-sm font-bold text-error-700 dark:text-error-300">{OP_LABELS_FA[entry.operation]} {TABLE_LABELS_FA[entry.table_name] || entry.table_name}</p>
                     <p className="text-[11px] text-slate-400 truncate">{entry.last_error || 'خطای نامشخص'}</p>
-                    {/* MOD-FIX-015: a value error and a network error look
-                        identical here, and only one of them can be solved by
-                        pressing Retry. Two records sat stuck for days while
-                        the panel advised exactly the wrong thing. */}
-                    <p className="text-[11px] text-slate-500 mt-0.5">{explainSyncError(entry.last_error || '')}</p>
                   </div>
                   <Badge color="error">{toPersianDigits(entry.retry_count)} بار تلاش</Badge>
+                </div>
+                <div className="mt-2 p-2 rounded-lg bg-white/70 dark:bg-slate-900/40">
+                  <p className="text-[11px] font-bold text-slate-700 dark:text-slate-200">{advice.title}</p>
+                  <p className="text-[11px] text-slate-500 dark:text-slate-400 leading-relaxed mt-0.5">{advice.advice}</p>
                 </div>
                 {expandedId === entry.id && (
                   <pre className="text-[10px] text-slate-500 dark:text-slate-400 mt-2 whitespace-pre-wrap break-all bg-white dark:bg-slate-900 rounded-lg p-2 max-h-[160px] overflow-y-auto">{JSON.stringify(entry.data, null, 2)}</pre>
                 )}
                 <div className="flex gap-2 mt-2">
-                  <Button size="sm" variant="primary" onClick={() => entry.id && handleRetry(entry.id)} disabled={busyId !== null}>
+                  {/* A retry that provably cannot succeed is not offered as
+                      the primary action — it only raises the counter and
+                      teaches the user that the panel lies. */}
+                  <Button
+                    size="sm"
+                    variant={advice.retryable ? 'primary' : 'secondary'}
+                    onClick={() => entry.id && handleRetry(entry.id)}
+                    disabled={busyId !== null}
+                  >
                     {busyId === entry.id ? <Spinner size={14} /> : 'تلاش مجدد'}
                   </Button>
-                  {!isRetryableError(entry.last_error || '') && (
+                  {/* Only a *data* failure can be repaired by clearing the
+                      bad value. Offering it on a permission failure would be
+                      the same wrong advice in a new shape. */}
+                  {advice.kind === 'data' && (
                     <Button size="sm" variant="primary" onClick={() => entry.id && handleRepair(entry.id)} disabled={busyId !== null}>
                       اصلاح و ارسال
                     </Button>
@@ -1486,7 +1514,8 @@ function FailedSyncTab() {
                   <Button size="sm" variant="danger" onClick={() => handleDiscard(entry)}>نادیده بگیر</Button>
                 </div>
               </div>
-            ))}
+              )
+            })}
           </div>
         )}
       </Card>

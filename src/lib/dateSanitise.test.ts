@@ -10,7 +10,7 @@
  * چون همان payload خراب دوباره فرستاده می‌شد.
  */
 import { describe, it, expect } from 'vitest'
-import { isValidISODate, sanitiseDates, isRetryableError, explainSyncError } from './dateSanitise'
+import { isValidISODate, sanitiseDates } from './dateSanitise'
 
 describe('🔴 تاریخ نامعتبر تشخیص داده می‌شود', () => {
   it('ماه صفر — همان چیزی که دو رکورد را گیر انداخت', () => {
@@ -96,28 +96,7 @@ describe('🔴 اصلاح payload گیرکرده', () => {
   })
 })
 
-describe('🔴 خطای شبکه و خطای مقدار از هم جدا می‌شوند', () => {
-  it('خطای مقدار قابل تلاش مجدد نیست', () => {
-    expect(isRetryableError('date/time field value out of range: "2-00-02"')).toBe(false)
-    expect(isRetryableError('invalid input syntax for type uuid')).toBe(false)
-    expect(isRetryableError('violates foreign key constraint')).toBe(false)
-  })
-
-  it('خطای شبکه قابل تلاش مجدد است', () => {
-    expect(isRetryableError('Failed to fetch')).toBe(true)
-    expect(isRetryableError('NetworkError when attempting to fetch resource')).toBe(true)
-    expect(isRetryableError('')).toBe(true)
-  })
-
-  it('پیام خطای مقدار، کاربر را دنبال تلاش مجدد نمی‌فرستد', () => {
-    // پنل قبلاً می‌گفت «معمولاً با اتصال بهتر حل می‌شود» — نصیحتی که
-    // برای این کلاس خطا هیچ‌وقت جواب نمی‌داد.
-    const msg = explainSyncError('date/time field value out of range: "2-00-02"')
-    expect(msg).toContain('اصلاح و ارسال')
-    expect(msg).not.toContain('اتصال بهتر')
-  })
-
-  it('پیام خطای شبکه همان راهنمای درست را می‌دهد', () => {
-    expect(explainSyncError('Failed to fetch')).toContain('اتصال بهتر')
-  })
-})
+// MOD-FIX-021: ادعاهای این بلوک به `syncFailureAdvice.test.ts` منتقل شدند،
+// چون تابعی که می‌سنجیدند (`isRetryableError`/`explainSyncError`) با
+// `classifySyncFailure` یکی شد. هیچ پوششی کم نشد — همان ورودی‌ها آن‌جا
+// سنجیده می‌شوند، به‌علاوه‌ی خطای دسترسی که این‌جا اصلاً دیده نمی‌شد.

@@ -191,21 +191,33 @@ function asJalali(iso: string): [number, number, number] {
   return toJalali(y, m, d)
 }
 
+/**
+ * MOD-FIX-020: `jalaliToGregorian` حالا `string | null` است — روی ورودی
+ * بی‌معنا `null` می‌دهد به‌جای اینکه بی‌صدا «امروز» برگرداند. تاریخ‌های این
+ * تست همه معتبرند، پس این کمک‌تابع همان‌جا شکست می‌خورد اگر روزی نبودند،
+ * به‌جای اینکه `null` را در ادعای بعدی پنهان کند.
+ */
+const greg = (jy: number, jm: number, jd: number): string => {
+  const iso = jalaliToGregorian(jy, jm, jd)
+  if (!iso) throw new Error(`تاریخ آزمون نامعتبر است: ${jy}/${jm}/${jd}`)
+  return iso
+}
+
 describe('🔴 سررسیدها روی همان روزِ شمسی می‌مانند', () => {
   it('شروع از اول مهر — شش قسط، همه روز اول', () => {
-    const start = jalaliToGregorian(1405, 7, 1)
+    const start = greg(1405, 7, 1)
     const days = installmentDueDates(start, 6).map((iso) => asJalali(iso)[2])
     expect(days).toEqual([1, 1, 1, 1, 1, 1])
   })
 
   it('ماه‌ها پشت سر هم جلو می‌روند، بدون پرش', () => {
-    const start = jalaliToGregorian(1405, 7, 1)
+    const start = greg(1405, 7, 1)
     const months = installmentDueDates(start, 6).map((iso) => asJalali(iso)[1])
     expect(months).toEqual([7, 8, 9, 10, 11, 12])
   })
 
   it('از یک سال به سال بعد درست عبور می‌کند', () => {
-    const start = jalaliToGregorian(1405, 11, 15)
+    const start = greg(1405, 11, 15)
     const parts = installmentDueDates(start, 4).map(asJalali)
     expect(parts).toEqual([
       [1405, 11, 15], [1405, 12, 15], [1406, 1, 15], [1406, 2, 15],
@@ -217,7 +229,7 @@ describe('🔴 روز ۳۱ به آخر ماه کوتاه چسبانده می‌�
   it('شروع از ۳۱ فروردین — مهر ۳۰ روزه است', () => {
     // فروردین تا شهریور ۳۱ روز دارند، مهر ۳۰. اگر روز پرتاب می‌شد،
     // قسط هفتم یک ماه کامل جابه‌جا می‌شد — دعوای واقعی با بیمار.
-    const start = jalaliToGregorian(1405, 1, 31)
+    const start = greg(1405, 1, 31)
     const parts = installmentDueDates(start, 8).map(asJalali)
     expect(parts.map((p) => p[1])).toEqual([1, 2, 3, 4, 5, 6, 7, 8])
     expect(parts.map((p) => p[2])).toEqual([31, 31, 31, 31, 31, 31, 30, 30])
@@ -225,7 +237,7 @@ describe('🔴 روز ۳۱ به آخر ماه کوتاه چسبانده می‌�
 
   it('روز چسبانده‌شده ماه بعد دوباره ۳۱ می‌شود', () => {
     // چسباندن نباید روز اصلی را برای همیشه از دست بدهد.
-    const start = jalaliToGregorian(1405, 6, 31)
+    const start = greg(1405, 6, 31)
     const parts = installmentDueDates(start, 8).map(asJalali)
     expect(parts[0]).toEqual([1405, 6, 31])
     expect(parts[1][2]).toBe(30)          // مهر
@@ -233,7 +245,7 @@ describe('🔴 روز ۳۱ به آخر ماه کوتاه چسبانده می‌�
   })
 
   it('۳۰ اسفند در سال غیرکبیسه به ۲۹ می‌رسد', () => {
-    const start = jalaliToGregorian(1405, 6, 30)
+    const start = greg(1405, 6, 30)
     const parts = installmentDueDates(start, 7).map(asJalali)
     const esfand = parts[6]
     expect(esfand[1]).toBe(12)
@@ -242,7 +254,7 @@ describe('🔴 روز ۳۱ به آخر ماه کوتاه چسبانده می‌�
 
   it('هیچ سررسیدی از طول ماه خودش بیشتر نیست', () => {
     for (const startDay of [28, 29, 30, 31]) {
-      const start = jalaliToGregorian(1405, 1, startDay)
+      const start = greg(1405, 1, startDay)
       for (const iso of installmentDueDates(start, 24)) {
         const [y, m, d] = asJalali(iso)
         expect(d, `${y}/${m}/${d} از طول ماه بیشتر است`).toBeLessThanOrEqual(jalaliMonthLength(y, m))
@@ -253,12 +265,12 @@ describe('🔴 روز ۳۱ به آخر ماه کوتاه چسبانده می‌�
 
 describe('پایداری سررسیدها', () => {
   it('تعداد خروجی با تعداد اقساط برابر است', () => {
-    const start = jalaliToGregorian(1405, 3, 12)
+    const start = greg(1405, 3, 12)
     expect(installmentDueDates(start, 12)).toHaveLength(12)
   })
 
   it('سررسیدها همیشه صعودی‌اند', () => {
-    const start = jalaliToGregorian(1405, 1, 31)
+    const start = greg(1405, 1, 31)
     const dates = installmentDueDates(start, 24)
     for (let i = 1; i < dates.length; i++) {
       expect(dates[i] > dates[i - 1], `${dates[i - 1]} → ${dates[i]}`).toBe(true)

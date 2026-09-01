@@ -34,8 +34,14 @@ export default defineConfig({
 
   projects: [
     {
+      // devices['iPhone 13'] defaults to WebKit, but `npm run e2e:install`
+      // only downloads Chromium — so this project could never launch on a
+      // clean machine or in CI, and the whole suite failed before running a
+      // single assertion. What these tests actually check is layout at phone
+      // width (mirrored arch, half-width arch, overflow), and viewport is
+      // what decides that, not the engine. So: iPhone metrics, Chromium.
       name: 'iphone',
-      use: { ...devices['iPhone 13'] },
+      use: { ...devices['iPhone 13'], browserName: 'chromium' },
     },
     {
       name: 'desktop',
@@ -51,5 +57,15 @@ export default defineConfig({
     url: 'http://localhost:5173',
     reuseExistingServer: !process.env.CI,
     timeout: 120_000,
+    env: {
+      // Without a key, Layout renders the "پیکربندی سرور ناقص است" screen
+      // instead of the app, so every test would be inspecting an error
+      // page. A placeholder is enough: it never reaches a server — the
+      // clinic-flow tests intercept the Supabase endpoints (see
+      // e2e/fixtures/backend.ts), and the smoke tests assert the offline
+      // behaviour on purpose. A real key here would leak into CI logs.
+      VITE_SUPABASE_ANON_KEY: process.env.VITE_SUPABASE_ANON_KEY || 'e2e-placeholder-key',
+      VITE_SUPABASE_URL: process.env.VITE_SUPABASE_URL || 'https://e2e.invalid',
+    },
   },
 })

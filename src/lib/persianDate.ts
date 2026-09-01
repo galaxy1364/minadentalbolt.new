@@ -53,12 +53,37 @@ export function toJalaliString(dateStr: string): string {
   return `${jy}/${String(jm).padStart(2, '0')}/${String(jd).padStart(2, '0')}`
 }
 
+/**
+ * MOD-FIX-022: the human-readable date. Used on the dashboard, calendar,
+ * lab orders, patient file and the printed receipt — all of which sit
+ * beside counters and clocks written in Persian digits, so Latin digits
+ * here produced «9 شهریور 1405 — ۲۲:۴۰» on one line.
+ *
+ * toJalaliString() deliberately keeps Latin digits: its output is compared
+ * and stored, not read.
+ */
 export function toJalaliStringPretty(dateStr: string): string {
   if (!dateStr) return ''
   const d = new Date(dateStr)
   if (isNaN(d.getTime())) return ''
   const [jy, jm, jd] = toJalali(d.getFullYear(), d.getMonth() + 1, d.getDate())
-  return `${jd} ${persianMonths[jm - 1]} ${jy}`
+  return toPersianDigits(`${jd} ${persianMonths[jm - 1]} ${jy}`)
+}
+
+/**
+ * MOD-FIX-018: the compact date, for reading.
+ *
+ * Three date renderers, one purpose each — keeping them apart is what stops
+ * the next person guessing:
+ *   • toJalaliString      «1405/06/09»  — key/compare/export. Latin, always.
+ *   • toJalaliShort       «۱۴۰۵/۰۶/۰۹»  — same shape for a table or a chip.
+ *   • toJalaliStringPretty «۹ شهریور ۱۴۰۵» — prose, where there is room.
+ *
+ * Display sites used to call toJalaliString directly, so a Persian-digit
+ * clock and a Latin-digit date sat on the same row.
+ */
+export function toJalaliShort(dateStr: string): string {
+  return toPersianDigits(toJalaliString(dateStr))
 }
 
 export function getJalaliMonthYear(dateStr: string): { year: number; month: number } {
@@ -211,6 +236,7 @@ export function getHoliday(jalaliDateStr: string): string | null {
   // why they're prefixed as approximate rather than presented as fact.
   try {
     const gregorian = jalaliToGregorian(Number(year), Number(month), Number(day))
+    if (!gregorian) return null
     const computed = getLunarHoliday(gregorian)
     return computed ? `${computed} (تقریبی)` : null
   } catch {
@@ -233,35 +259,52 @@ export function getGregorianHolidays(year: number, month: number): Map<string, s
       const holiday = getHoliday(jalaliStr)
       if (holiday) {
         const gregStr = jalaliToGregorian(year, month, day)
-        result.set(gregStr, holiday)
+        if (gregStr) result.set(gregStr, holiday)
       }
     }
   }
   return result
 }
 
-export function jalaliToGregorian(jy: number, jm: number, jd: number): string {
-  // Defensive guard: jalaali-js throws on non-finite input (e.g. NaN
-  // year/month, which is exactly what produced a real corrupted
-  // "N-0a-0N"-style date saved to a patient's treatment phase before
-  // this file's toGregorian was replaced with jalaali-js). Falling
-  // back to today instead of letting a malformed string reach a
-  // Postgres `date` column (which silently gets stuck failing to sync
-  // forever) or crashing the calendar outright.
+/**
+ * MOD-FIX-020 | تبدیل شمسی به میلادی — یا تاریخ درست، یا `null`
+ *
+ * محافظ قبلی فقط `Number.isFinite` را می‌سنجید. مسئله این است که
+ * jalaali-js **هرگز** خروجی غیرمتناهی نمی‌دهد؛ خطر واقعی جای دیگری است:
+ * ورودی بی‌معنا را بی‌صدا به یک تاریخ **معتبرِ اشتباه** تبدیل می‌کند.
+ *
+ *   toGregorian(1405, 0, 15)  →  2026-03-04    ← ماه صفر، بدون هیچ خطایی
+ *   toGregorian(1405, 1, 32)  →  2026-04-21    ← روز ۳۲
+ *
+ * پس ورودی هم باید سنجیده شود، نه فقط خروجی.
+ *
+ * و برگشت بی‌صدا به «امروز» — کاری که این تابع قبلاً می‌کرد — تور ایمنی
+ * است نه راه‌حل: نوبتِ ثبت‌شده روی تاریخ اشتباه، به‌اندازه‌ی سینکِ شکسته
+ * بد است، فقط دیرتر معلوم می‌شود. `null` صدازننده را مجبور می‌کند تصمیم
+ * بگیرد.
+ */
+export function jalaliToGregorian(jy: number, jm: number, jd: number): string | null {
+  // A Jalali date the clinic could plausibly hold. jalaali-js accepts
+  // years down to -61, which is never a real appointment.
+  if (!Number.isInteger(jy) || jy < 1 || jy > 1700) return null
+  if (!Number.isInteger(jm) || jm < 1 || jm > 12) return null
+  if (!Number.isInteger(jd) || jd < 1 || jd > 31) return null
+
   try {
-    // MOD-FIX-015: the finiteness check alone let "2-00-02" through and
-    // into a Postgres `date` column, where it stuck two records in the
-    // sync queue forever. 2 and 0 are both perfectly finite; what makes
-    // them invalid is being outside a real calendar. Validating the
-    // *output* rather than trusting the conversion is the only guard
-    // that catches a bad input this function was never given a chance
-    // to reject.
+    // MOD-FIX-015 (main) + MOD-FIX-020: both ends are checked now. The
+    // finiteness test alone let "2-00-02" reach a Postgres `date` column
+    // — 2 and 0 are perfectly finite; what makes them invalid is being
+    // outside a real calendar. But an output check alone cannot see that
+    // toGregorian(1405, 0, 15) is wrong either, because 2026-03-04 is a
+    // perfectly valid date. Only the input guard above catches that one.
     const [gy, gm, gd] = toGregorian(jy, jm, jd)
+    // خروجی با isValidISODate از main سنجیده می‌شود — از بازه‌ی خام
+    // دقیق‌تر است چون ۳۱ فروردین را از ۳۱ اسفند و ۳۰ فوریه را هم
+    // تشخیص می‌دهد، همان‌طور که پستگرس می‌دهد.
     const iso = `${gy}-${String(gm).padStart(2, '0')}-${String(gd).padStart(2, '0')}`
-    if (!isValidISODate(iso)) throw new Error(`conversion produced an impossible date: ${iso}`)
-    return iso
+    return isValidISODate(iso) ? iso : null
   } catch {
-    return new Date().toISOString().slice(0, 10)
+    return null
   }
 }
 

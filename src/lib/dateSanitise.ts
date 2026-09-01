@@ -77,20 +77,13 @@ export function sanitiseDates<T extends Record<string, unknown>>(payload: T): Sa
 }
 
 /**
- * Whether an error is worth retrying at all.
+ * MOD-FIX-021: `isRetryableError` و `explainSyncError` از این‌جا برداشته
+ * شدند. همان کار را `classifySyncFailure` در `syncErrors.ts` می‌کند —
+ * دقیق‌تر، چون خطای **دسترسی** (RLS) را از خطای **داده** جدا می‌کند.
+ * نسخه‌ی قبلی هر دو را «غیرقابل‌تلاش‌مجدد» می‌دید و بعد پیشنهاد می‌داد
+ * «تاریخ نامعتبرش پاک شود» — که برای رد شدن به‌خاطر سیاست دسترسی، هیچ
+ * ربطی ندارد.
  *
- * A network failure clears on its own; a rejected value never will.
- * Telling someone to retry a value error is how a record gets stuck for
- * a week while the person dutifully presses the button.
+ * دو طبقه‌بند موازی، همان «دو مسیر برای یک مقصد» است که استاندارد پروژه
+ * ممنوع کرده. `sanitiseDates` و `isValidISODate` سر جایشان ماندند.
  */
-export function isRetryableError(message: string): boolean {
-  return !/out of range|invalid input syntax|violates|malformed|invalid text representation/i.test(message)
-}
-
-/** پیام فارسی مناسب هر کلاس خطا. */
-export function explainSyncError(message: string): string {
-  if (!isRetryableError(message)) {
-    return 'مقدار این رکورد برای سرور معتبر نیست — «تلاش مجدد» تنهایی حلش نمی‌کند. با «اصلاح و ارسال» تاریخ نامعتبرش پاک و دوباره فرستاده می‌شود.'
-  }
-  return 'به سرور نرسید. معمولاً با اتصال بهتر و «تلاش مجدد» حل می‌شود.'
-}

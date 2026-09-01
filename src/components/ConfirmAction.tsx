@@ -276,9 +276,16 @@ export function ConfirmAction({ config, onClose }: { config: ConfirmActionConfig
                 className={`relative w-full py-4 rounded-2xl font-bold text-sm text-white overflow-hidden transition-all-smooth bg-gradient-to-br ${meta.color} shadow-lg select-none touch-none ${holdProgress > 0 ? 'scale-[0.98]' : 'press-scale'}`}
               >
                 {/* Fill overlay */}
+                {/* MOD-FIX-023: CSS inset() uses PHYSICAL edges, so
+                    `inset(0 X% 0 0)` always clipped from the right and the
+                    fill grew left→right — backwards in an RTL screen, and
+                    the opposite of the wizard's own step bar two dialogs
+                    earlier. Inset from the left instead so progress starts
+                    at the right edge, where reading starts. */}
                 <div
+                  data-testid="hold-progress"
                   className={`absolute inset-0 bg-white/25 transition-none`}
-                  style={{ clipPath: `inset(0 ${100 - holdProgress}% 0 0)` }}
+                  style={{ clipPath: `inset(0 0 0 ${100 - holdProgress}%)` }}
                 />
                 <div className="relative flex items-center justify-center gap-2">
                   {holdProgress > 0 ? (

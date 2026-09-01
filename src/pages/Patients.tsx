@@ -1,9 +1,10 @@
 import { useState, useEffect, useCallback, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Plus, Search, Edit2, Phone, Filter, Users, Award, AlertCircle, Smile, FileText, User, Trash2, Heart, Shield, MapPin } from 'lucide-react'
-import { fetchPatients, createPatient, updatePatient, fetchDoctors, fetchPayments, fetchTreatments, fetchImplantCases, peekNextFileNumber } from '../lib/api'
+import { Plus, Search, Edit2, Phone, Filter, Users, Award, AlertCircle, Smile, FileText, User, Trash2, Heart, Shield, MapPin, Wallet, Stethoscope} from 'lucide-react'
+import { fetchPatients, createPatient, updatePatient, fetchDoctors, fetchPayments, fetchTreatments, fetchImplantCases, peekNextFileNumber, fetchCheques} from '../lib/api'
 import { toJalaliStringPretty, formatCurrency, toPersianDigits } from '../lib/persianDate'
-import { Patient, Doctor, Payment, Treatment, ImplantCase } from '../types'
+import { validatePatientIdentity, findNationalIdDuplicate, duplicateNationalIdMessage } from '../lib/patientIdentity'
+import { Patient, Doctor, Payment, Treatment, ImplantCase, Cheque} from '../types'
 import { Modal, Card, Button, Input, Select, Textarea, Spinner, EmptyState, showToast, HighlightText, SkeletonList } from '../components/ui'
 import { PatientPhotoUpload } from '../components/PatientPhotoUpload'
 import { PersianDateInput } from '../components/PersianDateInput'
@@ -12,7 +13,7 @@ import { useConfirmAction, ConfirmActionConfig } from '../components/ConfirmActi
 import { h } from '../lib/haptics'
 import { usePullToRefresh } from '../lib/usePullToRefresh'
 import { scoreFields } from '../lib/fuzzySearch'
-import { calcPatientBalance } from '../lib/finance'
+import { calcPatientBalance, pendingChequesByPatient } from '../lib/finance'
 import { calculateAge } from '../lib/patientUtils'
 
 const vipLevels: { value: number; label: string; color: string; icon: string }[] = [
@@ -81,6 +82,7 @@ export default function Patients() {
   const [showFilters, setShowFilters] = useState(false)
 
   const [modalOpen, setModalOpen] = useState(false)
+  const [cheques, setCheques] = useState<Cheque[]>([])
   const [editingPatient, setEditingPatient] = useState<Patient | null>(null)
   const [saving, setSaving] = useState(false)
   const [formData, setFormData] = useState(emptyForm)
@@ -90,8 +92,8 @@ export default function Patients() {
   const loadData = useCallback(async () => {
     setLoading(true)
     try {
-      const [pats, docs, pays, trts, implCases] = await Promise.all([fetchPatients(), fetchDoctors(), fetchPayments(), fetchTreatments(), fetchImplantCases()])
-      setPatients(pats); setDoctors(docs); setPayments(pays); setTreatments(trts); setImplantCases(implCases)
+      const [pats, docs, pays, trts, implCases, chqs] = await Promise.all([fetchPatients(), fetchDoctors(), fetchPayments(), fetchTreatments(), fetchImplantCases(), fetchCheques()])
+      setPatients(pats); setDoctors(docs); setPayments(pays); setTreatments(trts); setImplantCases(implCases); setCheques(chqs)
     } catch { showToast('error', 'خطا در بارگذاری بیماران') }
     finally { setLoading(false) }
   }, [])
@@ -108,6 +110,16 @@ export default function Patients() {
     }
     return map
   }, [patients, payments, treatments, implantCases])
+
+  // MOD-UI-012: چک‌های در جریانِ هر بیمار. تعریفش در finance.ts است تا با
+  // همان عددی که صفحه‌ی مالی نشان می‌دهد یکی بماند.
+  const chequesByPatient = useMemo(() => pendingChequesByPatient(cheques), [cheques])
+
+  const doctorNameById = useMemo(() => {
+    const map = new Map<string, string>()
+    for (const d of doctors) if (d.name) map.set(d.id, d.name)
+    return map
+  }, [doctors])
 
   // All distinct patient tags currently in use — powers the grouping/
   // segmentation filter row (مینادنت's "گروه‌بندی و تفکیک بیماران").
@@ -192,15 +204,15 @@ export default function Patients() {
 
   // ── Preview + Confirm for create/edit ──
   const handleSave = () => {
-    if (!formData.first_name.trim() || !formData.last_name.trim()) { h.error(); showToast('error', 'نام و نام خانوادگی الزامی است'); return }
-    // Phone is used everywhere downstream — SMS reminders, appointment
-    // confirmations, the whole notification system assumes every
-    // patient has one. Letting it be skipped meant some patients could
-    // silently never receive any reminder/alarm the rest of the app
-    // promises, with no visible sign anything was missing.
-    if (!formData.phone.trim()) { h.error(); showToast('error', 'شماره تلفن الزامی است — پایه‌ی یادآوری‌ها و پیامک‌هاست'); return }
-    if (!formData.national_id.trim()) { h.error(); showToast('error', 'کد ملی الزامی است'); return }
-    if (!formData.phone2.trim()) { h.error(); showToast('error', 'شماره منزل الزامی است'); return }
+    // MOD-FIX-017: the rule lives in lib/patientIdentity.ts so the edit
+    // form in PatientDetail enforces exactly the same one. It used to
+    // enforce only the name, which let both the mobile and the national ID
+    // be cleared from an existing record.
+    const identityError = validatePatientIdentity({
+      first_name: formData.first_name, last_name: formData.last_name,
+      phone: formData.phone, national_id: formData.national_id, phone2: formData.phone2,
+    })
+    if (identityError) { h.error(); showToast('error', identityError); return }
 
     const vipMeta = getVipMeta(Number(formData.vip_level) || 0)
     const genderLabel = formData.gender ? (formData.gender === 'male' ? 'آقا' : 'خانم') : '—'
@@ -217,13 +229,11 @@ export default function Patients() {
     const dupPhone = formData.phone
       ? patients.find((p) => p.phone === formData.phone.trim() && p.id !== editingPatient?.id)
       : null
-    const dupNationalId = formData.national_id
-      ? patients.find((p) => p.national_id === formData.national_id.trim() && p.id !== editingPatient?.id)
-      : null
+    const dupNationalId = findNationalIdDuplicate(formData.national_id, patients, editingPatient?.id)
 
     if (dupNationalId) {
       h.error()
-      showToast('error', `این کد ملی قبلاً برای «${dupNationalId.first_name} ${dupNationalId.last_name}» ثبت شده — کد ملی نمی‌تواند تکراری باشد`)
+      showToast('error', duplicateNationalIdMessage(dupNationalId))
       return
     }
 
@@ -443,6 +453,8 @@ export default function Patients() {
             const vipMeta = getVipMeta(patient.vip_level)
             const age = calculateAge(patient.birth_date)
             const fin = patientFinances.get(patient.id) || { balance: 0, paid: 0, totalCost: 0 }
+            const chq = chequesByPatient.get(patient.id)
+            const primaryDoctor = patient.primary_doctor_id ? doctorNameById.get(patient.primary_doctor_id) : undefined
             const hasAllergies = patient.allergies && patient.allergies.trim().length > 0
             const hasConditions = patient.medical_conditions && patient.medical_conditions.trim().length > 0
 
@@ -499,17 +511,56 @@ export default function Patients() {
                     >
                       <Trash2 size={14} />
                     </button>
+                    {/* MOD-UI-012: مبلغ روی خودِ چیپ. «بدهکار» به تنهایی
+                        می‌گفت مشکلی هست ولی نه چقدر، و منشی برای یک عدد
+                        مجبور بود پرونده را باز کند. */}
                     {fin.totalCost > 0 ? (
                       fin.balance <= 0 ? (
                         <span className="status-pill bg-success-100 text-success-700">تسویه</span>
                       ) : (
-                        <span className="status-pill bg-error-100 text-error-700">بدهکار</span>
+                        // چیپ تک‌خطی «بدهکار ۵,۰۰۰,۰۰۰ ت» تقریباً نصف عرض
+                        // گوشی را می‌گرفت و تلفن را به خط بعد می‌انداخت.
+                        // دوخطی همان اطلاعات را در نصف عرض می‌دهد و عدد را
+                        // هم برجسته‌تر می‌کند.
+                        <span className="shrink-0 text-left px-2 py-1 rounded-lg bg-error-50 leading-none">
+                          <span className="block text-[9px] text-error-500">بدهکار</span>
+                          <b dir="ltr" className="block font-mono text-[11px] text-error-700 mt-0.5">{formatCurrency(fin.balance)}</b>
+                        </span>
                       )
                     ) : (
                       <span className="status-pill bg-slate-100 text-slate-500">بدون تراکنش</span>
                     )}
                   </div>
                 </div>
+
+                {/* MOD-UI-012: ردیف دوم، عمداً کم‌رنگ‌تر و ریزتر از سطر
+                    اصلی. چیزی که منشی «می‌خواند» بالاست؛ اینها چیزی است که
+                    وقتی لازم شد «نگاه می‌کند». هر کدام فقط وقتی هست که
+                    مقداری دارد — ردیفِ همیشه‌حاضرِ خط‌تیره‌دار فقط ارتفاع
+                    می‌گیرد. */}
+                {(fin.paid > 0 || chq || primaryDoctor) && (
+                  <div className="flex items-center gap-3 mt-1.5 text-[10px] text-slate-400 flex-wrap">
+                    {/* هر قلم whitespace-nowrap است تا اگر ردیف شکست، وسط
+                        یک عدد نشکند — «۳,۰۰۰,» روی یک خط و «۰۰۰ ت» روی خط
+                        بعد بدتر از نبودنش است. */}
+                    {fin.paid > 0 && (
+                      <span className="flex items-center gap-1 whitespace-nowrap" title="مجموع پرداختی">
+                        <Wallet size={10} /> <b dir="ltr" className="font-mono text-slate-500">{formatCurrency(fin.paid)}</b>
+                      </span>
+                    )}
+                    {chq && (
+                      <span className="flex items-center gap-1 whitespace-nowrap text-warning-600" title="چک در جریان">
+                        <FileText size={10} /> {toPersianDigits(chq.count)} چک
+                        <b dir="ltr" className="font-mono">{formatCurrency(chq.amount)}</b>
+                      </span>
+                    )}
+                    {primaryDoctor && (
+                      <span className="flex items-center gap-1 whitespace-nowrap truncate" title="پزشک اصلی">
+                        <Stethoscope size={10} /> {primaryDoctor}
+                      </span>
+                    )}
+                  </div>
+                )}
 
                 {/* Medical alerts row */}
                 {(hasAllergies || hasConditions || !patient.is_active) && (
@@ -552,8 +603,8 @@ export default function Patients() {
               <h4 className="text-xs font-bold text-slate-500 mb-3 uppercase tracking-wider">اطلاعات شخصی</h4>
               <PatientPhotoUpload value={formData.avatar_url} onChange={(url) => setFormData((p) => ({ ...p, avatar_url: url }))} />
               <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mt-3">
-                <Input label="نام" value={formData.first_name} onChange={(v) => setFormData((p) => ({ ...p, first_name: v }))} placeholder="نام" />
-                <Input label="نام خانوادگی" value={formData.last_name} onChange={(v) => setFormData((p) => ({ ...p, last_name: v }))} placeholder="نام خانوادگی" />
+                <Input label="نام *" value={formData.first_name} onChange={(v) => setFormData((p) => ({ ...p, first_name: v }))} placeholder="نام" />
+                <Input label="نام خانوادگی *" value={formData.last_name} onChange={(v) => setFormData((p) => ({ ...p, last_name: v }))} placeholder="نام خانوادگی" />
                 <Input label="کد ملی *" value={formData.national_id} onChange={(v) => setFormData((p) => ({ ...p, national_id: v }))} placeholder="کد ملی" dir="ltr" />
                 <Input label="تلفن *" value={formData.phone} onChange={(v) => setFormData((p) => ({ ...p, phone: v }))} placeholder="09xxxxxxxxx" dir="ltr" />
                 <Input label="شماره منزل *" value={formData.phone2} onChange={(v) => setFormData((p) => ({ ...p, phone2: v }))} placeholder="تلفن ثابت منزل" dir="ltr" />

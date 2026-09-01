@@ -69,7 +69,14 @@ export function installmentDueDates(startISO: string, count: number): string[] {
     const year = jy + Math.floor(absolute / 12)
     const month = (absolute % 12) + 1
     const day = Math.min(jd, jalaliMonthLength(year, month))
-    return jalaliToGregorian(year, month, day)
+    const iso = jalaliToGregorian(year, month, day)
+    // MOD-FIX-020: jalaliToGregorian now returns null on an impossible
+    // date. It cannot happen here — month is 1..12 by construction and
+    // day is clamped to that month's real length — but a silently
+    // dropped instalment is a financial error nobody would notice, so
+    // this refuses loudly rather than returning a shorter schedule.
+    if (!iso) throw new Error(`سررسید نامعتبر ساخته شد: ${year}/${month}/${day}`)
+    return iso
   })
 }
 

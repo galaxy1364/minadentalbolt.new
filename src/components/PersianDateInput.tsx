@@ -40,7 +40,25 @@ export function PersianDateInput({ label, value, onChange, placeholder = 'انت
             </div>
             <PersianCalendar
               selectedDate={value || new Date().toISOString().slice(0, 10)}
-              onDateSelect={(d) => { onChange(d); setOpen(false) }}
+              // MOD-FIX-020: the second gate, on purpose. This component is
+              // the date entry for lab orders, treatment phases and eight
+              // other pages, and whatever leaves here goes straight into a
+              // Postgres `date` column — where a bad value does not fail
+              // loudly, it parks the record in the sync queue forever.
+              // The calendar is fixed and already refuses to emit a
+              // non-date, so this should never fire; it exists so that the
+              // next bug upstream stops here instead of reaching the
+              // database. Silence is the failure mode to avoid: a rejected
+              // value leaves the field untouched rather than writing a
+              // plausible-looking wrong date.
+              onDateSelect={(d) => {
+                if (!/^\d{4}-\d{2}-\d{2}$/.test(d)) {
+                  console.error('[minadent] تاریخ نامعتبر از تقویم:', d)
+                  return
+                }
+                onChange(d)
+                setOpen(false)
+              }}
             />
           </div>
         </div>

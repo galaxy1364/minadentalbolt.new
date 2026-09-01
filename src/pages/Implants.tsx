@@ -9,7 +9,7 @@ import { fetchImplantCases, createImplantCase, updateImplantCase, createImplantC
 import { calcSurgeryShare, canMoveStage, validateImplantCase, caseFinancials } from '../lib/implants'
 import { BarcodeScanner } from '../components/BarcodeScanner'
 import { CLINIC_ID } from '../lib/supabase'
-import { toJalaliString, toJalaliStringPretty, formatCurrency, formatNumber, toPersianDigits } from '../lib/persianDate'
+import { toJalaliString, toJalaliStringPretty, formatCurrency, formatNumber, toPersianDigits, toJalaliShort} from '../lib/persianDate'
 import { h } from '../lib/haptics'
 import { useConfirmAction } from '../components/ConfirmAction'
 import { ImplantCase, ImplantCaseWithRelations, ImplantComponent, Patient, Doctor } from '../types'
@@ -790,7 +790,7 @@ export default function Implants() {
                   {c.surgery_date && (
                     <span className="flex items-center gap-1 text-slate-500">
                       <Calendar size={12} />
-                      جراحی: {toJalaliString(c.surgery_date)}
+                      جراحی: {toJalaliShort(c.surgery_date)}
                       {c.surgery_date >= new Date().toISOString().slice(0, 10) && (
                         <button
                           onClick={() => downloadICSReminder({

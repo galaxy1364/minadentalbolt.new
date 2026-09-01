@@ -5,7 +5,7 @@ import { PieChart, Pie, Cell, Tooltip as RTooltip, ResponsiveContainer } from 'r
 import { staffSaveMessage, LoginOutcome } from '../lib/staffSaveOutcome'
 import { fetchStaff, createStaff, updateStaff, fetchEncounters, fetchLabOrders, fetchTreatments, createExpense, fetchDoctors, fetchStaffLoginStatuses, setStaffLoginActive } from '../lib/api'
 import { CLINIC_ID, supabase } from '../lib/supabase'
-import { toJalaliString, toJalaliStringPretty, formatCurrency, formatNumber, toPersianDigits } from '../lib/persianDate'
+import { toJalaliString, toJalaliStringPretty, formatCurrency, formatNumber, toPersianDigits, toJalaliShort} from '../lib/persianDate'
 import type { Staff as StaffType, StaffInput, EncounterWithRelations, LabOrderWithRelations, Treatment } from '../types'
 import { Modal, Wizard, Card, Button, Input, Select, Badge, Spinner, EmptyState, showToast } from '../components/ui'
 import { PersianDateInput } from '../components/PersianDateInput'
@@ -738,7 +738,7 @@ export default function Staff() {
                       {s.hire_date && (
                         <div className="flex items-center gap-2 text-slate-600">
                           <Calendar size={14} className="text-slate-400" />
-                          <span>تاریخ استخدام: {toJalaliString(s.hire_date)}</span>
+                          <span>تاریخ استخدام: {toJalaliShort(s.hire_date)}</span>
                         </div>
                       )}
                       {s.salary != null && (

@@ -830,9 +830,15 @@ export type ExpenseInput = Omit<
   clinic_id?: string
 }
 
+// MOD-FIX-016: 'clinic_id' has to be omitted before being re-added as
+// optional — intersecting a required property with an optional one leaves
+// it required. So this type demanded a clinic_id that createToothRecord
+// discards anyway (it always writes CLINIC_ID), which is why every call
+// site reached for `as any` and quietly dropped other columns with it.
+// DoctorInput and UnitInput already spell it this way.
 export type ToothRecordInput = Omit<
   ToothRecord,
-  'id' | 'created_at' | 'updated_at'
+  'id' | 'created_at' | 'updated_at' | 'clinic_id'
 > & {
   clinic_id?: string
 }

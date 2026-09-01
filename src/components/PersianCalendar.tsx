@@ -44,14 +44,19 @@ export function PersianCalendar({ selectedDate, onDateSelect, appointments = [],
     else setViewMonth((m) => m + 1)
   }
 
-  const getGregorianForDay = (day: number): string => {
-    const [gy, gm, gd] = (() => {
-      // Convert Jalali to Gregorian using jalaliToGregorian from persianDate
-      const result = jalaliToGregorianFunc(viewYear, viewMonth, day)
-      return result
-    })()
-    return `${gy}-${String(gm).padStart(2, '0')}-${String(gd).padStart(2, '0')}`
-  }
+  /**
+   * MOD-FIX-020: this used to unpack jalaliToGregorian's **string** as if
+   * it were a [gy, gm, gd] tuple, so it took the first three characters —
+   * '2', '0', '2' — and rebuilt them into `"2-00-02"` for every single day
+   * of the grid. Two records reached Postgres with it and stuck in the
+   * sync queue: «date/time field value out of range: "2-00-02"».
+   *
+   * The function already returns exactly the string this needs, so there
+   * is nothing to build. `null` means the conversion refused, and the
+   * caller must not treat that as a date.
+   */
+  const getGregorianForDay = (day: number): string | null =>
+    jalaliToGregorianFunc(viewYear, viewMonth, day)
 
   return (
     <div className="bg-white rounded-2xl card-shadow p-4">
@@ -85,25 +90,24 @@ export function PersianCalendar({ selectedDate, onDateSelect, appointments = [],
         {grid.flat().map((day, i) => {
           if (day === null) return <div key={i} className="aspect-square" />
           const gregDate = getGregorianForDay(day)
-          // Defensive guard: if the Jalali->Gregorian conversion ever
-          // produces something malformed (e.g. NaN-NaN-NaN from a bad
-          // input), gregDate could coincidentally equal an equally
-          // malformed selectedDate for EVERY day in the grid, making
-          // every cell render as 'selected' at once. A real date is
-          // always exactly YYYY-MM-DD with numeric parts.
-          const isValidDate = /^\d{4}-\d{2}-\d{2}$/.test(gregDate)
+          // The old guard here only decided which cell *looked* selected;
+          // onDateSelect below handed the malformed string out regardless.
+          // A day the calendar cannot convert is now not clickable at all,
+          // so nothing downstream ever receives a non-date.
+          const isValidDate = gregDate !== null && /^\d{4}-\d{2}-\d{2}$/.test(gregDate)
           const jalaliStr = `${viewYear}/${String(viewMonth).padStart(2, '0')}/${String(day).padStart(2, '0')}`
           const holiday = getHoliday(jalaliStr)
           const isToday = todayJalali.jy === viewYear && todayJalali.jm === viewMonth && todayJalali.jd === day
           const isSelected = isValidDate && gregDate === selectedDate
-          const hasAppt = apptDates.has(gregDate)
-          const isHighlighted = highlightSet.has(gregDate)
+          const hasAppt = gregDate !== null && apptDates.has(gregDate)
+          const isHighlighted = gregDate !== null && highlightSet.has(gregDate)
           const isFriday = i % 7 === 6
 
           return (
             <button
               key={i}
-              onClick={() => { h.select(); onDateSelect(gregDate) }}
+              disabled={!isValidDate}
+              onClick={() => { if (!isValidDate || gregDate === null) return; h.select(); onDateSelect(gregDate) }}
               className={`
                 aspect-square rounded-xl flex flex-col items-center justify-center relative transition-all-smooth press-scale
                 ${isSelected ? 'bg-primary-600 text-white shadow-lg ring-2 ring-primary-300 ring-offset-2 scale-105 z-10' : ''}
