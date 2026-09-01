@@ -4,6 +4,7 @@ import { PatientSelect } from '../components/PatientSelect'
 import { toothLabel } from '../lib/toothLabel'
 import { buildPrintDocument } from '../lib/printDocument'
 import { resolveAttribution, attributableTreatments, treatmentRemaining } from '../lib/paymentAttribution'
+import { validateCheque, chequeModeHint } from '../lib/chequeValidation'
 import { useNavigate, useLocation } from 'react-router-dom'
 import { CreditCard, Plus, Search, DollarSign, TrendingUp, Wallet, Calendar, CalendarClock, CheckCircle2, AlertCircle, Edit2, Filter, Receipt, Banknote, Clock, Trash2, Printer } from 'lucide-react'
 import { ChevronDown } from 'lucide-react'
@@ -136,6 +137,10 @@ export default function Billing() {
     sayad_id: '',
     notes: '',
     status: 'pending',
+    // MOD-FEAT-029: تا امروز فرم همیشه purpose: 'payment' می‌نوشت، پس
+    // چک ضمانت اصلاً قابل ساخت نبود.
+    isGuarantee: false,
+    payment_plan_id: '',
   })
 
   // Payment plan modal
@@ -423,10 +428,12 @@ export default function Billing() {
             cheque_number: chequeForm.cheque_number || null, account_number: chequeForm.account_number || null,
             issue_date: chequeForm.issue_date, due_date: chequeForm.due_date,
             payee_name: chequeForm.payee_name || null, sayad_id: toEnglishDigits(chequeForm.sayad_id || '').trim() || null, notes: chequeForm.notes || null,
-            // A cheque created here (the general چک module) is always a
-            // normal payment cheque, never a plan's guarantee cheque —
-            // those are only ever created atomically inside createPaymentPlan.
-            purpose: 'payment', payment_plan_id: null,
+            // MOD-FEAT-029: the کind is now the user's choice. Guarantee
+            // cheques used to be creatable only inside createPaymentPlan,
+            // so a guarantee taken on its own had to be recorded as a
+            // payment cheque — the one kind that is expected to clear.
+            purpose: chequeForm.isGuarantee ? 'guarantee' : 'payment',
+            payment_plan_id: chequeForm.isGuarantee ? (chequeForm.payment_plan_id || null) : null,
             status: chequeForm.status, created_by: null,
           } as any)
           showToast('success', 'چک ثبت شد'); setChequeModalOpen(false); await loadData()
@@ -1626,12 +1633,48 @@ export default function Billing() {
       steps={[
         {
           label: 'بیمار و مبلغ',
-          validate: () => (!chequeForm.patient_id ? 'انتخاب بیمار الزامی است' : (!chequeForm.amount || Number(chequeForm.amount) <= 0) ? 'مبلغ را وارد کنید' : null),
+          validate: () => {
+            const { error } = validateCheque({
+              patient_id: chequeForm.patient_id, amount: chequeForm.amount,
+              isGuarantee: chequeForm.isGuarantee, payment_plan_id: chequeForm.payment_plan_id || null,
+            }, 'basics')
+            return error
+          },
           content: (
             <>
               <PatientSelect value={chequeForm.patient_id} onChange={(v) => setChequeForm((p) => ({ ...p, patient_id: v }))} patients={patients} balances={patientBalancesMap} />
               <CurrencyInput label="مبلغ (تومان)" value={chequeForm.amount} onChange={(v) => setChequeForm((p) => ({ ...p, amount: v }))} />
               <Input label="در وجه" value={chequeForm.payee_name} onChange={(v) => setChequeForm((p) => ({ ...p, payee_name: v }))} />
+
+              {/* MOD-FEAT-029: the two kinds carry different obligations —
+                  one gets banked, the other gets held — so the choice is
+                  made before any of the fields that depend on it. */}
+              <div className={`p-3 rounded-xl border ${chequeForm.isGuarantee ? 'border-slate-300 bg-slate-50 dark:bg-slate-800' : 'border-primary-200 bg-primary-50 dark:bg-primary-900/20'}`}>
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={chequeForm.isGuarantee}
+                    onChange={(e) => { h.tap(); setChequeForm((p) => ({ ...p, isGuarantee: e.target.checked, payment_plan_id: '' })) }}
+                    className="w-4 h-4 accent-slate-600"
+                  />
+                  <span className="text-sm font-bold text-slate-700 dark:text-slate-200">این چک ضمانت است</span>
+                </label>
+                <p className="mt-1.5 text-[11px] text-slate-600 dark:text-slate-400">
+                  {chequeModeHint(chequeForm.isGuarantee)}
+                </p>
+              </div>
+
+              {chequeForm.isGuarantee && (
+                <Select
+                  label="طرح قسطی که این ضمانت پشتش است *"
+                  value={chequeForm.payment_plan_id}
+                  onChange={(v) => setChequeForm((p) => ({ ...p, payment_plan_id: v }))}
+                  options={paymentPlans
+                    .filter((pl) => pl.patient_id === chequeForm.patient_id)
+                    .map((pl) => ({ value: pl.id, label: `طرح ${formatCurrency(pl.total_amount)} ت — ${toPersianDigits(pl.installment_count ?? 0)} قسط` }))}
+                  placeholder={chequeForm.patient_id ? 'انتخاب طرح قسطی…' : 'اول بیمار را انتخاب کنید'}
+                />
+              )}
             </>
           ),
         },
@@ -1642,7 +1685,15 @@ export default function Billing() {
             if (digits && (digits.length !== 16 || !/^[0-9]+$/.test(digits))) {
               return 'شناسه صیاد باید ۱۶ رقم باشد'
             }
-            return null
+            // A payment cheque is going to be banked, so what the clinic
+            // needs in order to bank it is not optional. A guarantee is
+            // held, so it is.
+            return validateCheque({
+              patient_id: chequeForm.patient_id, amount: chequeForm.amount,
+              isGuarantee: chequeForm.isGuarantee, payment_plan_id: chequeForm.payment_plan_id || null,
+              cheque_number: chequeForm.cheque_number, bank_name: chequeForm.bank_name,
+              due_date: chequeForm.due_date,
+            }).error
           },
           content: (
             <>
