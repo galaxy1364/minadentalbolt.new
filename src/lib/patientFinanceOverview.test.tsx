@@ -52,7 +52,7 @@ describe('🔴 تاریخچه‌ی پرداخت با دندان و پزشک', ()
     // پس هر سه یک چیز می‌گویند.
     show(<PatientFinanceOverview {...base} payments={[payment()]} />)
     expect(screen.getByText(/بیلدآپ/)).toBeDefined()
-    expect(screen.getByText(/دندان UR۱/)).toBeDefined()
+    expect(screen.getByText(/دندان ۱┐/)).toBeDefined()
     expect(screen.getByText(/مینا مازندارنی/)).toBeDefined()
   })
 

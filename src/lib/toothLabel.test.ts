@@ -5,16 +5,20 @@
  * دندون یازده.» چارت پالمر بود، بقیه‌ی برنامه FDI.
  */
 import { describe, it, expect } from 'vitest'
-import { toothLabel, toothLabelWithWord, toothQuadrant, palmerSymbol } from './toothLabel'
+import { toothLabel, toothCode, toothLabelWithWord, toothQuadrant, palmerSymbol } from './toothLabel'
 
 describe('🔴 همان دندانی که در چارت زده شد، همه‌جا همان نام را دارد', () => {
-  it('FDI ۱۱ همان UR۱ است، نه «۱۱»', () => {
-    expect(toothLabel(11)).toBe('UR۱')
+  it('🔴 FDI ۱۱ با براکت پالمر نمایش داده می‌شود، نه «۱۱»', () => {
+    // MOD-FEAT-032: خط افقی بالا = فک بالا، خط عمودی راست = سمت خط وسط.
+    expect(toothLabel(11)).toBe('۱┐')
     expect(toothLabel(11)).not.toContain('11')
+    // کد قابل حمل برای اسناد چاپی و خروجی، همچنان ربع‌دار است.
+    expect(toothCode(11)).toBe('UR۱')
   })
 
-  it('FDI ۳۸ همان LL۸ است، نه «۳۸»', () => {
-    expect(toothLabel(38)).toBe('LL۸')
+  it('🔴 FDI ۳۸ همان «└۸» است — سبکی که مهدی خواست', () => {
+    expect(toothLabel(38)).toBe('└۸')
+    expect(toothCode(38)).toBe('LL۸')
   })
 
   it('رشته و عدد یک نتیجه می‌دهند', () => {
@@ -53,8 +57,9 @@ describe('نماد پالمر', () => {
   })
 
   it('دندان شیری با حرف نمایش داده می‌شود، نه عدد', () => {
-    expect(toothLabel(51)).toBe('URA')
-    expect(toothLabel(75)).toBe('LLE')
+    expect(toothLabel(51)).toBe('A┐')
+    expect(toothLabel(75)).toBe('└E')
+    expect(toothCode(51)).toBe('URA')
   })
 })
 
@@ -75,13 +80,18 @@ describe('🔴 هر دندان در کل دهان نام یکتا دارد', () 
     expect(new Set(all).size).toBe(20)
   })
 
+  it('🔴 چهار براکت، چهار ربع — هیچ دوتایی یکسان نیست', () => {
+    expect([toothLabel(11), toothLabel(21), toothLabel(31), toothLabel(41)])
+      .toEqual(['۱┐', '┌۱', '└۱', '۱┘'])
+  })
+
   it('چهار «۱» چارت از هم قابل تشخیص‌اند', () => {
     // شکایت قدیمی «چرا دو تا ۱؟» — پیشوند ربع همان را حل می‌کند.
     expect(new Set([toothLabel(11), toothLabel(21), toothLabel(31), toothLabel(41)]).size).toBe(4)
   })
 
   it('رقم‌ها فارسی‌اند، مثل بقیه‌ی اعداد برنامه', () => {
-    expect(toothLabel(17)).toBe('UR۷')
+    expect(toothLabel(17)).toBe('۷┐')
     expect(toothLabel(17)).not.toMatch(/[0-9]/)
   })
 })
@@ -102,7 +112,7 @@ describe('ورودی نامعتبر دستکاری نمی‌شود', () => {
 
   it('نسخه‌ی کلمه‌دار برای خالی، جایگزین می‌گذارد', () => {
     expect(toothLabelWithWord(null)).toBe('—')
-    expect(toothLabelWithWord(11)).toBe('دندان UR۱')
+    expect(toothLabelWithWord(11)).toBe('دندان ۱┐')
   })
 })
 
@@ -173,7 +183,7 @@ describe('🔴 راست و چپ همیشه مالِ بیمار است', () => {
   })
 
   it('برچسب کامل، کد و سمت را با هم می‌دهد', () => {
-    expect(toothFullLabel(11)).toBe('UR۱ — بالا راست بیمار')
+    expect(toothFullLabel(11)).toBe('۱┐ — بالا راست بیمار')
   })
 
   it('دندان شیری هم سمت دارد', () => {

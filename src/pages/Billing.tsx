@@ -1,7 +1,7 @@
 // Billing.tsx - Persian RTL Dental Clinic Billing & Payments Management
 import { useState, useEffect, useCallback, useMemo } from 'react'
 import { PatientSelect } from '../components/PatientSelect'
-import { toothLabel } from '../lib/toothLabel'
+import { toothLabel, toothCode } from '../lib/toothLabel'
 import { buildPrintDocument } from '../lib/printDocument'
 import { resolveAttribution, attributableTreatments, treatmentRemaining } from '../lib/paymentAttribution'
 import { validateCheque, chequeModeHint } from '../lib/chequeValidation'
@@ -807,7 +807,10 @@ export default function Billing() {
           ${(() => {
             const a = resolveAttribution(p, treatments as never, doctors as never)
             const rows: string[] = []
-            if (a.procedureName) rows.push(`<tr><td>بابت</td><td>${a.procedureName}${a.toothNumber ? ` — دندان ${toothLabel(a.toothNumber)}` : ''}</td></tr>`)
+            // MOD-FEAT-032: the receipt uses the portable code. A box-drawing
+            // bracket is a font gamble on a printer and on whatever reads a
+            // shared receipt; UR۱ survives both.
+            if (a.procedureName) rows.push(`<tr><td>بابت</td><td>${a.procedureName}${a.toothNumber ? ` — دندان ${toothCode(a.toothNumber)}` : ''}</td></tr>`)
             if (a.doctorName) rows.push(`<tr><td>پزشک</td><td>دکتر ${a.doctorName}</td></tr>`)
             return rows.join('')
           })()}

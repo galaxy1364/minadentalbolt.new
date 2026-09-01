@@ -64,7 +64,57 @@ function parseFdi(value: string | number | null | undefined): number | null {
  * silently replaced: a clinic that typed something unusual into that
  * field should see what they typed, not a guess.
  */
+/**
+ * MOD-FEAT-032 | براکت واقعی پالمر
+ *
+ * گزارش مهدی: «پالمر باشد، L1 به این سبک.»
+ *
+ * `UR۱` was unambiguous and easy to build, but it is not Palmer notation
+ * — it is a quadrant abbreviation with a number after it. Real Palmer
+ * writes an L-shaped bracket around the digit, and the shape itself
+ * carries the quadrant:
+ *
+ *   horizontal stroke on TOP    → upper jaw
+ *   horizontal stroke on BOTTOM → lower jaw
+ *   vertical stroke on the side facing the MIDLINE
+ *
+ * Which gives, with the chart drawn facing the patient:
+ *
+ *   ┐۱  بالا راست     ┌۱  بالا چپ
+ *   ┘۱  پایین راست    └۱  پایین چپ   ← «L1» مهدی
+ *
+ * The digit sits inside the bracket's corner, which is why the bracket
+ * leads for left quadrants and trails for right ones.
+ */
+const PALMER_BRACKET: Record<Quadrant, { char: string; before: boolean }> = {
+  // Midline is to the right of these, so the vertical stroke goes right.
+  UR: { char: '┐', before: false },
+  LR: { char: '┘', before: false },
+  // Midline is to the left, so the vertical stroke goes left.
+  UL: { char: '┌', before: true },
+  LL: { char: '└', before: true },
+}
+
 export function toothLabel(value: string | number | null | undefined): string {
+  const fdi = parseFdi(value)
+  if (fdi === null) return value === null || value === undefined ? '' : String(value)
+  const quadrant = toothQuadrant(fdi)
+  if (!quadrant) return String(value)
+
+  const digit = toPersianDigits(palmerSymbol(fdi))
+  const { char, before } = PALMER_BRACKET[quadrant]
+  return before ? `${char}${digit}` : `${digit}${char}`
+}
+
+/**
+ * کد ربع‌دار — `UR۱`.
+ *
+ * Kept for places where a bracket cannot be trusted to render: printed
+ * documents, exported files, and anywhere the text may be copied into
+ * another system. The bracket is the clinical notation; this is the
+ * portable one.
+ */
+export function toothCode(value: string | number | null | undefined): string {
   const fdi = parseFdi(value)
   if (fdi === null) return value === null || value === undefined ? '' : String(value)
   const quadrant = toothQuadrant(fdi)
@@ -103,9 +153,11 @@ export function toothSideLabel(value: string | number | null | undefined): strin
 
 /** ربع یک مقدار خام (رشته یا عدد)، یا null اگر دندان معتبری نباشد. */
 export function toothQuadrantOf(value: string | number | null | undefined): Quadrant | null {
-  const label = toothLabel(value)
-  const prefix = label.slice(0, 2)
-  return prefix === 'UR' || prefix === 'UL' || prefix === 'LL' || prefix === 'LR' ? prefix : null
+  // MOD-FEAT-032: reads the portable code, not the display label. The
+  // label is now a bracket plus a digit, and slicing two characters off
+  // it would return the bracket.
+  const fdi = parseFdi(value)
+  return fdi === null ? null : toothQuadrant(fdi)
 }
 
 /** «UR۱ — بالا راست بیمار» */

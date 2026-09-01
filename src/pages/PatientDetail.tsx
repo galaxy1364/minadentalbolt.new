@@ -1,7 +1,7 @@
 // PatientDetail.tsx - Persian RTL Dental Clinic Patient Detail Page
 import { InsurancePanel } from '../components/InsurancePanel'
 import { PatientDebtBar, PatientChequeRows } from '../components/PatientDebtBar'
-import { toothLabel } from '../lib/toothLabel'
+import { toothLabel, toothCode } from '../lib/toothLabel'
 import { buildPrintDocument } from '../lib/printDocument'
 import { PatientAlerts } from '../components/PatientAlerts'
 import { buildPatientAlerts, alertChips } from '../lib/patientAlerts'
@@ -413,8 +413,8 @@ export default function PatientDetail() {
     setEditingPhase(null)
     setPhaseWizardStep(0)
     setPhaseForm({
-      doctor_id: '', title: prefillToothNumber ? `درمان دندان ${toothLabel(prefillToothNumber)}` : '', description: '',
-      procedures: prefillToothNumber ? `دندان ${toothLabel(prefillToothNumber)}` : '',
+      doctor_id: '', title: prefillToothNumber ? `درمان دندان ${toothCode(prefillToothNumber)}` : '', description: '',
+      procedures: prefillToothNumber ? `دندان ${toothCode(prefillToothNumber)}` : '',
       estimated_cost: '', actual_cost: '', estimated_duration_days: '', status: 'planned', start_date: '', end_date: '',
     })
     setPhaseModalOpen(true)

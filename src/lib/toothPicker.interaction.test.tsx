@@ -25,38 +25,38 @@ describe('انتخابگر دندان — تعامل واقعی', () => {
 
   it('🔴 هر ۳۲ دندان دائمی قابل انتخاب‌اند', () => {
     render(<ToothArchSelect value="" onChange={() => {}} />)
-    expect(screen.getAllByRole('button', { name: /^دندان (UR|UL|LL|LR)/ })).toHaveLength(32)
+    expect(screen.getAllByRole('button', { name: /^دندان [۰-۹A-E┌┐└┘]/ })).toHaveLength(32)
   })
 
   it('🔴 کلیک روی یک دندان، شماره‌ی FDI آن را برمی‌گرداند', () => {
     const onChange = vi.fn()
     render(<ToothArchSelect value="" onChange={onChange} />)
-    screen.getByRole('button', { name: 'دندان LL۸' }).click()
+    screen.getByRole('button', { name: 'دندان └۸' }).click()
     expect(onChange).toHaveBeenCalledWith('38')
   })
 
   it('🔴 برچسب‌ها پالمرند، نه FDI — همان چیزی که مهدی دید', () => {
     render(<ToothArchSelect value="" onChange={() => {}} />)
-    expect(screen.getByRole('button', { name: 'دندان UR۱' })).toBeDefined()
-    expect(screen.queryByRole('button', { name: 'دندان ۱۱' })).toBeNull()
+    expect(screen.getByRole('button', { name: 'دندان ۱┐' })).toBeDefined()
+    expect(screen.queryByRole('button', { name: 'دندان 11' })).toBeNull()
   })
 
   it('دندان انتخاب‌شده با کلمه و سمت اعلام می‌شود', () => {
     // روی قوسِ اسکرول‌شونده، دندان انتخابی ممکن است بیرون از دید باشد.
     render(<ToothArchSelect value="38" onChange={() => {}} />)
-    expect(screen.getByText('انتخاب‌شده: LL۸ — پایین چپ بیمار')).toBeDefined()
+    expect(screen.getByText('انتخاب‌شده: └۸ — پایین چپ بیمار')).toBeDefined()
   })
 
   it('🔴 ترتیب روی صفحه از راستِ بیمار به چپِ بیمار است', () => {
     // MOD-FIX-013: با dir="ltr" ترتیب DOM همان ترتیب دیداری است، پس
     // این تست واقعاً چیدمان را می‌سنجد نه فقط داده را.
     render(<ToothArchSelect value="" onChange={() => {}} />)
-    const names = screen.getAllByRole('button', { name: /^دندان (UR|UL|LL|LR)/ })
+    const names = screen.getAllByRole('button', { name: /^دندان [۰-۹A-E┌┐└┘]/ })
       .map((b) => b.getAttribute('aria-label'))
-    expect(names[0]).toBe('دندان UR۸')
-    expect(names[15]).toBe('دندان UL۸')
-    expect(names[16]).toBe('دندان LR۸')
-    expect(names[31]).toBe('دندان LL۸')
+    expect(names[0]).toBe('دندان ۸┐')
+    expect(names[15]).toBe('دندان ┌۸')
+    expect(names[16]).toBe('دندان ۸┘')
+    expect(names[31]).toBe('دندان └۸')
   })
 
   it('🔴 هر دو نیمه با نام سمت بیمار برچسب خورده‌اند', () => {
@@ -80,7 +80,7 @@ describe('انتخابگر دندان — تعامل واقعی', () => {
     const { container } = render(<ToothArchSelect value="" onChange={() => {}} />)
     await user.click(screen.getByText('دندان شیری'))
     expect(container.querySelectorAll('.w-px').length).toBe(2)
-    expect(screen.getAllByRole('button', { name: /^دندان (UR|UL|LL|LR)/ })).toHaveLength(20)
+    expect(screen.getAllByRole('button', { name: /^دندان [۰-۹A-E┌┐└┘]/ })).toHaveLength(20)
   })
 
   it('عوض کردن دائمی/شیری، انتخاب قبلی را پاک می‌کند', async () => {
