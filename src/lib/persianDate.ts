@@ -34,7 +34,7 @@ export function jsDateToPersianWeekday(date: Date): number {
 // boundaries), caught because a user's real device showed a different
 // date than this app computed. Kept the same function names/signatures
 // so every caller in this file needs zero changes.
-function toJalali(gy: number, gm: number, gd: number): [number, number, number] {
+export function toJalali(gy: number, gm: number, gd: number): [number, number, number] {
   const { jy, jm, jd } = toJalaali(gy, gm, gd)
   return [jy, jm, jd]
 }
@@ -80,11 +80,29 @@ export function isJalaliLeapYear(jy: number): boolean {
   return isLeapJalaaliYear(jy)
 }
 
+/**
+ * MOD-FIX-014 | طول یک ماه شمسی
+ *
+ * فروردین تا شهریور ۳۱ روز، مهر تا بهمن ۳۰، و اسفند ۲۹ روز — مگر سال
+ * کبیسه که ۳۰ می‌شود.
+ *
+ * Extracted from getJalaliMonthGrid, where it was a local expression.
+ * The instalment scheduler needs exactly this number to clamp a due date
+ * to the end of its month, and re-deriving it there would have put two
+ * copies of the Persian calendar in one codebase — the failure mode this
+ * project has hit three times already.
+ */
+export function jalaliMonthLength(year: number, month: number): number {
+  if (month <= 6) return 31
+  if (month <= 11) return 30
+  return isJalaliLeapYear(year) ? 30 : 29
+}
+
 export function getJalaliMonthGrid(year: number, month: number): (number | null)[][] {
   const [gy, gm, gd] = toGregorian(year, month, 1)
   const firstDay = new Date(gy, gm - 1, gd)
   const startWeekday = jsDateToPersianWeekday(firstDay)
-  const daysInMonth = month <= 6 ? 31 : month <= 11 ? 30 : (isJalaliLeapYear(year) ? 30 : 29)
+  const daysInMonth = jalaliMonthLength(year, month)
   const grid: (number | null)[][] = []
   let currentDay = 1
   let week: (number | null)[] = []

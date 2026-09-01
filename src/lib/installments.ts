@@ -24,6 +24,8 @@
  * that does not match the number they were quoted starts an argument at
  * the desk, while a final one that is a few toman different does not.
  */
+
+import { toJalali, jalaliToGregorian, jalaliMonthLength } from './persianDate'
 export function splitAmount(total: number, count: number): number[] {
   if (!Number.isFinite(total) || !Number.isFinite(count)) return []
   const n = Math.floor(count)
@@ -37,35 +39,37 @@ export function splitAmount(total: number, count: number): number[] {
   return [...head, last]
 }
 
-/** Days in a Gregorian month, 1-indexed month. */
-function daysInMonth(year: number, month: number): number {
-  return new Date(Date.UTC(year, month, 0)).getUTCDate()
-}
-
 /**
- * Monthly due dates starting from `startISO`.
+ * MOD-FIX-014 | سررسیدهای ماهانه — با ماه شمسی
  *
- * Written by hand rather than with Date.setMonth, which overflows: a
- * plan starting on 31 January produced 3 March for its second
- * instalment, because February has no 31st and JavaScript rolls forward.
- * A due date that silently moves by a month is a real dispute with a
- * patient, so the day is clamped to the end of the target month instead.
+ * A clinic and its patients agree instalments in Jalali months. This
+ * function used to step Gregorian months instead, and because Jalali
+ * months are 31, 30 and 29 days long while Gregorian ones are 31, 30 and
+ * 28, the Jalali day of the month slid as the plan ran. A patient told
+ * «اول هر ماه» saw due dates land on the 1st, 1st, 2nd, 2nd, 3rd, 4th…
+ *
+ * Storage stays ISO Gregorian — the database column is a `date` and every
+ * other part of the app reads it that way. Only the arithmetic moved to
+ * the Persian calendar, which is where the agreement actually lives.
+ *
+ * The day is clamped to the end of the target Jalali month rather than
+ * allowed to roll forward. A plan starting 31 Farvardin has no 31st in
+ * Mehr; landing on 1 Aban would move a payment by a whole month, which is
+ * a real dispute with a patient, not a rounding detail.
  */
 export function installmentDueDates(startISO: string, count: number): string[] {
   const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(startISO)
   const n = Math.floor(count)
   if (!m || n < 1) return []
 
-  const year = Number(m[1])
-  const month = Number(m[2])
-  const day = Number(m[3])
+  const [jy, jm, jd] = toJalali(Number(m[1]), Number(m[2]), Number(m[3]))
 
   return Array.from({ length: n }, (_, i) => {
-    const absolute = month - 1 + i
-    const y = year + Math.floor(absolute / 12)
-    const mo = (absolute % 12) + 1
-    const d = Math.min(day, daysInMonth(y, mo))
-    return `${y}-${String(mo).padStart(2, '0')}-${String(d).padStart(2, '0')}`
+    const absolute = jm - 1 + i
+    const year = jy + Math.floor(absolute / 12)
+    const month = (absolute % 12) + 1
+    const day = Math.min(jd, jalaliMonthLength(year, month))
+    return jalaliToGregorian(year, month, day)
   })
 }
 
