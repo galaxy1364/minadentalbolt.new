@@ -6,6 +6,7 @@ import { buildPrintDocument } from '../lib/printDocument'
 import { resolveAttribution, attributableTreatments, treatmentRemaining } from '../lib/paymentAttribution'
 import { validateCheque, chequeModeHint } from '../lib/chequeValidation'
 import { findDuplicatePayments, duplicateWarning } from '../lib/duplicatePayment'
+import { PatientFinanceOverview } from '../components/PatientFinanceOverview'
 import { useNavigate, useLocation } from 'react-router-dom'
 import { CreditCard, Plus, Search, DollarSign, TrendingUp, Wallet, Calendar, CalendarClock, CheckCircle2, AlertCircle, Edit2, Filter, Receipt, Banknote, Clock, Trash2, Printer } from 'lucide-react'
 import { ChevronDown } from 'lucide-react'
@@ -73,6 +74,7 @@ export default function Billing() {
   const navigate = useNavigate()
   // Closed on open: the payment list is why this page exists.
   const [chartsOpen, setChartsOpen] = useState(false)
+  const [financeOverviewPatientId, setFinanceOverviewPatientId] = useState<string | null>(null)
   const location = useLocation()
 
   const [payments, setPayments] = useState<Payment[]>([])
@@ -856,7 +858,20 @@ export default function Billing() {
                     </div>
                     <div>
                       <p className="text-sm font-bold text-slate-800">{formatCurrency(p.amount)} تومان</p>
-                      <p className="text-xs text-slate-500">{getPatientName(p.patient_id)} - {methodMeta.label} - {toJalaliStringPretty(p.payment_date)}</p>
+                      {/* MOD-FEAT-031: «وقتی کلیک کنیم، کل پرداختی‌ها،
+                          تاریخش، بابت چه دندونی، کدوم دکتر». The name is
+                          the natural handle — it is what someone is
+                          looking at when the question occurs to them. */}
+                      <p className="text-xs text-slate-500">
+                        <button
+                          type="button"
+                          onClick={() => { h.tap(); setFinanceOverviewPatientId(p.patient_id) }}
+                          className="font-bold text-primary-700 dark:text-primary-400 hover:underline"
+                        >
+                          {getPatientName(p.patient_id)}
+                        </button>
+                        {' - '}{methodMeta.label} - {toJalaliStringPretty(p.payment_date)}
+                      </p>
                       {/* MOD-FEAT-020: shown for every payment, including the
                           older ones that predate attribution — «بابت مشخص
                           نشده» is information, not noise: it marks exactly
@@ -1894,6 +1909,25 @@ export default function Billing() {
 
       {renderStats()}
       {renderCharts()}
+
+      {/* MOD-FEAT-031 */}
+      <Modal
+        open={!!financeOverviewPatientId}
+        onClose={() => setFinanceOverviewPatientId(null)}
+        title="نمای کلی مالی بیمار"
+      >
+        {financeOverviewPatientId && (
+          <PatientFinanceOverview
+            patientId={financeOverviewPatientId}
+            patientName={getPatientName(financeOverviewPatientId)}
+            payments={payments}
+            treatments={treatments}
+            doctors={doctors as never}
+            implantCases={implantCases}
+            cheques={cheques as never}
+          />
+        )}
+      </Modal>
 
       <Tabs tabs={tabs} active={activeTab} onChange={setActiveTab} />
 
