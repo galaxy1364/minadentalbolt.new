@@ -6,13 +6,36 @@
  * map controls which modules/routes that role can see and open.
  */
 
+/**
+ * MOD-FIX-017 | یک واژگان نقش برای کل برنامه
+ *
+ * `Staff.tsx` ده نقش داشت و این فایل شش‌تا، با فقط چهار مورد مشترک.
+ * هر کارمندی با نقشی که فقط در فهرست کارکنان بود — مدیر، تکنسین
+ * لابراتوار، بهداشتکار — به `canAccess` می‌رسید، در هیچ نقشه‌ای پیدا
+ * نمی‌شد، و **فقط داشبورد** می‌گرفت.
+ *
+ * At the time this was written the live clinic had five staff and three
+ * of them held such a role, so three of five people could open nothing.
+ * The two vocabularies each looked complete on their own, which is why
+ * neither read as wrong.
+ *
+ * Values match what `staff.role` already stores, so no data changes.
+ * Non-clinical roles are listed explicitly with dashboard-only access
+ * rather than left out — an omission reads as an oversight, a deliberate
+ * empty list reads as a decision.
+ */
 export const ROLES = {
   owner: 'مدیر کلینیک',
+  manager: 'مدیر',
   doctor: 'پزشک',
-  receptionist: 'منشی',
-  assistant: 'دستیار',
-  lab: 'لابراتوار',
+  receptionist: 'پذیرش',
+  assistant: 'دستیار دندانپزشک',
+  hygienist: 'بهداشتکار',
+  lab_technician: 'تکنسین لابراتوار',
   accountant: 'حسابدار',
+  cleaner: 'نظافتچی',
+  security: 'نگهبان',
+  other: 'سایر',
 } as const
 
 // Mirrors Layout's REQUIRE_LOGIN flag: while login is disabled, nobody has
@@ -30,11 +53,23 @@ const ALL_PATHS = [
 /** Route path prefixes each role is allowed to open. '/' always included. */
 const ROLE_ACCESS: Record<Role, string[]> = {
   owner: ALL_PATHS,
-  doctor: ['/', '/patients', '/appointments', '/treatments', '/prescriptions', '/radiology', '/implants', '/waiting-list', '/reports', '/settings', '/calendar'],
+  // A manager runs the clinic day to day but is not its owner. Everything
+  // except the owner's private books.
+  manager: ALL_PATHS.filter((p) => p !== '/personal-finance'),
+  // Doctors send work to the lab, so they can see what they sent — the
+  // treatment form creates the order and previously the doctor could not
+  // then look at it.
+  doctor: ['/', '/patients', '/appointments', '/treatments', '/prescriptions', '/radiology', '/implants', '/laboratory', '/waiting-list', '/reports', '/settings', '/calendar'],
   receptionist: ['/', '/patients', '/appointments', '/billing', '/waiting-list', '/insurance', '/archive', '/settings', '/calendar', '/sms', '/reminders'],
   assistant: ['/', '/patients', '/appointments', '/treatments', '/waiting-list', '/settings', '/calendar'],
-  lab: ['/', '/laboratory', '/implants', '/settings', '/calendar'],
+  hygienist: ['/', '/patients', '/appointments', '/treatments', '/waiting-list', '/settings', '/calendar'],
+  lab_technician: ['/', '/laboratory', '/implants', '/settings', '/calendar'],
   accountant: ['/', '/billing', '/insurance', '/reports', '/archive', '/settings', '/personal-finance', '/reminders'],
+  // Present on the payroll, not users of the clinical system. Listed so
+  // the absence is a decision rather than a gap.
+  cleaner: ['/'],
+  security: ['/'],
+  other: ['/'],
 }
 
 export function canAccess(role: string | null | undefined, path: string): boolean {

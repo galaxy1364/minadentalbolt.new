@@ -16,18 +16,27 @@ import { useConfirmAction } from '../components/ConfirmAction'
 import { h } from '../lib/haptics'
 import { CurrencyInput } from '../components/CurrencyInput'
 
-const staffRoles: { value: string; label: string; color: string }[] = [
-  { value: 'doctor', label: 'پزشک', color: 'primary' },
-  { value: 'receptionist', label: 'پذیرش', color: 'accent' },
-  { value: 'assistant', label: 'دستیار دندانپزشک', color: 'success' },
-  { value: 'hygienist', label: 'بهداشتکار', color: 'warning' },
-  { value: 'manager', label: 'مدیر', color: 'error' },
-  { value: 'accountant', label: 'حسابدار', color: 'secondary' },
-  { value: 'lab_technician', label: 'تکنسین لابراتوار', color: 'accent' },
-  { value: 'cleaner', label: 'نظافتچی', color: 'slate' },
-  { value: 'security', label: 'نگهبان', color: 'slate' },
-  { value: 'other', label: 'سایر', color: 'slate' },
-]
+/**
+ * MOD-FIX-017: برچسب‌ها از `permissions.ts` می‌آیند، نه از یک فهرست دوم.
+ *
+ * This list used to be defined here in full, ten roles deep, while
+ * permissions.ts held its own six. Anyone given a role that existed only
+ * here — مدیر, تکنسین لابراتوار, بهداشتکار — reached `canAccess`, matched
+ * nothing, and was left with the dashboard alone.
+ *
+ * Colours stay local: they are a presentation choice for this page and
+ * nothing else reads them.
+ */
+const ROLE_COLORS: Record<string, string> = {
+  owner: 'error', manager: 'error', doctor: 'primary', receptionist: 'accent',
+  assistant: 'success', hygienist: 'warning', lab_technician: 'accent',
+  accountant: 'secondary', cleaner: 'slate', security: 'slate', other: 'slate',
+}
+
+const staffRoles: { value: string; label: string; color: string }[] =
+  Object.entries(ROLES).map(([value, label]) => ({
+    value, label, color: ROLE_COLORS[value] || 'slate',
+  }))
 
 const shareTypes: { value: string; label: string; desc: string }[] = [
   { value: 'net_split', label: 'سود خالص منهای لابراتوار', desc: '(کل کارکرد - کل لابراتوار) × درصد سهم' },
