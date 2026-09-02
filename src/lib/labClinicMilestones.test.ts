@@ -214,3 +214,77 @@ describe('🔴 حلقه بسته می‌شود', () => {
     expect(appointments).toContain('نوبت ثبت شد ولی به سفارش لابراتوار وصل نشد')
   })
 })
+
+/**
+ * MOD-FIX-018 | موعد یک روز است، نه یک لحظه
+ *
+ * در عکس مهدی: نواری زرد روی سفارشی که «هنوز ارسال نشده» بود و می‌گفت
+ * «علی‌رغم موعد — ۰ روز تاخیر».
+ *
+ * علت: `new Date(deadline) < new Date()`. سررسید تاریخِ بدون ساعت است و
+ * نیمه‌شب خوانده می‌شود؛ طرف دیگر لحظه‌ی جاری است. پس **هر سفارشی از یک
+ * دقیقه بعد از نیمه‌شبِ روزِ سررسیدش دیرکرده حساب می‌شد** — و همان
+ * حساب، صفر روز تاخیر گزارش می‌کرد، که خودش می‌گفت هیچ تاخیری نیست.
+ */
+import { deadlineState } from './labClinicMilestones'
+
+describe('🔴 وضعیت موعد', () => {
+  it('🔴 سفارشی که امروز موعدش است، دیرکرده نیست', () => {
+    // همان حالتی که «۰ روز تاخیر» تولید می‌کرد.
+    const st = deadlineState({ deadline: TODAY } as never, TODAY)
+    expect(st.kind).toBe('due_today')
+    expect(st.days).toBe(0)
+  })
+
+  it('دیروز، یک روز تاخیر', () => {
+    const st = deadlineState({ deadline: '2026-08-31' } as never, TODAY)
+    expect(st.kind).toBe('late')
+    expect(st.days).toBe(1)
+  })
+
+  it('فردا، یک روز مانده', () => {
+    const st = deadlineState({ deadline: '2026-09-02' } as never, TODAY)
+    expect(st.kind).toBe('ontime')
+    expect(st.days).toBe(1)
+  })
+
+  it('روزهای تاخیر همیشه مثبت گزارش می‌شود', () => {
+    // کارت «۳ روز تاخیر» می‌نویسد، نه «−۳».
+    expect(deadlineState({ deadline: '2026-08-29' } as never, TODAY).days).toBe(3)
+  })
+
+  it('بدون موعد، وضعیتی نیست', () => {
+    expect(deadlineState({} as never, TODAY).kind).toBe('none')
+    expect(deadlineState({ deadline: 'خراب' } as never, TODAY).kind).toBe('none')
+  })
+
+  it('ساعت روی نتیجه اثر ندارد', () => {
+    // همان تاریخ، با و بدون بخش زمان، باید یکی باشد.
+    expect(deadlineState({ deadline: `${TODAY}T23:59:00Z` } as never, TODAY).kind).toBe('due_today')
+  })
+})
+
+/** قفل ساختاری: مقایسه‌ی لحظه‌ای و عبارت غلط برنگردند. */
+import laboratoryPage from '../pages/Laboratory.tsx?raw'
+
+describe('🔴 صفحه‌ی لابراتوار از منطق مشترک استفاده می‌کند', () => {
+  it('مقایسه‌ی تاریخ با لحظه‌ی جاری حذف شده', () => {
+    expect(laboratoryPage).not.toContain('return deadline < now')
+  })
+
+  it('از deadlineState استفاده می‌کند', () => {
+    expect(laboratoryPage).toContain('deadlineState(order as never')
+  })
+
+  it('«علی‌رغم موعد» دیگر به کاربر نشان داده نمی‌شود', () => {
+    // یعنی «با وجودِ موعد» — چیزی که برای سفارش دیرکرده معنی نمی‌دهد.
+    // فقط رشته‌های داخل JSX و برچسب‌ها سنجیده می‌شوند؛ کامنتی که توضیح
+    // می‌دهد چرا عبارت عوض شد باید بماند.
+    const codeOnly = laboratoryPage
+      .split('\n')
+      .filter((l) => !l.trim().startsWith('//') && !l.trim().startsWith('*'))
+      .join('\n')
+    expect(codeOnly).not.toContain('علی‌رغم موعد')
+    expect(codeOnly).toContain('از موعد گذشته')
+  })
+})

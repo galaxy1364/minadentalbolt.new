@@ -113,3 +113,42 @@ export function needsAttention(order: LabOrderLike, today: string): boolean {
   if (days !== null && days < 0) return true
   return !!order.received_at && !order.delivery_appointment_id && !order.delivered
 }
+
+export type DeadlineKind = 'none' | 'ontime' | 'due_today' | 'late'
+
+export interface DeadlineState {
+  kind: DeadlineKind
+  /** روزهای مانده (مثبت) یا گذشته (مثبت، همراه kind='late'). */
+  days: number
+}
+
+/**
+ * MOD-FIX-018 | وضعیت موعد، بر حسب روز نه لحظه
+ *
+ * `Laboratory.tsx` مقایسه می‌کرد `new Date(deadline) < new Date()`.
+ * سررسید یک تاریخِ بدون ساعت است و نیمه‌شب خوانده می‌شود، در حالی که
+ * طرف دیگر لحظه‌ی جاری است — پس **هر سفارشی در روزِ سررسیدش دیرکرده
+ * حساب می‌شد**، و چون اختلافِ روز صفر بود، کارت می‌گفت «۰ روز تاخیر».
+ *
+ * A deadline is a day, not an instant. Comparing it to a clock reading
+ * makes every order late from one minute past midnight on the day it is
+ * actually due.
+ *
+ * «امروز» به‌عنوان یک روز جدا برگردانده می‌شود، نه به‌عنوان دیرکرد یا
+ * فرصت باقی‌مانده: هیچ‌کدام درست نیست و آن روز تنها روزی است که کسی
+ * واقعاً باید پیگیری کند.
+ */
+export function deadlineState(
+  order: LabOrderLike,
+  today: string,
+): DeadlineState {
+  if (!order.deadline) return { kind: 'none', days: 0 }
+  const due = Date.parse(`${String(order.deadline).slice(0, 10)}T00:00:00Z`)
+  const now = Date.parse(`${String(today).slice(0, 10)}T00:00:00Z`)
+  if (Number.isNaN(due) || Number.isNaN(now)) return { kind: 'none', days: 0 }
+
+  const days = Math.round((due - now) / 86_400_000)
+  if (days === 0) return { kind: 'due_today', days: 0 }
+  if (days < 0) return { kind: 'late', days: -days }
+  return { kind: 'ontime', days }
+}

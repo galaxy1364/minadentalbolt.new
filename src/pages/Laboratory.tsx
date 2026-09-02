@@ -2,7 +2,7 @@
 import { useState, useEffect, useCallback, useMemo } from 'react'
 import { SurfaceSelect } from '../components/SurfaceSelect'
 import { formatSurfaces } from '../lib/toothSurfaces'
-import { clinicMilestones, nextClinicAction } from '../lib/labClinicMilestones'
+import { clinicMilestones, nextClinicAction, deadlineState } from '../lib/labClinicMilestones'
 import { PatientSelect } from '../components/PatientSelect'
 import { toothLabel, toothLabelWithWord } from '../lib/toothLabel'
 import { FlaskConical, Plus, Search, Clock, CheckCircle2, AlertCircle, Edit2, Trash2, Phone, Filter, TrendingUp, Package, CalendarClock, ChevronLeft, RotateCcw } from 'lucide-react'
@@ -246,11 +246,19 @@ export default function Laboratory() {
     return d ? `دکتر ${d.name || d.specialty || 'پزشک'}` : 'نامشخص'
   }
 
+  /** یک بار در هر رندر — تا دو مقایسه در یک صفحه به دو «امروز» نرسند. */
+  const todayISO = () => new Date().toISOString().slice(0, 10)
+
+  /**
+   * MOD-FIX-018: a deadline is a day, not an instant. The old comparison
+   * read the date as midnight and put it against the current clock, so
+   * every order counted as late from one minute past midnight on the day
+   * it was actually due — and the card then said «۰ روز تاخیر», which is
+   * the arithmetic quietly reporting that nothing was late at all.
+   */
   const isOverdue = (order: LabOrder) => {
-    if (!order.deadline || order.status === 'delivered' || order.status === 'cancelled') return false
-    const deadline = new Date(order.deadline)
-    const now = new Date()
-    return deadline < now
+    if (order.status === 'delivered' || order.status === 'cancelled') return false
+    return deadlineState(order as never, todayISO()).kind === 'late'
   }
 
   const getDaysLeft = (deadline: string | null): number | null => {
@@ -620,7 +628,7 @@ export default function Laboratory() {
       items={[
         { key: 'total', node: <ModuleStatCard moduleKey="laboratory" icon={<Package size={20} />} label="کل سفارش‌ها" value={toPersianDigits(stats.total)} /> },
         { key: 'inprogress', node: <ModuleStatCard moduleKey="laboratory" icon={<Clock size={20} />} label="در حال انجام" value={toPersianDigits(stats.inProgress)} /> },
-        { key: 'overdue', node: <ModuleStatCard moduleKey="laboratory" icon={<AlertCircle size={20} />} label="علی‌رغم موعد" value={toPersianDigits(stats.overdue)} /> },
+        { key: 'overdue', node: <ModuleStatCard moduleKey="laboratory" icon={<AlertCircle size={20} />} label="از موعد گذشته" value={toPersianDigits(stats.overdue)} /> },
         { key: 'cost', node: <ModuleStatCard moduleKey="laboratory" icon={<TrendingUp size={20} />} label="کل هزینه" value={`${formatCurrency(stats.totalCost)} ت`} /> },
         { key: 'ready', node: <ModuleStatCard moduleKey="laboratory" icon={<Package size={20} />} label="آماده تحویل" value={toPersianDigits(labSummary.readyForDelivery)} /> },
         { key: 'alarms', node: <ModuleStatCard moduleKey="laboratory" icon={<AlertCircle size={20} />} label="یادآور گذشته" value={toPersianDigits(labSummary.overdueAlarms)} /> },
@@ -808,19 +816,34 @@ export default function Laboratory() {
             'bg-success-50 text-success-700'
           }`}>
             <Clock size={14} />
-            <span className="text-xs font-medium">
-              {overdue ? 'علی‌رغم موعد' : `موعد تحویل: ${toJalaliStringPretty(order.deadline)}`}
-            </span>
-            {daysLeft !== null && !overdue && (
-              <span className="text-xs mr-auto">
-                {toPersianDigits(Math.abs(daysLeft))} روز مانده
-              </span>
-            )}
-            {overdue && daysLeft !== null && (
-              <span className="text-xs mr-auto">
-                {toPersianDigits(Math.abs(daysLeft))} روز تاخیر
-              </span>
-            )}
+            {(() => {
+              // MOD-FIX-018: «علی‌رغم موعد» means "in spite of the
+              // deadline", which is not what a late order is. And a
+              // deadline that falls today is neither late nor pending.
+              const dl = deadlineState(order as never, todayISO())
+              if (dl.kind === 'late') {
+                return (
+                  <>
+                    <span className="text-xs font-medium">از موعد گذشته</span>
+                    <span className="text-xs mr-auto">{toPersianDigits(dl.days)} روز تاخیر</span>
+                  </>
+                )
+              }
+              if (dl.kind === 'due_today') {
+                return (
+                  <>
+                    <span className="text-xs font-medium">موعد تحویل: امروز</span>
+                    <span className="text-xs mr-auto">همین امروز پیگیری شود</span>
+                  </>
+                )
+              }
+              return (
+                <>
+                  <span className="text-xs font-medium">موعد تحویل: {toJalaliStringPretty(order.deadline)}</span>
+                  <span className="text-xs mr-auto">{toPersianDigits(dl.days)} روز مانده</span>
+                </>
+              )
+            })()}
             <button
               onClick={() => downloadICSReminder({
                 title: `موعد تحویل لابراتوار — ${getPatientName(order.patient_id)}`,
@@ -914,7 +937,7 @@ export default function Laboratory() {
             <div className="flex items-end gap-2">
               <label className="flex items-center gap-2 text-xs font-medium text-slate-600 cursor-pointer pb-2">
                 <input type="checkbox" checked={filterOverdue} onChange={(e) => setFilterOverdue(e.target.checked)} className="w-4 h-4 rounded text-primary-600" />
-                فقط سفارش‌های علی‌رغم موعد
+                فقط سفارش‌های از موعد گذشته
               </label>
             </div>
           </div>
