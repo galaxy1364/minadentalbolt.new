@@ -260,6 +260,37 @@ export default function Settings() {
       } as DoctorSchedule])
     }
   }
+  /**
+   * MOD-FEAT-036 | شیفت پیش‌فرض هفت‌روزه
+   *
+   * گزارش مهدی: «معمولاً هر روز کاری وجود داره از ساعت ۸ صبح تا ۲۳ برای
+   * همه پزشک‌ها فعاله، ولی تداخل و اینها باید رعایت بشه.»
+   *
+   * The week had to be built one day at a time, seven taps per doctor
+   * before a single appointment could be booked — which is a large part
+   * of why `doctor_schedules` still had zero rows and the whole booking
+   * module was untestable.
+   *
+   * The hours are Mehdi's, not a guess. Every day is filled rather than
+   * only weekdays, because he described the clinic as open daily; a day
+   * that is genuinely off can be toggled back off in one tap, which is
+   * cheaper than adding six.
+   *
+   * Conflict checking is unaffected: `checkConflict` compares real
+   * appointments against each other, so two doctors sharing the same
+   * hours never collide unless they share a unit at the same moment.
+   */
+  const DEFAULT_SHIFT = { start: '08:00', end: '23:00' }
+  const applyDefaultWeek = () => {
+    h.tap()
+    setDoctorSchedule(weekdays.map((_, day) => ({
+      id: `new-${day}`, clinic_id: '', doctor_id: editingDoctor?.id || '', day_of_week: day,
+      start_time: DEFAULT_SHIFT.start, end_time: DEFAULT_SHIFT.end, slot_duration: 30,
+      break_duration: null, break_start: null, break_end: null, max_appointments: null,
+      is_active: true, notes: null, created_at: '', updated_at: '',
+    } as DoctorSchedule)))
+  }
+
   const updateDayTime = (day: number, field: 'start_time' | 'end_time', value: string) => {
     setDoctorSchedule(doctorSchedule.map((s) => s.day_of_week === day ? { ...s, [field]: value } : s))
   }
@@ -758,7 +789,19 @@ export default function Settings() {
 
           {editingDoctor && (
             <div className="pt-3 border-t border-slate-100 dark:border-slate-700">
-              <p className="text-sm font-bold text-slate-700 dark:text-slate-200 mb-2">برنامه‌ی کاری هفتگی</p>
+              <div className="flex items-center justify-between gap-2 mb-2">
+                <p className="text-sm font-bold text-slate-700 dark:text-slate-200">برنامه‌ی کاری هفتگی</p>
+                {/* MOD-FEAT-036: seven taps per doctor before a single
+                    appointment could be booked is a large part of why
+                    doctor_schedules still had zero rows. */}
+                <button
+                  type="button"
+                  onClick={applyDefaultWeek}
+                  className="shrink-0 text-[11px] font-bold text-primary-700 bg-primary-50 dark:bg-primary-900/20 px-2.5 py-1.5 rounded-lg press-scale"
+                >
+                  همه‌ی روزها ۸ تا ۲۳
+                </button>
+              </div>
               <p className="text-xs text-slate-400 mb-3">روزهایی که پزشک کار نمی‌کند را خاموش بگذارید. این برنامه در نوبت‌دهی برای هشدار تداخل با ساعت کاری استفاده می‌شود.</p>
               <div className="space-y-2">
                 {weekdays.map((label, day) => {
