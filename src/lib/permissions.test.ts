@@ -165,3 +165,96 @@ describe('دسترسی هر نقش منطقی است', () => {
     expect(canAccess('cleaner', '/patients')).toBe(false)
   })
 })
+
+/**
+ * MOD-FIX-019 | مجوز داخل صفحه‌ی تنظیمات
+ *
+ * `/settings` برای هر شش نقش بالینی باز است و باید باشد — ظاهر، لرزش و
+ * قفل امنیتی تنظیمات شخصیِ خودِ کاربرند.
+ *
+ * ولی همان صفحه چهارده بخش دارد و یکی‌شان **«دسترسی نقش‌ها»** است. یعنی
+ * یک دستیار می‌توانست مجوزهای خودش را عوض کند، قیمت‌ها را تغییر دهد، و
+ * گزارش فعالیت‌ها را بخواند.
+ *
+ * با دو کارمند نظری بود. با ده نفر، صفحه‌ی تنظیماتی بدون مرز داخلی،
+ * صفحه‌ی تنظیمات نیست — دری قفل‌نشده با چهارده اتاق پشتش است.
+ */
+import { canOpenSettingsSection, allowedSettingsSections } from './permissions'
+import settingsPage from '../pages/Settings.tsx?raw'
+
+describe('🔴 دسترسی نقش‌ها فقط برای مالک', () => {
+  it('مالک می‌تواند', () => {
+    expect(canOpenSettingsSection('owner', 'rbac')).toBe(true)
+  })
+
+  it('🔴 دستیار نمی‌تواند مجوزهای خودش را عوض کند', () => {
+    expect(canOpenSettingsSection('assistant', 'rbac')).toBe(false)
+  })
+
+  it('حتی مدیر هم به نقش‌ها و پشتیبان و گزارش فعالیت دست نمی‌زند', () => {
+    // پشتیبان و تغییر نقش برگشت‌ناپذیرند.
+    for (const sec of ['rbac', 'backup', 'audit'] as const) {
+      expect(canOpenSettingsSection('manager', sec), sec).toBe(false)
+    }
+  })
+})
+
+describe('🔴 تنظیمات شخصی برای همه باز است', () => {
+  it('هر نقشی ظاهر و لرزش و قفل را دارد', () => {
+    for (const role of Object.keys(ROLES)) {
+      for (const sec of ['appearance', 'haptics', 'app_lock'] as const) {
+        expect(canOpenSettingsSection(role, sec), `${role}/${sec}`).toBe(true)
+      }
+    }
+  })
+
+  it('کاربر بدون نقش هم تنظیمات شخصی دارد', () => {
+    expect(canOpenSettingsSection(null, 'appearance')).toBe(true)
+    expect(canOpenSettingsSection(null, 'rbac')).toBe(false)
+  })
+
+  it('نقش ناشناخته فقط تنظیمات شخصی می‌گیرد', () => {
+    // همان حالتی که در MOD-FIX-017 سه کارمند را قفل کرد — اینجا نباید
+    // برعکسش اتفاق بیفتد و دسترسی اضافه بدهد.
+    expect(canOpenSettingsSection('unknown_role', 'appearance')).toBe(true)
+    expect(canOpenSettingsSection('unknown_role', 'procedures')).toBe(false)
+  })
+})
+
+describe('پیکربندی کلینیک', () => {
+  it('مدیر قیمت رویه‌ها و پزشکان را تنظیم می‌کند', () => {
+    expect(canOpenSettingsSection('manager', 'procedures')).toBe(true)
+    expect(canOpenSettingsSection('manager', 'doctors')).toBe(true)
+  })
+
+  it('پذیرش و پزشک قیمت‌ها را عوض نمی‌کنند', () => {
+    for (const role of ['receptionist', 'doctor', 'lab_technician'] as const) {
+      expect(canOpenSettingsSection(role, 'procedures'), role).toBe(false)
+    }
+  })
+
+  it('🔴 هرکس رکورد می‌سازد، همگام‌سازی ناموفقش را می‌بیند', () => {
+    // پنهان کردنش یعنی داده‌ی گیرکرده بی‌صدا بماند.
+    for (const role of ['doctor', 'receptionist', 'assistant', 'lab_technician'] as const) {
+      expect(canOpenSettingsSection(role, 'failed_sync'), role).toBe(true)
+    }
+  })
+
+  it('نقش غیربالینی فقط تنظیمات شخصی دارد', () => {
+    expect(allowedSettingsSections('cleaner')).toEqual(['appearance', 'haptics', 'app_lock'])
+  })
+})
+
+describe('🔴 محتوا هم محافظت می‌شود، نه فقط تب', () => {
+  it('هر بخش شرط مجوز دارد', () => {
+    // فیلتر کردن نوار تب کافی نیست: اگر tab ذخیره‌شده روی بخش ممنوع
+    // بماند، محتوا بدون این شرط رندر می‌شد.
+    for (const sec of ['rbac', 'backup', 'audit', 'procedures', 'doctors'] as const) {
+      expect(settingsPage, sec).toContain(`canOpenSettingsSection(profile?.role, '${sec}')`)
+    }
+  })
+
+  it('تب ممنوع، صفحه را خالی نمی‌گذارد', () => {
+    expect(settingsPage).toContain('allowedSettingsSections(profile?.role)[0]')
+  })
+})

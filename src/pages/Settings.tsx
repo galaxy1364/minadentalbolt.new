@@ -1,5 +1,6 @@
 // Settings.tsx — Full management: doctors, units, procedures, SMS, packages, categories
 import { useState, useEffect, useCallback, useMemo } from 'react'
+import { useAuth } from '../lib/auth'
 import {
   Settings as SettingsIcon, Building2, Hash, MessageSquare, Package, Save, Smile,
   Cloud, Download, Upload, Vibrate, Volume2, Bell, Database, RefreshCw, Check,
@@ -37,7 +38,7 @@ import { DOCTOR_COLOR_PALETTE } from '../lib/doctorColors'
 import { getErrorLog, clearErrorLog, LoggedError } from '../lib/errorLog'
 import { fetchAuditLog, clearAuditLog } from '../lib/auditLog'
 import { allModules } from '../theme/modules'
-import { canAccess, ROLES, getAllModulePaths } from '../lib/permissions'
+import { canAccess, ROLES, getAllModulePaths, canOpenSettingsSection, SettingsSection, allowedSettingsSections } from '../lib/permissions'
 import { listBackupSnapshots, restoreFromSnapshot } from '../lib/autoBackup'
 import { checkForUpdate, applyUpdate } from '../lib/updateCheck'
 import { APP_VERSION, BUILD_DATE } from '../lib/appVersion'
@@ -65,7 +66,23 @@ function getCatLabel(cat: string | null) {
 }
 
 export default function Settings() {
+  const { profile } = useAuth()
+
   const [activeTab, setActiveTab] = useState('general')
+
+  /**
+   * MOD-FIX-019: a tab the role cannot open leaves the page blank rather
+   * than telling anyone why. If the stored tab is out of reach — a saved
+   * preference, a role change, a shared device — fall back to the first
+   * section this person actually has.
+   */
+  useEffect(() => {
+    if (activeTab === 'updates') return
+    if (canOpenSettingsSection(profile?.role, activeTab as SettingsSection)) return
+    const first = allowedSettingsSections(profile?.role)[0]
+    if (first) setActiveTab(first)
+  }, [profile?.role, activeTab])
+
   // MOD-UI-001 — سطح شفازیت فعلی برای نمایش انتخاب جاری در تب ظاهر
   const [materialLevel, setMaterialLevelState] = useState<MaterialLevel>(() => getMaterialLevel())
   const [smsTemplates, setSmsTemplates] = useState<SmsTemplate[]>([])
@@ -486,13 +503,18 @@ export default function Settings() {
           { key: 'rbac', label: 'دسترسی نقش‌ها', icon: <Shield size={16} /> },
           { key: 'failed_sync', label: 'همگام‌سازی ناموفق', icon: <CloudOff size={16} /> },
           { key: 'updates', label: 'به‌روزرسانی', icon: <Sparkles size={16} /> },
-        ]}
+        ].filter((t) =>
+          // MOD-FIX-019: «به‌روزرسانی» is about the installed app itself,
+          // not clinic data, so it stays open like the personal
+          // preferences. Everything else answers to the role.
+          t.key === 'updates' || canOpenSettingsSection(profile?.role, t.key as SettingsSection),
+        )}
         active={activeTab}
         onChange={setActiveTab}
       />
 
       {/* General Tab */}
-      {activeTab === 'general' && (
+      {activeTab === 'general' && canOpenSettingsSection(profile?.role, 'general') && (
         <Card className="p-5">
           <h2 className="text-base font-bold text-slate-800 mb-4 flex items-center gap-2"><Building2 size={18} className="text-primary-600" /> اطلاعات کلینیک</h2>
           <div className="space-y-3">
@@ -508,7 +530,7 @@ export default function Settings() {
       )}
 
       {/* Doctors & Units Tab */}
-      {activeTab === 'doctors' && (
+      {activeTab === 'doctors' && canOpenSettingsSection(profile?.role, 'doctors') && (
         <div className="space-y-4">
           <Card className="p-4">
             <div className="flex items-center justify-between mb-3">
@@ -552,7 +574,7 @@ export default function Settings() {
       )}
 
       {/* Procedures Tab */}
-      {activeTab === 'procedures' && (
+      {activeTab === 'procedures' && canOpenSettingsSection(profile?.role, 'procedures') && (
         <Card className="p-4">
           <h3 className="text-sm font-bold text-slate-800 mb-3 flex items-center gap-2"><ListOrdered size={16} className="text-primary-600" /> کاتالوگ رویه‌های درمانی</h3>
           {renderCrudList(
@@ -576,7 +598,7 @@ export default function Settings() {
       )}
 
       {/* Backup Tab */}
-      {activeTab === 'backup' && (
+      {activeTab === 'backup' && canOpenSettingsSection(profile?.role, 'backup') && (
         <div className="space-y-4">
           <Card className="p-5">
             <h2 className="text-base font-bold text-slate-800 mb-4 flex items-center gap-2"><RefreshCw size={18} className="text-primary-600" /> وضعیت سینک</h2>
@@ -615,20 +637,20 @@ export default function Settings() {
       )}
 
       {/* Error Log Tab */}
-      {activeTab === 'errors' && <ErrorLogTab />}
+      {activeTab === 'errors' && canOpenSettingsSection(profile?.role, 'errors') && <ErrorLogTab />}
 
       {/* Audit Log Tab */}
-      {activeTab === 'audit' && <AuditLogTab />}
-      {activeTab === 'rbac' && <RbacMatrixTab />}
+      {activeTab === 'audit' && canOpenSettingsSection(profile?.role, 'audit') && <AuditLogTab />}
+      {activeTab === 'rbac' && canOpenSettingsSection(profile?.role, 'rbac') && <RbacMatrixTab />}
 
       {/* Failed Sync Tab */}
-      {activeTab === 'failed_sync' && <FailedSyncTab />}
+      {activeTab === 'failed_sync' && canOpenSettingsSection(profile?.role, 'failed_sync') && <FailedSyncTab />}
 
       {/* Updates Tab */}
       {activeTab === 'updates' && <UpdatesTab />}
 
       {/* Haptics Tab */}
-      {activeTab === 'appearance' && (
+      {activeTab === 'appearance' && canOpenSettingsSection(profile?.role, 'appearance') && (
         <div className="space-y-4">
           <Card className="p-5">
             <h2 className="text-base font-bold text-slate-800 mb-1 flex items-center gap-2">
@@ -668,7 +690,7 @@ export default function Settings() {
         </div>
       )}
 
-      {activeTab === 'haptics' && (
+      {activeTab === 'haptics' && canOpenSettingsSection(profile?.role, 'haptics') && (
         <div className="space-y-4">
           <Card className="p-5">
             <h2 className="text-base font-bold text-slate-800 mb-4 flex items-center gap-2"><Vibrate size={18} className="text-primary-600" /> لرزش و بازخورد لمسی</h2>
@@ -699,10 +721,10 @@ export default function Settings() {
           </Card>
         </div>
       )}
-      {activeTab === 'app_lock' && <AppLockTab />}
+      {activeTab === 'app_lock' && canOpenSettingsSection(profile?.role, 'app_lock') && <AppLockTab />}
 
       {/* File Number Tab */}
-      {activeTab === 'file_number' && (
+      {activeTab === 'file_number' && canOpenSettingsSection(profile?.role, 'file_number') && (
         <div className="space-y-4">
           <Card className="p-5">
             <h2 className="text-base font-bold text-slate-800 mb-4 flex items-center gap-2"><Hash size={18} className="text-primary-600" /> پیکربندی شماره پرونده</h2>
@@ -726,7 +748,7 @@ export default function Settings() {
       {/* SMS Templates Tab */}
 
       {/* Packages Tab */}
-      {activeTab === 'packages' && (
+      {activeTab === 'packages' && canOpenSettingsSection(profile?.role, 'packages') && (
         <Card className="p-4">
           <h3 className="text-sm font-bold text-slate-800 mb-3 flex items-center gap-2"><Package size={16} className="text-primary-600" /> پکیج‌های درمانی</h3>
           {renderCrudList(
@@ -747,7 +769,7 @@ export default function Settings() {
       )}
 
       {/* Categories Tab */}
-      {activeTab === 'categories' && (
+      {activeTab === 'categories' && canOpenSettingsSection(profile?.role, 'categories') && (
         <Card className="p-4">
           <h3 className="text-sm font-bold text-slate-800 mb-3 flex items-center gap-2"><Tag size={16} className="text-primary-600" /> دسته‌بندی‌های انبار</h3>
           {renderCrudList(

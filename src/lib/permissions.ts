@@ -112,3 +112,75 @@ export function getAllModulePaths(): string[] {
   return ALL_PATHS
 }
 
+
+/**
+ * MOD-FIX-019 | مجوز داخل صفحه‌ی تنظیمات
+ *
+ * `/settings` برای هر شش نقشِ بالینی باز است، و باید باشد — ظاهر، لرزش و
+ * قفل امنیتی تنظیمات شخصیِ خودِ کاربرند و هیچ‌کس نباید برای عوض کردن
+ * تمشان از مدیر اجازه بگیرد.
+ *
+ * ولی همان صفحه چهارده بخش دارد، و میان آن‌ها **«دسترسی نقش‌ها»** است.
+ * یعنی یک دستیار می‌توانست تنظیمات را باز کند و مجوزهای خودش را عوض
+ * کند — و قیمت‌ها را، و پشتیبان را، و گزارش فعالیت‌ها را ببیند.
+ *
+ * With two staff this was theoretical. Mehdi is adding doctors,
+ * receptionists, assistants and lab technicians, and at that size a
+ * settings page with no internal boundary is not a settings page, it is
+ * an unlocked door with fourteen rooms behind it.
+ *
+ * Route-level access alone cannot express this: the answer is not
+ * «may they open Settings» but «which parts».
+ */
+export type SettingsSection =
+  | 'general' | 'doctors' | 'procedures' | 'backup' | 'appearance' | 'haptics'
+  | 'app_lock' | 'file_number' | 'packages' | 'categories' | 'errors'
+  | 'audit' | 'rbac' | 'failed_sync'
+
+/** تنظیمات شخصیِ خودِ کاربر — همه، بدون استثنا. */
+const PERSONAL: SettingsSection[] = ['appearance', 'haptics', 'app_lock']
+
+/** پیکربندی کلینیک — تصمیم کسب‌وکار. */
+const CLINIC_CONFIG: SettingsSection[] = [
+  'general', 'doctors', 'procedures', 'packages', 'categories', 'file_number',
+]
+
+/** داده و امنیت — فقط مالک. یک پشتیبان یا تغییر نقش، برگشت‌ناپذیر است. */
+const OWNER_ONLY: SettingsSection[] = ['backup', 'rbac', 'audit']
+
+/**
+ * هرکس که رکورد می‌سازد باید بتواند ببیند کدام رکوردش به سرور نرسیده.
+ * پنهان کردنش یعنی داده‌ی گیرکرده بی‌صدا بماند.
+ */
+const SYNC: SettingsSection[] = ['failed_sync']
+
+const SETTINGS_ACCESS: Record<Role, SettingsSection[]> = {
+  owner: [...PERSONAL, ...CLINIC_CONFIG, ...OWNER_ONLY, ...SYNC, 'errors'],
+  manager: [...PERSONAL, ...CLINIC_CONFIG, ...SYNC, 'errors'],
+  doctor: [...PERSONAL, ...SYNC],
+  receptionist: [...PERSONAL, ...SYNC],
+  assistant: [...PERSONAL, ...SYNC],
+  hygienist: [...PERSONAL, ...SYNC],
+  lab_technician: [...PERSONAL, ...SYNC],
+  accountant: [...PERSONAL, ...SYNC],
+  cleaner: PERSONAL,
+  security: PERSONAL,
+  other: PERSONAL,
+}
+
+export function canOpenSettingsSection(
+  role: string | null | undefined,
+  section: SettingsSection,
+): boolean {
+  if (!REQUIRE_LOGIN) return true
+  // No role yet means no clinic configuration — personal preferences only,
+  // which is the same answer as for a non-clinical staff member.
+  if (!role || !(role in SETTINGS_ACCESS)) return PERSONAL.includes(section)
+  return SETTINGS_ACCESS[role as Role].includes(section)
+}
+
+export function allowedSettingsSections(role: string | null | undefined): SettingsSection[] {
+  if (!REQUIRE_LOGIN) return Object.keys(SETTINGS_ACCESS.owner) as never
+  if (!role || !(role in SETTINGS_ACCESS)) return PERSONAL
+  return SETTINGS_ACCESS[role as Role]
+}
