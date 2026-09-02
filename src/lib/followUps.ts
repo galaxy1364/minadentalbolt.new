@@ -22,7 +22,7 @@ import { toothLabel } from './toothLabel'
 import type { PhaseLike } from './phases'
 import { stageIndex } from './implants'
 
-export type ClinicalFollowUpKind = 'lab_overdue' | 'implant_stalled' | 'phase_overdue'
+export type ClinicalFollowUpKind = 'lab_overdue' | 'lab_awaiting_delivery' | 'implant_stalled' | 'phase_overdue'
 
 export interface ClinicalFollowUp {
   kind: ClinicalFollowUpKind
@@ -67,6 +67,55 @@ export interface LabOrderLike {
   work_done?: boolean | null
   delivered?: boolean | null
   description?: string | null
+  /** MOD-FEAT-035: تاریخ رسیدن کار به مطب. */
+  received_at?: string | null
+  /** نوبتی که برای تحویل به بیمار گذاشته شده. */
+  delivery_appointment_id?: string | null
+}
+
+/**
+ * MOD-FEAT-035 | کاری که رسیده و بیمار خبر ندارد
+ *
+ * گزارش مهدی: «وقتی که تحویل گرفته شد باید برنامه اتوماتیک آلارم بده که
+ * باید برای این بیمار وقت گذاشته بشه برای نوبت‌دهی برای تحویل کار.»
+ *
+ * This is the gap that keeps a finished crown in a drawer. The order is
+ * no longer late — the lab did its job — so `findOverdueLabOrders` goes
+ * quiet exactly when someone needs to act. Nothing else was watching.
+ *
+ * Derived rather than stored: the moment an appointment is booked the
+ * item disappears on its own. A written reminder would have to be
+ * deleted by hand, and the one that isn't becomes noise that trains
+ * people to ignore the list.
+ *
+ * `daysLate` counts from arrival, so a crown that landed three weeks ago
+ * outranks one that came in yesterday.
+ */
+export function findLabAwaitingDeliveryAppointment(
+  orders: LabOrderLike[],
+  todayISO: string,
+): ClinicalFollowUp[] {
+  const out: ClinicalFollowUp[] = []
+  for (const o of orders) {
+    if (o.delivered || o.status === 'cancelled' || o.status === 'delivered') continue
+    // Only work that is physically in the clinic. Anything still at the
+    // lab is the other check's business.
+    if (!o.received_at) continue
+    if (o.delivery_appointment_id) continue
+
+    const waiting = daysSince(o.received_at, todayISO) ?? 0
+    out.push({
+      kind: 'lab_awaiting_delivery',
+      key: `lab-delivery:${o.id}`,
+      patientId: o.patient_id ?? null,
+      title: o.description?.trim() || 'کار لابراتوار',
+      detail: waiting > 0
+        ? `${waiting} روز است در مطب مانده — نوبت تحویل گذاشته نشده`
+        : 'رسید به مطب — نوبت تحویل گذاشته نشده',
+      daysLate: waiting,
+    })
+  }
+  return out
 }
 
 export function findOverdueLabOrders(
@@ -207,6 +256,10 @@ export function buildClinicalFollowUps(
 ): ClinicalFollowUp[] {
   return [
     ...findOverdueLabOrders(orders, todayISO),
+    // MOD-FEAT-035: work that has arrived and is waiting on an
+    // appointment. The overdue check goes quiet the moment the lab
+    // delivers, which is exactly when the clinic has to act.
+    ...findLabAwaitingDeliveryAppointment(orders, todayISO),
     ...findStalledImplants(implants, todayISO),
     ...findOverduePhases(phases, todayISO),
   ].sort((a, b) => b.daysLate - a.daysLate)

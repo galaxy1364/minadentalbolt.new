@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useMemo } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useLocation } from 'react-router-dom'
 import { Calendar, Clock, CheckCircle2, User, ChevronRight, ChevronLeft, Plus, Search, Trash2, AlertCircle, Edit2, Stethoscope, DollarSign, FileText, Activity, List, Grid, X, UserPlus, Globe } from 'lucide-react'
-import { fetchTreatments, fetchPayments, fetchImplantCases, fetchAppointments, createAppointment, updateAppointment, checkConflict, fetchPatients, updatePatient, fetchDoctors, fetchUnits, peekNextFileNumber, createPatient, createEncounter, fetchDoctorSchedules, fetchOnlineBookingRequests, rejectBookingRequest } from '../lib/api'
+import { fetchTreatments, fetchPayments, fetchImplantCases, fetchAppointments, createAppointment, updateAppointment, checkConflict, fetchPatients, updatePatient, fetchDoctors, fetchUnits, peekNextFileNumber, createPatient, createEncounter, fetchDoctorSchedules, fetchOnlineBookingRequests, rejectBookingRequest, updateLabOrder } from '../lib/api'
 import { toJalaliString, toJalaliStringPretty, getJalaliDateInfo, formatTime, formatCurrency, toPersianDigits, persianWeekdaysShort, getHoliday, jsDateToPersianWeekday } from '../lib/persianDate'
 import { doctorColor } from '../lib/doctorColors'
 import { summariseDay, shiftsCapacityMinutes } from '../lib/dayMetrics'
@@ -85,6 +85,37 @@ export default function Appointments() {
   const [showPatientResults, setShowPatientResults] = useState(false)
   const [quickPatient, setQuickPatient] = useState({ first_name: '', last_name: '', phone: '' })
   const [editingAppt, setEditingAppt] = useState<AppointmentWithRelations | null>(null)
+  const routerLocation = useLocation()
+
+  /**
+   * MOD-FEAT-035 | ورود از سفارش لابراتوار
+   *
+   * Laboratory's «نوبت تحویل بگذار» routes here with the patient, the
+   * doctor and the order. Until now that state was sent and nothing read
+   * it — the sender existed without a receiver, so the loop never closed.
+   */
+  useEffect(() => {
+    const st = routerLocation.state as {
+      quickStartPatientId?: string; quickStartDoctorId?: string | null; labOrderId?: string
+    } | null
+    if (!st?.quickStartPatientId) return
+
+    setWizardData((w) => ({
+      ...w,
+      patient_id: st.quickStartPatientId!,
+      doctor_id: st.quickStartDoctorId || w.doctor_id,
+      type: 'delivery',
+      notes: 'تحویل کار لابراتوار',
+    }))
+    setPendingLabOrderId(st.labOrderId ?? null)
+    setEditingAppt(null)
+    setWizardStep(0)
+    setWizardOpen(true)
+    // Clearing history state stops the wizard reopening on back-navigation.
+    window.history.replaceState({}, '')
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [routerLocation.state])
+
   const [wizardData, setWizardData] = useState({
     patient_id: '', doctor_id: '', unit_id: '',
     date: new Date().toISOString().slice(0, 10),
@@ -94,6 +125,13 @@ export default function Appointments() {
     recurrence: 'none' as 'none' | 'weekly' | 'biweekly' | 'monthly',
     recurrenceCount: '4',
   })
+  /**
+   * MOD-FEAT-035: the lab order this appointment is being booked to hand
+   * over. Lab sends the patient here and this sends the appointment's id
+   * back, so `delivery_appointment_id` is filled by whoever books rather
+   * than by a second manual step nobody remembers.
+   */
+  const [pendingLabOrderId, setPendingLabOrderId] = useState<string | null>(null)
 
   const { config, confirmAction, close, ConfirmActionModal } = useConfirmAction()
 
@@ -355,8 +393,23 @@ export default function Appointments() {
           }
           showToast(skipped > 0 ? 'error' : 'success', skipped > 0 ? `${toPersianDigits(created)} نوبت ثبت شد، ${toPersianDigits(skipped)} مورد به‌خاطر تداخل رد شد` : `${toPersianDigits(created)} نوبت با موفقیت ثبت شد`)
         } else {
-          await createAppointment({ ...basePayload, date: wizardData.date })
+          const created = await createAppointment({ ...basePayload, date: wizardData.date })
+          // MOD-FEAT-035: close the loop. Only for a single booking — a
+          // recurring series has no one appointment that is "the
+          // delivery", and guessing which would be worse than leaving it
+          // for the person to set.
+          if (pendingLabOrderId && created?.id) {
+            try {
+              await updateLabOrder(pendingLabOrderId, { delivery_appointment_id: created.id } as never)
+              showToast('success', 'نوبت تحویل ثبت و به سفارش لابراتوار وصل شد')
+            } catch {
+              // The appointment is saved either way; failing to link is
+              // recoverable and must not look like the booking failed.
+              showToast('error', 'نوبت ثبت شد ولی به سفارش لابراتوار وصل نشد')
+            }
+          }
         }
+        setPendingLabOrderId(null)
         setWizardOpen(false)
         // The list defaults to "امروز" (today) — a newly-booked appointment
         // for any other date would silently vanish from view even though
