@@ -109,7 +109,6 @@ export default function Settings() {
   const [doctorModal, setDoctorModal] = useState(false)
   const [editingDoctor, setEditingDoctor] = useState<Doctor | null>(null)
   const [doctorSchedule, setDoctorSchedule] = useState<DoctorSchedule[]>([])
-  const [savingSchedule, setSavingSchedule] = useState(false)
   // Saturday-first, matching persianDate.ts's jsDateToPersianWeekday
   // convention (0=Saturday...6=Friday) — this array's index IS the
   // day_of_week value stored on doctor_schedules, so this order isn't
@@ -312,28 +311,37 @@ export default function Settings() {
     setDoctorSchedule(doctorSchedule.map((s) => s.day_of_week === day ? { ...s, [field]: value } : s))
   }
 
-  const handleSaveSchedule = async () => {
-    if (!editingDoctor) return
-    setSavingSchedule(true)
-    try {
-      // Simplest reliable approach given schedules are few rows per
-      // doctor: replace the doctor's whole week — delete whatever
-      // existed, then re-create the current in-memory state.
-      const existing = (await fetchDoctorSchedules()).filter((sc) => sc.doctor_id === editingDoctor.id)
-      for (const s of existing) await deactivateDoctorSchedule(s.id)
-      for (const s of doctorSchedule) {
-        await createDoctorSchedule({
-          clinic_id: '', doctor_id: editingDoctor.id, day_of_week: s.day_of_week,
-          start_time: s.start_time, end_time: s.end_time, slot_duration: s.slot_duration || 30,
-          break_duration: null, break_start: null, break_end: null, max_appointments: null,
-          is_active: true, notes: null,
-        } as any)
-      }
-      showToast('success', 'برنامه‌ی کاری ذخیره شد')
-      const refreshed = (await fetchDoctorSchedules()).filter((sc) => sc.doctor_id === editingDoctor.id)
-      setDoctorSchedule(refreshed)
-    } catch { showToast('error', 'خطا در ذخیره‌ی برنامه') }
-    finally { setSavingSchedule(false) }
+  /**
+   * MOD-FIX-020 | یک دکمه‌ی ذخیره، نه دو
+   *
+   * گزارش مهدی: «ذخیره می‌کنم ولی میام بیرون دوباره پریده.»
+   *
+   * The doctor modal had two save buttons: the large one at the bottom
+   * wrote the doctor's details and closed the modal; a small one under
+   * the weekly grid wrote the schedule. Press the obvious one and the
+   * week you just filled in was thrown away. Two paths to one place —
+   * the exact thing this project's standard forbids — and the reason
+   * `doctor_schedules` stayed at zero rows through three rounds of
+   * «انجام شد».
+   *
+   * The schedule now persists as part of the doctor's save. Extracted to
+   * take the doctor id so a doctor created and scheduled in one sitting
+   * gets both written.
+   */
+  const persistSchedule = async (doctorId: string) => {
+    // Replace the whole week: deactivate what existed, recreate the
+    // current state. Few rows per doctor, so this is the simplest
+    // approach that cannot leave a stale day behind.
+    const existing = (await fetchDoctorSchedules()).filter((sc) => sc.doctor_id === doctorId)
+    for (const sc of existing) await deactivateDoctorSchedule(sc.id)
+    for (const sc of doctorSchedule) {
+      await createDoctorSchedule({
+        clinic_id: '', doctor_id: doctorId, day_of_week: sc.day_of_week,
+        start_time: sc.start_time, end_time: sc.end_time, slot_duration: sc.slot_duration || 30,
+        break_duration: null, break_start: null, break_end: null, max_appointments: null,
+        is_active: true, notes: null,
+      } as any)
+    }
   }
   const openEditDoctor = (d: Doctor) => {
     setEditingDoctor(d)
@@ -346,8 +354,13 @@ export default function Settings() {
     setSavingDoctor(true)
     try {
       const payload: DoctorInput = { clinic_id: CLINIC_ID, user_id: null, staff_id: editingDoctor?.staff_id ?? null, name: doctorForm.name.trim(), specialty: doctorForm.specialty.trim() || null, license_number: doctorForm.license_number || null, color: doctorForm.color, is_active: doctorForm.is_active === 'true' }
-      if (editingDoctor) { await updateDoctor(editingDoctor.id, payload); showToast('success', 'پزشک ویرایش شد') }
-      else { await createDoctor(payload); showToast('success', 'پزشک اضافه شد') }
+      let doctorId: string
+      if (editingDoctor) { await updateDoctor(editingDoctor.id, payload); doctorId = editingDoctor.id }
+      else { const created = await createDoctor(payload); doctorId = created.id }
+      // MOD-FIX-020: the week is part of the doctor, so it saves with the
+      // doctor. Before this it had its own button that nobody pressed.
+      await persistSchedule(doctorId)
+      showToast('success', editingDoctor ? 'پزشک و برنامه‌ی کاری ذخیره شد' : 'پزشک اضافه شد')
       setDoctorModal(false); loadData()
     } catch { showToast('error', 'خطا در ذخیره') } finally { setSavingDoctor(false) }
   }
@@ -851,9 +864,7 @@ export default function Settings() {
                   )
                 })}
               </div>
-              <Button variant="secondary" size="sm" onClick={handleSaveSchedule} disabled={savingSchedule} className="w-full justify-center mt-3">
-                {savingSchedule ? <Spinner size={14} /> : 'ذخیره‌ی برنامه‌ی کاری'}
-              </Button>
+              <p className="text-[11px] text-slate-400 mt-2">با دکمه‌ی «ذخیره» پایین پنجره، برنامه هم ذخیره می‌شود.</p>
             </div>
           )}
           <div className="flex justify-end gap-2 pt-2 border-t border-slate-100"><Button variant="secondary" onClick={() => setDoctorModal(false)}>انصراف</Button><Button variant="primary" onClick={handleSaveDoctor} disabled={savingDoctor}>{savingDoctor ? <Spinner size={16} /> : editingDoctor ? 'ذخیره' : 'افزودن'}</Button></div>
