@@ -7,8 +7,7 @@ import type {
   ToothRecord, InventoryItem, InventoryCategory, PaymentPlan, Installment,
   Cheque, DoctorSchedule, ImplantCase, ImplantComponent, SmsTemplate, PersonalFinanceItem, CashRegisterSession,
   RolePermission, CustomRole,
-  ManualReminder,
-} from '../types'
+  ManualReminder, ImplantCostItem } from '../types'
 import type { PatientPolicy } from './insurance'
 
 export interface SyncQueueEntry {
@@ -79,6 +78,7 @@ class MinadentDB extends Dexie {
   cheques!: Table<Cheque, string>
   doctor_schedules!: Table<DoctorSchedule, string>
   implant_cases!: Table<ImplantCase, string>
+  implant_cost_items!: Table<ImplantCostItem, string>
   implant_components!: Table<ImplantComponent, string>
   sms_templates!: Table<SmsTemplate, string>
   sync_queue!: Table<SyncQueueEntry, number>
@@ -190,6 +190,10 @@ class MinadentDB extends Dexie {
     this.version(11).stores({
       patient_policies: 'id, clinic_id, patient_id, company_id, is_active, start_date, end_date',
     })
+    // MOD-FEAT-040: one line per priced thing on an implant case.
+    this.version(12).stores({
+      implant_cost_items: 'id, clinic_id, implant_case_id, kind, doctor_id',
+    })
   }
 }
 
@@ -221,7 +225,7 @@ export const TABLE_NAMES = [
   'patient_timeline', 'waiting_list', 'staff', 'expenses', 'treatment_packages',
   'consent_forms', 'tooth_records', 'inventory_items', 'inventory_categories',
   'payment_plans', 'installments', 'cheques', 'doctor_schedules',
-  'implant_cases', 'implant_components', 'sms_templates', 'personal_finance_items', 'cash_register_sessions',
+  'implant_cases', 'implant_components', 'implant_cost_items', 'sms_templates', 'personal_finance_items', 'cash_register_sessions',
   'role_permissions', 'custom_roles', 'manual_reminders', 'patient_policies',
 ] as const
 

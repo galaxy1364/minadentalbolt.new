@@ -135,7 +135,8 @@ describe('🔴 یک نوار پیشرفت، و راهی به مالی', () => {
   it('هر کارت ایمپلنت میان‌بر پرداخت دارد', () => {
     // «هر کدام از این مراحل باید قابلیت ارسال به مالی وجود داشته باشد»
     expect(implantsPage).toContain('<PatientDebtBar')
-    expect(implantsPage).toContain('bone_graft_cost')
-    expect(implantsPage).toContain('sinus_lift_cost')
+    // MOD-FEAT-040: the two cost columns became lines; the total now
+    // comes from caseTotal over the lines, not from adding the columns.
+    expect(implantsPage).toContain('caseTotal(c.total_cost')
   })
 })

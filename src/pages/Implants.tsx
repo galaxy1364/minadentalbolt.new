@@ -1,20 +1,23 @@
 // Implants.tsx - Persian RTL Dental Clinic Implant Cases Management
 import { useState, useEffect, useCallback, useMemo } from 'react'
+import { ImplantCostItemsEditor, type EditableCostItem } from '../components/ImplantCostItemsEditor'
+import { suggestOpgDate, caseTotal, costKindMeta, describeItem, lineTotal } from '../lib/implantCosting'
+import { EXTRA_CATALOG, parseExtras, extrasTotal, toggleExtra, setExtraCost, setExtraLabel, type ImplantExtra } from '../lib/implantExtras'
 import { PatientDebtBar } from '../components/PatientDebtBar'
-import { implantMilestones, nextImplantAction, implantDeadline, IMPLANT_MILESTONE_COLORS } from '../lib/implantMilestones'
+import { implantMilestones, nextImplantAction, implantDeadline, IMPLANT_MILESTONE_COLORS, healingEndDate } from '../lib/implantMilestones'
 import { PatientSelect } from '../components/PatientSelect'
 import { toothLabel, toothLabelWithWord } from '../lib/toothLabel'
 import { useNavigate, useLocation } from 'react-router-dom'
-import { Smile, Plus, Search, Edit2, Eye, Filter, Package, Calendar, DollarSign, ShieldCheck, AlertTriangle, CheckCircle2, Clock, Activity, Layers, CalendarClock, ScanLine, Archive, Ban } from 'lucide-react'
+import { Smile, Plus, Search, Edit2, Eye, Filter, Package, Calendar, DollarSign, ShieldCheck, AlertTriangle, CheckCircle2, Clock, Activity, Layers, CalendarClock, ScanLine, Archive, Ban, X } from 'lucide-react'
 import { downloadICSReminder } from '../lib/icsReminder'
-import { fetchImplantCases, createImplantCase, updateImplantCase, createImplantComponent, deactivateImplantComponent, fetchPatients, fetchDoctors, createExpense, fetchInventoryItems } from '../lib/api'
+import { fetchImplantCases, createImplantCase, updateImplantCase, createImplantComponent, deactivateImplantComponent, fetchPatients, fetchDoctors, createExpense, fetchInventoryItems, fetchImplantCostItems, createImplantCostItem, updateImplantCostItem } from '../lib/api'
 import { calcSurgeryShare, canMoveStage, validateImplantCase, caseFinancials } from '../lib/implants'
 import { BarcodeScanner } from '../components/BarcodeScanner'
 import { CLINIC_ID } from '../lib/supabase'
 import { toJalaliString, toJalaliStringPretty, formatCurrency, formatNumber, toPersianDigits } from '../lib/persianDate'
 import { h } from '../lib/haptics'
 import { useConfirmAction } from '../components/ConfirmAction'
-import { ImplantCase, ImplantCaseWithRelations, ImplantComponent, Patient, Doctor } from '../types'
+import { ImplantCase, ImplantCaseWithRelations, ImplantComponent, Patient, Doctor, ImplantCostItem } from '../types'
 import { Wizard, Card, Button, Input, Select, Textarea, Badge, Spinner, EmptyState, showToast } from '../components/ui'
 import { PersianDateInput } from '../components/PersianDateInput'
 // MOD-FEAT-024: the same arch the chart draws, instead of a separate row of numbers.
@@ -131,6 +134,8 @@ export default function Implants() {
   const [savingComponent, setSavingComponent] = useState(false)
 
   // Case form state
+  const [costItems, setCostItems] = useState<EditableCostItem[]>([])
+  const [allCostItems, setAllCostItems] = useState<ImplantCostItem[]>([])
   const [caseForm, setCaseForm] = useState({
     patient_id: '',
     doctor_id: '',
@@ -142,18 +147,11 @@ export default function Implants() {
     surgery_date: '',
     healing_months: '',
     opg_reminder_date: '',
-    bone_graft: false,
-    bone_graft_cost: '',
-    gbr: false,
-    membrane_used: false,
-    extraction_needed: false,
-    sinus_lift: false,
-    sinus_lift_cost: '',
-    immediate_loading: false,
     total_cost: '',
     paid_amount: '',
     warranty_years: '',
     notes: '',
+    extras: [] as ImplantExtra[],
     surgery_fee_mode: 'formula' as 'formula' | 'negotiated',
     surgery_fee_amount: '',
     prosthesis_doctor_id: '',
@@ -182,12 +180,15 @@ export default function Implants() {
   const loadData = useCallback(async () => {
     setLoading(true)
     try {
-      const [cs, pats, docs, invItems] = await Promise.all([
+      const [cs, pats, docs, invItems, lines] = await Promise.all([
         fetchImplantCases(),
         fetchPatients(),
         fetchDoctors(),
         fetchInventoryItems(),
+        // MOD-FEAT-040: priced lines, so the card's total includes them.
+        fetchImplantCostItems(),
       ])
+      setAllCostItems(lines)
       // Archived (is_active === false) cases are intentionally kept out of
       // this page's list — they're fully preserved and only reachable
       // from Archive, exactly like archived patients/staff.
@@ -222,10 +223,9 @@ export default function Implants() {
     setCaseWizardStep(0)
     setCaseForm({
       patient_id: state.quickStartPatientId, doctor_id: state.quickStartDoctorId || '', tooth_number: handoff?.toothNumber || '', brand: '', custom_brand: '', model: '', diameter: '', length: '',
-      surgery_date: '', healing_months: '', opg_reminder_date: '', bone_graft: false, bone_graft_cost: '', gbr: false, membrane_used: false, extraction_needed: false,
-      sinus_lift: false, sinus_lift_cost: '', immediate_loading: false,
+      surgery_date: '', healing_months: '', opg_reminder_date: '',
       total_cost: '', paid_amount: '', warranty_years: '', notes: '',
-      surgery_fee_mode: 'formula', surgery_fee_amount: '', prosthesis_doctor_id: '', prosthesis_fee_amount: '',
+      extras: [], surgery_fee_mode: 'formula', surgery_fee_amount: '', prosthesis_doctor_id: '', prosthesis_fee_amount: '',
     })
     setCaseModalOpen(true)
     window.history.replaceState({}, '')
@@ -285,20 +285,44 @@ export default function Implants() {
   const openCreateCaseModal = () => {
     h.tap()
     setEditingCase(null)
+    setCostItems([])
     setCaseWizardStep(0)
     setCaseForm({
       patient_id: '', doctor_id: '', tooth_number: '', brand: '', custom_brand: '', model: '', diameter: '', length: '',
-      surgery_date: '', healing_months: '', opg_reminder_date: '', bone_graft: false, bone_graft_cost: '', gbr: false, membrane_used: false, extraction_needed: false,
-      sinus_lift: false, sinus_lift_cost: '', immediate_loading: false,
+      surgery_date: '', healing_months: '', opg_reminder_date: '',
       total_cost: '', paid_amount: '', warranty_years: '', notes: '',
-      surgery_fee_mode: 'formula', surgery_fee_amount: '', prosthesis_doctor_id: '', prosthesis_fee_amount: '',
+      extras: [], surgery_fee_mode: 'formula', surgery_fee_amount: '', prosthesis_doctor_id: '', prosthesis_fee_amount: '',
     })
     setCaseModalOpen(true)
+  }
+
+  /**
+   * MOD-FEAT-040: writes the editor's lines. New lines are created,
+   * existing ones updated, removed ones deactivated — never deleted.
+   */
+  const persistCostItems = async (caseId: string) => {
+    for (const item of costItems) {
+      const base = {
+        kind: item.kind, label: item.label, variant: item.variant ?? null,
+        quantity: Math.max(1, Math.floor(Number(item.quantity) || 1)),
+        unit_price: Math.max(0, Number(item.unit_price) || 0),
+        doctor_id: item.doctor_id || null, is_active: item.is_active !== false,
+      }
+      if (item.id) {
+        await updateImplantCostItem(item.id, base)
+      } else if (base.is_active) {
+        await createImplantCostItem({ ...base, clinic_id: '', implant_case_id: caseId, notes: null })
+      }
+    }
   }
 
   const openEditCaseModal = (c: ImplantCaseWithRelations) => {
     h.tap()
     setEditingCase(c)
+    // MOD-FEAT-040: the case's priced lines ride along with the form.
+    fetchImplantCostItems(c.id).then((rows) =>
+      setCostItems(rows.map((r) => ({ ...r, _key: r.id }))),
+    ).catch(() => setCostItems([]))
     // If the stored brand isn't one of the predefined values, it was
     // entered as free text via 'سایر' — re-select 'other' and restore
     // the actual name into custom_brand so editing shows it correctly
@@ -316,18 +340,11 @@ export default function Implants() {
       surgery_date: c.surgery_date || '',
       healing_months: c.healing_months != null ? String(c.healing_months) : '',
       opg_reminder_date: c.opg_reminder_date || '',
-      bone_graft: c.bone_graft || false,
-      bone_graft_cost: (c as any).bone_graft_cost != null ? String((c as any).bone_graft_cost) : '',
-      gbr: c.gbr || false,
-      membrane_used: c.membrane_used || false,
-      extraction_needed: c.extraction_needed || false,
-      sinus_lift: c.sinus_lift || false,
-      sinus_lift_cost: (c as any).sinus_lift_cost != null ? String((c as any).sinus_lift_cost) : '',
-      immediate_loading: c.immediate_loading || false,
       total_cost: c.total_cost != null ? String(c.total_cost) : '',
       paid_amount: c.paid_amount != null ? String(c.paid_amount) : '',
       warranty_years: c.warranty_years != null ? String(c.warranty_years) : '',
       notes: c.notes || '',
+      extras: parseExtras((c as { extras?: unknown }).extras),
       surgery_fee_mode: (c.surgery_fee_mode as 'formula' | 'negotiated') || 'formula',
       surgery_fee_amount: c.surgery_fee_amount != null ? String(c.surgery_fee_amount) : '',
       prosthesis_doctor_id: c.prosthesis_doctor_id || '',
@@ -448,11 +465,6 @@ export default function Implants() {
       // MOD-FEAT-039: the two links the chain could not compute without.
       healing_months: caseForm.healing_months ? Number(caseForm.healing_months) : null,
       opg_reminder_date: caseForm.opg_reminder_date || null,
-      bone_graft: caseForm.bone_graft,
-      bone_graft_cost: caseForm.bone_graft && caseForm.bone_graft_cost ? Number(caseForm.bone_graft_cost) : null,
-      gbr: caseForm.gbr, membrane_used: caseForm.membrane_used, extraction_needed: caseForm.extraction_needed,
-      sinus_lift: caseForm.sinus_lift, immediate_loading: caseForm.immediate_loading,
-      sinus_lift_cost: caseForm.sinus_lift && caseForm.sinus_lift_cost ? Number(caseForm.sinus_lift_cost) : null,
       total_cost: caseForm.total_cost ? Number(caseForm.total_cost) : null,
       paid_amount: caseForm.paid_amount ? Number(caseForm.paid_amount) : null,
       warranty_years: caseForm.warranty_years ? Number(caseForm.warranty_years) : null,
@@ -489,8 +501,13 @@ export default function Implants() {
       onConfirm: async () => {
         setSaving(true)
         try {
-          if (editingCase) { await updateImplantCase(editingCase.id, payload); showToast('success', 'ویرایش شد') }
-          else { await createImplantCase(payload); showToast('success', 'ایجاد شد') }
+          let caseId: string
+          if (editingCase) { await updateImplantCase(editingCase.id, payload); caseId = editingCase.id }
+          else { const created = await createImplantCase(payload); caseId = created.id }
+          // MOD-FEAT-040: lines save with the case, in the same action — the
+          // doctor modal taught us what a second save button does.
+          await persistCostItems(caseId)
+          showToast('success', editingCase ? 'ویرایش شد' : 'ایجاد شد')
           setCaseModalOpen(false); await loadData()
         } catch { showToast('error', 'خطا در ذخیره') }
         finally { setSaving(false) }
@@ -631,7 +648,10 @@ export default function Implants() {
             the patient record, so the number shown and the number
             prefilled are one number. */}
         {(() => {
-          const total = Number(c.total_cost || 0) + Number(c.bone_graft_cost || 0) + Number(c.sinus_lift_cost || 0)
+          // MOD-FEAT-040: the fixture plus every priced line. The two old
+          // cost columns were migrated into lines, so they are not added
+          // again here — that would count them twice.
+          const total = caseTotal(c.total_cost, allCostItems.filter((i) => i.implant_case_id === c.id))
           const paid = Number(c.paid_amount || 0)
           if (total <= 0) return null
           return (
@@ -820,12 +840,16 @@ export default function Implants() {
                       )}
                     </span>
                   )}
-                  {c.extraction_needed && <Badge color="slate">کشیدن دندان</Badge>}
-                  {c.bone_graft && <Badge color="warning">پودر استخوانی{(c as any).bone_graft_cost ? ` — ${formatCurrency((c as any).bone_graft_cost)} ت` : ''}</Badge>}
-                  {c.gbr && <Badge color="warning">GBR</Badge>}
-                  {c.membrane_used && <Badge color="warning">ممبران</Badge>}
-                  {c.sinus_lift && <Badge color="accent">سینوس لیفت{(c as any).sinus_lift_cost ? ` — ${formatCurrency((c as any).sinus_lift_cost)} ت` : ''}</Badge>}
-                  {c.immediate_loading && <Badge color="success">بارگذاری فوری</Badge>}
+                  {/* MOD-FEAT-040: what was done, from the priced lines. The
+                      six booleans this replaced had no UI to set them, so on
+                      every case created from the app they were all false. */}
+                  {allCostItems
+                    .filter((i) => i.implant_case_id === c.id && i.is_active !== false)
+                    .map((i) => (
+                      <Badge key={i.id} color={costKindMeta(i.kind).group === 'fee' ? 'primary' : costKindMeta(i.kind).group === 'prosthetic' ? 'secondary' : 'warning'}>
+                        {describeItem(i)}{i.unit_price > 0 ? ` — ${formatCurrency(lineTotal(i))} ت` : ''}
+                      </Badge>
+                    ))}
                   {c.prosthesis_doctor_id && c.prosthesis_doctor_id !== c.doctor_id && (
                     <Badge color="secondary">پروتز: دکتر {doctors.find((d) => d.id === c.prosthesis_doctor_id)?.name || '؟'}</Badge>
                   )}
@@ -1013,7 +1037,17 @@ export default function Implants() {
                 <Select
                   label="مدت هیلینگ"
                   value={caseForm.healing_months}
-                  onChange={(v) => setCaseForm({ ...caseForm, healing_months: v })}
+                  onChange={(v) => {
+                    // MOD-FEAT-040: «در مرحله ثبت تاریخ OPG همزمان با
+                    // نوبت‌دهی هیلینگ باید یادآوری شود.» The X-ray is what
+                    // tells the surgeon healing actually worked, so its
+                    // reminder belongs to the same decision as the healing
+                    // length. Suggested only when empty — a date the clinic
+                    // chose deliberately is not overwritten.
+                    const end = healingEndDate({ surgery_date: caseForm.surgery_date || null, healing_months: Number(v) || null })
+                    const opg = caseForm.opg_reminder_date || suggestOpgDate(end) || ''
+                    setCaseForm({ ...caseForm, healing_months: v, opg_reminder_date: opg })
+                  }}
                   options={[
                     { value: '2', label: '۲ ماه' }, { value: '3', label: '۳ ماه' },
                     { value: '4', label: '۴ ماه' }, { value: '6', label: '۶ ماه' },
@@ -1092,44 +1126,89 @@ export default function Implants() {
             content: (
               <>
                 <div className="grid grid-cols-3 gap-2">
-                  <CurrencyInput label="کل هزینه (ت)" value={caseForm.total_cost} onChange={(v) => setCaseForm({ ...caseForm, total_cost: v })} />
+                  <CurrencyInput label="قیمت فیکسچر (ت)" value={caseForm.total_cost} onChange={(v) => setCaseForm({ ...caseForm, total_cost: v })} />
                   <CurrencyInput label="پرداختی (ت)" value={caseForm.paid_amount} onChange={(v) => setCaseForm({ ...caseForm, paid_amount: v })} />
                   <Input label="گارانتی (سال)" type="number" value={caseForm.warranty_years} onChange={(v) => setCaseForm({ ...caseForm, warranty_years: v })} placeholder="5" />
                 </div>
+                {/* MOD-FEAT-040: every priced thing around the fixture —
+                    extraction, graft, membrane, sinus lift, fees, crowns by
+                    type and retention — as lines, not checkboxes. */}
+                <ImplantCostItemsEditor
+                  items={costItems}
+                  onChange={setCostItems}
+                  doctors={doctors}
+                  fixturePrice={Number(caseForm.total_cost) || 0}
+                />
                 {!editingCase && caseForm.total_cost && cases.some((c) => c.brand === caseForm.brand && c.total_cost) && (
                   <p className="text-[11px] text-slate-400 -mt-2">پیشنهاد خودکار بر اساس میانگین موارد قبلی همین برند در همین کلینیک — قابل تغییر است</p>
                 )}
-                <div className="flex flex-col gap-3 p-3 bg-slate-50 dark:bg-slate-700/50 rounded-xl">
-                  <label className="flex items-center gap-2 cursor-pointer">
-                    <input type="checkbox" checked={caseForm.extraction_needed} onChange={(e) => setCaseForm({ ...caseForm, extraction_needed: e.target.checked })} className="rounded text-primary-600 focus:ring-primary-400" />
-                    <span className="text-sm text-slate-700 dark:text-slate-200">کشیدن دندان همزمان (Extraction)</span>
-                  </label>
-                  <label className="flex items-center gap-2 cursor-pointer">
-                    <input type="checkbox" checked={caseForm.bone_graft} onChange={(e) => setCaseForm({ ...caseForm, bone_graft: e.target.checked })} className="rounded text-primary-600 focus:ring-primary-400" />
-                    <span className="text-sm text-slate-700 dark:text-slate-200">پودر استخوانی (Bone Graft)</span>
-                  </label>
-                  {caseForm.bone_graft && (
-                    <CurrencyInput label="هزینه‌ی پودر استخوانی (ت)" value={caseForm.bone_graft_cost} onChange={(v) => setCaseForm({ ...caseForm, bone_graft_cost: v })} />
+                {/* MOD-FEAT-040: every surgical extra priced, not just two of
+                    six. One list, one sum, and a new option needs no
+                    migration. */}
+                <div className="p-3 bg-slate-50 dark:bg-slate-700/50 rounded-xl">
+                  <p className="text-xs font-bold text-slate-700 dark:text-slate-200 mb-2">اقدامات و هزینه‌های اضافی</p>
+                  <div className="flex flex-wrap gap-1.5 mb-3">
+                    {EXTRA_CATALOG.map((opt) => {
+                      const on = caseForm.extras.some((e) => e.key === opt.key) && opt.key !== 'other'
+                      return (
+                        <button
+                          key={opt.key}
+                          type="button"
+                          aria-pressed={on}
+                          onClick={() => { h.select(); setCaseForm({ ...caseForm, extras: toggleExtra(caseForm.extras, opt.key) }) }}
+                          className={`px-2.5 py-1.5 rounded-lg text-xs font-medium border transition-all-smooth ${
+                            on
+                              ? 'bg-primary-600 text-white border-primary-600'
+                              : 'bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 border-slate-200 dark:border-slate-600'
+                          }`}
+                        >
+                          {opt.key === 'other' ? '+ سایر' : opt.label}
+                        </button>
+                      )
+                    })}
+                  </div>
+
+                  {caseForm.extras.length > 0 && (
+                    <div className="space-y-2">
+                      {caseForm.extras.map((ex, i) => (
+                        <div key={`${ex.key}-${i}`} className="flex items-center gap-2">
+                          {ex.key === 'other' ? (
+                            <input
+                              value={ex.label}
+                              onChange={(e) => setCaseForm({ ...caseForm, extras: setExtraLabel(caseForm.extras, i, e.target.value) })}
+                              placeholder="عنوان"
+                              className="flex-1 min-w-0 px-2.5 py-2 text-xs rounded-lg border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-800"
+                            />
+                          ) : (
+                            <span className="flex-1 min-w-0 text-xs text-slate-700 dark:text-slate-200 truncate">{ex.label}</span>
+                          )}
+                          <div className="w-36 shrink-0">
+                            <CurrencyInput
+                              label=""
+                              value={ex.cost ? String(ex.cost) : ''}
+                              onChange={(v) => setCaseForm({ ...caseForm, extras: setExtraCost(caseForm.extras, i, Number(v) || 0) })}
+                            />
+                          </div>
+                          <button
+                            type="button"
+                            aria-label={`حذف ${ex.label}`}
+                            onClick={() => setCaseForm({ ...caseForm, extras: caseForm.extras.filter((_, j) => j !== i) })}
+                            className="p-1.5 rounded-lg text-slate-400 hover:text-error-600 shrink-0"
+                          >
+                            <X size={14} />
+                          </button>
+                        </div>
+                      ))}
+                      {/* The sum sits with the items so the form never has a
+                          total the person cannot reconstruct by hand. */}
+                      <p className="text-xs text-slate-600 dark:text-slate-300 pt-2 border-t border-slate-200 dark:border-slate-600">
+                        جمع اضافات: <b>{formatCurrency(extrasTotal(caseForm.extras))} ت</b>
+                        {caseForm.total_cost && (
+                          <> · کل: <b>{formatCurrency(Number(caseForm.total_cost) + extrasTotal(caseForm.extras))} ت</b></>
+                        )}
+                      </p>
+                    </div>
                   )}
-                  <label className="flex items-center gap-2 cursor-pointer">
-                    <input type="checkbox" checked={caseForm.gbr} onChange={(e) => setCaseForm({ ...caseForm, gbr: e.target.checked })} className="rounded text-primary-600 focus:ring-primary-400" />
-                    <span className="text-sm text-slate-700 dark:text-slate-200">بازسازی استخوان هدایت‌شده (GBR)</span>
-                  </label>
-                  <label className="flex items-center gap-2 cursor-pointer">
-                    <input type="checkbox" checked={caseForm.membrane_used} onChange={(e) => setCaseForm({ ...caseForm, membrane_used: e.target.checked })} className="rounded text-primary-600 focus:ring-primary-400" />
-                    <span className="text-sm text-slate-700 dark:text-slate-200">استفاده از ممبران (Membrane)</span>
-                  </label>
-                  <label className="flex items-center gap-2 cursor-pointer">
-                    <input type="checkbox" checked={caseForm.sinus_lift} onChange={(e) => setCaseForm({ ...caseForm, sinus_lift: e.target.checked })} className="rounded text-primary-600 focus:ring-primary-400" />
-                    <span className="text-sm text-slate-700 dark:text-slate-200">سینوس لیفت (Sinus Lift)</span>
-                  </label>
-                  {caseForm.sinus_lift && (
-                    <CurrencyInput label="هزینه‌ی سینوس لیفت (ت)" value={caseForm.sinus_lift_cost} onChange={(v) => setCaseForm({ ...caseForm, sinus_lift_cost: v })} />
-                  )}
-                  <label className="flex items-center gap-2 cursor-pointer">
-                    <input type="checkbox" checked={caseForm.immediate_loading} onChange={(e) => setCaseForm({ ...caseForm, immediate_loading: e.target.checked })} className="rounded text-primary-600 focus:ring-primary-400" />
-                    <span className="text-sm text-slate-700 dark:text-slate-200">بارگذاری فوری (Immediate Loading)</span>
-                  </label>
                 </div>
               </>
             ),

@@ -1041,3 +1041,25 @@ export interface CashRegisterSession {
 }
 
 export type CashRegisterSessionInput = Omit<CashRegisterSession, 'id' | 'created_at' | 'updated_at'> & { clinic_id?: string }
+
+/** MOD-FEAT-040: یک ردیف برای هر چیز قیمت‌دار روی یک مورد ایمپلنت. */
+export interface ImplantCostItem {
+  id: string
+  clinic_id: string
+  implant_case_id: string
+  /** واژگان برنامه — kind در implantCosting.ts */
+  kind: string
+  /** آنچه کلینیک نوشت؛ برای kind ناشناخته همین نمایش داده می‌شود. */
+  label: string
+  /** مثلاً cemented یا screw برای روکش */
+  variant: string | null
+  quantity: number
+  unit_price: number
+  /** پزشکی که این دستمزد مال اوست */
+  doctor_id: string | null
+  notes: string | null
+  is_active: boolean
+  created_at: string
+  updated_at: string
+}
+export type ImplantCostItemInput = Omit<ImplantCostItem, 'id' | 'created_at' | 'updated_at'>

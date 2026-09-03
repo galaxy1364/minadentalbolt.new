@@ -28,8 +28,7 @@ import {
   PersonalFinanceItem, PersonalFinanceItemInput, CashRegisterSession,
   ConsentFormInput, DashboardStats, DoctorInput, UnitInput,
   RolePermission, RolePermissionInput, CustomRole, CustomRoleInput,
-  ManualReminder, ManualReminderInput,
-} from '../types'
+  ManualReminder, ManualReminderInput, ImplantCostItem, ImplantCostItemInput } from '../types'
 
 function uid(): string {
   if (typeof crypto !== 'undefined' && crypto.randomUUID) return crypto.randomUUID()
@@ -786,6 +785,38 @@ export async function fetchImplantCase(id: string): Promise<ImplantCaseWithRelat
     doctor: doctors.find((d) => d.id === item.doctor_id) ?? null,
     components,
   }
+}
+
+// ── MOD-FEAT-040: اقلام هزینه‌ی ایمپلنت ────────────────────────────────
+// One line per priced thing. Replaced six booleans and two cost columns
+// that could not carry a price, "and the rest", or whose fee it was.
+
+export async function fetchImplantCostItems(implantCaseId?: string): Promise<ImplantCostItem[]> {
+  let q = db.implant_cost_items.where('clinic_id').equals(CLINIC_ID)
+  const all = await q.toArray()
+  return all.filter((i) => i.is_active !== false && (!implantCaseId || i.implant_case_id === implantCaseId))
+}
+
+export async function createImplantCostItem(item: ImplantCostItemInput): Promise<ImplantCostItem> {
+  const { clinic_id, ...rest } = item
+  const id = uid()
+  const row: ImplantCostItem = { ...rest, is_active: rest.is_active ?? true, id, clinic_id: CLINIC_ID, created_at: nowISO(), updated_at: nowISO() }
+  await db.implant_cost_items.put(row)
+  await queueOperation('implant_cost_items', 'insert', id, row)
+  return row
+}
+
+export async function updateImplantCostItem(id: string, patch: Partial<ImplantCostItem>): Promise<void> {
+  const existing = await db.implant_cost_items.get(id)
+  if (!existing) return
+  const row = { ...existing, ...patch, updated_at: nowISO() }
+  await db.implant_cost_items.put(row)
+  await queueOperation('implant_cost_items', 'update', id, row)
+}
+
+/** Soft: the line is deactivated, never deleted — same rule as every table. */
+export async function deactivateImplantCostItem(id: string): Promise<void> {
+  await updateImplantCostItem(id, { is_active: false })
 }
 
 export async function createImplantCase(c: ImplantCaseInput): Promise<ImplantCase> {
