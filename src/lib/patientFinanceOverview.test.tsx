@@ -133,3 +133,54 @@ describe('🔴 از فهرست پرداخت‌ها باز می‌شود', () => 
     expect(billing).toContain('<PatientFinanceOverview')
   })
 })
+
+/**
+ * MOD-FEAT-038 | تاریخچه‌ی کامل بیمار
+ *
+ * گزارش مهدی: «تاریخچه کارهای بیمار به همراه دیتیل دقیق شماره دندان و
+ * تاریخ و قیمت و نام پزشک کامل شود و تاریخچه همیشه همه را نشان دهد.»
+ */
+import patientDetail from '../pages/PatientDetail.tsx?raw'
+
+describe('🔴 ردیف درمان، تاریخ و پزشک و سطح را می‌گوید', () => {
+  it('تاریخ درمان نشان داده می‌شود', () => {
+    // ردیف پیش از این فقط رویه، وضعیت و قیمت داشت.
+    expect(patientDetail).toContain("toJalaliStringPretty(String(t.created_at).slice(0, 10))")
+  })
+
+  it('نام پزشک نشان داده می‌شود', () => {
+    expect(patientDetail).toContain('getDoctorName(t.doctor_id)')
+  })
+
+  it('سطوح با نماد استاندارد نشان داده می‌شوند', () => {
+    expect(patientDetail).toContain('formatSurfaces(t.tooth_surface)')
+  })
+})
+
+describe('🔴 تاریخچه چیزی را برای همیشه پنهان نمی‌کند', () => {
+  it('همه‌ی تغییرات بارگذاری می‌شوند، نه فقط هشت‌تا', () => {
+    expect(patientDetail).not.toContain('setRecordHistory(entries.slice(0, 8))')
+    expect(patientDetail).toContain('setRecordHistory(entries)')
+  })
+
+  it('بقیه با یک لمس قابل دیدن است', () => {
+    expect(patientDetail).toContain('نمایش همه‌ی')
+  })
+})
+
+describe('🔴 یک تاریخچه‌ی پرداخت، نه دو', () => {
+  it('تب پرداخت‌ها از نمای مشترک استفاده می‌کند', () => {
+    // MOD-FEAT-031 عمداً اینجا نایستاد تا دو نما نسازد. راه درست حذف
+    // فهرست دستی بود، نه اضافه کردن سومی.
+    expect(patientDetail).toContain('<PatientFinanceOverview')
+  })
+
+  it('دفتر پزشکان — چیزی که فقط این تب داشت — مانده', () => {
+    expect(patientDetail).toContain('{renderDoctorLedger()}')
+  })
+
+  it('کارت‌های خلاصه‌ی تکراری حذف شدند', () => {
+    // نوار مانده داخل نمای مشترک همان سه عدد را دارد.
+    expect(patientDetail).not.toContain('<p className="text-xs text-slate-500 mb-1">کل هزینه درمان</p>')
+  })
+})

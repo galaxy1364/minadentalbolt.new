@@ -1,5 +1,7 @@
 // PatientDetail.tsx - Persian RTL Dental Clinic Patient Detail Page
 import { InsurancePanel } from '../components/InsurancePanel'
+import { PatientFinanceOverview } from '../components/PatientFinanceOverview'
+import { formatSurfaces } from '../lib/toothSurfaces'
 import { PatientDebtBar, PatientChequeRows } from '../components/PatientDebtBar'
 import { toothLabel, toothCode } from '../lib/toothLabel'
 import { buildPrintDocument } from '../lib/printDocument'
@@ -131,6 +133,7 @@ export default function PatientDetail() {
 
   const [patient, setPatient] = useState<Patient | null>(null)
   const [recordHistory, setRecordHistory] = useState<AuditLogEntry[]>([])
+  const [showAllHistory, setShowAllHistory] = useState(false)
   const [doctors, setDoctors] = useState<Doctor[]>([])
   const [loading, setLoading] = useState(true)
 
@@ -290,7 +293,9 @@ export default function PatientDetail() {
   useEffect(() => {
     if (!id) return
     db.audit_log.where('table_name').equals('patients').and((e) => e.record_id === id).reverse().sortBy('id').then((entries) => {
-      setRecordHistory(entries.slice(0, 8))
+      // MOD-FEAT-038: «تاریخچه همیشه همه را نشان دهد». Everything is loaded;
+      // the card shows the latest few and offers the rest on request.
+      setRecordHistory(entries)
     }).catch(() => {})
   }, [id])
 
@@ -967,15 +972,29 @@ export default function PatientDetail() {
             THIS patient's own record, not clinical/care events) */}
         {recordHistory.length > 0 && (
           <Card className="p-4 lg:col-span-2">
-            <h3 className="text-sm font-bold text-slate-700 mb-3">آخرین تغییرات پرونده</h3>
+            <h3 className="text-sm font-bold text-slate-700 mb-3">
+              تغییرات پرونده
+              <span className="text-xs font-normal text-slate-400 mr-1.5">({toPersianDigits(recordHistory.length)})</span>
+            </h3>
             <div className="space-y-2">
-              {recordHistory.map((entry) => (
+              {(showAllHistory ? recordHistory : recordHistory.slice(0, 8)).map((entry) => (
                 <div key={entry.id} className="flex items-center justify-between gap-2 text-xs">
                   <span className="text-slate-600">{entry.summary}</span>
                   <span className="text-slate-400 shrink-0">{entry.actor_name || 'ناشناس'} — {toJalaliStringPretty(entry.created_at.slice(0, 10))}</span>
                 </div>
               ))}
             </div>
+            {/* Nothing is hidden for good. The cap is only a first screen;
+                a record edited 300 times still has all 300 one tap away. */}
+            {recordHistory.length > 8 && (
+              <button
+                type="button"
+                onClick={() => setShowAllHistory((v) => !v)}
+                className="mt-2 text-xs font-bold text-primary-600"
+              >
+                {showAllHistory ? 'نمایش کمتر' : `نمایش همه‌ی ${toPersianDigits(recordHistory.length)} مورد`}
+              </button>
+            )}
           </Card>
         )}
       </div>
@@ -1147,6 +1166,17 @@ export default function PatientDetail() {
                           <span className="text-xs text-slate-500">{formatCurrency(t.total_price)} ت</span>
                         )}
                       </div>
+                      {/* MOD-FEAT-038: «تاریخچه کارهای بیمار به همراه دیتیل
+                          دقیق شماره دندان و تاریخ و قیمت و نام پزشک». The row
+                          had the procedure, the status and the price; the
+                          date, the doctor and the surfaces were on the record
+                          and never shown. A history that cannot say who did
+                          it or when is a list, not a history. */}
+                      <p className="text-[11px] text-slate-500 mt-1">
+                        {toJalaliStringPretty(String(t.created_at).slice(0, 10))}
+                        {t.doctor_id && ` · ${getDoctorName(t.doctor_id)}`}
+                        {t.tooth_surface && ` · سطح ${formatSurfaces(t.tooth_surface)}`}
+                      </p>
                     </div>
                   </div>
                 )
@@ -1532,8 +1562,22 @@ export default function PatientDetail() {
     )
   }
 
+  /**
+   * MOD-FEAT-038 | یک تاریخچه‌ی پرداخت، نه دو
+   *
+   * MOD-FEAT-031 built the patient's financial overview and stopped
+   * short of this tab because it already had its own payment list —
+   * putting both here would have been two views of one thing. The right
+   * fix was never "add a third"; it was to let the hand-rolled list go.
+   *
+   * What this tab had that the overview did not was the per-doctor
+   * ledger, so that stays. What the overview has that this list never
+   * did is which tooth and which doctor each payment was for, and the
+   * cheques — which is exactly the detail Mehdi asked the history to
+   * carry.
+   */
   const renderPayments = () => {
-    if (payments.length === 0) {
+    if (payments.length === 0 && cheques.length === 0) {
       return (
         <Card className="p-6">
           <EmptyState icon={<CreditCard size={32} />} title="پرداختی ثبت نشده" description="برای این بیمار پرداختی ثبت نشده است" />
@@ -1543,85 +1587,17 @@ export default function PatientDetail() {
     return (
       <div className="space-y-4">
         {renderDoctorLedger()}
-
-        {/* Summary */}
-        <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-          <Card className="p-4">
-            <p className="text-xs text-slate-500 mb-1">کل پرداختی</p>
-            <p className="text-lg font-bold text-success-700">{formatCurrency(totalPaid)} تومان</p>
-          </Card>
-          <Card className="p-4">
-            <p className="text-xs text-slate-500 mb-1">کل هزینه درمان</p>
-            <p className="text-lg font-bold text-primary-700">{formatCurrency(totalTreatmentCost)} تومان</p>
-          </Card>
-          <Card className="p-4 col-span-2 md:col-span-1">
-            <p className="text-xs text-slate-500 mb-1">مانده</p>
-            <p className={`text-lg font-bold ${patientBalance > 0 ? 'text-error-700' : 'text-success-700'}`}>
-              {formatCurrency(patientBalance)} تومان
-            </p>
-          </Card>
-        </div>
-
-        {/* Settled-patient archive suggestion — only when there's real
-            billing history that's now fully paid off, not a brand-new
-            patient with zero activity. Archiving stays a deliberate
-            staff decision (they might still have upcoming treatment),
-            never automatic. */}
-        {patientBalance <= 0 && totalTreatmentCost > 0 && patient?.is_active && (
-          <Card className="p-3.5 bg-success-50 dark:bg-success-900/10 border border-success-200 flex items-center gap-3">
-            <CheckCircle2 size={18} className="text-success-600 shrink-0" />
-            <div className="flex-1 min-w-0">
-              <p className="text-sm font-bold text-success-700 dark:text-success-400">این بیمار تسویه‌حساب کامل دارد</p>
-              <p className="text-[11px] text-success-600 dark:text-success-500">اگر درمان تمام شده و فعلاً برنامه‌ی درمانی جدیدی ندارد، می‌توانید بایگانی‌اش کنید.</p>
-            </div>
-            <Button
-              size="sm" variant="secondary"
-              onClick={() => {
-                h.tap()
-                confirmAction({
-                  type: 'status', title: 'بایگانی بیمار',
-                  warning: 'بیمار از لیست‌های فعال مخفی می‌شود، ولی هیچ داده‌ای پاک نمی‌شود — همیشه از بخش «بایگانی» قابل بازگردانی است.',
-                  fields: [{ label: 'نام', value: `${patient.first_name} ${patient.last_name}`, highlight: true }],
-                  confirmLabel: 'بایگانی کردن',
-                  onConfirm: async () => {
-                    await updatePatient(patient.id, { is_active: false })
-                    setPatient((p) => p ? { ...p, is_active: false } : p)
-                    showToast('success', 'بیمار بایگانی شد')
-                  },
-                })
-              }}
-            >
-              بایگانی کردن
-            </Button>
-          </Card>
-        )}
-
-        {/* Payment list */}
-        <div className="space-y-2">
-          {payments.map((p) => {
-            const methodMeta = paymentMethods.find((m) => m.value === p.payment_method)
-            const statusMeta = paymentStatuses.find((s) => s.value === p.status) || paymentStatuses[0]
-            return (
-              <Card key={p.id} className="p-4">
-                <div className="flex items-center justify-between gap-3 flex-wrap">
-                  <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-xl bg-success-50 text-success-600 flex items-center justify-center">
-                      <CreditCard size={18} />
-                    </div>
-                    <div>
-                      <p className="text-sm font-bold text-slate-800">{formatCurrency(p.amount)} تومان</p>
-                      <p className="text-xs text-slate-500">
-                        {methodMeta?.label || 'نامشخص'} - {toJalaliStringPretty(p.payment_date)}
-                      </p>
-                    </div>
-                  </div>
-                  <Badge color={statusMeta.color}>{statusMeta.label}</Badge>
-                </div>
-                {p.notes && <p className="text-xs text-slate-400 mt-2">{p.notes}</p>}
-              </Card>
-            )
-          })}
-        </div>
+        <Card className="p-4">
+          <PatientFinanceOverview
+            patientId={patient!.id}
+            patientName={`${patient!.first_name} ${patient!.last_name}`}
+            payments={payments}
+            treatments={treatments}
+            doctors={doctors as never}
+            implantCases={implantCases}
+            cheques={cheques as never}
+          />
+        </Card>
       </div>
     )
   }
