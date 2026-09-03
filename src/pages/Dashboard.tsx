@@ -2,6 +2,7 @@
 // iOS 27 design • Dark mode • Time-range & doctor filters • Period comparison
 // Auto-refresh • CSV export • Activity feed • Full accessibility • Responsive
 import { useState, useEffect, useCallback, useMemo, useRef, cloneElement, isValidElement } from 'react'
+import { subscribeSync, type SyncStatus } from '../lib/sync'
 import { useNavigate } from 'react-router-dom'
 import {
   Users, Calendar, DollarSign, FlaskConical, Plus, ArrowLeft, Activity,
@@ -582,6 +583,33 @@ export default function Dashboard() {
       if (autoTimer) clearInterval(autoTimer)
     }
   }, [loadData, autoRefresh])
+
+  /**
+   * MOD-FIX-021 | داشبورد بعد از همگام‌سازی تازه می‌شود
+   *
+   * گزارش مهدی: «در داشبورد زنده مانده ۵ میلیون ولی داخل مالی بدهی
+   * نداریم.»
+   *
+   * Both pages call the same calcAllPatientBalances on the same tables.
+   * The dashboard loaded once at mount and then every 90 seconds if
+   * auto-refresh was on — so after a payment was cancelled elsewhere and
+   * synced down, the dashboard kept the morning's figure until the timer
+   * fired, or forever with auto-refresh off. Billing, opened later, read
+   * fresh data. Two screens, two truths, one database.
+   *
+   * A sync completing is the one moment the local data is known to have
+   * changed, so it is the right trigger. Silent: the person did not ask
+   * for a refresh and should not see a spinner for one.
+   */
+  useEffect(() => {
+    let last: SyncStatus | null = null
+    const unsub = subscribeSync((status) => {
+      // Fire on the transition into a settled state, not on every tick.
+      if (last === 'syncing' && status !== 'syncing') loadData(true, true)
+      last = status
+    })
+    return unsub
+  }, [loadData])
 
   // ── Date Range ─────────────────────────────────────────────────
 
