@@ -596,6 +596,12 @@ export interface ImplantCase {
   healing_abutment_date: string | null
   impression_date: string | null
   crown_delivery_date: string | null
+  /** MOD-FEAT-039: مدت هیلینگ به ماه — پایانش از تاریخ جراحی حساب می‌شود. */
+  healing_months: number | null
+  /** تاریخی که باید عکس OPG گرفته شود. */
+  opg_reminder_date: string | null
+  /** سفارش لابراتوار روکش — زنجیره‌ی ارسال و تحویل همان‌جاست. */
+  lab_order_id: string | null
   stage: string | null
   bone_graft: boolean | null
   /** Itemized cost for the bone graft procedure specifically — total_cost

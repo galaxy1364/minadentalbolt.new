@@ -1,5 +1,7 @@
 // Implants.tsx - Persian RTL Dental Clinic Implant Cases Management
 import { useState, useEffect, useCallback, useMemo } from 'react'
+import { PatientDebtBar } from '../components/PatientDebtBar'
+import { implantMilestones, nextImplantAction, implantDeadline, IMPLANT_MILESTONE_COLORS } from '../lib/implantMilestones'
 import { PatientSelect } from '../components/PatientSelect'
 import { toothLabel, toothLabelWithWord } from '../lib/toothLabel'
 import { useNavigate, useLocation } from 'react-router-dom'
@@ -76,10 +78,6 @@ function getStageMeta(stage: string | null) {
   return implantStages.find((s) => s.value === stage) || implantStages[0]
 }
 
-function getStageIndex(stage: string | null) {
-  const idx = implantStages.findIndex((s) => s.value === stage)
-  return idx >= 0 ? idx : 0
-}
 
 function getSuccessMeta(status: string | null) {
   return successStatuses.find((s) => s.value === status) || successStatuses[0]
@@ -142,6 +140,8 @@ export default function Implants() {
     diameter: '',
     length: '',
     surgery_date: '',
+    healing_months: '',
+    opg_reminder_date: '',
     bone_graft: false,
     bone_graft_cost: '',
     gbr: false,
@@ -222,7 +222,7 @@ export default function Implants() {
     setCaseWizardStep(0)
     setCaseForm({
       patient_id: state.quickStartPatientId, doctor_id: state.quickStartDoctorId || '', tooth_number: handoff?.toothNumber || '', brand: '', custom_brand: '', model: '', diameter: '', length: '',
-      surgery_date: '', bone_graft: false, bone_graft_cost: '', gbr: false, membrane_used: false, extraction_needed: false,
+      surgery_date: '', healing_months: '', opg_reminder_date: '', bone_graft: false, bone_graft_cost: '', gbr: false, membrane_used: false, extraction_needed: false,
       sinus_lift: false, sinus_lift_cost: '', immediate_loading: false,
       total_cost: '', paid_amount: '', warranty_years: '', notes: '',
       surgery_fee_mode: 'formula', surgery_fee_amount: '', prosthesis_doctor_id: '', prosthesis_fee_amount: '',
@@ -288,7 +288,7 @@ export default function Implants() {
     setCaseWizardStep(0)
     setCaseForm({
       patient_id: '', doctor_id: '', tooth_number: '', brand: '', custom_brand: '', model: '', diameter: '', length: '',
-      surgery_date: '', bone_graft: false, bone_graft_cost: '', gbr: false, membrane_used: false, extraction_needed: false,
+      surgery_date: '', healing_months: '', opg_reminder_date: '', bone_graft: false, bone_graft_cost: '', gbr: false, membrane_used: false, extraction_needed: false,
       sinus_lift: false, sinus_lift_cost: '', immediate_loading: false,
       total_cost: '', paid_amount: '', warranty_years: '', notes: '',
       surgery_fee_mode: 'formula', surgery_fee_amount: '', prosthesis_doctor_id: '', prosthesis_fee_amount: '',
@@ -314,6 +314,8 @@ export default function Implants() {
       diameter: c.diameter || '',
       length: c.length || '',
       surgery_date: c.surgery_date || '',
+      healing_months: c.healing_months != null ? String(c.healing_months) : '',
+      opg_reminder_date: c.opg_reminder_date || '',
       bone_graft: c.bone_graft || false,
       bone_graft_cost: (c as any).bone_graft_cost != null ? String((c as any).bone_graft_cost) : '',
       gbr: c.gbr || false,
@@ -442,7 +444,11 @@ export default function Implants() {
       patient_id: caseForm.patient_id, doctor_id: caseForm.doctor_id || null,
       tooth_number: caseForm.tooth_number, brand: caseForm.brand === 'other' ? (caseForm.custom_brand.trim() || 'سایر') : (caseForm.brand || null),
       model: caseForm.model || null, diameter: caseForm.diameter || null, length: caseForm.length || null,
-      surgery_date: caseForm.surgery_date || null, bone_graft: caseForm.bone_graft,
+      surgery_date: caseForm.surgery_date || null,
+      // MOD-FEAT-039: the two links the chain could not compute without.
+      healing_months: caseForm.healing_months ? Number(caseForm.healing_months) : null,
+      opg_reminder_date: caseForm.opg_reminder_date || null,
+      bone_graft: caseForm.bone_graft,
       bone_graft_cost: caseForm.bone_graft && caseForm.bone_graft_cost ? Number(caseForm.bone_graft_cost) : null,
       gbr: caseForm.gbr, membrane_used: caseForm.membrane_used, extraction_needed: caseForm.extraction_needed,
       sinus_lift: caseForm.sinus_lift, immediate_loading: caseForm.immediate_loading,
@@ -573,69 +579,75 @@ export default function Implants() {
   // Render: Osseointegration Timeline
   // ===========================================================================
 
+  /**
+   * MOD-FEAT-039 | زنجیره‌ی ایمپلنت، مشتق از تاریخ‌ها
+   *
+   * The old timeline read `c.stage`, a string someone advanced by hand.
+   * It could say «در حال بهبود» on a case whose healing ended two months
+   * ago, or «قالب‌گیری» with no impression date on the record. Same
+   * failure the lab module had before MOD-FEAT-034: a position in a list
+   * standing in for facts nobody wrote down.
+   *
+   * This bar is computed from the dates themselves, with the lab portion
+   * living on the linked lab order rather than repeated here. Each link
+   * keeps its own hue; a late case turns its done-portion red.
+   */
   const renderTimeline = (c: ImplantCaseWithRelations) => {
-    const currentIdx = getStageIndex(c.stage)
-    // Skip 'failed' in the progress display unless it's the current stage
-    const stages = implantStages.filter((s) => s.value !== 'failed')
-    const failed = c.stage === 'failed'
+    const today = new Date().toISOString().slice(0, 10)
+    const chain = implantMilestones(c as never, today)
+    const late = implantDeadline(c as never, today).kind === 'late'
+    const next = nextImplantAction(c as never, today)
+    const doneCount = chain.filter((m) => m.done).length
     return (
-      <div className="flex items-center gap-1 mt-3">
-        {stages.map((s, i) => {
-          const isCompleted = failed ? false : i < currentIdx
-          const isCurrent = failed ? false : i === currentIdx
-          const isLast = i === stages.length - 1
+      <div className="mt-3">
+        <div dir="ltr" className="flex items-center gap-1 mb-1.5">
+          {chain.map((m) => (
+            <div
+              key={m.key}
+              title={m.label + (m.date ? ` — ${toJalaliStringPretty(m.date)}` : '')}
+              className="flex-1 h-1.5 rounded-full"
+              style={{ backgroundColor: m.done ? (late ? '#dc2626' : IMPLANT_MILESTONE_COLORS[m.key]) : 'rgb(226 232 240)' }}
+            />
+          ))}
+        </div>
+        <div className="flex items-center justify-between gap-2">
+          <span className="text-[11px] text-slate-500">
+            {doneCount ? chain.filter((m) => m.done).slice(-1)[0].label : 'هنوز شروع نشده'}
+            <span className="text-slate-400"> · {toPersianDigits(doneCount)}/{toPersianDigits(chain.length)}</span>
+          </span>
+          {/* During healing this reads «هیلینگ تا …» — a wait, not a button.
+              Offering an action during a mandatory wait invites the wrong
+              action. */}
+          {next && (
+            next.key === 'wait' || next.key === 'surgery'
+              ? <span className="text-[11px] text-violet-700 font-medium">{next.label}</span>
+              : <span className="text-[11px] text-primary-600 font-bold">{next.label}</span>
+          )}
+        </div>
+
+        {/* MOD-FEAT-039: «هر کدام از این مراحل باید قابلیت ارسال به مالی
+            وجود داشته باشد». The case knew its cost and what was paid;
+            the card offered no way to act on the gap. Same shared bar as
+            the patient record, so the number shown and the number
+            prefilled are one number. */}
+        {(() => {
+          const total = Number(c.total_cost || 0) + Number(c.bone_graft_cost || 0) + Number(c.sinus_lift_cost || 0)
+          const paid = Number(c.paid_amount || 0)
+          if (total <= 0) return null
           return (
-            <div key={s.value} className="flex items-center flex-1">
-              <div className="flex flex-col items-center flex-shrink-0">
-                <div
-                  className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold transition-all-smooth ${
-                    isCompleted ? 'bg-success-500 text-white' :
-                    isCurrent ? 'bg-primary-600 text-white ring-4 ring-primary-100' :
-                    'bg-slate-100 text-slate-400'
-                  }`}
-                >
-                  {isCompleted ? '✓' : toPersianDigits(i + 1)}
-                </div>
-                <span className={`text-[10px] mt-1 text-center max-w-[60px] leading-tight ${isCurrent ? 'text-primary-700 font-medium' : 'text-slate-400'}`}>
-                  {s.label}
-                </span>
-              </div>
-              {!isLast && (
-                <div className={`h-0.5 flex-1 mx-1 ${isCompleted ? 'bg-success-400' : 'bg-slate-200'}`} />
-              )}
+            <div className="mt-2">
+              <PatientDebtBar
+                patientId={c.patient_id}
+                balance={{ balance: total - paid, paid, totalCost: total }}
+                variant="compact"
+              />
             </div>
           )
-        })}
+        })()}
       </div>
     )
   }
 
-  // ===========================================================================
-  // Render: Progress Bar
-  // ===========================================================================
-
-  const renderProgressBar = (stage: string | null) => {
-    const currentIdx = getStageIndex(stage)
-    const stages = implantStages.filter((s) => s.value !== 'failed')
-    const failed = stage === 'failed'
-    const progress = failed ? 0 : Math.round((currentIdx / (stages.length - 1)) * 100)
-    return (
-      <div className="mt-2">
-        <div className="flex items-center justify-between text-xs mb-1">
-          <span className="text-slate-500">پیشرفت</span>
-          <span className={failed ? 'text-error-600 font-medium' : 'text-primary-600 font-medium'}>
-            {failed ? 'ناموفق' : `${toPersianDigits(progress)}٪`}
-          </span>
-        </div>
-        <div className="h-2 bg-slate-100 rounded-full overflow-hidden">
-          <div
-            className={`h-full rounded-full transition-all-smooth ${failed ? 'bg-error-500' : 'bg-gradient-to-r from-primary-500 to-success-500'}`}
-            style={{ width: `${failed ? 100 : progress}%` }}
-          />
-        </div>
-      </div>
-    )
-  }
 
   // ===========================================================================
   // Render
@@ -822,8 +834,10 @@ export default function Implants() {
                 {/* Osseointegration Timeline */}
                 {renderTimeline(c)}
 
-                {/* Progress Bar */}
-                {renderProgressBar(c.stage)}
+                {/* MOD-FEAT-039: the stage-driven progress bar used to sit
+                    here beside the derived chain — two bars, one card. The
+                    chain reads what happened; the bar read what was last
+                    clicked. Removed. */}
 
                 {/* Cost breakdown */}
                 <div className="grid grid-cols-3 gap-2 mt-3 pt-3 border-t border-slate-100">
@@ -992,6 +1006,21 @@ export default function Implants() {
                     an arch of sixteen. */}
                 <ToothArchSelect label="دندان *" value={caseForm.tooth_number} onChange={(v) => setCaseForm({ ...caseForm, tooth_number: v })} allowPrimary={false} />
                 <PersianDateInput label="تاریخ جراحی" value={caseForm.surgery_date} onChange={(v) => setCaseForm({ ...caseForm, surgery_date: v })} />
+                {/* MOD-FEAT-039: healing is entered as a duration, never as an
+                    end date, so the end is computed from the surgery and
+                    cannot be typed wrong. The one date patients most often
+                    forget should not be the one a human copies by hand. */}
+                <Select
+                  label="مدت هیلینگ"
+                  value={caseForm.healing_months}
+                  onChange={(v) => setCaseForm({ ...caseForm, healing_months: v })}
+                  options={[
+                    { value: '2', label: '۲ ماه' }, { value: '3', label: '۳ ماه' },
+                    { value: '4', label: '۴ ماه' }, { value: '6', label: '۶ ماه' },
+                  ]}
+                  placeholder="انتخاب…"
+                />
+                <PersianDateInput label="تاریخ عکس OPG" value={caseForm.opg_reminder_date} onChange={(v) => setCaseForm({ ...caseForm, opg_reminder_date: v })} />
               </>
             ),
           },
