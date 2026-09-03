@@ -5,7 +5,7 @@
 // means users keep getting an old JS bundle after a deploy, which can
 // leave the app failing to load entirely when the cached HTML and the
 // new assets no longer match.
-const CACHE_NAME = 'minadent-v1.218.0'
+const CACHE_NAME = 'minadent-v1.219.0'
 const STATIC_ASSETS = [
   '/',
   '/index.html',

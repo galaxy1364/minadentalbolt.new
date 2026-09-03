@@ -44,6 +44,25 @@ export interface MilestoneState {
   date: string | null
 }
 
+/**
+ * MOD-FEAT-037 | یک رنگ برای هر حلقه
+ *
+ * گزارش مهدی: «خط روند هر کادر یه رنگ متفاوت داشته باشد، قابل جداسازی
+ * باشند، راحت پیدا شود.»
+ *
+ * Five identical teal segments told you how far along the chain was but
+ * not which step you were looking at. Each link now has its own hue, so
+ * «رسید به مطب» is recognisable at a glance across every card without
+ * counting from the left.
+ */
+export const MILESTONE_COLORS: Record<ClinicMilestone, string> = {
+  sent: '#0284c7',      // sky-600     — فرستادیم
+  due: '#7c3aed',       // violet-600  — موعد
+  arrived: '#059669',   // emerald-600 — رسید
+  booked: '#d97706',    // amber-600   — نوبت
+  delivered: '#16a34a', // green-600   — تحویل
+}
+
 const LABELS: Record<ClinicMilestone, string> = {
   sent: 'ارسال به لابراتوار',
   due: 'موعد رسیدن به مطب',

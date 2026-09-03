@@ -14,6 +14,7 @@ import { canAccess, REQUIRE_LOGIN } from '../lib/permissions'
 import { isAppLockEnabled } from '../lib/appLock'
 import { AppLockScreen } from './AppLockScreen'
 import { ModuleIconBadge } from './ModuleIconBadge'
+import { labOpenWork, appointmentsOpenWork, billingOpenWork, LEVEL_COLORS, type OpenWork } from '../lib/openWork'
 import { APP_VERSION } from '../lib/appVersion'
 import { checkForUpdate, applyUpdate } from '../lib/updateCheck'
 import {
@@ -21,7 +22,7 @@ import {
   getModuleByPath, setModuleTheme, type ModuleIdentity,
 } from '../theme/modules'
 import { subscribeSync, initSyncEngine, syncNow, SyncStatus } from '../lib/sync'
-import { fetchPayments, fetchTreatments, fetchImplantCases, loadRolePermissionOverrides } from '../lib/api'
+import { fetchPayments, fetchTreatments, fetchImplantCases, loadRolePermissionOverrides, fetchLabOrders, fetchAppointments } from '../lib/api'
 import { runAutoBackupIfNeeded } from '../lib/autoBackup'
 import { calcAllPatientBalances } from '../lib/finance'
 import { h } from '../lib/haptics'
@@ -233,21 +234,32 @@ function BottomTabBar() {
   const location = useLocation()
   const { profile } = useAuth()
   const [moreOpen, setMoreOpen] = useState(false)
-  const [debtorCount, setDebtorCount] = useState(0)
+  const [openWork, setOpenWork] = useState<Record<string, OpenWork>>({})
   const isActive = (path: string) => path === '/' ? location.pathname === '/' : location.pathname.startsWith(path)
 
   // Badge on the مالی (Billing) nav icon — how many patients currently
   // owe money, refreshed on every navigation so it stays live as
   // payments get recorded elsewhere in the app. Pure local Dexie reads,
   // so this is cheap even running on every route change.
+  // MOD-FEAT-037: every module with open work gets a badge, coloured by
+  // how urgent the worst item in it is. Before this only مالی had one,
+  // and it was always red — a bar that only ever shouts about money
+  // teaches people the rest is quiet.
   useEffect(() => {
     let cancelled = false
-    Promise.all([fetchPayments(), fetchTreatments(), fetchImplantCases()]).then(([pays, trts, impl]) => {
-      if (cancelled) return
-      const { byPatient } = calcAllPatientBalances(pays, trts, impl)
-      const count = Array.from(byPatient.values()).filter((f) => f.balance > 0).length
-      setDebtorCount(count)
-    }).catch(() => {})
+    const today = new Date().toISOString().slice(0, 10)
+    Promise.all([fetchPayments(), fetchTreatments(), fetchImplantCases(), fetchLabOrders(), fetchAppointments()])
+      .then(([pays, trts, impl, labs, appts]) => {
+        if (cancelled) return
+        const { byPatient } = calcAllPatientBalances(pays, trts, impl)
+        const debtors = Array.from(byPatient.values()).filter((f) => f.balance > 0).length
+        setOpenWork({
+          '/billing': billingOpenWork(debtors),
+          '/laboratory': labOpenWork(labs as never, today),
+          '/appointments': appointmentsOpenWork(appts as never, today),
+        })
+      })
+      .catch(() => {})
     return () => { cancelled = true }
   }, [location.pathname])
   const visiblePrimary = primaryModules.filter((item: ModuleIdentity) => canAccess(profile?.role, item.path))
@@ -278,11 +290,19 @@ function BottomTabBar() {
                       recognisable shape at, so the custom glyphs read as
                       smudges on a phone. */}
                   <Icon size={active ? 28 : 25} strokeWidth={active ? 2.4 : 1.9} />
-                  {item.path === '/billing' && debtorCount > 0 && (
-                    <span className="absolute -top-1 -left-1 min-w-[16px] h-4 px-1 rounded-full bg-error-500 text-white text-[9px] font-bold flex items-center justify-center border border-white dark:border-slate-900">
-                      {debtorCount > 99 ? '99+' : debtorCount}
-                    </span>
-                  )}
+                  {(() => {
+                    const w = openWork[item.path]
+                    if (!w || w.count === 0) return null
+                    return (
+                      <span
+                        className="absolute -top-1 -left-1 min-w-[16px] h-4 px-1 rounded-full text-white text-[9px] font-bold flex items-center justify-center border border-white dark:border-slate-900"
+                        style={{ backgroundColor: LEVEL_COLORS[w.level] }}
+                        aria-label={`${w.count} کار باز`}
+                      >
+                        {w.count > 99 ? '99+' : w.count}
+                      </span>
+                    )
+                  })()}
                 </div>
                 <span
                   className="text-[10px] font-medium leading-none"

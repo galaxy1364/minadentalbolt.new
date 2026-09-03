@@ -2,7 +2,8 @@
 import { useState, useEffect, useCallback, useMemo } from 'react'
 import { SurfaceSelect } from '../components/SurfaceSelect'
 import { formatSurfaces } from '../lib/toothSurfaces'
-import { clinicMilestones, nextClinicAction, deadlineState } from '../lib/labClinicMilestones'
+import { clinicMilestones, nextClinicAction, deadlineState, MILESTONE_COLORS } from '../lib/labClinicMilestones'
+import { LEVEL_COLORS } from '../lib/openWork'
 import { PatientSelect } from '../components/PatientSelect'
 import { toothLabel, toothLabelWithWord } from '../lib/toothLabel'
 import { FlaskConical, Plus, Search, Clock, CheckCircle2, AlertCircle, Edit2, Trash2, Phone, Filter, TrendingUp, Package, CalendarClock, ChevronLeft, RotateCcw } from 'lucide-react'
@@ -779,13 +780,21 @@ export default function Laboratory() {
         {order.status !== 'delivered' && order.status !== 'cancelled' && (
           <div className="mb-3">
             <div dir="ltr" className="flex items-center gap-1 mb-1.5">
-              {clinicMilestones(order).map((m) => (
-                <div
-                  key={m.key}
-                  title={m.label}
-                  className={`flex-1 h-1.5 rounded-full ${m.done ? 'bg-primary-500' : 'bg-slate-200 dark:bg-slate-600'}`}
-                />
-              ))}
+              {clinicMilestones(order).map((m) => {
+                // MOD-FEAT-037: each link keeps its own hue when done, so a
+                // card can be read without counting segments. A late order
+                // turns the whole done-portion red — the state that matters
+                // most should not be hidden inside a pleasant gradient.
+                const late = deadlineState(order as never, todayISO()).kind === 'late'
+                return (
+                  <div
+                    key={m.key}
+                    title={m.label}
+                    className={`flex-1 h-2 rounded-full transition-all-smooth ${m.done ? '' : 'bg-slate-200 dark:bg-slate-600'}`}
+                    style={m.done ? { backgroundColor: late ? LEVEL_COLORS.late : MILESTONE_COLORS[m.key] } : undefined}
+                  />
+                )
+              })}
             </div>
             <div className="flex items-center justify-between">
               <span className="text-[11px] text-slate-500">
@@ -798,9 +807,17 @@ export default function Laboratory() {
                   step is a card nobody acts on. */}
               {(() => {
                 const next = nextClinicAction(order)
+                // MOD-FEAT-037: «دکمه‌های ارسال به لابراتوار خیلی واضح باشد».
+                // The next step was an 11px text link, indistinguishable
+                // from the status label beside it. It is the one thing on
+                // the card someone is meant to press, so it looks like one.
                 return next ? (
-                  <button onClick={() => advanceClinicStep(order, next.key)} className="text-[11px] text-primary-600 font-bold flex items-center gap-0.5">
-                    {next.label} <ChevronLeft size={12} />
+                  <button
+                    onClick={() => advanceClinicStep(order, next.key)}
+                    className="press-scale flex items-center gap-1 px-3 py-1.5 rounded-xl text-white text-xs font-bold shadow-sm transition-all-smooth"
+                    style={{ backgroundColor: MILESTONE_COLORS[next.key] }}
+                  >
+                    {next.label} <ChevronLeft size={14} />
                   </button>
                 ) : null
               })()}
