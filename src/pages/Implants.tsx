@@ -3,7 +3,6 @@ import { useState, useEffect, useCallback, useMemo } from 'react'
 import { ImplantCostItemsEditor, type EditableCostItem } from '../components/ImplantCostItemsEditor'
 import { suggestOpgDate, caseTotal, costKindMeta, describeItem, lineTotal, deriveLabOrderFromImplant } from '../lib/implantCosting'
 import { clinicMilestones, nextClinicAction } from '../lib/labClinicMilestones'
-import { EXTRA_CATALOG, parseExtras, extrasTotal, toggleExtra, setExtraCost, setExtraLabel, type ImplantExtra } from '../lib/implantExtras'
 import { PatientDebtBar } from '../components/PatientDebtBar'
 import { implantMilestones, nextImplantAction, implantDeadline, IMPLANT_MILESTONE_COLORS, healingEndDate } from '../lib/implantMilestones'
 import { PatientSelect } from '../components/PatientSelect'
@@ -154,7 +153,6 @@ export default function Implants() {
     paid_amount: '',
     warranty_years: '',
     notes: '',
-    extras: [] as ImplantExtra[],
     surgery_fee_mode: 'formula' as 'formula' | 'negotiated',
     surgery_fee_amount: '',
     prosthesis_doctor_id: '',
@@ -231,7 +229,7 @@ export default function Implants() {
       patient_id: state.quickStartPatientId, doctor_id: state.quickStartDoctorId || '', tooth_number: handoff?.toothNumber || '', brand: '', custom_brand: '', model: '', diameter: '', length: '',
       surgery_date: '', healing_months: '', opg_reminder_date: '',
       total_cost: '', paid_amount: '', warranty_years: '', notes: '',
-      extras: [], surgery_fee_mode: 'formula', surgery_fee_amount: '', prosthesis_doctor_id: '', prosthesis_fee_amount: '',
+      surgery_fee_mode: 'formula', surgery_fee_amount: '', prosthesis_doctor_id: '', prosthesis_fee_amount: '',
     })
     setCaseModalOpen(true)
     window.history.replaceState({}, '')
@@ -297,7 +295,7 @@ export default function Implants() {
       patient_id: '', doctor_id: '', tooth_number: '', brand: '', custom_brand: '', model: '', diameter: '', length: '',
       surgery_date: '', healing_months: '', opg_reminder_date: '',
       total_cost: '', paid_amount: '', warranty_years: '', notes: '',
-      extras: [], surgery_fee_mode: 'formula', surgery_fee_amount: '', prosthesis_doctor_id: '', prosthesis_fee_amount: '',
+      surgery_fee_mode: 'formula', surgery_fee_amount: '', prosthesis_doctor_id: '', prosthesis_fee_amount: '',
     })
     setCaseModalOpen(true)
   }
@@ -327,6 +325,29 @@ export default function Implants() {
    * from its priced lines. The lab is the one thing the case cannot know,
    * so the person still picks that; everything else arrives filled.
    */
+  /**
+   * MOD-FIX-022: one handler per step, each writing the fact it stands
+   * for — the same shape as the lab chain. Booking steps hand over to
+   * the appointment module rather than inventing a time.
+   */
+  const advanceImplantStep = async (c: ImplantCaseWithRelations, step: string) => {
+    h.tap()
+    const today = new Date().toISOString().slice(0, 10)
+    try {
+      if (step === 'surgery_booked' || step === 'impression') {
+        labNav('/appointments', {
+          state: { quickStartPatientId: c.patient_id, quickStartDoctorId: step === 'impression' ? (c.prosthesis_doctor_id || c.doctor_id) : c.doctor_id, implantCaseId: c.id, implantStep: step },
+        })
+        return
+      }
+      if (step === 'healing') { openEditCaseModal(c); return }
+      if (step === 'opg') { await updateImplantCase(c.id, { opg_reminder_date: today } as never); showToast('success', 'عکس OPG ثبت شد') }
+      else if (step === 'lab') { sendToLab(c); return }
+      else if (step === 'delivered') { await updateImplantCase(c.id, { crown_delivery_date: today } as never); showToast('success', 'تحویل روکش ثبت شد') }
+      await loadData()
+    } catch { showToast('error', 'خطا در ثبت این گام') }
+  }
+
   const sendToLab = (c: ImplantCaseWithRelations) => {
     h.tap()
     const lines = allCostItems.filter((i) => i.implant_case_id === c.id)
@@ -362,7 +383,6 @@ export default function Implants() {
       paid_amount: c.paid_amount != null ? String(c.paid_amount) : '',
       warranty_years: c.warranty_years != null ? String(c.warranty_years) : '',
       notes: c.notes || '',
-      extras: parseExtras((c as { extras?: unknown }).extras),
       surgery_fee_mode: (c.surgery_fee_mode as 'formula' | 'negotiated') || 'formula',
       surgery_fee_amount: c.surgery_fee_amount != null ? String(c.surgery_fee_amount) : '',
       prosthesis_doctor_id: c.prosthesis_doctor_id || '',
@@ -653,19 +673,22 @@ export default function Implants() {
           {/* During healing this reads «هیلینگ تا …» — a wait, not a button.
               Offering an action during a mandatory wait invites the wrong
               action. */}
+          {/* MOD-FIX-022: «دکمه مشخص رنگی». Every step that is an action is
+              a button in the colour of its milestone; only the wait is a
+              label, because there is nothing to press during healing. */}
           {next && (
             next.key === 'wait' || next.key === 'surgery'
               ? <span className="text-[11px] text-violet-700 font-medium">{next.label}</span>
-              : next.key === 'lab'
-                // MOD-FEAT-041: the one step that was a label and not a
-                // button. Everything the order needs is on the case; the
-                // lab page fills its form from it and links back.
-                ? (
-                  <button type="button" onClick={() => sendToLab(c)} className="text-[11px] text-primary-600 font-bold flex items-center gap-0.5 press-scale">
-                    {next.label} <ChevronLeft size={12} />
-                  </button>
-                )
-                : <span className="text-[11px] text-primary-600 font-bold">{next.label}</span>
+              : (
+                <button
+                  type="button"
+                  onClick={() => advanceImplantStep(c, next.key)}
+                  style={{ backgroundColor: IMPLANT_MILESTONE_COLORS[next.key as keyof typeof IMPLANT_MILESTONE_COLORS] ?? '#0f766e' }}
+                  className="text-[11px] font-bold text-white px-3 py-1.5 rounded-lg flex items-center gap-1 press-scale shadow-sm"
+                >
+                  {next.label} <ChevronLeft size={12} />
+                </button>
+              )
           )}
         </div>
 
@@ -1190,71 +1213,10 @@ export default function Implants() {
                 {/* MOD-FEAT-040: every surgical extra priced, not just two of
                     six. One list, one sum, and a new option needs no
                     migration. */}
-                <div className="p-3 bg-slate-50 dark:bg-slate-700/50 rounded-xl">
-                  <p className="text-xs font-bold text-slate-700 dark:text-slate-200 mb-2">اقدامات و هزینه‌های اضافی</p>
-                  <div className="flex flex-wrap gap-1.5 mb-3">
-                    {EXTRA_CATALOG.map((opt) => {
-                      const on = caseForm.extras.some((e) => e.key === opt.key) && opt.key !== 'other'
-                      return (
-                        <button
-                          key={opt.key}
-                          type="button"
-                          aria-pressed={on}
-                          onClick={() => { h.select(); setCaseForm({ ...caseForm, extras: toggleExtra(caseForm.extras, opt.key) }) }}
-                          className={`px-2.5 py-1.5 rounded-lg text-xs font-medium border transition-all-smooth ${
-                            on
-                              ? 'bg-primary-600 text-white border-primary-600'
-                              : 'bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 border-slate-200 dark:border-slate-600'
-                          }`}
-                        >
-                          {opt.key === 'other' ? '+ سایر' : opt.label}
-                        </button>
-                      )
-                    })}
-                  </div>
+                {/* MOD-FIX-022: the JSON-backed chip section that lived here
+                    was one of two cost editors on this form. Its chips moved
+                    into ImplantCostItemsEditor, on the table model. */}
 
-                  {caseForm.extras.length > 0 && (
-                    <div className="space-y-2">
-                      {caseForm.extras.map((ex, i) => (
-                        <div key={`${ex.key}-${i}`} className="flex items-center gap-2">
-                          {ex.key === 'other' ? (
-                            <input
-                              value={ex.label}
-                              onChange={(e) => setCaseForm({ ...caseForm, extras: setExtraLabel(caseForm.extras, i, e.target.value) })}
-                              placeholder="عنوان"
-                              className="flex-1 min-w-0 px-2.5 py-2 text-xs rounded-lg border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-800"
-                            />
-                          ) : (
-                            <span className="flex-1 min-w-0 text-xs text-slate-700 dark:text-slate-200 truncate">{ex.label}</span>
-                          )}
-                          <div className="w-36 shrink-0">
-                            <CurrencyInput
-                              label=""
-                              value={ex.cost ? String(ex.cost) : ''}
-                              onChange={(v) => setCaseForm({ ...caseForm, extras: setExtraCost(caseForm.extras, i, Number(v) || 0) })}
-                            />
-                          </div>
-                          <button
-                            type="button"
-                            aria-label={`حذف ${ex.label}`}
-                            onClick={() => setCaseForm({ ...caseForm, extras: caseForm.extras.filter((_, j) => j !== i) })}
-                            className="p-1.5 rounded-lg text-slate-400 hover:text-error-600 shrink-0"
-                          >
-                            <X size={14} />
-                          </button>
-                        </div>
-                      ))}
-                      {/* The sum sits with the items so the form never has a
-                          total the person cannot reconstruct by hand. */}
-                      <p className="text-xs text-slate-600 dark:text-slate-300 pt-2 border-t border-slate-200 dark:border-slate-600">
-                        جمع اضافات: <b>{formatCurrency(extrasTotal(caseForm.extras))} ت</b>
-                        {caseForm.total_cost && (
-                          <> · کل: <b>{formatCurrency(Number(caseForm.total_cost) + extrasTotal(caseForm.extras))} ت</b></>
-                        )}
-                      </p>
-                    </div>
-                  )}
-                </div>
               </>
             ),
           },

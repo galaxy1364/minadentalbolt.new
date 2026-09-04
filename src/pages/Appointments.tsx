@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useMemo } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
 import { Calendar, Clock, CheckCircle2, User, ChevronRight, ChevronLeft, Plus, Search, Trash2, AlertCircle, Edit2, Stethoscope, DollarSign, FileText, Activity, List, Grid, X, UserPlus, Globe } from 'lucide-react'
-import { fetchTreatments, fetchPayments, fetchImplantCases, fetchAppointments, createAppointment, updateAppointment, checkConflict, fetchPatients, updatePatient, fetchDoctors, fetchUnits, peekNextFileNumber, createPatient, createEncounter, fetchDoctorSchedules, fetchOnlineBookingRequests, rejectBookingRequest, updateLabOrder } from '../lib/api'
+import { fetchTreatments, fetchPayments, fetchImplantCases, fetchAppointments, createAppointment, updateAppointment, checkConflict, fetchPatients, updatePatient, fetchDoctors, fetchUnits, peekNextFileNumber, createPatient, createEncounter, fetchDoctorSchedules, fetchOnlineBookingRequests, rejectBookingRequest, updateLabOrder, updateImplantCase } from '../lib/api'
 import { toJalaliString, toJalaliStringPretty, getJalaliDateInfo, formatTime, formatCurrency, toPersianDigits, persianWeekdaysShort, getHoliday, jsDateToPersianWeekday } from '../lib/persianDate'
 import { doctorColor } from '../lib/doctorColors'
 import { summariseDay, shiftsCapacityMinutes } from '../lib/dayMetrics'
@@ -96,18 +96,28 @@ export default function Appointments() {
    */
   useEffect(() => {
     const st = routerLocation.state as {
-      quickStartPatientId?: string; quickStartDoctorId?: string | null; labOrderId?: string
+      quickStartPatientId?: string; quickStartDoctorId?: string | null
+      labOrderId?: string; implantCaseId?: string; implantStep?: string
     } | null
     if (!st?.quickStartPatientId) return
+
+    // MOD-FIX-022: implant steps arrive here too. Surgery and impression
+    // are appointments; on save their date goes back to the case.
+    const implantStep = st.implantStep
+    const typeAndNote = implantStep === 'surgery_booked'
+      ? { type: 'surgery', notes: 'جراحی ایمپلنت' }
+      : implantStep === 'impression'
+        ? { type: 'impression', notes: 'قالب‌گیری ایمپلنت' }
+        : { type: 'delivery', notes: 'تحویل کار لابراتوار' }
 
     setWizardData((w) => ({
       ...w,
       patient_id: st.quickStartPatientId!,
       doctor_id: st.quickStartDoctorId || w.doctor_id,
-      type: 'delivery',
-      notes: 'تحویل کار لابراتوار',
+      ...typeAndNote,
     }))
     setPendingLabOrderId(st.labOrderId ?? null)
+    setPendingImplant(st.implantCaseId && implantStep ? { caseId: st.implantCaseId, step: implantStep } : null)
     setEditingAppt(null)
     setWizardStep(0)
     setWizardOpen(true)
@@ -132,6 +142,7 @@ export default function Appointments() {
    * than by a second manual step nobody remembers.
    */
   const [pendingLabOrderId, setPendingLabOrderId] = useState<string | null>(null)
+  const [pendingImplant, setPendingImplant] = useState<{ caseId: string; step: string } | null>(null)
 
   const { config, confirmAction, close, ConfirmActionModal } = useConfirmAction()
 
@@ -398,6 +409,20 @@ export default function Appointments() {
           // recurring series has no one appointment that is "the
           // delivery", and guessing which would be worse than leaving it
           // for the person to set.
+          // MOD-FIX-022: an implant step booked here writes its date to the
+          // case, so the chain advances from the appointment rather than
+          // from a second manual entry.
+          if (pendingImplant && created?.id) {
+            try {
+              const patch = pendingImplant.step === 'surgery_booked'
+                ? { surgery_date: wizardData.date, surgery_appointment_id: created.id }
+                : { impression_date: wizardData.date }
+              await updateImplantCase(pendingImplant.caseId, patch as never)
+            } catch {
+              showToast('error', 'نوبت ثبت شد ولی به مورد ایمپلنت وصل نشد')
+            }
+            setPendingImplant(null)
+          }
           if (pendingLabOrderId && created?.id) {
             try {
               await updateLabOrder(pendingLabOrderId, { delivery_appointment_id: created.id } as never)

@@ -260,3 +260,46 @@ describe('🔴 فرستنده گیرنده دارد — حلقه بسته است
     expect(implantsPage).toContain('labOrders.find((o) => o.id === c.lab_order_id)')
   })
 })
+
+/**
+ * MOD-FIX-022 | یک ویرایشگر، نه دو — و دکمه‌های رنگی
+ *
+ * v1.223 دو ویرایشگر هزینه روی یک فرم داشت: چیپ‌هایی که ستون JSON را
+ * می‌نوشتند، و کرکره‌ای که جدول را. هر دو مال یک نویسنده در یک روز، دو
+ * طرفِ یک بازنشانی حافظه، بی‌خبر از هم. مهدی هر دو را دید و گفت فرم
+ * هوشمند نیست. حق داشت.
+ */
+describe('🔴 یک ویرایشگر اقلام هزینه', () => {
+  it('بخش JSON‌محور حذف شده', () => {
+    expect(implantsPage).not.toContain('اقدامات و هزینه‌های اضافی')
+    expect(implantsPage).not.toContain('implantExtras')
+    expect(implantsPage).not.toContain('extras:')
+  })
+
+  it('ویرایشگر باقی‌مانده چیپ‌ها را دارد', async () => {
+    const editor = (await import('../components/ImplantCostItemsEditor.tsx?raw')).default
+    expect(editor).toContain('aria-pressed={on}')
+    expect(editor).toContain("toggle('other')")
+  })
+
+  // The JSON module itself is gone; TypeScript refuses to compile an
+  // import of it, which is a stronger lock than any runtime check.
+})
+
+describe('🔴 هر گام یک دکمه‌ی رنگی است، نه برچسب', () => {
+  it('اقدام بعدی با رنگ حلقه‌اش رندر می‌شود', () => {
+    expect(implantsPage).toContain('advanceImplantStep(c, next.key)')
+    expect(implantsPage).toContain('IMPLANT_MILESTONE_COLORS[next.key')
+  })
+
+  it('جراحی و قالب‌گیری به نوبت‌دهی می‌روند، نه اینکه زمان اختراع کنند', () => {
+    expect(implantsPage).toContain("implantStep: step")
+  })
+
+  it('نوبت‌دهی گام ایمپلنت را می‌خواند و تاریخ را برمی‌گرداند', async () => {
+    const appts = (await import('../pages/Appointments.tsx?raw')).default
+    expect(appts).toContain('implantCaseId')
+    expect(appts).toContain('surgery_date: wizardData.date')
+    expect(appts).toContain('impression_date: wizardData.date')
+  })
+})
