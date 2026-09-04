@@ -8,7 +8,7 @@ import { PatientSelect } from '../components/PatientSelect'
 import { toothLabel, toothLabelWithWord } from '../lib/toothLabel'
 import { FlaskConical, Plus, Search, Clock, CheckCircle2, AlertCircle, Edit2, Trash2, Phone, Filter, TrendingUp, Package, CalendarClock, ChevronLeft, RotateCcw } from 'lucide-react'
 import { downloadICSReminder } from '../lib/icsReminder'
-import { fetchLabOrders, createLabOrder, updateLabOrder, fetchLabs, createLab, updateLab, fetchPatients, fetchDoctors, fetchTreatments, updateTreatment } from '../lib/api'
+import { fetchLabOrders, createLabOrder, updateLabOrder, fetchLabs, createLab, updateLab, fetchPatients, fetchDoctors, fetchTreatments, updateTreatment, updateImplantCase } from '../lib/api'
 import {
   formatShelfLocation, validateShelf, alarmInfo, suggestAlarmDate,
   readyForDelivery, sortByUrgency, summariseLab, deliveryPatch,
@@ -117,6 +117,8 @@ export default function Laboratory() {
   // Order modal
   const [orderModalOpen, setOrderModalOpen] = useState(false)
   const location = useLocation()
+  /** MOD-FEAT-041: the implant case waiting for this order's id. */
+  const [pendingImplantCaseId, setPendingImplantCaseId] = useState<string | null>(null)
   const appointmentNav = useNavigate()
   const [orderWizardStep, setOrderWizardStep] = useState(0)
   const [editingOrder, setEditingOrder] = useState<LabOrder | null>(null)
@@ -335,6 +337,32 @@ export default function Laboratory() {
   // MOD-FEAT-022: arriving from the dental chart opens the order form with
   // the tooth already chosen. Guarded on labs being loaded so the lab
   // dropdown isn't empty when the form appears.
+  /**
+   * MOD-FEAT-041 | ورود از مورد ایمپلنت
+   *
+   * Implants derives the whole order — patient, prosthodontist, tooth,
+   * work type, material, units — from the case and its priced lines, and
+   * sends it here. The lab is the one thing the case cannot know, so the
+   * form opens with everything else filled and the lab left to choose.
+   * On save, the order's id goes back to the case (`lab_order_id`) and
+   * the lab chain takes over the tracking.
+   */
+  useEffect(() => {
+    const st = location.state as { fromImplantCaseId?: string; order?: {
+      patient_id: string; doctor_id: string | null; tooth_number: string | null
+      work_type: string; material: string | null; notes: string
+    } } | null
+    if (!st?.fromImplantCaseId || !st.order || labs.length === 0) return
+    openCreateOrderModal({
+      toothNumber: st.order.tooth_number || '', patientId: st.order.patient_id, doctorId: st.order.doctor_id,
+      workType: st.order.work_type, material: st.order.material, notes: st.order.notes,
+      fromImplantCaseId: st.fromImplantCaseId,
+    })
+    setOrderModalOpen(true)
+    window.history.replaceState({}, '')
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [location.state, labs.length])
+
   useEffect(() => {
     const handoff = readChartHandoff(location.state)
     if (!handoff || labs.length === 0) return
@@ -345,19 +373,23 @@ export default function Laboratory() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [location.state, labs.length])
 
-  const openCreateOrderModal = (seed?: { toothNumber: string; surface?: string | null; patientId: string; doctorId: string | null }) => {
+  const openCreateOrderModal = (seed?: {
+    toothNumber: string; surface?: string | null; patientId: string; doctorId: string | null
+    workType?: string; material?: string | null; notes?: string; fromImplantCaseId?: string
+  }) => {
     h.tap()
     setEditingOrder(null)
+    setPendingImplantCaseId(seed?.fromImplantCaseId ?? null)
     setOrderWizardStep(0)
     setOrderForm({
       lab_id: labs.length > 0 ? labs[0].id : '',
       patient_id: seed?.patientId || '',
       doctor_id: seed?.doctorId || '',
-      work_type: 'crown', custom_work_type: '',
+      work_type: seed?.workType || 'crown', custom_work_type: '',
       tooth_number: seed?.toothNumber || '',
       tooth_surface: seed?.surface || '',
       shade: '',
-      material: 'zirconia',
+      material: seed?.material || 'zirconia',
       deadline: '',
       cost: '',
       notes: '',
@@ -463,7 +495,23 @@ export default function Laboratory() {
         setSavingOrder(true)
         try {
           if (editingOrder) { await updateLabOrder(editingOrder.id, payload); showToast('success', 'سفارش ویرایش شد') }
-          else { await createLabOrder(payload); showToast('success', 'سفارش ثبت شد') }
+          else {
+            const created = await createLabOrder(payload)
+            // MOD-FEAT-041: close the loop with the implant case, so its
+            // chain moves to «ارسال به لابراتوار» and the lab chain owns
+            // the rest. Failing to link must not read as a failed order.
+            if (pendingImplantCaseId && created?.id) {
+              try {
+                await updateImplantCase(pendingImplantCaseId, { lab_order_id: created.id } as never)
+                showToast('success', 'سفارش ثبت و به مورد ایمپلنت وصل شد')
+              } catch {
+                showToast('error', 'سفارش ثبت شد ولی به مورد ایمپلنت وصل نشد')
+              }
+              setPendingImplantCaseId(null)
+            } else {
+              showToast('success', 'سفارش ثبت شد')
+            }
+          }
           setOrderModalOpen(false); await loadData()
         } catch { showToast('error', 'خطا در ذخیره') }
         finally { setSavingOrder(false) }

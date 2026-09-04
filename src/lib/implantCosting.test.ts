@@ -161,3 +161,102 @@ describe('🔴 اقلام جای بولی‌ها را گرفته‌اند', () =
     expect(implantsPage).toContain('suggestOpgDate(end)')
   })
 })
+
+/**
+ * MOD-FEAT-041 | از ایمپلنت به لابراتوار
+ *
+ * سه بار در «ریسک باقی‌مانده» نوشته شد: «ارسال به لابراتوار از ایمپلنت
+ * هنوز سفارش نمی‌سازد». کارت می‌گفت اقدام بعدی چیست و راهی برای انجامش
+ * نمی‌داد. فرم لابراتوار همه‌چیز را دوباره می‌پرسید — و تایپ دوباره همان
+ * جایی است که روکش برای دندان اشتباه سفارش می‌شود.
+ */
+import { deriveLabOrderFromImplant } from './implantCosting'
+
+const implant = (over: Record<string, unknown> = {}) => ({
+  id: 'ic1', patient_id: 'p1', doctor_id: 'surgeon', prosthesis_doctor_id: 'prostho',
+  tooth_number: '36', ...over,
+}) as never
+
+describe('🔴 سفارش از مورد مشتق می‌شود، نه دوباره تایپ', () => {
+  it('بیمار و دندان از مورد', () => {
+    const o = deriveLabOrderFromImplant(implant(), [])
+    expect(o.patient_id).toBe('p1')
+    expect(o.tooth_number).toBe('36')
+  })
+
+  it('🔴 پزشک سفارش، پروتزکار است نه جراح', () => {
+    expect(deriveLabOrderFromImplant(implant(), []).doctor_id).toBe('prostho')
+  })
+
+  it('بدون پروتزکار، جراح — سفارش هرگز بی‌پزشک نیست', () => {
+    expect(deriveLabOrderFromImplant(implant({ prosthesis_doctor_id: null }), []).doctor_id).toBe('surgeon')
+  })
+})
+
+describe('🔴 جنس و تعداد از اقلام قیمت‌گذاری‌شده', () => {
+  it('روکش زیرکونیا → جنس zirconia', () => {
+    const o = deriveLabOrderFromImplant(implant(), [line({ kind: 'crown_zirconia', label: 'روکش زیرکونیا' })])
+    expect(o.material).toBe('zirconia')
+    expect(o.work_type).toBe('implant_crown')
+  })
+
+  it('روکش PFM → pfm · IPS → ips_emax', () => {
+    expect(deriveLabOrderFromImplant(implant(), [line({ kind: 'crown_pfm' })]).material).toBe('pfm')
+    expect(deriveLabOrderFromImplant(implant(), [line({ kind: 'crown_ips' })]).material).toBe('ips_emax')
+  })
+
+  it('🔴 بیش از یک واحد → پل', () => {
+    const o = deriveLabOrderFromImplant(implant(), [
+      line({ kind: 'crown_zirconia', label: 'روکش زیرکونیا', quantity: 2 }),
+      line({ kind: 'pontic', label: 'پونتیک', quantity: 1 }),
+    ])
+    expect(o.work_type).toBe('bridge')
+    expect(o.units).toBe(3)
+  })
+
+  it('یادداشت به لابراتوار می‌گوید چه چیزی و چند تا و چه نگهداری', () => {
+    const o = deriveLabOrderFromImplant(implant(), [
+      line({ kind: 'crown_zirconia', label: 'روکش زیرکونیا', quantity: 2, variant: 'screw' }),
+      line({ kind: 'pontic', label: 'پونتیک', quantity: 1 }),
+    ])
+    expect(o.notes).toContain('2 × روکش زیرکونیا')
+    expect(o.notes).toContain('1 × پونتیک')
+    expect(o.notes).toContain('پیچ‌شونده')
+  })
+
+  it('بدون قلم قیمت‌گذاری‌شده، سفارش همچنان می‌رود', () => {
+    // لابراتوار لازمش دارد؛ جنس پیش از ارسال قابل اصلاح است.
+    const o = deriveLabOrderFromImplant(implant(), [])
+    expect(o.work_type).toBe('implant_crown')
+    expect(o.material).toBeNull()
+    expect(o.units).toBe(1)
+  })
+
+  it('قلم غیرفعال در سفارش نیست', () => {
+    const o = deriveLabOrderFromImplant(implant(), [line({ kind: 'crown_zirconia', is_active: false })])
+    expect(o.material).toBeNull()
+  })
+})
+
+describe('🔴 فرستنده گیرنده دارد — حلقه بسته است', () => {
+  it('کارت ایمپلنت دکمه‌ی ارسال دارد', () => {
+    expect(implantsPage).toContain('sendToLab(c)')
+    expect(implantsPage).toContain('deriveLabOrderFromImplant(')
+  })
+
+  it('صفحه‌ی لابراتوار ورودی ایمپلنت را می‌خواند', async () => {
+    const lab = (await import('../pages/Laboratory.tsx?raw')).default
+    expect(lab).toContain('fromImplantCaseId')
+    expect(lab).toContain('pendingImplantCaseId')
+  })
+
+  it('پس از ثبت سفارش، پیوند به مورد نوشته می‌شود', async () => {
+    const lab = (await import('../pages/Laboratory.tsx?raw')).default
+    expect(lab).toContain('lab_order_id: created.id')
+  })
+
+  it('کارت ایمپلنت وضعیت لابراتوار را نشان می‌دهد', () => {
+    // «روکش کجاست» نباید دو ماژول لازم داشته باشد.
+    expect(implantsPage).toContain('labOrders.find((o) => o.id === c.lab_order_id)')
+  })
+})

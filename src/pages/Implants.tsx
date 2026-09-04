@@ -1,23 +1,24 @@
 // Implants.tsx - Persian RTL Dental Clinic Implant Cases Management
 import { useState, useEffect, useCallback, useMemo } from 'react'
 import { ImplantCostItemsEditor, type EditableCostItem } from '../components/ImplantCostItemsEditor'
-import { suggestOpgDate, caseTotal, costKindMeta, describeItem, lineTotal } from '../lib/implantCosting'
+import { suggestOpgDate, caseTotal, costKindMeta, describeItem, lineTotal, deriveLabOrderFromImplant } from '../lib/implantCosting'
+import { clinicMilestones, nextClinicAction } from '../lib/labClinicMilestones'
 import { EXTRA_CATALOG, parseExtras, extrasTotal, toggleExtra, setExtraCost, setExtraLabel, type ImplantExtra } from '../lib/implantExtras'
 import { PatientDebtBar } from '../components/PatientDebtBar'
 import { implantMilestones, nextImplantAction, implantDeadline, IMPLANT_MILESTONE_COLORS, healingEndDate } from '../lib/implantMilestones'
 import { PatientSelect } from '../components/PatientSelect'
 import { toothLabel, toothLabelWithWord } from '../lib/toothLabel'
 import { useNavigate, useLocation } from 'react-router-dom'
-import { Smile, Plus, Search, Edit2, Eye, Filter, Package, Calendar, DollarSign, ShieldCheck, AlertTriangle, CheckCircle2, Clock, Activity, Layers, CalendarClock, ScanLine, Archive, Ban, X } from 'lucide-react'
+import { Smile, Plus, Search, Edit2, Eye, Filter, Package, Calendar, DollarSign, ShieldCheck, AlertTriangle, CheckCircle2, Clock, Activity, Layers, CalendarClock, ScanLine, Archive, Ban, X, ChevronLeft } from 'lucide-react'
 import { downloadICSReminder } from '../lib/icsReminder'
-import { fetchImplantCases, createImplantCase, updateImplantCase, createImplantComponent, deactivateImplantComponent, fetchPatients, fetchDoctors, createExpense, fetchInventoryItems, fetchImplantCostItems, createImplantCostItem, updateImplantCostItem } from '../lib/api'
+import { fetchImplantCases, createImplantCase, updateImplantCase, createImplantComponent, deactivateImplantComponent, fetchPatients, fetchDoctors, createExpense, fetchInventoryItems, fetchImplantCostItems, createImplantCostItem, updateImplantCostItem, fetchLabOrders } from '../lib/api'
 import { calcSurgeryShare, canMoveStage, validateImplantCase, caseFinancials } from '../lib/implants'
 import { BarcodeScanner } from '../components/BarcodeScanner'
 import { CLINIC_ID } from '../lib/supabase'
 import { toJalaliString, toJalaliStringPretty, formatCurrency, formatNumber, toPersianDigits } from '../lib/persianDate'
 import { h } from '../lib/haptics'
 import { useConfirmAction } from '../components/ConfirmAction'
-import { ImplantCase, ImplantCaseWithRelations, ImplantComponent, Patient, Doctor, ImplantCostItem } from '../types'
+import { ImplantCase, ImplantCaseWithRelations, ImplantComponent, Patient, Doctor, ImplantCostItem, LabOrder } from '../types'
 import { Wizard, Card, Button, Input, Select, Textarea, Badge, Spinner, EmptyState, showToast } from '../components/ui'
 import { PersianDateInput } from '../components/PersianDateInput'
 // MOD-FEAT-024: the same arch the chart draws, instead of a separate row of numbers.
@@ -136,6 +137,8 @@ export default function Implants() {
   // Case form state
   const [costItems, setCostItems] = useState<EditableCostItem[]>([])
   const [allCostItems, setAllCostItems] = useState<ImplantCostItem[]>([])
+  const [labOrders, setLabOrders] = useState<LabOrder[]>([])
+  const labNav = useNavigate()
   const [caseForm, setCaseForm] = useState({
     patient_id: '',
     doctor_id: '',
@@ -180,15 +183,18 @@ export default function Implants() {
   const loadData = useCallback(async () => {
     setLoading(true)
     try {
-      const [cs, pats, docs, invItems, lines] = await Promise.all([
+      const [cs, pats, docs, invItems, lines, orders] = await Promise.all([
         fetchImplantCases(),
         fetchPatients(),
         fetchDoctors(),
         fetchInventoryItems(),
         // MOD-FEAT-040: priced lines, so the card's total includes them.
         fetchImplantCostItems(),
+        // MOD-FEAT-041: linked lab orders, so the card can say where the crown is.
+        fetchLabOrders(),
       ])
       setAllCostItems(lines)
+      setLabOrders(orders)
       // Archived (is_active === false) cases are intentionally kept out of
       // this page's list — they're fully preserved and only reachable
       // from Archive, exactly like archived patients/staff.
@@ -314,6 +320,18 @@ export default function Implants() {
         await createImplantCostItem({ ...base, clinic_id: '', implant_case_id: caseId, notes: null })
       }
     }
+  }
+
+  /**
+   * MOD-FEAT-041: hands the case to the lab page with the order derived
+   * from its priced lines. The lab is the one thing the case cannot know,
+   * so the person still picks that; everything else arrives filled.
+   */
+  const sendToLab = (c: ImplantCaseWithRelations) => {
+    h.tap()
+    const lines = allCostItems.filter((i) => i.implant_case_id === c.id)
+    const order = deriveLabOrderFromImplant(c as never, lines)
+    labNav('/laboratory', { state: { fromImplantCaseId: c.id, order } })
   }
 
   const openEditCaseModal = (c: ImplantCaseWithRelations) => {
@@ -638,9 +656,36 @@ export default function Implants() {
           {next && (
             next.key === 'wait' || next.key === 'surgery'
               ? <span className="text-[11px] text-violet-700 font-medium">{next.label}</span>
-              : <span className="text-[11px] text-primary-600 font-bold">{next.label}</span>
+              : next.key === 'lab'
+                // MOD-FEAT-041: the one step that was a label and not a
+                // button. Everything the order needs is on the case; the
+                // lab page fills its form from it and links back.
+                ? (
+                  <button type="button" onClick={() => sendToLab(c)} className="text-[11px] text-primary-600 font-bold flex items-center gap-0.5 press-scale">
+                    {next.label} <ChevronLeft size={12} />
+                  </button>
+                )
+                : <span className="text-[11px] text-primary-600 font-bold">{next.label}</span>
           )}
         </div>
+
+        {/* Once the order exists, the lab chain is the truth for where the
+            crown is. Shown here so nobody opens two modules to answer
+            «روکش کجاست». */}
+        {c.lab_order_id && (() => {
+          const order = labOrders.find((o) => o.id === c.lab_order_id)
+          if (!order) return null
+          const done = clinicMilestones(order as never).filter((m) => m.done)
+          const labNext = nextClinicAction(order as never)
+          return (
+            <div className="mt-2 px-2.5 py-2 rounded-xl bg-emerald-50 dark:bg-emerald-900/20 text-[11px] flex items-center justify-between gap-2">
+              <span className="text-emerald-800 dark:text-emerald-300">
+                لابراتوار: {done.length ? done[done.length - 1].label : 'ثبت شده'}
+              </span>
+              {labNext && <span className="text-emerald-700 font-bold">{labNext.label}</span>}
+            </div>
+          )
+        })()}
 
         {/* MOD-FEAT-039: «هر کدام از این مراحل باید قابلیت ارسال به مالی
             وجود داشته باشد». The case knew its cost and what was paid;

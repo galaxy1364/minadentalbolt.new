@@ -155,3 +155,83 @@ export function suggestOpgDate(healingEndISO: string | null): string | null {
   d.setUTCDate(d.getUTCDate() - 14)
   return d.toISOString().slice(0, 10)
 }
+
+/**
+ * MOD-FEAT-041 | از ایمپلنت به لابراتوار
+ *
+ * گزارش مهدی (سه بار): «قالب‌گیری و ارسال به لابراتوار و ردیابی خطی و
+ * دریافت و نوبت تحویل هم داشته باشد.»
+ *
+ * The implant card knew "next: send to lab" and offered no way to do it.
+ * The lab order form asked for everything again — patient, doctor,
+ * tooth, work type, material — all of which the implant case already
+ * knew. Retyping is where the crown ends up ordered for the wrong tooth.
+ *
+ * This derives the order from the case and its priced lines. The
+ * material comes from the crown line; a case with a zirconia crown
+ * priced on it sends a zirconia order. If nothing is priced yet, the
+ * order still goes out as a generic implant crown — the lab needs it,
+ * and the clinic can fix the material before it ships.
+ */
+export interface ImplantCaseForLab {
+  id: string
+  patient_id: string
+  doctor_id?: string | null
+  prosthesis_doctor_id?: string | null
+  tooth_number?: string | null
+}
+
+const CROWN_MATERIAL: Record<string, string> = {
+  crown_pfm: 'pfm',
+  crown_zirconia: 'zirconia',
+  crown_ips: 'ips_emax',
+}
+
+export interface DerivedLabOrder {
+  patient_id: string
+  doctor_id: string | null
+  tooth_number: string | null
+  work_type: string
+  material: string | null
+  /** تعداد واحدهای پروتز — روکش‌ها + پونتیک‌ها. */
+  units: number
+  /** یادداشت برای لابراتوار: چه چیزی، چند تا، چه نوع نگهداری. */
+  notes: string
+}
+
+export function deriveLabOrderFromImplant(
+  c: ImplantCaseForLab,
+  items: CostItemLike[],
+): DerivedLabOrder {
+  const active = items.filter((i) => i.is_active !== false)
+  const crowns = active.filter((i) => i.kind in CROWN_MATERIAL)
+  const pontics = active.filter((i) => i.kind === 'pontic')
+
+  // The prosthodontist owns the crown; fall back to the surgeon only when
+  // no one else is named, so the order is never doctor-less.
+  const doctor_id = c.prosthesis_doctor_id || c.doctor_id || null
+
+  const crownUnits = crowns.reduce((s, i) => s + Math.max(1, Math.floor(Number(i.quantity) || 1)), 0)
+  const ponticUnits = pontics.reduce((s, i) => s + Math.max(1, Math.floor(Number(i.quantity) || 1)), 0)
+
+  // One material per order. With mixed crown types the first priced
+  // wins and the note says the rest — a lab reads notes, not enums.
+  const material = crowns.length ? CROWN_MATERIAL[crowns[0].kind] : null
+  const retention = crowns.find((i) => i.variant)?.variant ?? null
+
+  const parts: string[] = []
+  for (const i of crowns) parts.push(describeItem(i))
+  if (ponticUnits > 0) parts.push(`${ponticUnits} × پونتیک`)
+  if (retention) parts.push(`نگهداری: ${RETENTION_LABELS[retention] ?? retention}`)
+  const notes = parts.length ? `روکش ایمپلنت — ${parts.join('، ')}` : 'روکش ایمپلنت'
+
+  return {
+    patient_id: c.patient_id,
+    doctor_id,
+    tooth_number: c.tooth_number ?? null,
+    work_type: crownUnits + ponticUnits > 1 ? 'bridge' : 'implant_crown',
+    material,
+    units: Math.max(1, crownUnits + ponticUnits),
+    notes,
+  }
+}
