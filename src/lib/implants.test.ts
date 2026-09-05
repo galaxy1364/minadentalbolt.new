@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import {
   deductibleComponentCost, calcSurgeryShare, calcProsthesisShare,
-  caseFinancials, stageIndex, canMoveStage, validateImplantDates,
+  caseFinancials, stageIndex, validateImplantDates,
   validateImplantCase, IMPLANT_STAGES,
 } from './implants'
 import type { ImplantCaseLike, ImplantComponentLike } from './implants'
@@ -118,46 +118,8 @@ describe('stageIndex', () => {
   })
 })
 
-describe('canMoveStage', () => {
-  it('allows one step forward', () => {
-    expect(canMoveStage('planned', 'surgery_done').allowed).toBe(true)
-    expect(canMoveStage('impression', 'crown_delivery').allowed).toBe(true)
-  })
-
-  it('refuses skipping a stage', () => {
-    // A file claiming a crown was delivered with no surgery behind it is
-    // what a clinic would rely on years later in a warranty argument.
-    const r = canMoveStage('planned', 'completed')
-    expect(r.allowed).toBe(false)
-    expect(r.reason).toContain('پرید')
-  })
-
-  it('allows going back to correct a mistake', () => {
-    // Staff mis-tap. Forcing them to live with a wrong stage is how a
-    // record stops being trusted.
-    expect(canMoveStage('healing', 'surgery_done').allowed).toBe(true)
-    expect(canMoveStage('completed', 'planned').allowed).toBe(true)
-  })
-
-  it('allows failing from any stage', () => {
-    for (const s of IMPLANT_STAGES) {
-      expect(canMoveStage(s, 'failed').allowed).toBe(true)
-    }
-  })
-
-  it('lets a failed case only be restarted from the beginning', () => {
-    expect(canMoveStage('failed', 'planned').allowed).toBe(true)
-    expect(canMoveStage('failed', 'crown_delivery').allowed).toBe(false)
-  })
-
-  it('refuses an unknown target stage', () => {
-    expect(canMoveStage('planned', 'nonsense').allowed).toBe(false)
-  })
-
-  it('allows staying put', () => {
-    expect(canMoveStage('healing', 'healing').allowed).toBe(true)
-  })
-})
+// MOD-FIX-023: canMoveStage is gone — the chain moves by recording what
+// happened, so there is no stage to move and nothing to check a move against.
 
 describe('validateImplantDates', () => {
   it('accepts dates in order', () => {

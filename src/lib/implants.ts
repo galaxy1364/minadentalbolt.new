@@ -111,43 +111,7 @@ export function stageIndex(stage: string | null | undefined): number {
   return i === -1 ? 0 : i
 }
 
-export interface StageMoveCheck {
-  allowed: boolean
-  reason: string | null
-}
 
-/**
- * Whether a case may move from one stage to another.
- *
- * Forward one step, or back to correct a mistake, or to `failed` from
- * anywhere. What is refused is SKIPPING: marking a case "completed"
- * while no surgery was ever recorded leaves a file claiming an implant
- * was delivered that has no operation behind it, and that file is what
- * a clinic would rely on years later in a warranty argument.
- *
- * Going backwards is deliberately allowed. Staff mis-tap, and forcing
- * them to live with a wrong stage is how a record stops being trusted.
- */
-export function canMoveStage(from: string | null | undefined, to: string): StageMoveCheck {
-  if (to === 'failed') return { allowed: true, reason: null }
-  if (from === 'failed') {
-    return to === 'planned'
-      ? { allowed: true, reason: null }
-      : { allowed: false, reason: 'پرونده ناموفق فقط به «برنامه‌ریزی شده» برمی‌گردد' }
-  }
-  if (!(IMPLANT_STAGES as readonly string[]).includes(to)) {
-    return { allowed: false, reason: 'مرحله نامعتبر است' }
-  }
-
-  const a = stageIndex(from)
-  const b = stageIndex(to)
-  if (b <= a) return { allowed: true, reason: null }
-  if (b === a + 1) return { allowed: true, reason: null }
-  return {
-    allowed: false,
-    reason: 'نمی‌توان از روی مراحل پرید — مرحله‌ها باید به‌ترتیب ثبت شوند',
-  }
-}
 
 /**
  * Chronological order of the recorded dates.

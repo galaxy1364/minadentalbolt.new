@@ -4,14 +4,14 @@ import { ImplantCostItemsEditor, type EditableCostItem } from '../components/Imp
 import { suggestOpgDate, caseTotal, costKindMeta, describeItem, lineTotal, deriveLabOrderFromImplant } from '../lib/implantCosting'
 import { clinicMilestones, nextClinicAction } from '../lib/labClinicMilestones'
 import { PatientDebtBar } from '../components/PatientDebtBar'
-import { implantMilestones, nextImplantAction, implantDeadline, IMPLANT_MILESTONE_COLORS, healingEndDate } from '../lib/implantMilestones'
+import { implantMilestones, nextImplantAction, implantDeadline, IMPLANT_MILESTONE_COLORS, healingEndDate, implantPhase } from '../lib/implantMilestones'
 import { PatientSelect } from '../components/PatientSelect'
 import { toothLabel, toothLabelWithWord } from '../lib/toothLabel'
 import { useNavigate, useLocation } from 'react-router-dom'
 import { Smile, Plus, Search, Edit2, Eye, Filter, Package, Calendar, DollarSign, ShieldCheck, AlertTriangle, CheckCircle2, Clock, Activity, Layers, CalendarClock, ScanLine, Archive, Ban, X, ChevronLeft } from 'lucide-react'
 import { downloadICSReminder } from '../lib/icsReminder'
 import { fetchImplantCases, createImplantCase, updateImplantCase, createImplantComponent, deactivateImplantComponent, fetchPatients, fetchDoctors, createExpense, fetchInventoryItems, fetchImplantCostItems, createImplantCostItem, updateImplantCostItem, fetchLabOrders } from '../lib/api'
-import { calcSurgeryShare, canMoveStage, validateImplantCase, caseFinancials } from '../lib/implants'
+import { calcSurgeryShare, validateImplantCase, caseFinancials } from '../lib/implants'
 import { BarcodeScanner } from '../components/BarcodeScanner'
 import { CLINIC_ID } from '../lib/supabase'
 import { toJalaliString, toJalaliStringPretty, formatCurrency, formatNumber, toPersianDigits } from '../lib/persianDate'
@@ -34,6 +34,7 @@ import { CurrencyInput } from '../components/CurrencyInput'
 const implantStages: { value: string; label: string; color: string; icon: string }[] = [
   { value: 'planned', label: 'برنامه‌ریزی شده', color: 'slate', icon: '📋' },
   { value: 'surgery_done', label: 'جراحی انجام شد', color: 'primary', icon: '🔪' },
+  { value: 'lab', label: 'در لابراتوار', color: 'accent', icon: '🧪' },
   { value: 'healing', label: 'در حال بهبود', color: 'warning', icon: '⏳' },
   { value: 'impression', label: 'قالب‌گیری', color: 'accent', icon: '🦷' },
   { value: 'crown_delivery', label: 'تحویل روکش', color: 'secondary', icon: '👑' },
@@ -247,7 +248,7 @@ export default function Implants() {
         const q = searchQuery.toLowerCase()
         if (!name.toLowerCase().includes(q) && !tooth.toLowerCase().includes(q)) return false
       }
-      if (filterStage && c.stage !== filterStage) return false
+      if (filterStage && implantPhase(c as never, new Date().toISOString().slice(0, 10)) !== filterStage) return false
       if (filterBrand && c.brand !== filterBrand) return false
       if (filterSuccess && c.success_status !== filterSuccess) return false
       return true
@@ -256,9 +257,12 @@ export default function Implants() {
 
   const stats = useMemo(() => {
     const total = cases.length
-    const inSurgery = cases.filter((c) => c.stage === 'surgery_done').length
-    const healing = cases.filter((c) => c.stage === 'healing').length
-    const completed = cases.filter((c) => c.stage === 'completed').length
+    // MOD-FIX-023: from what happened, not from the manually-bumped column.
+    const today = new Date().toISOString().slice(0, 10)
+    const phases = cases.map((c) => implantPhase(c as never, today))
+    const inSurgery = phases.filter((p) => p === 'surgery_done').length
+    const healing = phases.filter((p) => p === 'healing').length
+    const completed = phases.filter((p) => p === 'completed').length
     const successful = cases.filter((c) => c.success_status === 'success').length
     const successRate = total > 0 ? (successful / total) * 100 : 0
     const totalValue = cases.reduce((sum, c) => sum + (c.total_cost || 0), 0)
@@ -557,35 +561,6 @@ export default function Implants() {
   // Stage Advancement
   // ===========================================================================
 
-  const handleAdvanceStage = (c: ImplantCaseWithRelations, newStage: string) => {
-    h.select()
-    // Skipping is refused, going back is not. A file claiming a crown
-    // was delivered with no surgery behind it is what the clinic would
-    // rely on years later in a warranty argument — but staff also
-    // mis-tap, and forcing them to live with a wrong stage is how a
-    // record stops being trusted.
-    const move = canMoveStage(c.stage, newStage)
-    if (!move.allowed) { showToast('error', move.reason || 'این تغییر مرحله مجاز نیست'); return }
-    const meta = getStageMeta(newStage)
-    confirmAction({
-      type: 'status',
-      title: 'تغییر مرحله ایمپلنت',
-      fields: [
-        { label: 'بیمار', value: patientName(c), highlight: true },
-        { label: 'مرحله فعلی', value: getStageMeta(c.stage).label },
-        { label: 'مرحله جدید', value: meta.label, highlight: true },
-      ],
-      confirmLabel: 'تایید',
-      onConfirm: async () => {
-        const updates: Partial<ImplantCase> = { stage: newStage }
-        if (newStage === 'surgery_done' && !c.surgery_date) updates.surgery_date = new Date().toISOString().slice(0, 10)
-        if (newStage === 'completed') { updates.success_status = 'success'; if (!c.crown_delivery_date) updates.crown_delivery_date = new Date().toISOString().slice(0, 10) }
-        if (newStage === 'failed') updates.success_status = 'failed'
-        try { await updateImplantCase(c.id, updates as any); showToast('success', 'مرحله تغییر کرد'); await loadData() }
-        catch { showToast('error', 'خطا') }
-      },
-    })
-  }
 
   // ===========================================================================
   // Component Modal Handlers
@@ -835,7 +810,8 @@ export default function Implants() {
       ) : (
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
           {filteredCases.map((c) => {
-            const meta = getStageMeta(c.stage)
+            // MOD-FIX-023: the badge says what the chain says, not the column.
+            const meta = getStageMeta(implantPhase(c as never, new Date().toISOString().slice(0, 10)))
             const successMeta = getSuccessMeta(c.success_status)
             const remaining = (c.total_cost || 0) - (c.paid_amount || 0)
             const componentCount = c.components?.length || 0
@@ -984,19 +960,10 @@ export default function Implants() {
 
                 {/* Actions */}
                 <div className="flex flex-wrap items-center gap-2 mt-3 pt-3 border-t border-slate-100">
-                  {/* Stage advancement */}
-                  {c.stage !== 'completed' && c.stage !== 'failed' && (
-                    <select
-                      value=""
-                      onChange={(e) => { if (e.target.value) handleAdvanceStage(c, e.target.value) }}
-                      className="px-2 py-1 rounded-lg border border-slate-200 bg-slate-50 text-xs focus:outline-none focus:ring-2 focus:ring-primary-400"
-                    >
-                      <option value="">تغییر مرحله...</option>
-                      {implantStages.filter((s) => s.value !== c.stage).map((s) => (
-                        <option key={s.value} value={s.value}>{s.label}</option>
-                      ))}
-                    </select>
-                  )}
+                  {/* MOD-FIX-023: the «تغییر مرحله…» dropdown that lived here
+                      wrote a column nothing reads any more. The chain above
+                      moves by recording what happened; a manual override
+                      beside it was a second, contradicting truth. */}
                   <button
                     onClick={() => openComponentModal(c.id)}
                     className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-accent-50 text-accent-700 text-xs hover:bg-accent-100 transition-all-smooth"

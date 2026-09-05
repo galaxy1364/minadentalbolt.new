@@ -140,3 +140,58 @@ describe('🔴 یک نوار پیشرفت، و راهی به مالی', () => {
     expect(implantsPage).toContain('caseTotal(c.total_cost')
   })
 })
+
+/**
+ * MOD-FIX-023 | فاز از واقعیت، برای فیلتر و آمار
+ *
+ * بعد از اینکه زنجیره جای `stage` را گرفت، آن ستون هنوز در سه جا خوانده
+ * می‌شد: فیلتر، کارت‌های آمار، و payload. آمار می‌گفت «در حال بهبود: ۰» در
+ * حالی که کارت می‌گفت یک مورد وسط هیلینگ است. دو حقیقت، یک صفحه.
+ */
+import { implantPhase } from './implantMilestones'
+
+describe('🔴 فاز از آنچه اتفاق افتاده', () => {
+  it('بدون جراحی: برنامه‌ریزی', () => {
+    expect(implantPhase(c(), TODAY)).toBe('planned')
+  })
+
+  it('جراحیِ آینده هنوز برنامه‌ریزی است', () => {
+    expect(implantPhase(c({ surgery_date: '2026-10-01' }), TODAY)).toBe('planned')
+  })
+
+  it('در هیلینگ', () => {
+    expect(implantPhase(c({ surgery_date: '2026-08-15', healing_months: 3 }), TODAY)).toBe('healing')
+  })
+
+  it('🔴 هیلینگ تمام‌شده و هیچ‌چیز بعدش: جراحی انجام‌شده، نه «هنوز در هیلینگ»', () => {
+    // انتظارِ تمام‌شده نباید داخل عدد «در حال بهبود» پنهان شود.
+    expect(implantPhase(c({ surgery_date: '2026-05-01', healing_months: 3 }), TODAY)).toBe('surgery_done')
+  })
+
+  it('قالب‌گیری → لابراتوار → تکمیل', () => {
+    const base = { surgery_date: '2026-05-01', healing_months: 3 }
+    expect(implantPhase(c({ ...base, impression_date: '2026-08-20' }), TODAY)).toBe('impression')
+    expect(implantPhase(c({ ...base, impression_date: '2026-08-20', lab_order_id: 'lo' }), TODAY)).toBe('lab')
+    expect(implantPhase(c({ ...base, crown_delivery_date: '2026-09-01' }), TODAY)).toBe('completed')
+  })
+
+  it('ناموفق بر همه‌چیز مقدم است', () => {
+    expect(implantPhase(c({ surgery_date: '2026-05-01', success_status: 'failed' }), TODAY)).toBe('failed')
+  })
+
+  it('🔴 ستون stage نادیده گرفته می‌شود', () => {
+    expect(implantPhase(c({ stage: 'completed' }), TODAY)).toBe('planned')
+  })
+})
+
+describe('🔴 هیچ نوشتن دستی روی مرحله نمانده', () => {
+  it('کرکره‌ی «تغییر مرحله» حذف شده', () => {
+    expect(implantsPage).not.toContain('تغییر مرحله...')
+    expect(implantsPage).not.toContain('handleAdvanceStage')
+  })
+
+  it('آمار و فیلتر از فاز مشتق‌شده می‌خوانند', () => {
+    expect(implantsPage).toContain('implantPhase(c as never')
+    expect(implantsPage).not.toContain("c.stage === 'healing'")
+  })
+})

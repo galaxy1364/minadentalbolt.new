@@ -156,3 +156,32 @@ export function implantDeadline(c: ImplantCaseLike, today: string): DeadlineStat
   if (!next) return { kind: 'none', days: 0 }
   return deadlineState({ deadline: next }, t)
 }
+
+/**
+ * MOD-FIX-023 | فاز فعلی، مشتق‌شده — برای فیلتر و آمار
+ *
+ * `stage` was still read in three places after the chain replaced it:
+ * the filter dropdown, the stat cards and the save payload. The stats
+ * therefore said «در حال بهبود: ۰» while the chain on the card said a
+ * case was mid-healing. Two truths, one page.
+ *
+ * Same vocabulary as the old column so the filter labels do not change
+ * under the user's feet; the values now come from what happened.
+ */
+export type ImplantPhase =
+  | 'planned' | 'surgery_done' | 'healing' | 'impression' | 'lab' | 'crown_delivery' | 'completed' | 'failed'
+
+export function implantPhase(c: ImplantCaseLike, today: string): ImplantPhase {
+  if (c.success_status === 'failed') return 'failed'
+  if (c.crown_delivery_date) return 'completed'
+  if (c.lab_order_id) return 'lab'
+  if (c.impression_date) return 'impression'
+  if (!c.surgery_date) return 'planned'
+  const t = String(today).slice(0, 10)
+  if (c.surgery_date > t) return 'planned'
+  if (!healingComplete(c, t)) return 'healing'
+  // Healed and nothing since: the surgery is done and the next step is
+  // pending. Reported as surgery_done rather than healing so the stats
+  // do not hide a finished wait inside the "still healing" number.
+  return 'surgery_done'
+}
