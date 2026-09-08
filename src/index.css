@@ -71,7 +71,14 @@ body::after {
 }
 
 body {
-  font-family: 'Vazirmatn', sans-serif;
+  /* MOD-FIX-029: the fallback was a bare `sans-serif`. Vazirmatn is
+     served from a foreign CDN, and when that CDN is unreachable — a
+     routine condition for this clinic, and the exact failure this
+     session reproduced — `sans-serif` hands Persian to whatever the
+     browser picks by default, which on Windows is a Latin face that
+     renders فارسی with broken joins. Naming real Persian-capable
+     fallbacks keeps the app readable with no network at all. */
+  font-family: 'Vazirmatn', 'Vazir', 'IRANSans', 'IRANYekan', 'Segoe UI', Tahoma, system-ui, sans-serif;
   background: color-mix(in srgb, var(--module-color-light, #f0fdfa) 95%, #ffffff);
   overscroll-behavior-y: none;
   -webkit-tap-highlight-color: transparent;

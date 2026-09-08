@@ -334,7 +334,7 @@ function AppointmentRow({ apt, index, patientName, doctorName, onClick }: {
       className={`stagger-item flex items-center gap-3 p-3 rounded-2xl transition-all-smooth cursor-pointer hover:shadow-md border border-slate-100 dark:border-slate-700 hover:border-primary-200 dark:hover:border-primary-700 hover:bg-primary-50/30 dark:hover:bg-slate-700/50 ${isInChair ? 'bg-warning-50 dark:bg-warning-900/20 border-warning-200 dark:border-warning-700' : isCompleted ? 'bg-success-50/50 dark:bg-success-900/10 border-success-100 dark:border-success-800' : isCancelled ? 'bg-error-50/30 dark:bg-error-900/10 border-error-100 dark:border-error-800 opacity-70' : 'bg-white dark:bg-slate-800'}`}
     >
       <div className="flex flex-col items-center justify-center w-14 h-14 rounded-xl bg-gradient-to-br from-slate-700 to-slate-900 text-white flex-shrink-0">
-        <span className="text-xs font-bold">{toPersianDigits(formatTime(apt.start_time))}</span>
+        <span className="text-xs font-bold">{formatTime(apt.start_time)}</span>
         {isInChair && <Timer size={12} className="text-warning-300 mt-0.5" />}
       </div>
       <div className="min-w-0 flex-1">

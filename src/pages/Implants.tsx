@@ -14,7 +14,7 @@ import { fetchImplantCases, createImplantCase, updateImplantCase, createImplantC
 import { calcSurgeryShare, validateImplantCase, caseFinancials } from '../lib/implants'
 import { BarcodeScanner } from '../components/BarcodeScanner'
 import { CLINIC_ID } from '../lib/supabase'
-import { toJalaliString, toJalaliStringPretty, formatCurrency, formatNumber, toPersianDigits } from '../lib/persianDate'
+import { toJalaliDisplay, toJalaliStringPretty, formatCurrency, formatNumber, toPersianDigits } from '../lib/persianDate'
 import { h } from '../lib/haptics'
 import { useConfirmAction } from '../components/ConfirmAction'
 import { ImplantCase, ImplantCaseWithRelations, ImplantComponent, Patient, Doctor, ImplantCostItem, LabOrder } from '../types'
@@ -866,7 +866,7 @@ export default function Implants() {
                   {c.surgery_date && (
                     <span className="flex items-center gap-1 text-slate-500">
                       <Calendar size={12} />
-                      جراحی: {toJalaliString(c.surgery_date)}
+                      جراحی: {toJalaliDisplay(c.surgery_date)}
                       {c.surgery_date >= new Date().toISOString().slice(0, 10) && (
                         <button
                           onClick={() => downloadICSReminder({
@@ -1103,7 +1103,7 @@ export default function Implants() {
                   <Input label="طول (mm)" value={caseForm.length} onChange={(v) => setCaseForm({ ...caseForm, length: v })} placeholder="10" dir="ltr" />
                 </div>
                 <Select
-                  label="برند"
+                  label="برند *"
                   value={caseForm.brand}
                   onChange={(v) => {
                     // Smart suggestion: pre-fill the (now required) total
@@ -1157,11 +1157,13 @@ export default function Implants() {
             // cost at all (shown as '-' in the preview, per the exact
             // screenshot that flagged this) was previously fully
             // save-able — nothing on this step blocked continuing.
-            validate: () => (!caseForm.total_cost || Number(caseForm.total_cost) <= 0 ? 'کل هزینه الزامی است' : null),
+            // The message named "کل هزینه", a field that does not exist on this
+            // step — the input it actually guards is "قیمت فیکسچر".
+            validate: () => (!caseForm.total_cost || Number(caseForm.total_cost) <= 0 ? 'قیمت فیکسچر الزامی است' : null),
             content: (
               <>
                 <div className="grid grid-cols-3 gap-2">
-                  <CurrencyInput label="قیمت فیکسچر (ت)" value={caseForm.total_cost} onChange={(v) => setCaseForm({ ...caseForm, total_cost: v })} />
+                  <CurrencyInput label="قیمت فیکسچر (ت) *" value={caseForm.total_cost} onChange={(v) => setCaseForm({ ...caseForm, total_cost: v })} />
                   <CurrencyInput label="پرداختی (ت)" value={caseForm.paid_amount} onChange={(v) => setCaseForm({ ...caseForm, paid_amount: v })} />
                   <Input label="گارانتی (سال)" type="number" value={caseForm.warranty_years} onChange={(v) => setCaseForm({ ...caseForm, warranty_years: v })} placeholder="5" />
                 </div>
@@ -1219,7 +1221,7 @@ export default function Implants() {
                       سهم جراح = (هزینه‌ی کل − هزینه‌ی اقلامی که تیک «کسر در سهم جراح» خورده‌اند) ÷ ۲. هزینه‌ی فیکسچر همیشه مستقل حساب می‌شود.
                     </p>
                   ) : (
-                    <CurrencyInput label="مبلغ توافقی جراح (تومان)" value={caseForm.surgery_fee_amount} onChange={(v) => setCaseForm({ ...caseForm, surgery_fee_amount: v })} />
+                    <CurrencyInput label="مبلغ توافقی جراح (تومان) *" value={caseForm.surgery_fee_amount} onChange={(v) => setCaseForm({ ...caseForm, surgery_fee_amount: v })} />
                   )}
                 </div>
                 <div className="p-3 bg-slate-50 dark:bg-slate-700/50 rounded-xl">
@@ -1312,6 +1314,10 @@ export default function Implants() {
                   </datalist>
                 </div>
                 <Input label="مدل" value={componentForm.model} onChange={(v) => setComponentForm({ ...componentForm, model: v })} placeholder="مدل کامپوننت" />
+                {/* Neither field is required on its own, so neither can
+                    carry a *. Saying which pair is required is the only
+                    honest way to show it. */}
+                <p className="text-xs text-slate-500 dark:text-slate-400">* دست‌کم یکی از «برند کامپوننت» یا «مدل» را وارد کنید.</p>
               </>
             ),
           },

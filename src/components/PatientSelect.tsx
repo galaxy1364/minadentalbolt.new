@@ -3,6 +3,7 @@ import { Select } from './ui'
 import { formatCurrency, toPersianDigits } from '../lib/persianDate'
 import type { Patient } from '../types'
 import type { PatientBalance } from '../lib/finance'
+import { buildPatientAlerts, alertChips } from '../lib/patientAlerts'
 
 /**
  * MOD-FEAT-025 | یک انتخابگر بیمار برای تمام برنامه
@@ -79,7 +80,16 @@ export function PatientSelect({
       // a native <select> renders only text — and this has to work the
       // same way in all six places, not just the ones with room for a chip.
       const debt = balance > 0 ? ` • بدهکار ${formatCurrency(balance)} ت` : ''
-      return { value: p.id, label: `${patientLabel(p)}${debt}` }
+      // MOD-FIX-027: the clinical warning comes from the same
+      // buildPatientAlerts/alertChips pair the file header and the
+      // booking picker use. Treatments and Appointments each built their
+      // own "name ⚠ chips" string, which is how the treatment quick-start
+      // ended up as a third label format that showed the allergy but not
+      // the debt — you could start work on a patient owing ten million
+      // without the picker saying so.
+      const clinical = alertChips(buildPatientAlerts(p, null), 2)
+      const warn = clinical.length ? ` ⚠ ${clinical.join('، ')}` : ''
+      return { value: p.id, label: `${patientLabel(p)}${warn}${debt}` }
     })
     return allowEmpty ? [{ value: '', label: emptyLabel }, ...rows] : rows
   }, [filtered, balances, allowEmpty, emptyLabel])

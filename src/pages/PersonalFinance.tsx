@@ -295,7 +295,7 @@ export default function PersonalFinance() {
             validate: () => (!form.title.trim() ? 'عنوان الزامی است' : null),
             content: (
               <>
-                <Input label="عنوان" value={form.title} onChange={(v) => setForm({ ...form, title: v })} placeholder={tab === 'loan' ? 'مثلاً: وام بانک ملت' : tab === 'rent' ? 'اجاره مطب' : tab === 'cheque' ? 'چک شماره ۱۲۳' : 'بدهی به فلانی'} />
+                <Input label="عنوان *" value={form.title} onChange={(v) => setForm({ ...form, title: v })} placeholder={tab === 'loan' ? 'مثلاً: وام بانک ملت' : tab === 'rent' ? 'اجاره مطب' : tab === 'cheque' ? 'چک شماره ۱۲۳' : 'بدهی به فلانی'} />
                 <Input label="طرف حساب (بانک/موجر/طلبکار)" value={form.counterparty} onChange={(v) => setForm({ ...form, counterparty: v })} placeholder="نام بانک، موجر یا طرف حساب" />
                 {tab === 'cheque' && (
                   <div className="grid grid-cols-2 gap-3">
@@ -312,7 +312,7 @@ export default function PersonalFinance() {
             content: (
               <>
                 <div className="grid grid-cols-2 gap-3">
-                  <CurrencyInput label="مبلغ کل (ت)" value={form.total_amount} onChange={(v) => setForm({ ...form, total_amount: v })} />
+                  <CurrencyInput label="مبلغ کل (ت) *" value={form.total_amount} onChange={(v) => setForm({ ...form, total_amount: v })} />
                   <CurrencyInput label="پرداخت‌شده تا الان (ت)" value={form.paid_amount} onChange={(v) => setForm({ ...form, paid_amount: v })} />
                 </div>
                 {tab === 'loan' && (
@@ -332,7 +332,7 @@ export default function PersonalFinance() {
             validate: () => (!form.due_date ? 'تاریخ سررسید الزامی است' : null),
             content: (
               <>
-                <PersianDateInput label="تاریخ سررسید" value={form.due_date} onChange={(v) => setForm({ ...form, due_date: v })} />
+                <PersianDateInput label="تاریخ سررسید *" value={form.due_date} onChange={(v) => setForm({ ...form, due_date: v })} />
                 <Select label="وضعیت" value={form.status} onChange={(v) => setForm({ ...form, status: v as any })} options={Object.entries(statusMeta).map(([k, v]) => ({ value: k, label: v.label }))} />
                 <Textarea label="یادداشت" value={form.notes} onChange={(v) => setForm({ ...form, notes: v })} rows={2} />
               </>

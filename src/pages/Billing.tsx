@@ -8,13 +8,13 @@ import { validateCheque, chequeModeHint } from '../lib/chequeValidation'
 import { findDuplicatePayments, duplicateWarning } from '../lib/duplicatePayment'
 import { PatientFinanceOverview } from '../components/PatientFinanceOverview'
 import { useNavigate, useLocation } from 'react-router-dom'
-import { CreditCard, Plus, Search, DollarSign, TrendingUp, Wallet, Calendar, CalendarClock, CheckCircle2, AlertCircle, Edit2, Filter, Receipt, Banknote, Clock, Trash2, Printer } from 'lucide-react'
+import { CreditCard, Plus, Search, DollarSign, TrendingUp, Wallet, Calendar, CalendarClock, CheckCircle2, AlertCircle, Edit2, Filter, Receipt, Banknote, Clock, Printer, Ban, Archive } from 'lucide-react'
 import { ChevronDown } from 'lucide-react'
 import { BarChart, Bar, XAxis, YAxis, Tooltip as RTooltip, ResponsiveContainer, PieChart, Pie, Cell as RCell } from 'recharts'
 import { fetchPayments, createPayment, updatePayment, fetchEncounters, fetchCheques, createCheque, updateCheque, fetchPaymentPlans, createPaymentPlan, updatePaymentPlan, updateInstallment, fetchPatients, fetchExpenses, createExpense, updateExpense, deactivateExpense, fetchTreatments, fetchImplantCases, fetchDoctors } from '../lib/api'
 import { buildSchedule, splitAmount, planProgress, reconcilePlan } from '../lib/installments'
 import { checkOverpayment } from '../lib/finance'
-import { toJalaliString, toJalaliStringPretty, formatCurrency, formatNumber, toPersianDigits, toEnglishDigits } from '../lib/persianDate'
+import { toJalaliDisplay, toJalaliStringPretty, formatCurrency, formatNumber, toPersianDigits, toEnglishDigits } from '../lib/persianDate'
 import { h } from '../lib/haptics'
 import { useConfirmAction } from '../components/ConfirmAction'
 import { Payment, Encounter, Cheque, PaymentPlan, PaymentPlanWithRelations, Patient, Expense, Treatment, ImplantCase, Installment } from '../types'
@@ -406,7 +406,7 @@ export default function Billing() {
         { label: 'مبلغ', value: `${formatCurrency(Number(paymentForm.amount))} ت` },
         ...(paymentForm.discountPercent && Number(paymentForm.discountPercent) > 0 ? [{ label: 'تخفیف اعمال‌شده', value: `${toPersianDigits(paymentForm.discountPercent)}٪` }] : []),
         { label: 'روش', value: paymentMethods.find((m) => m.value === paymentForm.payment_method)?.label || paymentForm.payment_method },
-        { label: 'تاریخ', value: toJalaliString(paymentForm.payment_date) },
+        { label: 'تاریخ', value: toJalaliDisplay(paymentForm.payment_date) },
       ],
       confirmLabel: 'ثبت',
       onConfirm: async () => {
@@ -439,7 +439,7 @@ export default function Billing() {
         { label: 'بیمار', value: patient ? `${patient.first_name} ${patient.last_name}` : '-', highlight: true },
         { label: 'مبلغ', value: `${formatCurrency(Number(chequeForm.amount))} ت` },
         { label: 'بانک', value: chequeForm.bank_name || '-' },
-        { label: 'سررسید', value: toJalaliString(chequeForm.due_date) },
+        { label: 'سررسید', value: toJalaliDisplay(chequeForm.due_date) },
       ],
       confirmLabel: 'ثبت چک',
       onConfirm: async () => {
@@ -637,7 +637,7 @@ export default function Billing() {
       title: 'پرداخت قسط',
       fields: [
         { label: 'قسط', value: `قسط ${toPersianDigits(installment.installment_number)} — ${formatCurrency(installment.amount)} ت`, highlight: true },
-        { label: 'تاریخ', value: toJalaliString(new Date().toISOString().slice(0, 10)) },
+        { label: 'تاریخ', value: toJalaliDisplay(new Date().toISOString().slice(0, 10)) },
       ],
       confirmLabel: 'تایید پرداخت',
       onConfirm: async () => {
@@ -936,7 +936,7 @@ export default function Billing() {
                       confirmLabel: 'تایید لغو',
                       onConfirm: async () => { try { await updatePayment(p.id, { status: 'failed' } as any); showToast('success', 'پرداخت لغو شد — مانده‌حساب اصلاح شد'); loadData() } catch { showToast('error', 'خطا در لغو') } },
                     })
-                  }} className="flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs text-slate-500 hover:text-error-600 hover:bg-error-50 transition-colors"><Trash2 size={12} /> لغو پرداخت</button>
+                  }} className="flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs text-slate-500 hover:text-error-600 hover:bg-error-50 transition-colors"><Ban size={12} /> لغو پرداخت</button>
                 </div>
               </Card>
             )
@@ -1159,7 +1159,7 @@ export default function Billing() {
                       {chequeStatuses.map((s) => <option key={s.value} value={s.value}>{s.label}</option>)}
                     </select>
                     {c.status !== 'cleared' && (
-                      <button onClick={() => handleDeleteCheque(c)} aria-label="لغو چک" className="p-1.5 rounded-lg text-slate-400 hover:text-error-600 hover:bg-error-50 transition-colors"><Trash2 size={14} /></button>
+                      <button onClick={() => handleDeleteCheque(c)} aria-label="لغو چک" title="لغو" className="p-1.5 rounded-lg text-slate-400 hover:text-error-600 hover:bg-error-50 transition-colors"><Ban size={14} /></button>
                     )}
                     {c.status === 'pending' && (
                       <button
@@ -1228,7 +1228,7 @@ export default function Billing() {
                   <div className="flex items-center gap-2">
                     <Badge color={statusMeta.color}>{statusMeta.label}</Badge>
                     {paidCount === 0 && (
-                      <button onClick={() => handleDeletePlan(plan)} aria-label="لغو طرح قسطی" className="p-1.5 rounded-lg text-slate-400 hover:text-error-600 hover:bg-error-50 transition-colors"><Trash2 size={14} /></button>
+                      <button onClick={() => handleDeletePlan(plan)} aria-label="لغو طرح قسطی" title="لغو" className="p-1.5 rounded-lg text-slate-400 hover:text-error-600 hover:bg-error-50 transition-colors"><Ban size={14} /></button>
                     )}
                   </div>
                 </div>
@@ -1247,7 +1247,7 @@ export default function Billing() {
                       <span className="text-error-600 font-medium">{toPersianDigits(prog.overdueCount)} قسط سررسید گذشته</span>
                     )}
                     {prog.nextDue && (
-                      <span className="text-slate-500">قسط بعدی: {toJalaliString(prog.nextDue)}</span>
+                      <span className="text-slate-500">قسط بعدی: {toJalaliDisplay(prog.nextDue)}</span>
                     )}
                   </div>
                   {!check.ok && (
@@ -1408,11 +1408,11 @@ export default function Billing() {
                     <tr key={e.id} className="border-b border-slate-50 hover:bg-slate-50 transition-all-smooth">
                       <td className="px-4 py-3 font-medium text-slate-800">{e.category}</td>
                       <td className="px-4 py-3 text-error-600 font-bold">{formatCurrency(e.amount)} ت</td>
-                      <td className="px-4 py-3 text-slate-600">{e.date ? toJalaliString(e.date) : '-'}</td>
+                      <td className="px-4 py-3 text-slate-600">{e.date ? toJalaliDisplay(e.date) : '-'}</td>
                       <td className="px-4 py-3 text-slate-500 max-w-[200px] truncate">{e.description || '-'}</td>
                       <td className="px-4 py-3">
                         <button onClick={() => openEditExpense(e)} aria-label="ویرایش هزینه" className="text-slate-400 hover:text-primary-600 hover:bg-primary-50 p-1.5 rounded-lg transition-colors"><Edit2 size={15} /></button>
-                        <button onClick={() => handleDeleteExpense(e)} aria-label="غیرفعال کردن هزینه" className="text-slate-400 hover:text-error-600 hover:bg-error-50 p-1.5 rounded-lg transition-colors"><Trash2 size={15} /></button>
+                        <button onClick={() => handleDeleteExpense(e)} aria-label="غیرفعال کردن هزینه" title="غیرفعال کردن" className="text-slate-400 hover:text-error-600 hover:bg-error-50 p-1.5 rounded-lg transition-colors"><Archive size={15} /></button>
                       </td>
                     </tr>
                   ))}
@@ -1441,8 +1441,8 @@ export default function Billing() {
           validate: () => (!expenseForm.category.trim() ? 'دسته‌بندی الزامی است' : (!expenseForm.amount || Number(expenseForm.amount) <= 0) ? 'مبلغ الزامی است' : null),
           content: (
             <>
-              <Input label="دسته‌بندی" value={expenseForm.category} onChange={(v) => setExpenseForm((p) => ({ ...p, category: v }))} placeholder="مثال: اجاره، حقوق، تجهیزات..." />
-              <CurrencyInput label="مبلغ (تومان)" value={expenseForm.amount} onChange={(v) => setExpenseForm((p) => ({ ...p, amount: v }))} />
+              <Input label="دسته‌بندی *" value={expenseForm.category} onChange={(v) => setExpenseForm((p) => ({ ...p, category: v }))} placeholder="مثال: اجاره، حقوق، تجهیزات..." />
+              <CurrencyInput label="مبلغ (تومان) *" value={expenseForm.amount} onChange={(v) => setExpenseForm((p) => ({ ...p, amount: v }))} />
               <PersianDateInput label="تاریخ" value={expenseForm.date} onChange={(v) => setExpenseForm((p) => ({ ...p, date: v }))} />
             </>
           ),
@@ -1526,7 +1526,7 @@ export default function Billing() {
           validate: () => (!paymentForm.patient_id ? 'انتخاب بیمار الزامی است' : (!paymentForm.amount || Number(paymentForm.amount) <= 0) ? 'مبلغ را وارد کنید' : null),
           content: (
             <>
-              <PatientSelect value={paymentForm.patient_id} onChange={(v) => setPaymentForm((p) => ({ ...p, patient_id: v, encounter_id: '', implant_case_id: '' }))} patients={patients} balances={patientBalancesMap} />
+              <PatientSelect required value={paymentForm.patient_id} onChange={(v) => setPaymentForm((p) => ({ ...p, patient_id: v, encounter_id: '', implant_case_id: '' }))} patients={patients} balances={patientBalancesMap} />
               {paymentForm.patient_id && (() => {
                 const fin = patientBalancesMap.get(paymentForm.patient_id)
                 if (!fin) return null
@@ -1818,8 +1818,8 @@ export default function Billing() {
           validate: () => (!planForm.patient_id ? 'انتخاب بیمار الزامی است' : (!planForm.total_amount || Number(planForm.total_amount) <= 0) ? 'مبلغ کل را وارد کنید' : null),
           content: (
             <>
-              <PatientSelect value={planForm.patient_id} onChange={(v) => setPlanForm((p) => ({ ...p, patient_id: v }))} patients={patients} balances={patientBalancesMap} />
-              <CurrencyInput label="مبلغ کل (تومان)" value={planForm.total_amount} onChange={(v) => setPlanForm((p) => ({ ...p, total_amount: v }))} />
+              <PatientSelect required value={planForm.patient_id} onChange={(v) => setPlanForm((p) => ({ ...p, patient_id: v }))} patients={patients} balances={patientBalancesMap} />
+              <CurrencyInput label="مبلغ کل (تومان) *" value={planForm.total_amount} onChange={(v) => setPlanForm((p) => ({ ...p, total_amount: v }))} />
             </>
           ),
         },

@@ -1,7 +1,7 @@
 // Insurance.tsx - Persian RTL Dental Clinic Insurance Management
 import { useState, useEffect, useCallback, useMemo } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
-import { Shield, FileText, Search, Building2, Percent, Eye, Plus, Edit2, Trash2, Phone, MapPin, Wallet, CheckCircle2 } from 'lucide-react'
+import { Shield, FileText, Search, Building2, Percent, Eye, Plus, Edit2, Phone, MapPin, Wallet, CheckCircle2, Ban, Archive } from 'lucide-react'
 import { PieChart, Pie, Cell, XAxis, YAxis, Tooltip as RTooltip, ResponsiveContainer, Legend } from 'recharts'
 import {
   fetchInsuranceCompanies, fetchInsuranceClaims,
@@ -15,6 +15,7 @@ import {
   Patient,
 } from '../types'
 import { Card, Button, Badge, Spinner, EmptyState, Tabs, Wizard, Input, Select, Textarea, showToast } from '../components/ui'
+import { PatientSelect } from '../components/PatientSelect'
 import { ModuleHeader, ModuleStatCard, ReorderableStatGrid } from '../components/ModuleHeader'
 import { CLINIC_ID } from '../lib/supabase'
 import { useConfirmAction } from '../components/ConfirmAction'
@@ -451,7 +452,7 @@ export default function Insurance() {
                     <div className="flex items-center gap-1">
                       <Badge color={c.is_active ? 'success' : 'slate'}>{c.is_active ? 'فعال' : 'غیرفعال'}</Badge>
                       <button onClick={() => openEditCompany(c)} className="p-1.5 rounded-lg text-slate-400 hover:text-primary-600 hover:bg-primary-50 transition-colors"><Edit2 size={14} /></button>
-                      <button onClick={() => handleDeleteCompany(c)} className="p-1.5 rounded-lg text-slate-400 hover:text-error-600 hover:bg-error-50 transition-colors"><Trash2 size={14} /></button>
+                      <button onClick={() => handleDeleteCompany(c)} aria-label="غیرفعال کردن شرکت بیمه" title="غیرفعال کردن" className="p-1.5 rounded-lg text-slate-400 hover:text-error-600 hover:bg-error-50 transition-colors"><Archive size={14} /></button>
                     </div>
                   </div>
                   <div className="grid grid-cols-2 gap-3 mt-4">
@@ -516,7 +517,7 @@ export default function Insurance() {
                                 )
                               )}
                               <button onClick={() => openEditClaim(c)} className="text-slate-400 hover:text-primary-600 hover:bg-primary-50 p-1 rounded-lg transition-colors"><Edit2 size={15} /></button>
-                              <button onClick={() => handleDeleteClaim(c)} className="text-slate-400 hover:text-error-600 hover:bg-error-50 p-1 rounded-lg transition-colors"><Trash2 size={15} /></button>
+                              <button onClick={() => handleDeleteClaim(c)} aria-label="لغو ادعای بیمه" title="لغو" className="text-slate-400 hover:text-error-600 hover:bg-error-50 p-1 rounded-lg transition-colors"><Ban size={15} /></button>
                               <button onClick={() => navigate(`/patients/${c.patient_id}`)} className="text-primary-600 hover:text-primary-700 p-1 rounded-lg hover:bg-primary-50"><Eye size={15} /></button>
                             </div>
                           </td>
@@ -563,7 +564,7 @@ export default function Insurance() {
             validate: () => (!companyForm.name.trim() ? 'نام شرکت الزامی است' : null),
             content: (
               <>
-                <Input label="نام شرکت" value={companyForm.name} onChange={(v) => setCompanyForm((p) => ({ ...p, name: v }))} placeholder="نام شرکت بیمه" />
+                <Input label="نام شرکت *" value={companyForm.name} onChange={(v) => setCompanyForm((p) => ({ ...p, name: v }))} placeholder="نام شرکت بیمه" />
                 <div className="grid grid-cols-2 gap-3">
                   <Input label="کد" value={companyForm.code} onChange={(v) => setCompanyForm((p) => ({ ...p, code: v }))} placeholder="کد شرکت" dir="ltr" />
                   <Input label="تلفن" value={companyForm.phone} onChange={(v) => setCompanyForm((p) => ({ ...p, phone: v }))} placeholder="تلفن" dir="ltr" />
@@ -603,8 +604,8 @@ export default function Insurance() {
             validate: () => (!claimForm.patient_id ? 'انتخاب بیمار الزامی است' : !claimForm.company_id ? 'انتخاب شرکت بیمه الزامی است' : null),
             content: (
               <>
-                <Select label="بیمار" value={claimForm.patient_id} onChange={(v) => setClaimForm((p) => ({ ...p, patient_id: v }))} options={patients.map((p) => ({ value: p.id, label: `${p.first_name} ${p.last_name}` }))} placeholder="انتخاب بیمار" />
-                <Select label="شرکت بیمه" value={claimForm.company_id} onChange={(v) => setClaimForm((p) => ({ ...p, company_id: v }))} options={companies.map((c) => ({ value: c.id, label: c.name }))} placeholder="انتخاب شرکت" />
+                <PatientSelect required value={claimForm.patient_id} onChange={(v) => setClaimForm((p) => ({ ...p, patient_id: v }))} patients={patients} />
+                <Select label="شرکت بیمه *" value={claimForm.company_id} onChange={(v) => setClaimForm((p) => ({ ...p, company_id: v }))} options={companies.map((c) => ({ value: c.id, label: c.name }))} placeholder="انتخاب شرکت" />
               </>
             ),
           },
@@ -614,7 +615,7 @@ export default function Insurance() {
             content: (
               <>
                 <div className="grid grid-cols-2 gap-3">
-                  <Input label="مبلغ ادعا" value={claimForm.amount} onChange={(v) => setClaimForm((p) => ({ ...p, amount: v }))} placeholder="مبلغ" dir="ltr" />
+                  <Input label="مبلغ ادعا *" value={claimForm.amount} onChange={(v) => setClaimForm((p) => ({ ...p, amount: v }))} placeholder="مبلغ" dir="ltr" />
                   <Input label="مبلغ تایید شده" value={claimForm.approved_amount} onChange={(v) => setClaimForm((p) => ({ ...p, approved_amount: v }))} placeholder="مبلغ تایید شده" dir="ltr" />
                 </div>
                 <Select label="وضعیت" value={claimForm.status} onChange={(v) => setClaimForm((p) => ({ ...p, status: v }))} options={claimStatuses.map((s) => ({ value: s.value, label: s.label }))} />

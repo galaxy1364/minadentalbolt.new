@@ -134,6 +134,27 @@ const SUGGESTIONS = [
 
 export default function AICommandBar() {
   const [open, setOpen] = useState(false)
+  const [hidden, setHidden] = useState(false)
+
+  /**
+   * Hides the floating trigger while the page is scrolled downward.
+   * Threshold and floor keep it from flickering on small rubber-band
+   * movements near the top, which is what makes naive versions of this
+   * feel broken.
+   */
+  useEffect(() => {
+    if (window.matchMedia?.('(min-width: 640px)').matches) return
+    let last = window.scrollY
+    const onScroll = () => {
+      const y = window.scrollY
+      if (Math.abs(y - last) < 12) return
+      setHidden(y > last && y > 80)
+      last = y
+    }
+    window.addEventListener('scroll', onScroll, { passive: true })
+    return () => window.removeEventListener('scroll', onScroll)
+  }, [])
+
   const [input, setInput] = useState('')
   const [result, setResult] = useState<CommandMatch | null>(null)
   const [listening, setListening] = useState(false)
@@ -347,7 +368,19 @@ export default function AICommandBar() {
     return (
       <button
         onClick={() => { h.tap(); setOpen(true) }}
-        className="fixed bottom-24 left-4 z-40 flex items-center gap-2 px-4 py-2.5 rounded-full bg-gradient-to-r from-sky-500 to-teal-600 text-white text-sm font-medium shadow-lg hover:shadow-xl transition-all-smooth press-scale"
+        /* MOD-FIX-031: this pill floats over the list at the bottom-left,
+           which is exactly where an appointment card's status sits. It
+           now slides out of the way while the user scrolls down through
+           a list and comes back the moment they scroll up — the content
+           underneath is readable, and the button is one flick away
+           rather than gone. `pointer-events` is dropped with it so a tap
+           in that corner reaches the row, not the hidden button.
+           It never hides on desktop, where nothing is that cramped. */
+        className={`fixed bottom-24 left-4 z-40 flex items-center gap-2 px-4 py-2.5 rounded-full bg-gradient-to-r from-sky-500 to-teal-600 text-white text-sm font-medium shadow-lg hover:shadow-xl transition-all-smooth press-scale ${
+          hidden ? 'opacity-0 translate-y-24 pointer-events-none' : 'opacity-100 translate-y-0'
+        }`}
+        aria-hidden={hidden}
+        tabIndex={hidden ? -1 : 0}
         aria-label="دستیار هوشمند"
       >
         <Sparkles size={16} className="animate-pulse" />

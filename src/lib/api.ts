@@ -1,6 +1,6 @@
 // Minadent - Offline-first API layer
 // All reads come from local IndexedDB (instant). All writes go to local DB + sync queue.
-import { toJalaliString } from './persianDate'
+import { toJalaliDisplay } from './persianDate'
 import { toothLabel } from './toothLabel'
 import { supabase, CLINIC_ID } from './supabase'
 import { db } from './db'
@@ -163,7 +163,7 @@ export async function createAppointment(a: AppointmentInput): Promise<Appointmen
   await db.appointments.put(appt)
   await queueOperation('appointments', 'insert', id, appt)
   await logToTimeline(appt.patient_id, 'appointment_created', 'نوبت جدید',
-    `نوبت ${toJalaliString(appt.date)} ساعت ${appt.start_time || '-'}`, id)
+    `نوبت ${toJalaliDisplay(appt.date)} ساعت ${appt.start_time || '-'}`, id)
   return appt
 }
 

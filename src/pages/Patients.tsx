@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useMemo } from 'react'
 import { PatientDebtBar } from '../components/PatientDebtBar'
 import { useNavigate } from 'react-router-dom'
-import { Plus, Search, Edit2, Phone, Filter, Users, Award, AlertCircle, Smile, FileText, User, Trash2, Heart, Shield, MapPin } from 'lucide-react'
+import { Plus, Search, Edit2, Phone, Filter, Users, Award, AlertCircle, Smile, FileText, User, Heart, Shield, MapPin, Archive } from 'lucide-react'
 import { fetchPatients, createPatient, updatePatient, fetchDoctors, fetchPayments, fetchTreatments, fetchImplantCases, peekNextFileNumber } from '../lib/api'
 import { toJalaliStringPretty, formatCurrency, toPersianDigits } from '../lib/persianDate'
 import { Patient, Doctor, Payment, Treatment, ImplantCase } from '../types'
@@ -495,10 +495,11 @@ export default function Patients() {
                     </button>
                     <button
                       onClick={() => handleDelete(patient)}
-                      aria-label={`حذف ${patient.first_name} ${patient.last_name}`}
+                      aria-label={`غیرفعال کردن ${patient.first_name} ${patient.last_name}`}
+                      title="غیرفعال کردن"
                       className="p-1.5 rounded-lg text-error-400 hover:bg-error-50 hover:text-error-600 transition-all-smooth press-scale"
                     >
-                      <Trash2 size={14} />
+                      <Archive size={14} />
                     </button>
                     {/* MOD-FEAT-027: the amount, not just the word. «بدهکار»
                         alone made the row say someone owes money without

@@ -5,12 +5,24 @@
 // means users keep getting an old JS bundle after a deploy, which can
 // leave the app failing to load entirely when the cached HTML and the
 // new assets no longer match.
-const CACHE_NAME = 'minadent-v1.226.0'
+const CACHE_NAME = 'minadent-v1.230.0'
 const STATIC_ASSETS = [
   '/',
   '/index.html',
   'https://cdn.jsdelivr.net/gh/rastikerdar/vazirmatn@v33.003/Vazirmatn-font-face.css',
 ]
+
+/**
+ * MOD-FIX-029: the font lives on a CDN, and the fetch handler below only
+ * ever answered same-origin requests — so the font CSS pre-cached above
+ * was cached and then never served, and the .woff2 files it points at
+ * were never cached at all. Offline (and any time the CDN is blocked,
+ * which for this clinic is routine) the whole app fell back to a system
+ * font. Font files never change under a pinned version, so cache-first
+ * is right for them: after one successful online load the typeface keeps
+ * working with no network.
+ */
+const FONT_ORIGINS = ['https://cdn.jsdelivr.net', 'https://fonts.gstatic.com']
 
 self.addEventListener('install', (event) => {
   event.waitUntil(
@@ -53,6 +65,25 @@ self.addEventListener('fetch', (event) => {
   if (request.method !== 'GET') return
 
   const url = new URL(request.url)
+
+  if (FONT_ORIGINS.includes(url.origin)) {
+    event.respondWith(
+      caches.match(request).then((cached) => cached || fetch(request).then((response) => {
+        // An opaque (no-cors) response is still worth caching: the
+        // browser can replay it for the same request even though this
+        // script cannot read it.
+        if (response) {
+          const clone = response.clone()
+          caches.open(CACHE_NAME).then((cache) => cache.put(request, clone))
+        }
+        return response
+      // Nothing cached and no network: let it fail quietly so the CSS
+      // fallback stack takes over instead of the page erroring.
+      }).catch(() => Response.error())),
+    )
+    return
+  }
+
   if (url.origin === self.location.origin) {
     event.respondWith(
       fetch(request)

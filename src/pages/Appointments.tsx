@@ -1,8 +1,8 @@
 import { useState, useEffect, useCallback, useMemo } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
-import { Calendar, Clock, CheckCircle2, User, ChevronRight, ChevronLeft, Plus, Search, Trash2, AlertCircle, Edit2, Stethoscope, DollarSign, FileText, Activity, List, Grid, X, UserPlus, Globe } from 'lucide-react'
+import { Calendar, Clock, CheckCircle2, User, ChevronRight, ChevronLeft, Plus, Search, AlertCircle, Edit2, Stethoscope, DollarSign, FileText, Activity, List, Grid, X, UserPlus, Globe, Ban } from 'lucide-react'
 import { fetchTreatments, fetchPayments, fetchImplantCases, fetchAppointments, createAppointment, updateAppointment, checkConflict, fetchPatients, updatePatient, fetchDoctors, fetchUnits, peekNextFileNumber, createPatient, createEncounter, fetchDoctorSchedules, fetchOnlineBookingRequests, rejectBookingRequest, updateLabOrder, updateImplantCase } from '../lib/api'
-import { toJalaliString, toJalaliStringPretty, getJalaliDateInfo, formatTime, formatCurrency, toPersianDigits, persianWeekdaysShort, getHoliday, jsDateToPersianWeekday } from '../lib/persianDate'
+import { toJalaliString, toJalaliStringPretty, getJalaliDateInfo, formatTime, timeParts, formatCurrency, toPersianDigits, persianWeekdaysShort, getHoliday, jsDateToPersianWeekday } from '../lib/persianDate'
 import { doctorColor } from '../lib/doctorColors'
 import { summariseDay, shiftsCapacityMinutes } from '../lib/dayMetrics'
 import { generateSlots, slotAvailability, defaultEndTime, addMinutes, firstBookableSlot } from '../lib/timeSlots'
@@ -743,8 +743,8 @@ export default function Appointments() {
                           <span className={`status-pill ${sm.bg} ${sm.color}`}>{sm.label}</span>
                         </div>
                       </div>
-                      <button onClick={(e) => { e.stopPropagation(); handleDelete(appt) }} aria-label="لغو نوبت" className="p-1.5 rounded-lg bg-error-50 text-error-500 press-scale">
-                        <Trash2 size={14} />
+                      <button onClick={(e) => { e.stopPropagation(); handleDelete(appt) }} aria-label="لغو نوبت" title="لغو نوبت" className="p-1.5 rounded-lg bg-error-50 text-error-500 press-scale">
+                        <Ban size={14} />
                       </button>
                     </div>
                   </div>
@@ -782,13 +782,13 @@ export default function Appointments() {
                   {/* Time badge */}
                   {isToday && appt.status === 'scheduled' ? (
                     <div className="time-badge">
-                      <div className="text-[9px] opacity-80 leading-none">{formatTime(appt.start_time).split(' ')[0]}</div>
-                      <div className="text-lg font-extrabold leading-tight">{formatTime(appt.start_time).match(/\d+/)?.[0] || ''}</div>
+                      <div className="text-[9px] opacity-80 leading-none">{timeParts(appt.start_time).period}</div>
+                      <div className="text-lg font-extrabold leading-tight">{timeParts(appt.start_time).clock}</div>
                     </div>
                   ) : (
                     <div className="waiting-badge">
-                      <div className="text-[9px] text-accent-600 leading-none">{formatTime(appt.start_time).split(' ')[0]}</div>
-                      <div className="text-lg font-extrabold text-accent-700 leading-tight">{formatTime(appt.start_time).match(/\d+/)?.[0] || ''}</div>
+                      <div className="text-[9px] text-accent-600 leading-none">{timeParts(appt.start_time).period}</div>
+                      <div className="text-lg font-extrabold text-accent-700 leading-tight">{timeParts(appt.start_time).clock}</div>
                     </div>
                   )}
 
@@ -824,7 +824,7 @@ export default function Appointments() {
                       </button>
                     )}
                     <button onClick={() => handleDelete(appt)} aria-label="لغو نوبت" className="p-1.5 rounded-lg bg-error-50 text-error-500 hover:bg-error-100 transition-all-smooth press-scale" title="لغو">
-                      <Trash2 size={16} />
+                      <Ban size={16} />
                     </button>
                   </div>
                 </div>
@@ -1022,7 +1022,7 @@ export default function Appointments() {
                   </div>
                 ) : (
                   <Select
-                    label="پزشک"
+                    label="پزشک *"
                     value={wizardData.doctor_id}
                     onChange={(v) => {
                       h.select()

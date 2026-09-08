@@ -1957,7 +1957,7 @@ export default function PatientDetail() {
             validate: () => (!phaseForm.title.trim() ? 'عنوان فاز الزامی است' : null),
             content: (
               <>
-                <Input label="عنوان فاز" value={phaseForm.title} onChange={(v) => setPhaseForm({ ...phaseForm, title: v })} placeholder="مثلاً: کشیدن دندان‌های آسیب‌دیده" />
+                <Input label="عنوان فاز *" value={phaseForm.title} onChange={(v) => setPhaseForm({ ...phaseForm, title: v })} placeholder="مثلاً: کشیدن دندان‌های آسیب‌دیده" />
                 <Select label="پزشک مسئول" value={phaseForm.doctor_id} onChange={(v) => setPhaseForm({ ...phaseForm, doctor_id: v })} options={doctors.filter((d) => d.is_active).map((d) => ({ value: d.id, label: `دکتر ${d.name || d.specialty || 'پزشک'}` }))} placeholder="انتخاب پزشک..." />
                 <Textarea label="توضیحات" value={phaseForm.description} onChange={(v) => setPhaseForm({ ...phaseForm, description: v })} placeholder="جزئیات این فاز" rows={2} />
               </>
@@ -1968,7 +1968,7 @@ export default function PatientDetail() {
             validate: () => (!phaseForm.procedures.trim() ? 'رویه‌های این فاز الزامی است' : null),
             content: (
               <>
-                <Textarea label="رویه‌های این فاز" value={phaseForm.procedures} onChange={(v) => setPhaseForm({ ...phaseForm, procedures: v })} placeholder="مثلاً: کشیدن دندان ۱۶، ۱۷" rows={2} />
+                <Textarea label="رویه‌های این فاز *" value={phaseForm.procedures} onChange={(v) => setPhaseForm({ ...phaseForm, procedures: v })} placeholder="مثلاً: کشیدن دندان ۱۶، ۱۷" rows={2} />
                 <div className="grid grid-cols-2 gap-3">
                   <CurrencyInput label="هزینه‌ی تخمینی (ت)" value={phaseForm.estimated_cost} onChange={(v) => setPhaseForm({ ...phaseForm, estimated_cost: v })} />
                   <CurrencyInput label="هزینه‌ی واقعی (ت)" value={phaseForm.actual_cost} onChange={(v) => setPhaseForm({ ...phaseForm, actual_cost: v })} />
