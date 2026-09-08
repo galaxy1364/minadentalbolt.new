@@ -1,0 +1,61 @@
+# MOD-TEST-003 | همان چیزی که روی لپ‌تاپ اجرا می‌شود، روی هر push هم
+#
+# بریف تحویل این فایل را «🔴 دوم» گذاشته بود و نوشته بود متنش آماده است
+# ولی push نشده، چون توکن آن‌موقع دسترسی `workflow` نداشت.
+#
+# تا v1.226 اضافه کردنش هم فایده‌ی کاملی نداشت: `clinic-flow.spec.ts`
+# بدون `E2E_EMAIL`/`E2E_PASSWORD` همیشه skip می‌شد، و آن دو در CI وجود
+# ندارند — یعنی CI فقط تست دود را اجرا می‌کرد. حالا که harness شبکه را
+# خودش پاسخ می‌دهد، **کل** روند مطب در CI اجرا می‌شود، بدون هیچ secret.
+#
+# هیچ رمزی اینجا لازم نیست و هیچ‌کدام هم تعریف نشده — اگر روزی این
+# workflow به secret نیاز پیدا کرد، یعنی چیزی در تست‌ها به سرور واقعی
+# وصل شده و باید همان اصلاح شود، نه اینکه secret اضافه شود.
+
+name: Verify
+
+on:
+  push:
+    branches: ['**']
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - run: npm ci
+
+      # sync-sw + tsc --noEmit + vitest + vite build — همان چرخه‌ای که
+      # استاندارد پروژه برای هر تغییر اجباری می‌کند.
+      - name: npm run verify
+        run: npm run verify
+
+      # فقط Chromium — همان مرورگری که پروژه‌های playwright.config به آن
+      # پین شده‌اند. دانلود WebKit/Firefox چند دقیقه وقت می‌گیرد و هیچ
+      # تستی از آن‌ها استفاده نمی‌کند.
+      - name: نصب مرورگر
+        run: npx playwright install --with-deps chromium
+
+      - name: npm run e2e
+        run: npm run e2e
+
+      # اسکرین‌شات و trace هر شکستی نگه داشته می‌شود — یک تست چیدمانی که
+      # فقط متن خطا بدهد، چیزی درباره‌ی ظاهر واقعی صفحه نمی‌گوید.
+      - name: نگه‌داشتن گزارش شکست
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: |
+            playwright-report/
+            test-results/
+          retention-days: 14
