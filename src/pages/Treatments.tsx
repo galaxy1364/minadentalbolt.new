@@ -6,21 +6,24 @@ import { useNavigate, useLocation } from 'react-router-dom'
 import {
   Activity, ClipboardList, Stethoscope, Search, Eye, Smile, Plus, Edit2, Trash2, Ban, Layers,
   DollarSign, FlaskConical, CheckCircle2, X, UserPlus, ChevronRight, Bone,
+  ChevronDown, Wallet, Receipt, CalendarClock, Users,
 } from 'lucide-react'
 import { BarChart, Bar, XAxis, YAxis, Tooltip as RTooltip, ResponsiveContainer, Cell } from 'recharts'
 import {
   fetchEncounters, fetchTreatments, fetchProcedures, fetchPatients, fetchDoctors,
   fetchLabs, fetchToothRecords, createEncounter, updateEncounter, createTreatment,
+  fetchPayments, fetchImplantCases, fetchCheques, fetchAllInstallments,
   fetchPatientPolicies, fetchInsuranceClaims,
   updateTreatment, createLabOrder, fetchLabOrders, updateLabOrder,
   createToothRecord, updateToothRecord,
 } from '../lib/api'
 import { selectApplicablePolicy, splitCoverage } from '../lib/insurance'
 import { procedureDefaultPrice } from '../lib/selectionHints'
+import { groupPatientTreatments } from '../lib/patientTreatmentGroups'
 import type { PatientPolicy } from '../lib/insurance'
 import { PatientSelect } from '../components/PatientSelect'
 import { toJalaliDisplay, toJalaliStringPretty, formatCurrency, formatNumber, toPersianDigits } from '../lib/persianDate'
-import { Encounter, EncounterWithRelations, Treatment, Procedure, Patient, Doctor, Laboratory, ToothRecord, LabOrder, InsuranceClaim } from '../types'
+import { Encounter, EncounterWithRelations, Treatment, Procedure, Patient, Doctor, Laboratory, ToothRecord, LabOrder, InsuranceClaim, Payment, Cheque, Installment, ImplantCaseWithRelations } from '../types'
 import { Card, Button, Badge, Spinner, EmptyState, Tabs, Input, Select, Textarea, Modal, Wizard, showToast } from '../components/ui'
 import { PersianDateInput } from '../components/PersianDateInput'
 // MOD-FEAT-024: the same arch the chart draws, instead of a separate row of numbers.
@@ -123,6 +126,11 @@ export default function Treatments() {
   const [labs, setLabs] = useState<Laboratory[]>([])
   const [labOrders, setLabOrders] = useState<LabOrder[]>([])
   const [toothRecords, setToothRecords] = useState<ToothRecord[]>([])
+  const [payments, setPayments] = useState<Payment[]>([])
+  const [implantCases, setImplantCases] = useState<ImplantCaseWithRelations[]>([])
+  const [cheques, setCheques] = useState<Cheque[]>([])
+  const [installments, setInstallments] = useState<Installment[]>([])
+  const [expandedPatients, setExpandedPatients] = useState<Set<string>>(new Set())
   const [loading, setLoading] = useState(true)
 
   // Filters
@@ -287,9 +295,10 @@ export default function Treatments() {
   const loadData = useCallback(async () => {
     setLoading(true)
     try {
-      const [encs, trets, procs, pats, docs, labsList, labOrdersList] = await Promise.all([
+      const [encs, trets, procs, pats, docs, labsList, labOrdersList, pays, impl, chqs, insts] = await Promise.all([
         fetchEncounters(), fetchTreatments(), fetchProcedures(),
         fetchPatients(), fetchDoctors(), fetchLabs(), fetchLabOrders(),
+        fetchPayments(), fetchImplantCases(), fetchCheques(), fetchAllInstallments(),
       ])
       setEncounters(encs)
       setTreatments(trets as Treatment[])
@@ -298,6 +307,10 @@ export default function Treatments() {
       setDoctors(docs)
       setLabs(labsList)
       setLabOrders(labOrdersList as unknown as LabOrder[])
+      setPayments(pays)
+      setImplantCases(impl)
+      setCheques(chqs)
+      setInstallments(insts)
     } catch (err) {
       console.error('Error loading treatments:', err)
       showToast('error', 'خطا در بارگذاری درمان‌ها')
@@ -357,6 +370,38 @@ export default function Treatments() {
       return true
     })
   }, [encounters, searchQuery, filterStatus])
+
+  // MOD-FEAT-042: the «ویزیت‌ها» tab is one file per patient, not one row
+  // per visit. The status filter keeps working — it narrows which visits
+  // count toward a file, and a file with no matching visit drops out.
+  const patientGroups = useMemo(() => {
+    const encForGroups = filterStatus ? encounters.filter((e) => e.status === filterStatus) : encounters
+    const groups = groupPatientTreatments({
+      encounters: encForGroups,
+      treatments,
+      payments,
+      implantCases,
+      cheques,
+      installments,
+    })
+    if (!searchQuery.trim()) return groups
+    const q = searchQuery.toLowerCase().trim()
+    return groups.filter((g) => {
+      const p = patientMap.get(g.patientId)
+      const name = p ? `${p.first_name} ${p.last_name}`.toLowerCase() : ''
+      const file = (p?.file_number || '').toLowerCase()
+      const phone = p?.phone || ''
+      const diag = g.encounters.some((e) => (e as EncounterWithRelations).diagnosis?.toLowerCase().includes(q))
+      return name.includes(q) || file.includes(q) || phone.includes(q) || diag
+    })
+  }, [encounters, treatments, payments, implantCases, cheques, installments, filterStatus, searchQuery, patientMap])
+
+  const togglePatient = (id: string) =>
+    setExpandedPatients((prev) => {
+      const next = new Set(prev)
+      next.has(id) ? next.delete(id) : next.add(id)
+      return next
+    })
 
   const filteredProcedures = useMemo(() => {
     return procedures.filter((p) => {
@@ -960,49 +1005,116 @@ export default function Treatments() {
 
       {/* Encounters Tab */}
       {activeTab === 'encounters' && (
-        <div className="space-y-4">
-          {filteredEncounters.length === 0 ? (
-            <Card className="p-5"><EmptyState icon={<ClipboardList size={28} />} title="ویزیتی یافت نشد" description="با شروع درمان، ویزیت خودکار ثبت می‌شود" action={<Button onClick={openQuickTreatModal} className="flex items-center gap-1.5"><Stethoscope size={16} /> شروع درمان</Button>} /></Card>
+        <div className="space-y-3">
+          {patientGroups.length === 0 ? (
+            <Card className="p-5"><EmptyState icon={<ClipboardList size={28} />} title="پرونده‌ای یافت نشد" description="با شروع درمان، پرونده‌ی بیمار خودکار ساخته می‌شود" action={<Button onClick={openQuickTreatModal} className="flex items-center gap-1.5"><Stethoscope size={16} /> شروع درمان</Button>} /></Card>
           ) : (
-            <Card className="p-0 overflow-hidden">
-              <div className="overflow-x-auto">
-                <table className="w-full text-sm">
-                  <thead>
-                    <tr className="border-b border-slate-100 bg-slate-50">
-                      <th className="text-right px-4 py-3 text-xs font-medium text-slate-500">بیمار</th>
-                      <th className="text-right px-4 py-3 text-xs font-medium text-slate-500">پزشک</th>
-                      <th className="text-right px-4 py-3 text-xs font-medium text-slate-500">تاریخ</th>
-                      <th className="text-right px-4 py-3 text-xs font-medium text-slate-500">تشخیص</th>
-                      <th className="text-right px-4 py-3 text-xs font-medium text-slate-500">مبلغ</th>
-                      <th className="text-right px-4 py-3 text-xs font-medium text-slate-500">وضعیت</th>
-                      <th className="text-right px-4 py-3 text-xs font-medium text-slate-500"></th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {filteredEncounters.map((e) => {
-                      const meta = getEncounterStatusMeta(e.status)
-                      return (
-                        <tr key={e.id} className="border-b border-slate-50 hover:bg-slate-50 transition-all-smooth cursor-pointer" onClick={() => { h.tap(); setDetailEnc(e) }}>
-                          <td className="px-4 py-3"><p className="font-medium text-slate-800">{encounterPatientName(e)}</p></td>
-                          <td className="px-4 py-3 text-slate-600">{encounterDoctorName(e)}</td>
-                          <td className="px-4 py-3 text-slate-600">{toJalaliDisplay(e.encounter_date)}</td>
-                          <td className="px-4 py-3 text-slate-600 max-w-[200px] truncate">{e.diagnosis || '-'}</td>
-                          <td className="px-4 py-3 text-slate-700 font-medium">{e.total_amount ? `${formatCurrency(e.total_amount)} ت` : '-'}</td>
-                          <td className="px-4 py-3"><Badge color={meta.color}>{meta.label}</Badge></td>
-                          <td className="px-4 py-3" onClick={(ev) => ev.stopPropagation()}>
-                            <div className="flex items-center gap-1">
-                              <button onClick={() => setDetailEnc(e)} className="p-1 rounded-lg bg-slate-100 text-slate-600 hover:bg-slate-200"><Eye size={14} /></button>
-                              <button onClick={() => openEncEditModal(e)} className="p-1 rounded-lg bg-sky-50 text-sky-600 hover:bg-sky-100"><Edit2 size={14} /></button>
-                              <button onClick={() => handleDeleteEncounter(e)} aria-label="لغو ویزیت" title="لغو ویزیت" className="p-1 rounded-lg bg-rose-50 text-rose-500 hover:bg-rose-100"><Ban size={14} /></button>
+            patientGroups.map((g) => {
+              const p = patientMap.get(g.patientId)
+              const name = p ? `${p.first_name} ${p.last_name}` : 'نامشخص'
+              const initials = p ? `${p.first_name?.[0] ?? ''}${p.last_name?.[0] ?? ''}` : '؟'
+              const open = expandedPatients.has(g.patientId)
+              const owes = g.finance.balance > 0
+              const settled = g.finance.balance <= 0 && g.finance.totalCost > 0
+              // A file's left edge is its money status at a glance: red owes,
+              // green settled, slate untouched.
+              const edge = owes ? '#dc2626' : settled ? '#0d9488' : '#cbd5e1'
+              return (
+                <Card key={g.patientId} className="p-0 overflow-hidden" style={{ borderRight: `4px solid ${edge}` }}>
+                  {/* File header — tap to open the patient's visit history */}
+                  <button
+                    onClick={() => { h.tap(); togglePatient(g.patientId) }}
+                    className="w-full flex items-center gap-3 p-3.5 text-right hover:bg-slate-50 dark:hover:bg-slate-700/40 transition-all-smooth"
+                    aria-expanded={open}
+                  >
+                    <div className="w-11 h-11 rounded-2xl bg-gradient-to-br from-violet-500 to-sky-500 text-white flex items-center justify-center font-bold text-sm shrink-0">{initials}</div>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2">
+                        <h3 className="font-bold text-slate-800 dark:text-slate-100 truncate">{name}</h3>
+                        {p?.file_number && <span className="text-[10px] text-slate-400 font-mono shrink-0">{p.file_number}</span>}
+                      </div>
+                      <div className="flex items-center gap-1.5 flex-wrap mt-1">
+                        <span className="text-[11px] px-1.5 py-0.5 rounded-md bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300">{toPersianDigits(g.encounters.length)} ویزیت</span>
+                        <span className="text-[11px] px-1.5 py-0.5 rounded-md bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300">{toPersianDigits(g.treatmentCount)} درمان</span>
+                        {g.doctorChanged && (
+                          <span className="text-[11px] px-1.5 py-0.5 rounded-md bg-amber-100 text-amber-800 font-medium flex items-center gap-1" title={`${toPersianDigits(g.doctorIds.length)} پزشک روی این پرونده کار کرده‌اند`}>
+                            <Users size={11} /> {toPersianDigits(g.doctorIds.length)} پزشک
+                          </span>
+                        )}
+                        {g.lastVisitDate && <span className="text-[11px] text-slate-400">آخرین ویزیت: {toJalaliDisplay(g.lastVisitDate)}</span>}
+                      </div>
+                    </div>
+                    <div className="text-left shrink-0">
+                      <p className={`font-extrabold text-sm ${owes ? 'text-error-600' : 'text-success-600'}`}>{formatCurrency(Math.abs(g.finance.balance))} ت</p>
+                      <p className="text-[10px] text-slate-400">{owes ? 'بدهکار' : settled ? 'تسویه' : 'بدون هزینه'}</p>
+                    </div>
+                    {open ? <ChevronDown size={18} className="text-slate-400 shrink-0" /> : <ChevronRight size={18} className="text-slate-400 shrink-0 rotate-180" />}
+                  </button>
+
+                  {open && (
+                    <div className="border-t border-slate-100 dark:border-slate-700">
+                      {/* Money picture — cost / paid / balance, plus cheque
+                          and instalment standing when they exist. */}
+                      <div className="grid grid-cols-3 gap-px bg-slate-100 dark:bg-slate-700">
+                        <div className="bg-white dark:bg-slate-800 p-2.5 text-center">
+                          <p className="text-[10px] text-slate-400">کل هزینه</p>
+                          <p className="text-xs font-bold text-slate-700 dark:text-slate-200 mt-0.5">{formatCurrency(g.finance.totalCost)}</p>
+                        </div>
+                        <div className="bg-white dark:bg-slate-800 p-2.5 text-center">
+                          <p className="text-[10px] text-slate-400">پرداختی</p>
+                          <p className="text-xs font-bold text-success-600 mt-0.5">{formatCurrency(g.finance.paid)}</p>
+                        </div>
+                        <div className="bg-white dark:bg-slate-800 p-2.5 text-center">
+                          <p className="text-[10px] text-slate-400">مانده</p>
+                          <p className={`text-xs font-bold mt-0.5 ${owes ? 'text-error-600' : 'text-success-600'}`}>{formatCurrency(Math.abs(g.finance.balance))}</p>
+                        </div>
+                      </div>
+                      {(g.finance.pendingChequeCount > 0 || g.finance.remainingInstallmentCount > 0) && (
+                        <div className="flex items-center gap-2 flex-wrap px-3.5 py-2 bg-slate-50/60 dark:bg-slate-700/30">
+                          {g.finance.pendingChequeCount > 0 && (
+                            <span className="text-[11px] px-2 py-1 rounded-lg bg-sky-50 text-sky-700 font-medium flex items-center gap-1"><Receipt size={12} /> {toPersianDigits(g.finance.pendingChequeCount)} چک در انتظار — {formatCurrency(g.finance.pendingChequeAmount)} ت</span>
+                          )}
+                          {g.finance.remainingInstallmentCount > 0 && (
+                            <span className="text-[11px] px-2 py-1 rounded-lg bg-violet-50 text-violet-700 font-medium flex items-center gap-1"><CalendarClock size={12} /> {toPersianDigits(g.finance.remainingInstallmentCount)} قسط باقی — {formatCurrency(g.finance.remainingInstallmentAmount)} ت</span>
+                          )}
+                        </div>
+                      )}
+
+                      {/* Visit history — each opens the full encounter file */}
+                      <div className="divide-y divide-slate-50 dark:divide-slate-700/50">
+                        {g.encounters.length === 0 ? (
+                          <p className="px-3.5 py-3 text-xs text-slate-400">هنوز ویزیتی ثبت نشده — درمان‌ها بدون ویزیت ثبت شده‌اند.</p>
+                        ) : g.encounters.map((eLike) => {
+                          const e = eLike as EncounterWithRelations
+                          const meta = getEncounterStatusMeta(e.status)
+                          const docName = e.doctor ? (e.doctor.name || e.doctor.specialty || 'پزشک') : '—'
+                          return (
+                            <div key={e.id} className="flex items-center gap-3 px-3.5 py-2.5 hover:bg-slate-50 dark:hover:bg-slate-700/40 transition-all-smooth cursor-pointer" onClick={() => { h.tap(); setDetailEnc(e) }}>
+                              <div className="flex-1 min-w-0">
+                                <div className="flex items-center gap-2">
+                                  <span className="text-xs font-medium text-slate-700 dark:text-slate-200">{toJalaliDisplay(e.encounter_date)}</span>
+                                  <Badge color={meta.color}>{meta.label}</Badge>
+                                </div>
+                                <p className="text-[11px] text-slate-500 mt-0.5 flex items-center gap-1 truncate">
+                                  <Stethoscope size={11} className="shrink-0" /> دکتر {docName}
+                                  {e.diagnosis ? ` — ${e.diagnosis}` : ''}
+                                </p>
+                              </div>
+                              <span className="text-xs font-bold text-slate-700 dark:text-slate-200 shrink-0">{e.total_amount ? `${formatCurrency(e.total_amount)} ت` : '—'}</span>
+                              <div className="flex items-center gap-1 shrink-0" onClick={(ev) => ev.stopPropagation()}>
+                                <button onClick={() => setDetailEnc(e)} aria-label="باز کردن ویزیت" className="p-1 rounded-lg bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-200"><Eye size={14} /></button>
+                                <button onClick={() => openEncEditModal(e)} aria-label="ویرایش ویزیت" className="p-1 rounded-lg bg-sky-50 text-sky-600 hover:bg-sky-100"><Edit2 size={14} /></button>
+                                <button onClick={() => handleDeleteEncounter(e)} aria-label="لغو ویزیت" title="لغو ویزیت" className="p-1 rounded-lg bg-rose-50 text-rose-500 hover:bg-rose-100"><Ban size={14} /></button>
+                              </div>
                             </div>
-                          </td>
-                        </tr>
-                      )
-                    })}
-                  </tbody>
-                </table>
-              </div>
-            </Card>
+                          )
+                        })}
+                      </div>
+                    </div>
+                  )}
+                </Card>
+              )
+            })
           )}
         </div>
       )}
