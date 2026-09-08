@@ -54,6 +54,36 @@ npx playwright test → ۱۳ passed · ۳ skipped (تست‌های مخصوص گ
 npm run verify      → tsc ✓ · vitest ۱۱۰۰/۱۱۰۰ ✓ · build ✓
 ```
 
+### CI — و چیزی که اولین اجرایش پیدا کرد
+`.github/workflows/verify.yml` اضافه شد (مورد «🔴 دوم» بریف تحویل، که
+آن‌موقع توکن دسترسی `workflow` نداشت). تا قبل از harness اضافه کردنش
+فایده‌ی کاملی نداشت: بدون `E2E_EMAIL`/`E2E_PASSWORD` کل `clinic-flow`
+در CI هم skip می‌شد.
+
+**اولین اجرا قرمز شد، و درست هم بود.** روی Node 20:
+
+```
+Error: Node.js detected but native WebSocket not found.
+  ❯ Module.createClient node_modules/@supabase/supabase-js/…
+  ❯ src/lib/supabase.ts:39:25
+```
+
+`createClient()` یک `RealtimeClient` می‌سازد و آن سازنده بدون
+`globalThis.WebSocket` خطا می‌دهد. Node آن را در نسخه‌ی ۲۲ گرفت.
+`supabase.ts` این تابع را **هنگام بارگذاری ماژول** صدا می‌زند، پس شش
+تست در `supabase.test.ts` سرِ import شکستند.
+
+بازتولید محلی، برای اطمینان از علت:
+```bash
+node -e "delete globalThis.WebSocket; import('@supabase/supabase-js')…"
+→ THREW: Error: Node.js detected but native WebSocket not found.
+```
+
+مرورگر همیشه `WebSocket` دارد، پس این نیاز **زمانِ تست** است نه نیاز
+برنامه. workflow روی Node 22 پین شد و `engines.node: >=22` در
+`package.json` ثبت شد تا این شرط یک جای مرجع داشته باشد، نه فقط داخل
+فایل workflow.
+
 ### ریسک باقی‌مانده
 - **داده‌ی نمونه است، نه دیتابیس زنده.** هر باگی که فقط با داده‌ی واقعی
   مطب پیدا می‌شود، اینجا دیده نمی‌شود.

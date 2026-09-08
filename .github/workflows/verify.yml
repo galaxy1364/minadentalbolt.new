@@ -27,9 +27,18 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      # Node 22, not 20. `@supabase/supabase-js` builds a RealtimeClient
+      # inside createClient(), and that constructor throws
+      # «Node.js detected but native WebSocket not found» unless the
+      # runtime has a global WebSocket — which Node gained in 22.
+      # `src/lib/supabase.ts` calls createClient() at module load, so on
+      # Node 20 six tests in supabase.test.ts fail at import. Reproduced
+      # locally with `delete globalThis.WebSocket` before the import.
+      # The browser always has WebSocket, so this is a test-runtime
+      # requirement, not an app one.
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22
           cache: npm
 
       - run: npm ci
