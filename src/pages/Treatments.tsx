@@ -4,7 +4,7 @@ import { SurfaceSelect } from '../components/SurfaceSelect'
 import { toothLabel, toothLabelWithWord } from '../lib/toothLabel'
 import { useNavigate, useLocation } from 'react-router-dom'
 import {
-  Activity, ClipboardList, Stethoscope, Search, Eye, Smile, Plus, Edit2, Trash2, Layers,
+  Activity, ClipboardList, Stethoscope, Search, Eye, Smile, Plus, Edit2, Trash2, Ban, Layers,
   DollarSign, FlaskConical, CheckCircle2, X, UserPlus, ChevronRight, Bone,
 } from 'lucide-react'
 import { BarChart, Bar, XAxis, YAxis, Tooltip as RTooltip, ResponsiveContainer, Cell } from 'recharts'
@@ -17,9 +17,9 @@ import {
 } from '../lib/api'
 import { selectApplicablePolicy, splitCoverage } from '../lib/insurance'
 import { procedureDefaultPrice } from '../lib/selectionHints'
-import { buildPatientAlerts, alertChips } from '../lib/patientAlerts'
 import type { PatientPolicy } from '../lib/insurance'
-import { toJalaliString, toJalaliStringPretty, formatCurrency, formatNumber, toPersianDigits } from '../lib/persianDate'
+import { PatientSelect } from '../components/PatientSelect'
+import { toJalaliDisplay, toJalaliStringPretty, formatCurrency, formatNumber, toPersianDigits } from '../lib/persianDate'
 import { Encounter, EncounterWithRelations, Treatment, Procedure, Patient, Doctor, Laboratory, ToothRecord, LabOrder, InsuranceClaim } from '../types'
 import { Card, Button, Badge, Spinner, EmptyState, Tabs, Input, Select, Textarea, Modal, Wizard, showToast } from '../components/ui'
 import { PersianDateInput } from '../components/PersianDateInput'
@@ -550,7 +550,7 @@ export default function Treatments() {
       fields: [
         { label: 'بیمار', value: patient ? `${patient.first_name} ${patient.last_name}` : '-', highlight: true },
         { label: 'پزشک', value: getDoctorName(encForm.doctor_id) },
-        { label: 'تاریخ', value: toJalaliString(encForm.encounter_date) },
+        { label: 'تاریخ', value: toJalaliDisplay(encForm.encounter_date) },
         { label: 'شکایت اصلی', value: encForm.chief_complaint || '-' },
         { label: 'مبلغ کل', value: encForm.total_amount ? `${formatCurrency(Number(encForm.total_amount))} ت` : '-' },
       ],
@@ -588,7 +588,7 @@ export default function Treatments() {
       warning: 'این ویزیت هیچ‌وقت پاک نمی‌شود — فقط به‌عنوان لغو‌شده علامت می‌خورد و در تایم‌لاین بیمار باقی می‌ماند.',
       fields: [
         { label: 'بیمار', value: encounterPatientName(e), highlight: true },
-        { label: 'تاریخ', value: toJalaliString(e.encounter_date) },
+        { label: 'تاریخ', value: toJalaliDisplay(e.encounter_date) },
       ],
       confirmLabel: 'تایید لغو',
       onConfirm: async () => {
@@ -985,7 +985,7 @@ export default function Treatments() {
                         <tr key={e.id} className="border-b border-slate-50 hover:bg-slate-50 transition-all-smooth cursor-pointer" onClick={() => { h.tap(); setDetailEnc(e) }}>
                           <td className="px-4 py-3"><p className="font-medium text-slate-800">{encounterPatientName(e)}</p></td>
                           <td className="px-4 py-3 text-slate-600">{encounterDoctorName(e)}</td>
-                          <td className="px-4 py-3 text-slate-600">{toJalaliString(e.encounter_date)}</td>
+                          <td className="px-4 py-3 text-slate-600">{toJalaliDisplay(e.encounter_date)}</td>
                           <td className="px-4 py-3 text-slate-600 max-w-[200px] truncate">{e.diagnosis || '-'}</td>
                           <td className="px-4 py-3 text-slate-700 font-medium">{e.total_amount ? `${formatCurrency(e.total_amount)} ت` : '-'}</td>
                           <td className="px-4 py-3"><Badge color={meta.color}>{meta.label}</Badge></td>
@@ -993,7 +993,7 @@ export default function Treatments() {
                             <div className="flex items-center gap-1">
                               <button onClick={() => setDetailEnc(e)} className="p-1 rounded-lg bg-slate-100 text-slate-600 hover:bg-slate-200"><Eye size={14} /></button>
                               <button onClick={() => openEncEditModal(e)} className="p-1 rounded-lg bg-sky-50 text-sky-600 hover:bg-sky-100"><Edit2 size={14} /></button>
-                              <button onClick={() => handleDeleteEncounter(e)} className="p-1 rounded-lg bg-rose-50 text-rose-500 hover:bg-rose-100"><Trash2 size={14} /></button>
+                              <button onClick={() => handleDeleteEncounter(e)} aria-label="لغو ویزیت" title="لغو ویزیت" className="p-1 rounded-lg bg-rose-50 text-rose-500 hover:bg-rose-100"><Ban size={14} /></button>
                             </div>
                           </td>
                         </tr>
@@ -1077,7 +1077,7 @@ export default function Treatments() {
             content: (
               <>
                 <div>
-                  <label className="block text-xs font-medium text-slate-600 dark:text-slate-300 mb-1.5">بیمار (جستجو)</label>
+                  <label className="block text-xs font-medium text-slate-600 dark:text-slate-300 mb-1.5">بیمار (جستجو) *</label>
                   <div className="relative">
                     <Search size={16} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400" />
                     <input
@@ -1110,7 +1110,7 @@ export default function Treatments() {
                     <Button variant="secondary" size="sm" onClick={() => { setEncModalOpen(false); navigate('/staff') }}>رفتن به پرسنل</Button>
                   </div>
                 ) : (
-                  <Select label="پزشک (الزامی)" value={encForm.doctor_id} onChange={(v) => { h.select(); setEncForm((p) => ({ ...p, doctor_id: v })) }} options={doctors.filter((d) => d.is_active || d.id === encForm.doctor_id).map((d) => ({ value: d.id, label: `${d.name || d.specialty || `پزشک ${d.id.slice(0, 4)}`}${!d.is_active ? ' (غیرفعال)' : ''}` }))} placeholder="انتخاب پزشک..." />
+                  <Select label="پزشک *" value={encForm.doctor_id} onChange={(v) => { h.select(); setEncForm((p) => ({ ...p, doctor_id: v })) }} options={doctors.filter((d) => d.is_active || d.id === encForm.doctor_id).map((d) => ({ value: d.id, label: `${d.name || d.specialty || `پزشک ${d.id.slice(0, 4)}`}${!d.is_active ? ' (غیرفعال)' : ''}` }))} placeholder="انتخاب پزشک..." />
                 )}
                 <PersianDateInput label="تاریخ ویزیت" value={encForm.encounter_date} onChange={(v) => setEncForm((p) => ({ ...p, encounter_date: v }))} />
               </>
@@ -1206,7 +1206,7 @@ export default function Treatments() {
                       </div>
                       <div className="flex items-center gap-1">
                         <button onClick={() => openTreatEditModal(t)} className="p-1 rounded-lg bg-sky-50 text-sky-600 hover:bg-sky-100"><Edit2 size={14} /></button>
-                        <button onClick={() => handleDeleteTreatment(t)} className="p-1 rounded-lg bg-rose-50 text-rose-500 hover:bg-rose-100"><Trash2 size={14} /></button>
+                        <button onClick={() => handleDeleteTreatment(t)} aria-label="لغو درمان" title="لغو درمان" className="p-1 rounded-lg bg-rose-50 text-rose-500 hover:bg-rose-100"><Ban size={14} /></button>
                       </div>
                     </div>
                   ))}
@@ -1305,7 +1305,7 @@ export default function Treatments() {
                     </button>
                   </div>
                 ) : (
-                  <ToothArchSelect value={treatForm.tooth_number} onChange={(v) => setTreatForm((p) => ({ ...p, tooth_number: v }))} />
+                  <ToothArchSelect label="دندان *" value={treatForm.tooth_number} onChange={(v) => setTreatForm((p) => ({ ...p, tooth_number: v }))} />
                 )}
                 {/* MOD-FEAT-026: a dropdown returns one value, so «MOD» —
                     the commonest restoration there is — could not be
@@ -1320,7 +1320,7 @@ export default function Treatments() {
             content: (
               <>
                 <div>
-                  <label className="block text-xs font-medium text-slate-600 dark:text-slate-300 mb-1.5">رویه درمانی</label>
+                  <label className="block text-xs font-medium text-slate-600 dark:text-slate-300 mb-1.5">رویه درمانی *</label>
                   <div className="flex flex-wrap gap-1.5 mb-2">
                     <button
                       onClick={() => { h.select(); setProcCategoryFilter('') }}
@@ -1371,7 +1371,7 @@ export default function Treatments() {
                 <div className="grid grid-cols-3 gap-3">
                   <Input label="تعداد" value={treatForm.quantity} onChange={(v) => setTreatForm((p) => ({ ...p, quantity: v }))} type="number" dir="ltr" />
                   <div>
-                    <CurrencyInput label="قیمت واحد (ت)" value={treatForm.unit_price} onChange={(v) => setTreatForm((p) => ({ ...p, unit_price: v }))} />
+                    <CurrencyInput label="قیمت واحد (ت) *" value={treatForm.unit_price} onChange={(v) => setTreatForm((p) => ({ ...p, unit_price: v }))} />
                     {priceMissing && !treatForm.unit_price && (
                       <p className="mt-1 text-xs text-amber-700">
                         برای «{priceMissing}» قیمت پایه ثبت نشده — دستی وارد کنید یا در تنظیمات رویه‌ها اضافه کنید.
@@ -1497,19 +1497,16 @@ export default function Treatments() {
                 : 'مستقیم وارد ثبت درمان می‌شوید تا دندان و رویه را ثبت کنید، بدون مرور کل دهان.'}
             </p>
           </div>
-          <Select
-            label="بیمار *"
+          {/* MOD-FIX-027: was a hand-built <Select> — the third patient
+              picker in the app, and the only one that showed neither the
+              file number nor the balance. PatientSelect now carries the
+              clinical chips too, so this is the same picker as the
+              payment, lab, implant and prescription forms. */}
+          <PatientSelect
+            required
             value={quickTreatPatientId}
             onChange={setQuickTreatPatientId}
-            options={patients.filter((p) => p.is_active).map((p) => {
-              // Same warnings as the booking picker: a clinician about to
-              // treat should see an allergy before choosing, not after.
-              const chips = alertChips(buildPatientAlerts(p, null), 2)
-              return {
-                value: p.id,
-                label: `${p.first_name} ${p.last_name}${chips.length ? ` ⚠ ${chips.join('، ')}` : ''}`,
-              }
-            })}
+            patients={patients}
             placeholder="انتخاب بیمار..."
           />
           <Select

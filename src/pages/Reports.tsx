@@ -353,16 +353,13 @@ export default function Reports() {
     ])
   }
 
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center py-20">
-        <Spinner size={32} />
-      </div>
-    )
-  }
-
-  const tooltipStyle = { direction: 'rtl' as const, fontSize: 12, borderRadius: 12, border: 'none', boxShadow: '0 4px 12px rgba(0,0,0,0.1)' }
-
+  /*
+   * MOD-FIX-024: this useMemo has to stay ABOVE the `loading` early
+   * return. React counts hooks per render, so while loading was true the
+   * component ran one hook fewer than after the data arrived — "Rendered
+   * more hooks than during the previous render", straight into the error
+   * boundary. Every visit to گزارش‌ها crashed the moment loading flipped.
+   */
   // ── Aging Report (سن بدهی) ──────────────────────────────────────
   // Buckets each patient's outstanding balance by days since their
   // most recent treatment activity — the standard 30/60/90-day aging
@@ -390,6 +387,16 @@ export default function Reports() {
     for (const r of rows) totals[r.bucket] += r.balance
     return { rows, totals, grandTotal: rows.reduce((s, r) => s + r.balance, 0) }
   }, [payments, treatments, implantCases, patients, encounters])
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center py-20">
+        <Spinner size={32} />
+      </div>
+    )
+  }
+
+  const tooltipStyle = { direction: 'rtl' as const, fontSize: 12, borderRadius: 12, border: 'none', boxShadow: '0 4px 12px rgba(0,0,0,0.1)' }
 
   return (
     <div className="space-y-6">

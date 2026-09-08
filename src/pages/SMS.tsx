@@ -3,7 +3,7 @@
 // icon/nav entry of its own — moved out to a real, first-class module
 // matching every other section of the app.
 import { useState, useEffect, useMemo } from 'react'
-import { Megaphone, MessageSquareText, Plus, Edit2, Trash2 } from 'lucide-react'
+import { Megaphone, MessageSquareText, Plus, Edit2, Archive } from 'lucide-react'
 import { ModuleHeader } from '../components/ModuleHeader'
 import { Card, Button, Input, Textarea, Select, Badge, Tabs, EmptyState, Spinner, Modal, showToast } from '../components/ui'
 import { fetchSmsTemplates, createSmsTemplate, updateSmsTemplate, deactivateSmsTemplate, fetchPatients } from '../lib/api'
@@ -215,7 +215,7 @@ function TemplatesTab({ templates, onChange }: { templates: SmsTemplate[]; onCha
                 </div>
                 <div className="flex gap-1 shrink-0">
                   <button onClick={() => openEdit(t)} className="p-1.5 rounded-lg text-slate-400 hover:text-primary-600 hover:bg-primary-50"><Edit2 size={14} /></button>
-                  <button onClick={() => handleDelete(t)} className="p-1.5 rounded-lg text-slate-400 hover:text-error-600 hover:bg-error-50"><Trash2 size={14} /></button>
+                  <button onClick={() => handleDelete(t)} aria-label="غیرفعال کردن قالب" title="غیرفعال کردن" className="p-1.5 rounded-lg text-slate-400 hover:text-error-600 hover:bg-error-50"><Archive size={14} /></button>
                 </div>
               </div>
             </Card>

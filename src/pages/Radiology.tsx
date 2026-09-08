@@ -2,13 +2,14 @@
 import { useState, useEffect, useCallback, useMemo } from 'react'
 import { createPortal } from 'react-dom'
 import { useNavigate } from 'react-router-dom'
-import { Image, Search, Filter, Eye, XCircle, Smile, Camera, Calendar, User, FileText, Download, ZoomIn, Plus, Edit2, Trash2 } from 'lucide-react'
+import { Image, Search, Filter, Eye, XCircle, Smile, Camera, Calendar, User, FileText, Download, ZoomIn, Plus, Edit2, Archive } from 'lucide-react'
 import { PieChart, Pie, Cell, XAxis, YAxis, Tooltip as RTooltip, ResponsiveContainer, Legend } from 'recharts'
 import { fetchRadiologyImages, fetchPatients, createRadiologyImage, updateRadiologyImage } from '../lib/api'
-import { toJalaliString, toJalaliStringPretty, formatNumber, toPersianDigits } from '../lib/persianDate'
+import { toJalaliDisplay, toJalaliStringPretty, formatNumber, toPersianDigits } from '../lib/persianDate'
 import { RadiologyImage, Patient } from '../types'
 import { Card, Button, Badge, Spinner, EmptyState, Modal, Wizard, Input, Select, Textarea, showToast } from '../components/ui'
 import { PersianDateInput } from '../components/PersianDateInput'
+import { PatientSelect } from '../components/PatientSelect'
 import { ModuleHeader, ModuleStatCard, ReorderableStatGrid } from '../components/ModuleHeader'
 import { useConfirmAction } from '../components/ConfirmAction'
 
@@ -97,7 +98,7 @@ export default function Radiology() {
         { label: 'بیمار', value: patientObj ? `${patientObj.first_name} ${patientObj.last_name}` : '-', highlight: true },
         { label: 'نوع تصویر', value: imageTypes.find((t) => t.value === uploadForm.image_type)?.label || uploadForm.image_type },
         { label: 'شماره دندان', value: uploadForm.tooth_number || '-' },
-        { label: 'تاریخ تصویربرداری', value: uploadForm.taken_at ? toJalaliString(uploadForm.taken_at) : '-' },
+        { label: 'تاریخ تصویربرداری', value: uploadForm.taken_at ? toJalaliDisplay(uploadForm.taken_at) : '-' },
       ],
       confirmLabel: editingImage ? 'ذخیره تغییرات' : 'ثبت تصویر',
       onConfirm: async () => {
@@ -347,7 +348,7 @@ export default function Radiology() {
                           {img.tooth_number ? `دندان: ${toPersianDigits(img.tooth_number)}` : '-'}
                         </span>
                         <span className="text-xs text-slate-400">
-                          {img.taken_at ? toJalaliString(img.taken_at) : toJalaliString(img.created_at)}
+                          {img.taken_at ? toJalaliDisplay(img.taken_at) : toJalaliDisplay(img.created_at)}
                         </span>
                       </div>
                       {img.description && (
@@ -448,7 +449,7 @@ export default function Radiology() {
                 </div>
                 <div className="bg-slate-50 rounded-xl p-3">
                   <p className="text-xs text-slate-400 flex items-center gap-1 mb-1"><Calendar size={12} /> تاریخ</p>
-                  <p className="text-sm font-medium text-slate-800">{selectedImage.taken_at ? toJalaliStringPretty(selectedImage.taken_at) : toJalaliString(selectedImage.created_at)}</p>
+                  <p className="text-sm font-medium text-slate-800">{selectedImage.taken_at ? toJalaliStringPretty(selectedImage.taken_at) : toJalaliDisplay(selectedImage.created_at)}</p>
                 </div>
               </div>
 
@@ -485,8 +486,8 @@ export default function Radiology() {
                   ویرایش
                 </Button>
                 <Button variant="danger" size="sm" onClick={() => handleDeleteImage(selectedImage)}>
-                  <Trash2 size={14} className="inline ml-1" />
-                  حذف
+                  <Archive size={14} className="inline ml-1" />
+                  آرشیو
                 </Button>
               </div>
             </div>
@@ -511,7 +512,7 @@ export default function Radiology() {
             validate: () => (!uploadForm.patient_id ? 'انتخاب بیمار الزامی است' : null),
             content: (
               <>
-                <Select label="بیمار" value={uploadForm.patient_id} onChange={(v) => setUploadForm((p) => ({ ...p, patient_id: v }))} options={patients.map((p) => ({ value: p.id, label: `${p.first_name} ${p.last_name}` }))} placeholder="انتخاب بیمار" />
+                <PatientSelect required value={uploadForm.patient_id} onChange={(v) => setUploadForm((p) => ({ ...p, patient_id: v }))} patients={patients} />
                 <div className="grid grid-cols-2 gap-3">
                   <Select label="نوع تصویر" value={uploadForm.image_type} onChange={(v) => setUploadForm((p) => ({ ...p, image_type: v }))} options={imageTypes.map((t) => ({ value: t.value, label: t.label }))} />
                   <Input label="شماره دندان" value={uploadForm.tooth_number} onChange={(v) => setUploadForm((p) => ({ ...p, tooth_number: v }))} placeholder="مثال: 16" dir="ltr" />

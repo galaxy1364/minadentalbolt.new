@@ -45,6 +45,23 @@ function toGregorian(jy: number, jm: number, jd: number): [number, number, numbe
   return [gy, gm, gd]
 }
 
+/**
+ * MOD-FIX-025 | ارقام تاریخ
+ *
+ * The three date formatters split by JOB, not by taste, because mixing
+ * the two jobs is what produced "1405/06/17" sitting next to "۱۵٬۰۰۰٬۰۰۰
+ * ت" in the same table row:
+ *
+ *  - `toJalaliString`  — the machine form. ASCII digits, because it is
+ *    also a lookup key (`getHoliday`), gets `.split('/')` and parsed
+ *    back to numbers in the calendar, and lands in exported CSV. Never
+ *    put this on screen.
+ *  - `toJalaliDisplay` — the same numeric shape for the screen, with
+ *    Persian digits.
+ *  - `toJalaliStringPretty` — the long form for the screen, also with
+ *    Persian digits. It has a Persian month name in it, so it was never
+ *    machine-readable to begin with and has no parsing callers.
+ */
 export function toJalaliString(dateStr: string): string {
   if (!dateStr) return ''
   const d = new Date(dateStr)
@@ -53,12 +70,19 @@ export function toJalaliString(dateStr: string): string {
   return `${jy}/${String(jm).padStart(2, '0')}/${String(jd).padStart(2, '0')}`
 }
 
+/** Screen form of `toJalaliString`. Empty stays empty — an invalid date
+ * must not turn into a plausible-looking one. */
+export function toJalaliDisplay(dateStr: string): string {
+  const s = toJalaliString(dateStr)
+  return s ? toPersianDigits(s) : ''
+}
+
 export function toJalaliStringPretty(dateStr: string): string {
   if (!dateStr) return ''
   const d = new Date(dateStr)
   if (isNaN(d.getTime())) return ''
   const [jy, jm, jd] = toJalali(d.getFullYear(), d.getMonth() + 1, d.getDate())
-  return `${jd} ${persianMonths[jm - 1]} ${jy}`
+  return toPersianDigits(`${jd} ${persianMonths[jm - 1]} ${jy}`)
 }
 
 export function getJalaliMonthYear(dateStr: string): { year: number; month: number } {
@@ -265,13 +289,34 @@ export function jalaliToGregorian(jy: number, jm: number, jd: number): string {
   }
 }
 
-export function formatTime(timeStr: string): string {
-  if (!timeStr) return ''
+/**
+ * MOD-FIX-026 | ساعت، یک بار ساخته می‌شود
+ *
+ * `formatTime` returns one display string, so three call sites were
+ * pulling it apart again with `.split(' ')` and `/\d+/` to get the hour
+ * or the period back out. On the appointment card that produced a badge
+ * reading "10:00" in tiny type above "10" in large type — the same
+ * clock twice, neither of them the "صبح/بعدازظهر" the small line was
+ * meant to hold. Parsing a formatted string is also what kept the times
+ * in ASCII: the moment the digits became Persian, `/\d+/` matched
+ * nothing.
+ *
+ * `timeParts` returns the pieces, so nobody has to take the string
+ * apart to get them.
+ */
+export function timeParts(timeStr: string): { clock: string; period: string } {
+  if (!timeStr) return { clock: '', period: '' }
   const [h, m] = timeStr.split(':')
   const hour = parseInt(h)
+  if (isNaN(hour)) return { clock: '', period: '' }
   const period = hour < 12 ? 'صبح' : 'بعدازظهر'
   const displayHour = hour <= 12 ? hour : hour - 12
-  return `${displayHour}:${m} ${period}`
+  return { clock: toPersianDigits(`${displayHour}:${m}`), period }
+}
+
+export function formatTime(timeStr: string): string {
+  const { clock, period } = timeParts(timeStr)
+  return clock ? `${clock} ${period}` : ''
 }
 
 export function formatCurrency(amount: number | null | undefined): string {

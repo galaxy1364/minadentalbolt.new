@@ -4,7 +4,7 @@ import { useAuth } from '../lib/auth'
 import {
   Settings as SettingsIcon, Building2, Hash, MessageSquare, Package, Save, Smile,
   Cloud, Download, Upload, Vibrate, Volume2, Bell, Database, RefreshCw, Check,
-  Smartphone, Shield, AlertTriangle, Eye, ChevronRight, Wifi, Plus, Edit2, Trash2,
+  Smartphone, Shield, AlertTriangle, Eye, ChevronRight, Wifi, Plus, Edit2, Trash2, Archive, Delete,
   Stethoscope, Wrench, ListOrdered, Tag, Copy, CheckCircle2, History, CloudOff, Sparkles, Megaphone, Fingerprint,
 } from 'lucide-react'
 import { isAppLockEnabled, setAppLockPin, disableAppLock, isBiometricAvailable, registerBiometric, hasBiometricRegistered } from '../lib/appLock'
@@ -461,7 +461,7 @@ export default function Settings() {
                 <div className="flex-1 min-w-0">{renderItem(item)}</div>
                 <div className="flex gap-1 flex-shrink-0">
                   <button onClick={() => onEdit(item)} className="p-1.5 rounded-lg text-slate-400 hover:text-primary-600 hover:bg-primary-50 transition-colors"><Edit2 size={15} /></button>
-                  <button onClick={() => onDelete(item)} className="p-1.5 rounded-lg text-slate-400 hover:text-error-600 hover:bg-error-50 transition-colors"><Trash2 size={15} /></button>
+                  <button onClick={() => onDelete(item)} aria-label="غیرفعال کردن" title="غیرفعال کردن" className="p-1.5 rounded-lg text-slate-400 hover:text-error-600 hover:bg-error-50 transition-colors"><Archive size={15} /></button>
                 </div>
               </Card>
             ))}
@@ -1200,7 +1200,7 @@ function RbacMatrixTab() {
             <p className="text-xs text-primary-600 dark:text-primary-500">دسترسی به {toPersianDigits(moduleCountForRole(activeRole))} ماژول از {toPersianDigits(allModules.length)} ماژول</p>
           </div>
           {activeRoleMeta?.isCustom && (
-            <button onClick={() => handleDeleteRole(activeRoleMeta)} className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs text-error-600 hover:bg-error-50 transition-colors"><Trash2 size={12} /> حذف نقش</button>
+            <button onClick={() => handleDeleteRole(activeRoleMeta)} className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs text-error-600 hover:bg-error-50 transition-colors"><Archive size={12} /> غیرفعال کردن نقش</button>
           )}
         </div>
         <div className="grid grid-cols-2 gap-2">
@@ -1336,12 +1336,14 @@ function PinEntryInline({ onComplete }: { onComplete: (pin: string) => void }) {
         {[0, 1, 2, 3].map((i) => <div key={i} className={`w-3.5 h-3.5 rounded-full border-2 ${i < pin.length ? 'bg-primary-600 border-primary-600' : 'border-slate-300'}`} />)}
       </div>
       <div className="grid grid-cols-3 gap-3 w-full max-w-[240px]">
+        {/* The PIN itself stays ASCII — only what the key SHOWS is
+            Persian, like every other number in the app. */}
         {['1', '2', '3', '4', '5', '6', '7', '8', '9'].map((d) => (
-          <button key={d} onClick={() => press(d)} className="w-14 h-14 rounded-full bg-slate-100 dark:bg-slate-700 text-lg font-bold text-slate-700 dark:text-slate-200 mx-auto">{d}</button>
+          <button key={d} onClick={() => press(d)} aria-label={d} className="w-14 h-14 rounded-full bg-slate-100 dark:bg-slate-700 text-lg font-bold text-slate-700 dark:text-slate-200 mx-auto">{toPersianDigits(d)}</button>
         ))}
         <div />
-        <button onClick={() => press('0')} className="w-14 h-14 rounded-full bg-slate-100 dark:bg-slate-700 text-lg font-bold text-slate-700 dark:text-slate-200 mx-auto">0</button>
-        <button onClick={backspace} className="w-14 h-14 rounded-full flex items-center justify-center text-slate-400 mx-auto"><Trash2 size={16} /></button>
+        <button onClick={() => press('0')} aria-label="0" className="w-14 h-14 rounded-full bg-slate-100 dark:bg-slate-700 text-lg font-bold text-slate-700 dark:text-slate-200 mx-auto">{toPersianDigits('0')}</button>
+        <button onClick={backspace} aria-label="پاک کردن آخرین رقم" className="w-14 h-14 rounded-full flex items-center justify-center text-slate-400 mx-auto"><Delete size={16} /></button>
       </div>
     </div>
   )

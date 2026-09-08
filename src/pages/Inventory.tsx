@@ -1,7 +1,7 @@
 // Inventory.tsx - Persian RTL Dental Clinic Inventory Management
 import { useState, useEffect, useCallback, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Package, Boxes, Search, Plus, Edit2, Trash2, AlertTriangle, TrendingDown, PackageCheck, Smile, ScanLine } from 'lucide-react'
+import { Package, Boxes, Search, Plus, Edit2, AlertTriangle, TrendingDown, PackageCheck, Smile, ScanLine, Archive } from 'lucide-react'
 import { BarcodeScanner } from '../components/BarcodeScanner'
 import { BarChart, Bar, XAxis, YAxis, Tooltip as RTooltip, ResponsiveContainer, Cell } from 'recharts'
 import { fetchInventoryItems, fetchInventoryCategories, createInventoryItem, updateInventoryItem, deactivateInventoryItem } from '../lib/api'
@@ -427,7 +427,7 @@ export default function Inventory() {
                           <td className="px-4 py-3">
                             <div className="flex items-center gap-1">
                               <button onClick={() => openEditModal(i)} className="p-1 rounded-lg bg-slate-100 text-slate-600 hover:bg-slate-200 transition-all-smooth press-scale"><Edit2 size={14} /></button>
-                              <button onClick={() => handleDelete(i)} className="p-1 rounded-lg bg-error-50 text-error-500 hover:bg-error-100 transition-all-smooth press-scale"><Trash2 size={14} /></button>
+                              <button onClick={() => handleDelete(i)} aria-label="غیرفعال کردن کالا" title="غیرفعال کردن" className="p-1 rounded-lg bg-error-50 text-error-500 hover:bg-error-100 transition-all-smooth press-scale"><Archive size={14} /></button>
                             </div>
                           </td>
                         </tr>

@@ -1,11 +1,11 @@
 // Staff.tsx - Persian RTL Dental Clinic Staff Management with Doctor Revenue Sharing
 import { useState, useEffect, useCallback, useMemo } from 'react'
-import { Users, Search, Plus, Phone, Mail, Calendar, DollarSign, Smile, Briefcase, Edit2, Trash2, Stethoscope, Calculator, Award, TrendingUp, Percent, UserCheck, ChevronDown, ChevronUp, Shield, Lock, Unlock, RotateCcw } from 'lucide-react'
+import { Users, Search, Plus, Phone, Mail, Calendar, DollarSign, Smile, Briefcase, Edit2, Stethoscope, Calculator, Award, TrendingUp, Percent, UserCheck, ChevronDown, ChevronUp, Shield, Lock, Unlock, RotateCcw, Archive } from 'lucide-react'
 import { PieChart, Pie, Cell, Tooltip as RTooltip, ResponsiveContainer } from 'recharts'
 import { staffSaveMessage, LoginOutcome } from '../lib/staffSaveOutcome'
 import { fetchStaff, createStaff, updateStaff, fetchEncounters, fetchLabOrders, fetchTreatments, createExpense, fetchDoctors, fetchStaffLoginStatuses, setStaffLoginActive } from '../lib/api'
 import { CLINIC_ID, supabase } from '../lib/supabase'
-import { toJalaliString, toJalaliStringPretty, formatCurrency, formatNumber, toPersianDigits } from '../lib/persianDate'
+import { toJalaliDisplay, toJalaliStringPretty, formatCurrency, formatNumber, toPersianDigits } from '../lib/persianDate'
 import type { Staff as StaffType, StaffInput, EncounterWithRelations, LabOrderWithRelations, Treatment } from '../types'
 import { Modal, Wizard, Card, Button, Input, Select, Badge, Spinner, EmptyState, showToast } from '../components/ui'
 import { PersianDateInput } from '../components/PersianDateInput'
@@ -704,8 +704,8 @@ export default function Staff() {
                           <Edit2 size={15} />
                         </button>
                         {s.is_active ? (
-                          <button onClick={() => handleDelete(s)} title="غیرفعال کردن" className="p-1.5 rounded-lg text-slate-400 hover:text-error-600 hover:bg-error-50 transition-colors">
-                            <Trash2 size={15} />
+                          <button onClick={() => handleDelete(s)} aria-label="غیرفعال کردن پرسنل" title="غیرفعال کردن" className="p-1.5 rounded-lg text-slate-400 hover:text-error-600 hover:bg-error-50 transition-colors">
+                            <Archive size={15} />
                           </button>
                         ) : (
                           <button
@@ -747,7 +747,7 @@ export default function Staff() {
                       {s.hire_date && (
                         <div className="flex items-center gap-2 text-slate-600">
                           <Calendar size={14} className="text-slate-400" />
-                          <span>تاریخ استخدام: {toJalaliString(s.hire_date)}</span>
+                          <span>تاریخ استخدام: {toJalaliDisplay(s.hire_date)}</span>
                         </div>
                       )}
                       {s.salary != null && (
@@ -888,7 +888,7 @@ export default function Staff() {
             validate: () => (!formData.phone.trim() ? 'شماره تلفن الزامی است' : null),
             content: (
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <Input label="تلفن" value={formData.phone} onChange={(v) => setFormData({ ...formData, phone: v })} placeholder="شماره تماس" dir="ltr" />
+                <Input label="تلفن *" value={formData.phone} onChange={(v) => setFormData({ ...formData, phone: v })} placeholder="شماره تماس" dir="ltr" />
                 <Input label="ایمیل" value={formData.email} onChange={(v) => setFormData({ ...formData, email: v })} placeholder="email@example.com" dir="ltr" />
               </div>
             ),

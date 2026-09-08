@@ -16,6 +16,7 @@ import { AppLockScreen } from './AppLockScreen'
 import { ModuleIconBadge } from './ModuleIconBadge'
 import { labOpenWork, appointmentsOpenWork, billingOpenWork, LEVEL_COLORS, type OpenWork } from '../lib/openWork'
 import { APP_VERSION } from '../lib/appVersion'
+import { toPersianDigits } from '../lib/persianDate'
 import { checkForUpdate, applyUpdate } from '../lib/updateCheck'
 import {
   primaryModules, secondaryModules, allModules,
@@ -299,7 +300,10 @@ function BottomTabBar() {
                         style={{ backgroundColor: LEVEL_COLORS[w.level] }}
                         aria-label={`${w.count} کار باز`}
                       >
-                        {w.count > 99 ? '99+' : w.count}
+                        {/* The rest of the shell is in Persian digits;
+                            a Latin "1" here was the only ASCII numeral
+                            left on the bottom bar. */}
+                        {w.count > 99 ? '+۹۹' : toPersianDigits(w.count)}
                       </span>
                     )
                   })()}

@@ -6,14 +6,14 @@ import { clinicMilestones, nextClinicAction, deadlineState, MILESTONE_COLORS } f
 import { LEVEL_COLORS } from '../lib/openWork'
 import { PatientSelect } from '../components/PatientSelect'
 import { toothLabel, toothLabelWithWord } from '../lib/toothLabel'
-import { FlaskConical, Plus, Search, Clock, CheckCircle2, AlertCircle, Edit2, Trash2, Phone, Filter, TrendingUp, Package, CalendarClock, ChevronLeft, RotateCcw } from 'lucide-react'
+import { FlaskConical, Plus, Search, Clock, CheckCircle2, AlertCircle, Edit2, Phone, Filter, TrendingUp, Package, CalendarClock, ChevronLeft, RotateCcw, Ban, Archive } from 'lucide-react'
 import { downloadICSReminder } from '../lib/icsReminder'
 import { fetchLabOrders, createLabOrder, updateLabOrder, fetchLabs, createLab, updateLab, fetchPatients, fetchDoctors, fetchTreatments, updateTreatment, updateImplantCase } from '../lib/api'
 import {
   formatShelfLocation, validateShelf, alarmInfo, suggestAlarmDate,
   readyForDelivery, sortByUrgency, summariseLab, deliveryPatch,
 } from '../lib/labShelf'
-import { toJalaliString, toJalaliStringPretty, formatCurrency, toPersianDigits } from '../lib/persianDate'
+import { toJalaliDisplay, toJalaliStringPretty, formatCurrency, toPersianDigits } from '../lib/persianDate'
 import { h } from '../lib/haptics'
 import { useConfirmAction } from '../components/ConfirmAction'
 import type { LabOrder, Laboratory, Patient, Doctor, Treatment } from '../types'
@@ -485,10 +485,10 @@ export default function Laboratory() {
         { label: 'بیمار', value: patient ? `${patient.first_name} ${patient.last_name}` : '-', highlight: true },
         { label: 'لابراتوار', value: lab?.name || '-' },
         { label: 'نوع کار', value: workTypes.find((w) => w.value === orderForm.work_type)?.label || orderForm.work_type },
-        { label: 'موعد', value: orderForm.deadline ? toJalaliString(orderForm.deadline) : '-' },
+        { label: 'موعد', value: orderForm.deadline ? toJalaliDisplay(orderForm.deadline) : '-' },
         { label: 'هزینه', value: orderForm.cost ? `${formatCurrency(Number(orderForm.cost))} ت` : '-' },
         { label: 'مکان قفسه', value: formatShelfLocation({ shelf: orderForm.shelf, shelf_number: orderForm.shelf_number, shelf_space: orderForm.shelf_space }) || '-' },
-        { label: 'یادآور', value: orderForm.alarm_date ? toJalaliString(orderForm.alarm_date) : '-' },
+        { label: 'یادآور', value: orderForm.alarm_date ? toJalaliDisplay(orderForm.alarm_date) : '-' },
       ],
       confirmLabel: editingOrder ? 'ذخیره' : 'ثبت سفارش',
       onConfirm: async () => {
@@ -958,8 +958,8 @@ export default function Laboratory() {
               <Edit2 size={14} />
             </Button>
             {order.status !== 'cancelled' && order.status !== 'delivered' && (
-              <Button size="sm" variant="ghost" onClick={() => handleDeleteOrder(order)}>
-                <Trash2 size={14} className="text-error-500" />
+              <Button size="sm" variant="ghost" onClick={() => handleDeleteOrder(order)} aria-label="لغو سفارش" title="لغو سفارش">
+                <Ban size={14} className="text-error-500" />
               </Button>
             )}
           </div>
@@ -1116,7 +1116,7 @@ export default function Laboratory() {
                     onClick={async () => { try { await updateLab(lab.id, { is_active: !lab.is_active } as any); showToast('success', lab.is_active ? 'لابراتوار غیرفعال شد' : 'لابراتوار فعال شد'); await loadData() } catch { showToast('error', 'خطا در تغییر وضعیت') } }}
                     className={`flex-1 flex items-center justify-center gap-1 py-1.5 rounded-lg text-xs transition-colors ${lab.is_active ? 'text-warning-600 hover:bg-warning-50' : 'text-success-600 hover:bg-success-50'}`}
                   >
-                    {lab.is_active ? <><Trash2 size={12} /> غیرفعال</> : <><RotateCcw size={12} /> فعال‌سازی</>}
+                    {lab.is_active ? <><Archive size={12} /> غیرفعال</> : <><RotateCcw size={12} /> فعال‌سازی</>}
                   </button>
                 </div>
               </Card>
@@ -1165,9 +1165,10 @@ export default function Laboratory() {
                     <Button variant="secondary" size="sm" onClick={() => { setOrderModalOpen(false); setView('labs') }}>رفتن به لیست لابراتوارها</Button>
                   </div>
                 ) : (
-                  <Select label="لابراتوار" value={orderForm.lab_id} onChange={(v) => setOrderForm((p) => ({ ...p, lab_id: v }))} options={labOptions} placeholder="انتخاب لابراتوار" />
+                  <Select label="لابراتوار *" value={orderForm.lab_id} onChange={(v) => setOrderForm((p) => ({ ...p, lab_id: v }))} options={labOptions} placeholder="انتخاب لابراتوار" />
                 )}
                 <PatientSelect
+                  required
                   value={orderForm.patient_id}
                   onChange={(v) => {
                     // Real complaint from a direct walkthrough: this
@@ -1354,7 +1355,7 @@ export default function Laboratory() {
           validate: () => (!labForm.name.trim() ? 'نام لابراتوار الزامی است' : null),
           content: (
             <>
-              <Input label="نام لابراتوار" value={labForm.name} onChange={(v) => setLabForm((p) => ({ ...p, name: v }))} placeholder="نام لابراتوار" />
+              <Input label="نام لابراتوار *" value={labForm.name} onChange={(v) => setLabForm((p) => ({ ...p, name: v }))} placeholder="نام لابراتوار" />
               <Input label="نوع" value={labForm.type} onChange={(v) => setLabForm((p) => ({ ...p, type: v }))} placeholder="مثال: دیجیتال، سنتی" />
               <Select
                 label="تخصص لابراتوار"

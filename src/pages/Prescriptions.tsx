@@ -457,7 +457,7 @@ export default function Prescriptions() {
                     </button>
                   ))}
                 </div>
-                <label className="block text-xs font-medium text-slate-600 dark:text-slate-300 mb-1.5">داروها (هر خط یک دارو، با فرمت: نام | دوز | بسامد)</label>
+                <label className="block text-xs font-medium text-slate-600 dark:text-slate-300 mb-1.5">داروها (هر خط یک دارو، با فرمت: نام | دوز | بسامد) *</label>
                 <textarea
                   autoFocus
                   value={formData.medications}

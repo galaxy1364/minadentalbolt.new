@@ -6,7 +6,7 @@ import { useState, useEffect, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Calendar, Users, Wallet, Stethoscope, ChevronLeft, Clock } from 'lucide-react'
 import { fetchAppointments, fetchTreatments, fetchWaitingList, fetchLabOrders } from '../lib/api'
-import { toJalaliStringPretty, toPersianDigits, formatCurrency, formatTime } from '../lib/persianDate'
+import { toJalaliStringPretty, toPersianDigits, formatCurrency, timeParts } from '../lib/persianDate'
 import { Card, Badge } from '../components/ui'
 import { h } from '../lib/haptics'
 import type { AppointmentWithRelations, Treatment, WaitingListEntry, LabOrder } from '../types'
@@ -109,7 +109,7 @@ export default function DoctorDashboard({ doctorId, doctorName }: { doctorId: st
               <Card key={a.id} className="p-3 flex items-center gap-3">
                 <div className="w-11 h-11 rounded-xl bg-primary-50 dark:bg-primary-900/30 flex flex-col items-center justify-center shrink-0">
                   <Clock size={12} className="text-primary-500" />
-                  <span className="text-[10px] font-bold text-primary-700 dark:text-primary-400">{formatTime(a.start_time).match(/\d+:\d+/)?.[0] || a.start_time}</span>
+                  <span className="text-[10px] font-bold text-primary-700 dark:text-primary-400">{timeParts(a.start_time).clock || a.start_time}</span>
                 </div>
                 <div className="min-w-0 flex-1">
                   <p className="text-sm font-bold text-slate-800 dark:text-slate-100 truncate">{a.patient ? `${a.patient.first_name} ${a.patient.last_name}` : 'بیمار'}</p>

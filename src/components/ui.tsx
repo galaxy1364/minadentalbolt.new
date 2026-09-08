@@ -38,7 +38,10 @@ export function StatCard({ icon, title, value, color = 'primary', subtitle }: { 
   )
 }
 
-export function Button({ children, onClick, variant = 'primary', size = 'md', className = '', type = 'button', disabled }: { children: React.ReactNode; onClick?: () => void; variant?: 'primary' | 'secondary' | 'ghost' | 'danger' | 'success'; size?: 'sm' | 'md' | 'lg'; className?: string; type?: 'button' | 'submit'; disabled?: boolean }) {
+// `title`/`aria-label` are accepted because icon-only Buttons are real
+// in this app — a <Button> whose whole content is a 14px glyph has no
+// accessible name at all without one, and no tooltip on desktop either.
+export function Button({ children, onClick, variant = 'primary', size = 'md', className = '', type = 'button', disabled, title, 'aria-label': ariaLabel }: { children: React.ReactNode; onClick?: () => void; variant?: 'primary' | 'secondary' | 'ghost' | 'danger' | 'success'; size?: 'sm' | 'md' | 'lg'; className?: string; type?: 'button' | 'submit'; disabled?: boolean; title?: string; 'aria-label'?: string }) {
   const variants: Record<string, string> = {
     // primary-700, not 600: white text on primary-600 measures 3.74:1,
     // below the WCAG 2.2 AA floor of 4.5:1 for normal text. 700 gives
@@ -59,6 +62,8 @@ export function Button({ children, onClick, variant = 'primary', size = 'md', cl
       type={type}
       onClick={() => { if (!disabled) { h.tap(); onClick?.() } }}
       disabled={disabled}
+      title={title}
+      aria-label={ariaLabel}
       className={`rounded-xl font-medium transition-all-smooth press-scale disabled:opacity-50 disabled:cursor-not-allowed ${variants[variant]} ${sizes[size]} ${className}`}
     >
       {children}

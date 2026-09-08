@@ -63,6 +63,35 @@ describe('🔴 بدهکاری هنگام انتخاب بیمار دیده می�
   })
 })
 
+/**
+ * MOD-FIX-027 | هشدار بالینی هم از همین انتخابگر می‌آید
+ *
+ * «شروع درمان مستقیم» در `Treatments` انتخابگر سومی داشت که حساسیت را
+ * نشان می‌داد ولی بدهی را نه، و `PatientSelect` برعکسش. حالا هر دو از
+ * یک جا می‌آیند، پس هیچ فرمی نصفِ ماجرا را نمی‌بیند.
+ */
+describe('🔴 هشدار بالینی کنار نام', () => {
+  it('حساسیت دارویی در برچسب می‌آید', () => {
+    render(<PatientSelect value="" onChange={() => {}} patients={[patient({ allergies: 'پنی‌سیلین' })]} />)
+    expect(screen.getByRole('option', { name: /پنی‌سیلین/ })).toBeDefined()
+  })
+
+  it('بیمار بدون سابقه‌ی بالینی هیچ هشداری نمی‌گیرد', () => {
+    render(<PatientSelect value="" onChange={() => {}} patients={[patient({ allergies: 'ندارد' })]} />)
+    expect(screen.queryByRole('option', { name: /⚠/ })).toBeNull()
+  })
+
+  it('هشدار بالینی و بدهی با هم دیده می‌شوند', () => {
+    render(
+      <PatientSelect value="" onChange={() => {}}
+        patients={[patient({ allergies: 'لاتکس' })]}
+        balances={balances([['p1', 5_000_000]])} />,
+    )
+    const option = screen.getByRole('option', { name: /لاتکس/ })
+    expect(option.textContent).toContain('بدهکار')
+  })
+})
+
 describe('بیمار غیرفعال', () => {
   it('در فهرست انتخاب نمی‌آید', () => {
     render(<PatientSelect value="" onChange={() => {}} patients={[patient({ is_active: false })]} />)
