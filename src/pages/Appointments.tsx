@@ -1022,7 +1022,7 @@ export default function Appointments() {
                   </div>
                 ) : (
                   <Select
-                    label="پزشک"
+                    label="پزشک *"
                     value={wizardData.doctor_id}
                     onChange={(v) => {
                       h.select()

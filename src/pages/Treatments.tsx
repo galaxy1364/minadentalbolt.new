@@ -1353,17 +1353,40 @@ export default function Treatments() {
                         <option key={p.id} value={p.code}>{p.name} ({toPersianDigits(p.code)}){p.default_price ? ` - ${formatCurrency(p.default_price)} ت` : ''}</option>
                       ))
                     ) : (
-                      Object.entries(procedureCategories).map(([catVal, catLabel]) => {
-                        const groupProcs = procedures.filter((p) => p.is_active && p.category === catVal)
-                        if (groupProcs.length === 0) return null
-                        return (
-                          <optgroup key={catVal} label={catLabel}>
-                            {groupProcs.map((p) => (
-                              <option key={p.id} value={p.code}>{p.name} ({toPersianDigits(p.code)}){p.default_price ? ` - ${formatCurrency(p.default_price)} ت` : ''}</option>
-                            ))}
-                          </optgroup>
+                      (() => {
+                        const groups = Object.entries(procedureCategories).map(([catVal, catLabel]) => {
+                          const groupProcs = procedures.filter((p) => p.is_active && p.category === catVal)
+                          if (groupProcs.length === 0) return null
+                          return (
+                            <optgroup key={catVal} label={catLabel}>
+                              {groupProcs.map((p) => (
+                                <option key={p.id} value={p.code}>{p.name} ({toPersianDigits(p.code)}){p.default_price ? ` - ${formatCurrency(p.default_price)} ت` : ''}</option>
+                              ))}
+                            </optgroup>
+                          )
+                        })
+                        // MOD-FIX-033: a procedure whose category is null or
+                        // not one of the known keys used to fall out of the
+                        // grouped "همه" list entirely — invisible in the
+                        // picker, so it could never be billed. A real risk
+                        // for procedures imported or created with an
+                        // off-list category. Collect the leftovers into a
+                        // fallback group so every active procedure is always
+                        // reachable.
+                        const uncategorised = procedures.filter(
+                          (p) => p.is_active && !(p.category && p.category in procedureCategories),
                         )
-                      })
+                        if (uncategorised.length > 0) {
+                          groups.push(
+                            <optgroup key="__uncat" label="سایر">
+                              {uncategorised.map((p) => (
+                                <option key={p.id} value={p.code}>{p.name} ({toPersianDigits(p.code)}){p.default_price ? ` - ${formatCurrency(p.default_price)} ت` : ''}</option>
+                              ))}
+                            </optgroup>,
+                          )
+                        }
+                        return groups
+                      })()
                     )}
                   </select>
                 </div>
