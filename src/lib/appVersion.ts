@@ -6,5 +6,5 @@
  * detect when a newer build has been deployed than what's currently
  * loaded in the browser.
  */
-export const APP_VERSION = '1.227.0'
+export const APP_VERSION = '1.228.0'
 export const BUILD_DATE = '2026-09-08'

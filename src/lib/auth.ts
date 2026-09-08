@@ -72,17 +72,37 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }
 
   useEffect(() => {
+    // MOD-FIX-032: the loading gate must NEVER depend on the network
+    // resolving. Startup used to `await` getSession() and then
+    // loadProfile() before `setLoading(false)`. When the phone is truly
+    // offline those reject fast, so the gate cleared and the app opened
+    // on local Dexie data — which is why "it used to open without
+    // internet". But on a live-but-unreachable network (LTE up, the free
+    // Supabase project paused or filtered) the request neither resolves
+    // nor rejects — it hangs — so `setLoading(false)` never ran and the
+    // app sat on the spinner forever. Reproduced identically on v1.226.0,
+    // so this is a pre-existing bug, not a regression.
+    //
+    // The fix: bound the gate with a timeout. Whatever the network does,
+    // the app becomes interactive within STARTUP_BUDGET; the profile
+    // lookup still runs and, when it lands, onAuthStateChange /
+    // loadProfile fills the role in. An offline-first app has no business
+    // holding first paint hostage to a server it may never reach.
+    const STARTUP_BUDGET_MS = 4000
+    let settled = false
+    const clearGate = () => { if (!settled) { settled = true; setLoading(false) } }
+    const budget = setTimeout(clearGate, STARTUP_BUDGET_MS)
+
     supabase.auth.getSession().then(async ({ data }) => {
       setSession(data.session)
-      // Wait for the role/profile lookup to finish BEFORE letting the app
-      // render — otherwise Layout's loading gate flips to "ready" while
-      // profile is still null, and every role-filtered menu (بیشتر, nav,
-      // route access) briefly — or in some renders, persistently —
-      // computes as empty because canAccess(undefined, ...) only allows
-      // '/'. This was a real bug, not an intentional restriction.
+      // Still prefer to have the role/profile ready before first render —
+      // otherwise role-filtered menus (بیشتر, nav, route access) briefly
+      // compute as empty because canAccess(undefined, …) only allows '/'.
+      // But this is now a best-effort race against the budget above, not
+      // a hard block: a hung profile query can no longer freeze the app.
       if (data.session?.user) await loadProfile(data.session.user.id)
-      setLoading(false)
-    })
+    }).catch(() => { /* offline / unreachable — open on local data anyway */ })
+      .finally(() => { clearTimeout(budget); clearGate() })
 
     const { data: sub } = supabase.auth.onAuthStateChange(async (_event, newSession) => {
       setSession(newSession)
