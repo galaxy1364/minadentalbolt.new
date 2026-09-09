@@ -357,7 +357,10 @@ export function toEnglishDigits(s: string | number): string {
 }
 
 export function getTodayJalali(): string {
-  return toJalaliString(new Date().toISOString())
+  // Must use todayLocalISO() here, not new Date().toISOString():
+  // ISO string has a UTC time component; in Iran (UTC+3:30) the UTC date
+  // can be one day behind the local calendar date from midnight to ~3:30 AM.
+  return toJalaliString(todayLocalISO())
 }
 
 /** The correct way to get "today" as a plain YYYY-MM-DD string in the
