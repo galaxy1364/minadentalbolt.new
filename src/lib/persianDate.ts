@@ -64,9 +64,13 @@ function toGregorian(jy: number, jm: number, jd: number): [number, number, numbe
  */
 export function toJalaliString(dateStr: string): string {
   if (!dateStr) return ''
-  const d = new Date(dateStr)
-  if (isNaN(d.getTime())) return ''
-  const [jy, jm, jd] = toJalali(d.getFullYear(), d.getMonth() + 1, d.getDate())
+  // Parse YYYY-MM-DD components directly to avoid UTC offset shifting the date:
+  // new Date('2026-03-21') is midnight UTC which, in UTC-7, becomes 2026-03-20 17:00 local
+  // — causing toJalali to receive March 20 instead of March 21 (a genuine off-by-one).
+  // Splitting and passing the numbers directly bypasses timezone entirely.
+  const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(dateStr)
+  if (!m) return ''
+  const [jy, jm, jd] = toJalali(Number(m[1]), Number(m[2]), Number(m[3]))
   return `${jy}/${String(jm).padStart(2, '0')}/${String(jd).padStart(2, '0')}`
 }
 
@@ -79,24 +83,30 @@ export function toJalaliDisplay(dateStr: string): string {
 
 export function toJalaliStringPretty(dateStr: string): string {
   if (!dateStr) return ''
-  const d = new Date(dateStr)
-  if (isNaN(d.getTime())) return ''
-  const [jy, jm, jd] = toJalali(d.getFullYear(), d.getMonth() + 1, d.getDate())
+  // Same timezone-safe parsing — see toJalaliString comment above.
+  const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(dateStr)
+  if (!m) return ''
+  const [jy, jm, jd] = toJalali(Number(m[1]), Number(m[2]), Number(m[3]))
   return toPersianDigits(`${jd} ${persianMonths[jm - 1]} ${jy}`)
 }
 
 export function getJalaliMonthYear(dateStr: string): { year: number; month: number } {
-  const d = new Date(dateStr)
-  if (isNaN(d.getTime())) return getJalaliMonthYear(new Date().toISOString().slice(0, 10))
-  const [jy, jm] = toJalali(d.getFullYear(), d.getMonth() + 1, d.getDate())
+  // Same timezone-safe parsing — see toJalaliString comment above.
+  const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(dateStr)
+  if (!m) return getJalaliMonthYear(todayLocalISO())
+  const [jy, jm] = toJalali(Number(m[1]), Number(m[2]), Number(m[3]))
   return { year: jy, month: jm }
 }
 
 export function getJalaliDateInfo(dateStr: string): { year: number; month: number; day: number; weekday: number; monthName: string } {
-  const d = new Date(dateStr)
-  if (isNaN(d.getTime())) return getJalaliDateInfo(new Date().toISOString().slice(0, 10))
-  const [jy, jm, jd] = toJalali(d.getFullYear(), d.getMonth() + 1, d.getDate())
-  return { year: jy, month: jm, day: jd, weekday: jsDateToPersianWeekday(d), monthName: persianMonths[jm - 1] }
+  // Same timezone-safe parsing — see toJalaliString comment above.
+  const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(dateStr)
+  if (!m) return getJalaliDateInfo(todayLocalISO())
+  // Weekday needs a real Date — built with local noon (12:00) so timezone
+  // offset never flips it to the previous calendar day.
+  const weekdayDate = new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]), 12, 0, 0)
+  const [jy, jm, jd] = toJalali(Number(m[1]), Number(m[2]), Number(m[3]))
+  return { year: jy, month: jm, day: jd, weekday: jsDateToPersianWeekday(weekdayDate), monthName: persianMonths[jm - 1] }
 }
 
 // ── Jalali leap year calculation ──────────────────────────
