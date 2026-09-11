@@ -3,7 +3,8 @@ import { useState, useEffect, useCallback, useMemo } from 'react'
 import { PatientSelect } from '../components/PatientSelect'
 import { buildPrintDocument } from '../lib/printDocument'
 import { useNavigate } from 'react-router-dom'
-import { Pill, FileText, Search, Plus, Eye, Edit2, TrendingUp, Smile, Printer, Ban } from 'lucide-react'
+import { Pill, FileText, Search, Plus, Eye, Edit2, TrendingUp, Smile, Printer, Ban, AlertTriangle, Calculator, ShieldAlert } from 'lucide-react'
+import { checkDrugInteractions, calculatePediatricDosage } from '../lib/drugSafety'
 import { AreaChart, Area, XAxis, YAxis, Tooltip as RTooltip, ResponsiveContainer } from 'recharts'
 import { fetchPrescriptions, createPrescription, updatePrescription, fetchPatients, fetchDoctors } from '../lib/api'
 import { toJalaliString, toJalaliStringPretty, getJalaliMonthYear, formatCurrency, formatNumber, toPersianDigits, persianMonths } from '../lib/persianDate'
@@ -69,6 +70,24 @@ export default function Prescriptions() {
     medications: '',
     notes: '',
   })
+
+  // Pediatric calculator state
+  const [showPediaCalc, setShowPediaCalc] = useState(false)
+  const [pediaWeight, setPediaWeight] = useState('15')
+  const [pediaDrug, setPediaDrug] = useState<'amoxicillin' | 'ibuprofen' | 'acetaminophen'>('amoxicillin')
+
+  const selectedPatient = useMemo(() => {
+    return patients.find((p) => p.id === formData.patient_id)
+  }, [patients, formData.patient_id])
+
+  const drugSafetyAlerts = useMemo(() => {
+    if (!selectedPatient || !formData.medications) return []
+    return checkDrugInteractions({
+      allergies: selectedPatient.allergies,
+      medicalConditions: selectedPatient.medical_conditions,
+      medicationsText: formData.medications,
+    })
+  }, [selectedPatient, formData.medications])
 
   // ===========================================================================
   // Data Fetching
@@ -443,30 +462,173 @@ export default function Prescriptions() {
             label: 'داروها',
             validate: () => (!formData.medications.trim() ? 'ورود حداقل یک دارو الزامی است' : null),
             content: (
-              <div>
-                <label className="block text-xs font-medium text-slate-600 dark:text-slate-300 mb-1.5">داروهای پرمصرف (لمس کن تا اضافه شود)</label>
-                <div className="flex flex-wrap gap-1.5 mb-3">
-                  {COMMON_DENTAL_MEDS.map((med) => (
+              <div className="space-y-3">
+                <label className="sr-only">اقلام دارویی نسخه *</label>
+                {/* Patient medical summary reminder */}
+                {selectedPatient && (selectedPatient.allergies || selectedPatient.medical_conditions) && (
+                  <div className="p-2.5 rounded-xl bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 text-xs flex items-center gap-2 flex-wrap">
+                    <span className="font-bold text-slate-700 dark:text-slate-300">وضعیت پرونده بیمار:</span>
+                    {selectedPatient.allergies && (
+                      <span className="px-2 py-0.5 rounded-md bg-error-50 dark:bg-error-900/30 text-error-700 dark:text-error-400 font-medium">
+                        حساسیت: {selectedPatient.allergies}
+                      </span>
+                    )}
+                    {selectedPatient.medical_conditions && (
+                      <span className="px-2 py-0.5 rounded-md bg-warning-50 dark:bg-warning-900/30 text-warning-700 dark:text-warning-400 font-medium">
+                        بیماری: {selectedPatient.medical_conditions}
+                      </span>
+                    )}
+                  </div>
+                )}
+
+                {/* Drug Safety Contraindication Alerts */}
+                {drugSafetyAlerts.length > 0 && (
+                  <div className="space-y-2">
+                    {drugSafetyAlerts.map((alert) => (
+                      <div
+                        key={alert.id}
+                        className={`p-3 rounded-xl border ${
+                          alert.severity === 'high'
+                            ? 'bg-error-50 dark:bg-error-950/40 border-error-200 dark:border-error-800 text-error-800 dark:text-error-200'
+                            : 'bg-warning-50 dark:bg-warning-950/40 border-warning-200 dark:border-warning-800 text-warning-800 dark:text-warning-200'
+                        }`}
+                      >
+                        <div className="flex items-start gap-2">
+                          {alert.severity === 'high' ? (
+                            <ShieldAlert size={18} className="text-error-600 dark:text-error-400 shrink-0 mt-0.5" />
+                          ) : (
+                            <AlertTriangle size={18} className="text-warning-600 dark:text-warning-400 shrink-0 mt-0.5" />
+                          )}
+                          <div className="flex-1 min-w-0">
+                            <p className="text-xs font-bold leading-snug">{alert.title}</p>
+                            <p className="text-[11px] opacity-90 mt-0.5">{alert.description}</p>
+                            {alert.alternativeSuggestion && (
+                              <div className="mt-2 pt-2 border-t border-error-200/50 dark:border-error-800/50 flex items-center justify-between gap-2 flex-wrap">
+                                <span className="text-[11px] font-medium">پیشنهاد جایگزین امن: {alert.alternativeSuggestion}</span>
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setFormData((p) => ({
+                                      ...p,
+                                      medications: p.medications ? `${p.medications}\n${alert.alternativeSuggestion}` : alert.alternativeSuggestion!,
+                                    }))
+                                    showToast('info', 'داروی جایگزین اضافه شد')
+                                  }}
+                                  className="px-2 py-0.5 rounded-md text-[10px] font-bold bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-100 shadow-sm border border-slate-200 dark:border-slate-700"
+                                >
+                                  + افزودن جایگزین
+                                </button>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {/* Quick Add Buttons + Pediatric Calculator Toggle */}
+                <div>
+                  <div className="flex items-center justify-between mb-1.5">
+                    <label className="text-xs font-medium text-slate-600 dark:text-slate-300">داروهای پرمصرف دندانپزشکی</label>
                     <button
-                      key={med}
                       type="button"
-                      onClick={() => setFormData((p) => ({ ...p, medications: p.medications ? `${p.medications}\n${med}` : med }))}
-                      className="px-2.5 py-1 rounded-lg text-xs font-medium bg-primary-50 dark:bg-primary-900/20 text-primary-700 dark:text-primary-400 hover:bg-primary-100 dark:hover:bg-primary-900/40 transition-all-smooth press-scale"
+                      onClick={() => setShowPediaCalc(!showPediaCalc)}
+                      className="flex items-center gap-1 text-xs font-bold text-primary-600 dark:text-primary-400 hover:underline"
                     >
-                      + {med.split(' | ')[0]}
+                      <Calculator size={13} />
+                      {showPediaCalc ? 'بستن محاسبه‌گر اطفال' : 'محاسبه‌گر دوز اطفال (mg/kg)'}
                     </button>
-                  ))}
+                  </div>
+
+                  {/* Pediatric Calculator Drawer */}
+                  {showPediaCalc && (
+                    <div className="p-3 mb-3 rounded-xl bg-primary-50/70 dark:bg-primary-950/30 border border-primary-200 dark:border-primary-800 text-xs space-y-2">
+                      <p className="font-bold text-primary-900 dark:text-primary-300 flex items-center gap-1.5">
+                        <Calculator size={14} /> محاسبه دوز دقیق دارویی کودکان (بر اساس وزن)
+                      </p>
+                      <div className="grid grid-cols-2 gap-2">
+                        <div>
+                          <label className="block text-[11px] text-slate-600 dark:text-slate-400 mb-1">دارو</label>
+                          <select
+                            value={pediaDrug}
+                            onChange={(e) => setPediaDrug(e.target.value as any)}
+                            className="w-full px-2 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-xs"
+                          >
+                            <option value="amoxicillin">آموکسی‌سیلین (شربت)</option>
+                            <option value="ibuprofen">ایبوپروفن (شربت مسکن)</option>
+                            <option value="acetaminophen">استامینوفن (شربت/قطره)</option>
+                          </select>
+                        </div>
+                        <div>
+                          <label className="block text-[11px] text-slate-600 dark:text-slate-400 mb-1">وزن کودک (کیلوگرم)</label>
+                          <input
+                            type="number"
+                            min="3"
+                            max="60"
+                            value={pediaWeight}
+                            onChange={(e) => setPediaWeight(e.target.value)}
+                            className="w-full px-2 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-xs"
+                          />
+                        </div>
+                      </div>
+
+                      {(() => {
+                        const calc = calculatePediatricDosage(pediaDrug, Number(pediaWeight) || 15)
+                        const drugLabel = pediaDrug === 'amoxicillin' ? 'شربت آموکسی‌سیلین' : pediaDrug === 'ibuprofen' ? 'شربت ایبوپروفن' : 'شربت استامینوفن'
+                        const lineToInsert = `${drugLabel} | ${calc.recommendedSingleDoseMg}mg | ${calc.dailyFrequency} ${calc.suspensionNote ? `(${calc.suspensionNote})` : ''}`
+                        return (
+                          <div className="pt-2 border-t border-primary-200/60 dark:border-primary-800/60 flex items-center justify-between flex-wrap gap-2">
+                            <div className="text-[11px] text-slate-700 dark:text-slate-300">
+                              <span className="font-bold text-primary-700 dark:text-primary-400">{calc.recommendedSingleDoseMg} میلی‌گرم هر نوبت</span>
+                              <p className="text-[10px] text-slate-500">{calc.suspensionNote || calc.dailyFrequency}</p>
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setFormData((p) => ({
+                                  ...p,
+                                  medications: p.medications ? `${p.medications}\n${lineToInsert}` : lineToInsert,
+                                }))
+                                setShowPediaCalc(false)
+                                showToast('success', 'دوز محاسبه‌شده به نسخه اضافه شد')
+                              }}
+                              className="px-2.5 py-1 rounded-lg bg-primary-600 text-white font-bold text-xs hover:bg-primary-700"
+                            >
+                              + درج در نسخه
+                            </button>
+                          </div>
+                        )
+                      })()}
+                    </div>
+                  )}
+
+                  <div className="flex flex-wrap gap-1.5 mb-3">
+                    {COMMON_DENTAL_MEDS.map((med) => (
+                      <button
+                        key={med}
+                        type="button"
+                        onClick={() => setFormData((p) => ({ ...p, medications: p.medications ? `${p.medications}\n${med}` : med }))}
+                        className="px-2.5 py-1 rounded-lg text-xs font-medium bg-primary-50 dark:bg-primary-900/20 text-primary-700 dark:text-primary-400 hover:bg-primary-100 dark:hover:bg-primary-900/40 transition-all-smooth press-scale"
+                      >
+                        + {med.split(' | ')[0]}
+                      </button>
+                    ))}
+                  </div>
                 </div>
-                <label className="block text-xs font-medium text-slate-600 dark:text-slate-300 mb-1.5">داروها (هر خط یک دارو، با فرمت: نام | دوز | بسامد) *</label>
-                <textarea
-                  autoFocus
-                  value={formData.medications}
-                  onChange={(e) => setFormData({ ...formData, medications: e.target.value })}
-                  placeholder={'آموکسی‌سیلین | ۵۰۰mg | ۳ بار در روز\nاستامینوفن | ۳۲۵mg | هر ۶ ساعت'}
-                  rows={6}
-                  className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-600 bg-slate-50 dark:bg-slate-700 text-sm text-slate-800 dark:text-slate-100 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-primary-400 resize-none"
-                />
-                <p className="text-xs text-slate-400 mt-1">برای جدا کردن فیلدها از | استفاده کنید</p>
+
+                <div>
+                  <label className="block text-xs font-medium text-slate-600 dark:text-slate-300 mb-1.5">داروها (هر خط یک دارو، با فرمت: نام | دوز | بسامد) *</label>
+                  <textarea
+                    autoFocus
+                    value={formData.medications}
+                    onChange={(e) => setFormData({ ...formData, medications: e.target.value })}
+                    placeholder={'آموکسی‌سیلین | ۵۰۰mg | ۳ بار در روز\nاستامینوفن | ۳۲۵mg | هر ۶ ساعت'}
+                    rows={6}
+                    className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-600 bg-slate-50 dark:bg-slate-700 text-sm text-slate-800 dark:text-slate-100 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-primary-400 resize-none"
+                  />
+                  <p className="text-xs text-slate-400 mt-1">برای جدا کردن فیلدها از | استفاده کنید</p>
+                </div>
               </div>
             ),
           },

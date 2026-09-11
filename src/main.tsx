@@ -43,7 +43,36 @@ window.addEventListener('error', (event) => {
 
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {
-    navigator.serviceWorker.register('/sw.js').catch(() => {})
+    navigator.serviceWorker
+      .register('/sw.js')
+      .then((registration) => {
+        // Automatically check for service worker updates every 3 minutes
+        setInterval(() => {
+          registration.update().catch(() => {})
+        }, 3 * 60 * 1000)
+
+        // Check for updates when the user returns to the tab
+        window.addEventListener('focus', () => {
+          registration.update().catch(() => {})
+        })
+        document.addEventListener('visibilitychange', () => {
+          if (document.visibilityState === 'visible') {
+            registration.update().catch(() => {})
+          }
+        })
+      })
+      .catch(() => {})
+  })
+
+  // Automatically refresh when a new service worker takes control (via skipWaiting + clients.claim)
+  let refreshing = false
+  navigator.serviceWorker.addEventListener('controllerchange', () => {
+    if (refreshing) return
+    const key = 'minadent-sw-controller-reload'
+    if (sessionStorage.getItem(key)) return
+    sessionStorage.setItem(key, '1')
+    refreshing = true
+    window.location.reload()
   })
 }
 

@@ -12,10 +12,10 @@ import { phasePlanProgress, phaseSchedule, validatePhase, nextPhaseNumber, compa
 import { useState, useEffect, useCallback } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { ArrowRight, Edit2, Phone, Mail, MapPin, Calendar, CreditCard, Activity, FileText, Image as ImageIcon, Shield, Pill, Smile, Award, AlertCircle, Clock, CheckCircle2, Layers, Plus, Trash2, FileSignature, Printer, Bone, FlaskConical, Stethoscope } from 'lucide-react'
-import { fetchPatient, updatePatient, fetchTimeline, fetchTreatments, fetchAppointments, fetchPayments, fetchToothRecords, createToothRecord, updateToothRecord, fetchPrescriptions, fetchRadiologyImages, fetchEncounters, fetchDoctors, fetchImplantCases, fetchTreatmentPhases, createTreatmentPhase, updateTreatmentPhase, fetchConsentForms, createConsentForm, updateConsentForm, fetchLabOrders, updateTreatment, fetchCheques } from '../lib/api'
+import { fetchPatient, updatePatient, fetchTimeline, fetchTreatments, fetchAppointments, fetchPayments, fetchToothRecords, createToothRecord, updateToothRecord, fetchPrescriptions, fetchRadiologyImages, fetchEncounters, fetchDoctors, fetchImplantCases, fetchTreatmentPhases, createTreatmentPhase, updateTreatmentPhase, fetchConsentForms, createConsentForm, updateConsentForm, fetchLabOrders, updateTreatment, fetchCheques, fetchPerioExams, createPerioExam, updatePerioExam } from '../lib/api'
 import { toJalaliString, toJalaliStringPretty, formatCurrency, toPersianDigits, formatTime } from '../lib/persianDate'
 import { calcPatientBalance } from '../lib/finance'
-import { Patient, Doctor, PatientTimeline, Treatment, Appointment, Payment, ToothRecord, Prescription, RadiologyImage, Encounter, ImplantCase, TreatmentPhase, ConsentForm, LabOrder, Cheque } from '../types'
+import { Patient, Doctor, PatientTimeline, Treatment, Appointment, Payment, ToothRecord, Prescription, RadiologyImage, Encounter, ImplantCase, TreatmentPhase, ConsentForm, LabOrder, Cheque, PerioExam } from '../types'
 import { Modal, Card, Button, Input, Select, Textarea, Badge, Spinner, EmptyState, Tabs, showToast, Wizard } from '../components/ui'
 import { PersianDateInput } from '../components/PersianDateInput'
 import { calcPlanProgress, groupByTooth, nextStatus } from '../lib/treatmentPlan'
@@ -26,6 +26,10 @@ import { db } from '../lib/db'
 import type { AuditLogEntry } from '../lib/db'
 import DentalChart from '../components/DentalChart'
 import { CurrencyInput } from '../components/CurrencyInput'
+import { SignatureCanvas } from '../components/SignatureCanvas'
+import { CONSENT_TEMPLATES } from '../lib/consentTemplates'
+import { PeriodontalChart } from '../components/PeriodontalChart'
+import { DentalRadiologyViewer } from '../components/DentalRadiologyViewer'
 
 // ============================================================================
 // Constants
@@ -147,11 +151,13 @@ export default function PatientDetail() {
   const [implantCases, setImplantCases] = useState<ImplantCase[]>([])
   const [phases, setPhases] = useState<TreatmentPhase[]>([])
   const [consentForms, setConsentForms] = useState<ConsentForm[]>([])
+  const [perioExams, setPerioExams] = useState<PerioExam[]>([])
   const [appointments, setAppointments] = useState<Appointment[]>([])
   const [payments, setPayments] = useState<Payment[]>([])
   const [toothRecords, setToothRecords] = useState<ToothRecord[]>([])
   const [prescriptions, setPrescriptions] = useState<Prescription[]>([])
   const [radiologyImages, setRadiologyImages] = useState<RadiologyImage[]>([])
+  const [selectedRadImage, setSelectedRadImage] = useState<RadiologyImage | null>(null)
   const [encounters, setEncounters] = useState<Encounter[]>([])
   const [labOrders, setLabOrders] = useState<LabOrder[]>([])
 
@@ -243,7 +249,7 @@ export default function PatientDetail() {
   const loadTabData = useCallback(async () => {
     if (!id) return
     try {
-      const [tl, tr, ap, pm, tr_records, pres, radio, enc, implAll, ph, cf, labAll, chq] = await Promise.all([
+      const [tl, tr, ap, pm, tr_records, pres, radio, enc, implAll, ph, cf, labAll, chq, px] = await Promise.all([
         fetchTimeline(id),
         fetchTreatments(undefined, id),
         fetchAppointments(),
@@ -259,6 +265,7 @@ export default function PatientDetail() {
         // MOD-FEAT-028: cheques are debt until they clear, so the record
         // has to be able to say one is in flight and when it is due.
         fetchCheques(),
+        fetchPerioExams(id),
       ])
       setTimeline(tl)
       setCheques(chq.filter((c) => c.patient_id === id))
@@ -275,6 +282,7 @@ export default function PatientDetail() {
       // Archived consent forms stay out of the active list — fully
       // preserved, restorable, same pattern as radiology/implants/labs.
       setConsentForms(cf.filter((c) => c.is_active !== false))
+      setPerioExams(px || [])
     } catch (err) {
       console.error('Error loading tab data:', err)
     }
@@ -543,40 +551,78 @@ export default function PatientDetail() {
   const [editingConsent, setEditingConsent] = useState<ConsentForm | null>(null)
   const [savingConsent, setSavingConsent] = useState(false)
   const [consentForm, setConsentForm] = useState({
-    doctor_id: '', treatment_description: '', risks: '', notes: '', signed_by_patient: false,
+    doctor_id: '',
+    treatment_description: '',
+    risks: '',
+    notes: '',
+    signed_by_patient: false,
+    signature_data: '' as string | null,
+    template_key: '' as string | null,
   })
 
   const openCreateConsent = () => {
     h.tap()
     setEditingConsent(null)
-    setConsentForm({ doctor_id: '', treatment_description: '', risks: '', notes: '', signed_by_patient: false })
+    setConsentForm({
+      doctor_id: '',
+      treatment_description: '',
+      risks: '',
+      notes: '',
+      signed_by_patient: false,
+      signature_data: null,
+      template_key: null,
+    })
     setConsentModalOpen(true)
   }
 
   const openEditConsent = (c: ConsentForm) => {
     setEditingConsent(c)
     setConsentForm({
-      doctor_id: c.doctor_id || '', treatment_description: c.treatment_description || '',
-      risks: c.risks || '', notes: c.notes || '', signed_by_patient: c.signed_by_patient || false,
+      doctor_id: c.doctor_id || '',
+      treatment_description: c.treatment_description || '',
+      risks: c.risks || '',
+      notes: c.notes || '',
+      signed_by_patient: c.signed_by_patient || false,
+      signature_data: c.signature_data || null,
+      template_key: c.template_key || null,
     })
     setConsentModalOpen(true)
+  }
+
+  const handleApplyConsentTemplate = (templateId: string) => {
+    const t = CONSENT_TEMPLATES.find((tpl) => tpl.id === templateId)
+    if (!t) return
+    setConsentForm((prev) => ({
+      ...prev,
+      template_key: t.id,
+      treatment_description: t.treatmentDescription,
+      risks: t.risks,
+      notes: t.notes,
+    }))
+    showToast('info', `قالب «${t.title}» بارگذاری شد`)
   }
 
   const handleSaveConsent = () => {
     if (!consentForm.treatment_description.trim()) { showToast('error', 'شرح درمان الزامی است'); return }
     if (!id) return
+    const isSigned = consentForm.signed_by_patient || Boolean(consentForm.signature_data)
     const payload = {
-      patient_id: id, doctor_id: consentForm.doctor_id || null,
-      treatment_description: consentForm.treatment_description, risks: consentForm.risks || null,
-      notes: consentForm.notes || null, signed_by_patient: consentForm.signed_by_patient,
-      signed_at: consentForm.signed_by_patient ? new Date().toISOString() : null,
+      patient_id: id,
+      doctor_id: consentForm.doctor_id || null,
+      treatment_description: consentForm.treatment_description,
+      risks: consentForm.risks || null,
+      notes: consentForm.notes || null,
+      signed_by_patient: isSigned,
+      signature_data: consentForm.signature_data || null,
+      template_key: consentForm.template_key || null,
+      signed_at: isSigned ? new Date().toISOString() : null,
     } as any
     confirmAction({
       type: editingConsent ? 'edit' : 'create',
       title: editingConsent ? 'ویرایش فرم رضایت‌نامه' : 'فرم رضایت‌نامه‌ی جدید',
       fields: [
         { label: 'شرح درمان', value: consentForm.treatment_description, highlight: true },
-        { label: 'وضعیت امضا', value: consentForm.signed_by_patient ? 'امضا شده' : 'امضا نشده' },
+        { label: 'وضعیت امضا', value: isSigned ? 'دارای امضای دیجیتال' : 'امضا نشده' },
       ],
       confirmLabel: editingConsent ? 'ذخیره' : 'ثبت',
       onConfirm: async () => {
@@ -744,7 +790,10 @@ export default function PatientDetail() {
         ${c.notes ? `<div class="section"><h2>یادداشت</h2><p>${c.notes}</p></div>` : ''}
         <div class="section"><p>اینجانب با آگاهی کامل از شرح درمان و خطرات احتمالی ذکرشده در بالا، رضایت خود را برای انجام این درمان اعلام می‌کنم.</p></div>
         <div class="sign-row">
-          <div class="sign-box">امضای بیمار / ولی بیمار</div>
+          <div class="sign-box">
+            ${c.signature_data ? `<img src="${c.signature_data}" style="max-height: 55px; margin: 0 auto 6px; display: block;" />` : ''}
+            امضای بیمار / ولی بیمار
+          </div>
           <div class="sign-box">امضا و مهر پزشک</div>
         </div>
       `
@@ -875,6 +924,7 @@ export default function PatientDetail() {
     { key: 'appointments', label: 'نوبت‌ها', icon: <Calendar size={16} /> },
     { key: 'payments', label: 'پرداخت‌ها', icon: <CreditCard size={16} /> },
     { key: 'teeth', label: 'نمودار دندان‌ها', icon: <Smile size={16} /> },
+    { key: 'perio', label: 'چارت پریودنتال', icon: <Activity size={16} /> },
     { key: 'prescriptions', label: 'نسخه‌ها', icon: <Pill size={16} /> },
     { key: 'radiology', label: 'رادیولوژی', icon: <ImageIcon size={16} /> },
     { key: 'insurance', label: 'بیمه', icon: <Shield size={16} /> },
@@ -1410,8 +1460,14 @@ export default function PatientDetail() {
                   <div className="min-w-0 flex-1">
                     <p className="text-sm font-bold text-slate-800 dark:text-slate-100 truncate">{c.treatment_description}</p>
                     <p className="text-[11px] text-slate-400 mt-0.5">{doc ? `دکتر ${doc.name || doc.specialty}` : 'بدون پزشک'} — {toJalaliStringPretty(c.created_at)}</p>
+                    {c.signature_data && (
+                      <div className="mt-2 inline-flex items-center gap-2 px-2 py-1 rounded-lg bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700">
+                        <img src={c.signature_data} alt="امضا" className="h-6 max-w-[80px] object-contain" />
+                        <span className="text-[10px] text-success-600 dark:text-success-400 font-bold">دارای امضای دیجیتال</span>
+                      </div>
+                    )}
                   </div>
-                  <Badge color={c.signed_by_patient ? 'success' : 'warning'}>{c.signed_by_patient ? 'امضا شده' : 'امضا نشده'}</Badge>
+                  <Badge color={c.signed_by_patient || c.signature_data ? 'success' : 'warning'}>{c.signed_by_patient || c.signature_data ? 'امضا شده' : 'امضا نشده'}</Badge>
                 </div>
                 <div className="flex gap-2 mt-2.5 pt-2.5 border-t border-slate-100 dark:border-slate-700">
                   <button onClick={() => handlePrintConsent(c)} className="flex items-center gap-1 text-xs text-primary-600 hover:underline"><Printer size={12} /> چاپ</button>
@@ -1688,24 +1744,52 @@ export default function PatientDetail() {
       )
     }
     return (
-      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
-        {radiologyImages.map((img) => (
-          <Card key={img.id} className="p-3">
-            <div className="aspect-square rounded-xl bg-slate-100 flex items-center justify-center mb-2 overflow-hidden">
-              {img.image_url ? (
-                <img src={img.image_url} alt={img.description || 'رادیولوژی'} className="w-full h-full object-cover" />
-              ) : (
-                <ImageIcon size={32} className="text-slate-300" />
-              )}
+      <div className="space-y-4">
+        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
+          {radiologyImages.map((img) => (
+            <Card
+              key={img.id}
+              className="p-3 cursor-pointer hover:border-primary-400 dark:hover:border-primary-600 transition-all-smooth press-scale"
+              onClick={() => setSelectedRadImage(img)}
+            >
+              <div className="aspect-square rounded-xl bg-slate-100 dark:bg-slate-800 flex items-center justify-center mb-2 overflow-hidden relative group">
+                {img.image_url ? (
+                  <img src={img.image_url} alt={img.description || 'رادیولوژی'} className="w-full h-full object-cover" />
+                ) : (
+                  <ImageIcon size={32} className="text-slate-300" />
+                )}
+                <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center text-white text-xs font-medium">
+                  بررسی تشخیصی 🔍
+                </div>
+              </div>
+              <div className="space-y-1">
+                {img.image_type && <Badge color="primary">{img.image_type}</Badge>}
+                {img.tooth_number && <p className="text-xs text-slate-500">دندان: {toPersianDigits(img.tooth_number)}</p>}
+                {img.taken_at && <p className="text-xs text-slate-400">{toJalaliStringPretty(img.taken_at)}</p>}
+                {img.description && <p className="text-xs text-slate-500 truncate">{img.description}</p>}
+              </div>
+            </Card>
+          ))}
+        </div>
+
+        {/* Diagnostic Viewer Modal */}
+        {selectedRadImage && selectedRadImage.image_url && (
+          <Modal
+            open={Boolean(selectedRadImage)}
+            onClose={() => setSelectedRadImage(null)}
+            title={`نمایشگر تشخیصی — دندان ${selectedRadImage.tooth_number || '-'}`}
+            size="lg"
+          >
+            <div className="p-1">
+              <DentalRadiologyViewer
+                imageUrl={selectedRadImage.image_url}
+                title={`${patient?.first_name} ${patient?.last_name} — ${selectedRadImage.image_type || 'رادیولوژی'}`}
+                toothNumber={selectedRadImage.tooth_number}
+                onClose={() => setSelectedRadImage(null)}
+              />
             </div>
-            <div className="space-y-1">
-              {img.image_type && <Badge color="primary">{img.image_type}</Badge>}
-              {img.tooth_number && <p className="text-xs text-slate-500">دندان: {toPersianDigits(img.tooth_number)}</p>}
-              {img.taken_at && <p className="text-xs text-slate-400">{toJalaliStringPretty(img.taken_at)}</p>}
-              {img.description && <p className="text-xs text-slate-500 truncate">{img.description}</p>}
-            </div>
-          </Card>
-        ))}
+          </Modal>
+        )}
       </div>
     )
   }
@@ -1929,6 +2013,30 @@ export default function PatientDetail() {
       {activeTab === 'appointments' && renderAppointments()}
       {activeTab === 'payments' && renderPayments()}
       {activeTab === 'teeth' && renderTeethChart()}
+      {activeTab === 'perio' && (
+        <PeriodontalChart
+          patientId={patient.id}
+          patientName={`${patient.first_name} ${patient.last_name}`}
+          doctors={doctors}
+          exam={perioExams[0] || null}
+          onSave={async (teethData, notes, docId) => {
+            const payload = {
+              patient_id: patient.id,
+              doctor_id: docId,
+              exam_date: new Date().toISOString().slice(0, 10),
+              teeth_data: teethData,
+              notes,
+            }
+            if (perioExams[0]) {
+              await updatePerioExam(perioExams[0].id, payload)
+            } else {
+              await createPerioExam(payload)
+            }
+            const updated = await fetchPerioExams(patient.id)
+            setPerioExams(updated)
+          }}
+        />
+      )}
       {activeTab === 'prescriptions' && renderPrescriptions()}
       {activeTab === 'radiology' && renderRadiology()}
       {activeTab === 'insurance' && (
@@ -1995,16 +2103,60 @@ export default function PatientDetail() {
       {ConfirmActionModal}
 
       {/* Consent Form Modal */}
-      <Modal open={consentModalOpen} onClose={() => setConsentModalOpen(false)} title={editingConsent ? 'ویرایش فرم رضایت‌نامه' : 'فرم رضایت‌نامه‌ی جدید'} size="md">
-        <div className="space-y-3">
-          <Select label="پزشک" value={consentForm.doctor_id} onChange={(v) => setConsentForm({ ...consentForm, doctor_id: v })} options={doctors.filter((d) => d.is_active).map((d) => ({ value: d.id, label: `دکتر ${d.name || d.specialty || 'پزشک'}` }))} placeholder="انتخاب پزشک..." />
-          <Textarea label="شرح درمان" value={consentForm.treatment_description} onChange={(v) => setConsentForm({ ...consentForm, treatment_description: v })} placeholder="مثلاً: جراحی ایمپلنت دندان ۱۶ همراه با پیوند استخوان" rows={3} />
+      <Modal open={consentModalOpen} onClose={() => setConsentModalOpen(false)} title={editingConsent ? 'ویرایش فرم رضایت‌نامه' : 'فرم رضایت‌نامه‌ی جدید'} size="lg">
+        <div className="space-y-3.5">
+          {/* Pre-made Templates */}
+          <div>
+            <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1.5">
+              قالب‌های استاندارد رضایت آگاهانه (انتخاب سریع):
+            </label>
+            <div className="flex flex-wrap gap-1.5">
+              {CONSENT_TEMPLATES.map((tpl) => (
+                <button
+                  key={tpl.id}
+                  type="button"
+                  onClick={() => handleApplyConsentTemplate(tpl.id)}
+                  className={`px-2.5 py-1.5 rounded-xl text-xs font-medium transition-all-smooth press-scale border ${
+                    consentForm.template_key === tpl.id
+                      ? 'bg-primary-600 text-white border-primary-600 shadow-sm'
+                      : 'bg-slate-50 dark:bg-slate-800/80 text-slate-700 dark:text-slate-200 border-slate-200 dark:border-slate-700 hover:border-primary-400 dark:hover:border-primary-600'
+                  }`}
+                >
+                  {tpl.title}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <Select label="پزشک معالج" value={consentForm.doctor_id} onChange={(v) => setConsentForm({ ...consentForm, doctor_id: v })} options={doctors.filter((d) => d.is_active).map((d) => ({ value: d.id, label: `دکتر ${d.name || d.specialty || 'پزشک'}` }))} placeholder="انتخاب پزشک..." />
+          <Textarea label="شرح درمان *" value={consentForm.treatment_description} onChange={(v) => setConsentForm({ ...consentForm, treatment_description: v })} placeholder="مثلاً: جراحی ایمپلنت دندان ۱۶ همراه با پیوند استخوان" rows={3} />
           <Textarea label="خطرات و عوارض احتمالی" value={consentForm.risks} onChange={(v) => setConsentForm({ ...consentForm, risks: v })} placeholder="خطرات این درمان را برای بیمار توضیح دهید" rows={3} />
-          <Textarea label="یادداشت" value={consentForm.notes} onChange={(v) => setConsentForm({ ...consentForm, notes: v })} placeholder="یادداشت اضافی" rows={2} />
-          <label className="flex items-center gap-2 cursor-pointer p-2 rounded-xl bg-slate-50 dark:bg-slate-800/60">
-            <input type="checkbox" checked={consentForm.signed_by_patient} onChange={(e) => setConsentForm({ ...consentForm, signed_by_patient: e.target.checked })} className="w-4 h-4 rounded accent-primary-600" />
-            <span className="text-sm text-slate-700 dark:text-slate-200">بیمار این فرم را امضا کرده است</span>
-          </label>
+          <Textarea label="یادداشت و دستورات مراقبتی" value={consentForm.notes} onChange={(v) => setConsentForm({ ...consentForm, notes: v })} placeholder="یادداشت اضافی" rows={2} />
+
+          {/* Digital Signature Pad */}
+          <div className="pt-2 border-t border-slate-100 dark:border-slate-700">
+            <SignatureCanvas
+              value={consentForm.signature_data}
+              onChange={(data) => {
+                setConsentForm((prev) => ({
+                  ...prev,
+                  signature_data: data,
+                  signed_by_patient: Boolean(data),
+                }))
+              }}
+              label="امضای دیجیتال بیمار در مطب (لمسی با قلم یا انگشت)"
+            />
+            <label className="flex items-center gap-2 cursor-pointer mt-2.5 p-2 rounded-xl bg-slate-50 dark:bg-slate-800/60 text-xs text-slate-600 dark:text-slate-300">
+              <input
+                type="checkbox"
+                checked={consentForm.signed_by_patient}
+                onChange={(e) => setConsentForm({ ...consentForm, signed_by_patient: e.target.checked })}
+                className="w-4 h-4 rounded accent-primary-600"
+              />
+              <span>تایید امضای بیمار به‌صورت فیزیکی روی نسخه چاپی</span>
+            </label>
+          </div>
+
           <div className="flex justify-end gap-2 pt-2 border-t border-slate-100 dark:border-slate-700">
             <Button variant="secondary" onClick={() => setConsentModalOpen(false)}>انصراف</Button>
             <Button variant="primary" onClick={handleSaveConsent} disabled={savingConsent}>{savingConsent ? <Spinner size={16} /> : editingConsent ? 'ذخیره' : 'ثبت'}</Button>

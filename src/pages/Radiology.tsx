@@ -12,6 +12,7 @@ import { PersianDateInput } from '../components/PersianDateInput'
 import { PatientSelect } from '../components/PatientSelect'
 import { ModuleHeader, ModuleStatCard, ReorderableStatGrid } from '../components/ModuleHeader'
 import { useConfirmAction } from '../components/ConfirmAction'
+import { DentalRadiologyViewer } from '../components/DentalRadiologyViewer'
 
 // ============================================================================
 // Constants
@@ -418,20 +419,24 @@ export default function Radiology() {
       {/* Image Detail Modal */}
       {selectedImage && createPortal(
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm" onClick={() => setSelectedImage(null)}>
-          <div className="w-full max-w-2xl bg-white rounded-2xl card-shadow-lg max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
-            <div className="flex items-center justify-between px-5 py-4 border-b border-slate-100 sticky top-0 bg-white rounded-t-2xl z-10">
-              <h3 className="text-base font-bold text-slate-800">جزئیات تصویر رادیولوژی</h3>
-              <button onClick={() => setSelectedImage(null)} className="p-1.5 hover:bg-slate-100 rounded-lg transition-all-smooth text-slate-500">✕</button>
+          <div className="w-full max-w-4xl bg-white dark:bg-slate-900 rounded-2xl card-shadow-lg max-h-[95vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between px-5 py-3.5 border-b border-slate-100 dark:border-slate-800 sticky top-0 bg-white dark:bg-slate-900 rounded-t-2xl z-10">
+              <h3 className="text-base font-bold text-slate-800 dark:text-slate-100">نمایشگر تشخیصی تصویر رادیولوژی</h3>
+              <button onClick={() => setSelectedImage(null)} className="p-1.5 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition-all-smooth text-slate-500">✕</button>
             </div>
             <div className="p-5 space-y-4">
-              {/* Image preview */}
-              <div className="aspect-video bg-gradient-to-br from-slate-100 to-slate-200 rounded-xl flex items-center justify-center overflow-hidden">
-                {selectedImage.image_url ? (
-                  <img src={selectedImage.image_url} alt={selectedImage.description || ''} className="w-full h-full object-cover" />
-                ) : (
+              {/* Diagnostic Radiology Viewer */}
+              {selectedImage.image_url ? (
+                <DentalRadiologyViewer
+                  imageUrl={selectedImage.image_url}
+                  title={`${patientName(selectedImage)} — ${getTypeMeta(selectedImage.image_type).label}`}
+                  toothNumber={selectedImage.tooth_number}
+                />
+              ) : (
+                <div className="aspect-video bg-gradient-to-br from-slate-100 to-slate-200 dark:from-slate-800 dark:to-slate-900 rounded-xl flex items-center justify-center overflow-hidden">
                   <Image size={48} className="text-slate-400" />
-                )}
-              </div>
+                </div>
+              )}
 
               {/* Info grid */}
               <div className="grid grid-cols-2 gap-3">

@@ -1,9 +1,34 @@
 import { APP_VERSION } from './appVersion'
 
+export const AUTO_CHECK_KEY = 'minadent-auto-update-check'
+export const AUTO_APPLY_KEY = 'minadent-auto-apply-update'
+
+
 export interface UpdateCheckResult {
   updateAvailable: boolean
   remoteVersion: string | null
   remoteBuildDate: string | null
+  remoteTimestamp: number | null
+}
+
+export function isAutoCheckEnabled(): boolean {
+  if (typeof localStorage === 'undefined') return true
+  return localStorage.getItem(AUTO_CHECK_KEY) !== 'false'
+}
+
+export function setAutoCheckEnabled(enabled: boolean): void {
+  if (typeof localStorage === 'undefined') return
+  localStorage.setItem(AUTO_CHECK_KEY, String(enabled))
+}
+
+export function isAutoApplyEnabled(): boolean {
+  if (typeof localStorage === 'undefined') return true
+  return localStorage.getItem(AUTO_APPLY_KEY) !== 'false'
+}
+
+export function setAutoApplyEnabled(enabled: boolean): void {
+  if (typeof localStorage === 'undefined') return
+  localStorage.setItem(AUTO_APPLY_KEY, String(enabled))
 }
 
 /**
@@ -25,9 +50,10 @@ export async function checkForUpdate(): Promise<UpdateCheckResult> {
       updateAvailable: remoteVersion !== APP_VERSION,
       remoteVersion,
       remoteBuildDate: data.buildDate ?? null,
+      remoteTimestamp: data.buildTimestamp ?? null,
     }
   } catch {
-    return { updateAvailable: false, remoteVersion: null, remoteBuildDate: null }
+    return { updateAvailable: false, remoteVersion: null, remoteBuildDate: null, remoteTimestamp: null }
   }
 }
 
@@ -44,3 +70,4 @@ export async function applyUpdate(): Promise<void> {
     window.location.reload()
   }
 }
+

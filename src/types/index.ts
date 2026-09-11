@@ -441,11 +441,45 @@ export interface ConsentForm {
   risks: string | null
   signed_at: string | null
   signed_by_patient: boolean | null
+  signature_data?: string | null
+  template_key?: string | null
   notes: string | null
   /** Soft-delete flag — a signed consent form is a legal/medical
    * document (proof of informed consent), never permanently deleted. */
   is_active: boolean
   created_at: string
+}
+
+export interface PerioSiteData {
+  pd: number // Probing depth 1-12 mm
+  bop?: boolean // Bleeding on probing
+  suppuration?: boolean // Pus
+  gm?: number // Gingival margin / recession in mm
+  cal?: number // Clinical attachment level
+}
+
+export interface PerioToothData {
+  tooth_number: number
+  db: PerioSiteData
+  b: PerioSiteData
+  mb: PerioSiteData
+  dl: PerioSiteData
+  l: PerioSiteData
+  ml: PerioSiteData
+  mobility?: 0 | 1 | 2 | 3
+  furcation?: 0 | 1 | 2 | 3 | 4
+}
+
+export interface PerioExam {
+  id: string
+  clinic_id: string
+  patient_id: string
+  doctor_id: string | null
+  exam_date: string
+  teeth_data: Record<number, PerioToothData>
+  notes: string | null
+  created_at: string
+  updated_at: string
 }
 
 export interface ToothRecord {
@@ -947,6 +981,13 @@ export type InventoryCategoryInput = Omit<
 export type ConsentFormInput = Omit<
   ConsentForm,
   'id' | 'created_at' | 'clinic_id'
+> & {
+  clinic_id?: string
+}
+
+export type PerioExamInput = Omit<
+  PerioExam,
+  'id' | 'created_at' | 'updated_at' | 'clinic_id'
 > & {
   clinic_id?: string
 }

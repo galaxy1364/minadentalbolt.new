@@ -28,7 +28,8 @@ import {
   PersonalFinanceItem, PersonalFinanceItemInput, CashRegisterSession,
   ConsentFormInput, DashboardStats, DoctorInput, UnitInput,
   RolePermission, RolePermissionInput, CustomRole, CustomRoleInput,
-  ManualReminder, ManualReminderInput, ImplantCostItem, ImplantCostItemInput } from '../types'
+  ManualReminder, ManualReminderInput, ImplantCostItem, ImplantCostItemInput,
+  PerioExam, PerioExamInput } from '../types'
 
 function uid(): string {
   if (typeof crypto !== 'undefined' && crypto.randomUUID) return crypto.randomUUID()
@@ -1035,6 +1036,42 @@ export async function fetchConsentForms(patientId?: string): Promise<ConsentForm
   let items = await db.consent_forms.where('clinic_id').equals(CLINIC_ID).toArray()
   if (patientId) items = items.filter((c) => c.patient_id === patientId)
   return items.sort((a, b) => (b.created_at || '').localeCompare(a.created_at || ''))
+}
+
+// ── Periodontal Examinations ─────────────────────────────────
+export async function fetchPerioExams(patientId?: string): Promise<PerioExam[]> {
+  let items = await db.perio_exams.where('clinic_id').equals(CLINIC_ID).toArray()
+  if (patientId) items = items.filter((p) => p.patient_id === patientId)
+  return items.sort((a, b) => (b.exam_date || '').localeCompare(a.exam_date || ''))
+}
+
+export async function createPerioExam(input: PerioExamInput): Promise<PerioExam> {
+  const { clinic_id, ...rest } = input
+  const id = uid()
+  const exam: PerioExam = {
+    ...rest,
+    id,
+    clinic_id: CLINIC_ID,
+    created_at: nowISO(),
+    updated_at: nowISO(),
+  }
+  await db.perio_exams.put(exam)
+  await queueOperation('perio_exams', 'insert', id, exam)
+  return exam
+}
+
+export async function updatePerioExam(id: string, updates: Partial<PerioExamInput>): Promise<PerioExam> {
+  const existing = await db.perio_exams.get(id)
+  if (!existing) throw new Error('آزمون پریودنتال یافت نشد')
+  const { clinic_id, ...rest } = updates
+  const updated: PerioExam = {
+    ...existing,
+    ...rest,
+    updated_at: nowISO(),
+  }
+  await db.perio_exams.put(updated)
+  await queueOperation('perio_exams', 'update', id, rest)
+  return updated
 }
 
 // ── Dashboard Stats ──────────────────────────────────────────

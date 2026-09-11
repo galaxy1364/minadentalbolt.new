@@ -1,18 +1,23 @@
 {
   "name": "minadent",
   "private": true,
-  "version": "1.231.0",
+  "version": "1.232.1",
   "type": "module",
   "engines": {
     "node": ">=22"
   },
   "scripts": {
+    "predev": "node scripts/sync-version.mjs",
     "dev": "vite",
+    "prebuild": "node scripts/sync-version.mjs",
     "build": "tsc && vite build",
+    "bump": "node scripts/sync-version.mjs --bump-patch",
+    "bump:minor": "node scripts/sync-version.mjs --bump-minor",
+    "sync-version": "node scripts/sync-version.mjs",
     "preview": "vite preview",
     "test": "vitest run",
     "test:watch": "vitest",
-    "verify": "node scripts/sync-sw-version.mjs && tsc --noEmit && vitest run && vite build",
+    "verify": "node scripts/sync-version.mjs && tsc --noEmit && vitest run && vite build",
     "e2e": "playwright test",
     "e2e:ui": "playwright test --ui",
     "e2e:install": "playwright install --with-deps chromium",

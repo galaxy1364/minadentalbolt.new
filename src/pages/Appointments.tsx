@@ -17,6 +17,7 @@ import { h } from '../lib/haptics'
 import { usePullToRefresh } from '../lib/usePullToRefresh'
 import { PersianCalendar } from '../components/PersianCalendar'
 import { CurrencyInput } from '../components/CurrencyInput'
+import { MultiChairGrid } from '../components/MultiChairGrid'
 
 const typeMeta: Record<string, { label: string; color: string; bg: string; dot: string }> = {
   consultation:  { label: 'مشاوره',      color: 'text-primary-700',  bg: 'bg-primary-50',  dot: 'bg-primary-500' },
@@ -75,7 +76,7 @@ export default function Appointments() {
   const [activeFilter, setActiveFilter] = useState('today')
   const [searchQuery, setSearchQuery] = useState('')
   const [showSearch, setShowSearch] = useState(false)
-  const [viewMode, setViewMode] = useState<'list' | 'calendar'>('list')
+  const [viewMode, setViewMode] = useState<'list' | 'calendar' | 'operatory'>('list')
   const [selectedCalDate, setSelectedCalDate] = useState(new Date().toISOString().slice(0, 10))
 
   // Wizard state
@@ -234,7 +235,7 @@ export default function Appointments() {
   const unitName = (a: AppointmentWithRelations) => a.unit?.name || ''
 
   // ── Wizard ─────────────────────────────────────────────
-  const openWizard = (appt?: AppointmentWithRelations) => {
+  const openWizard = (appt?: AppointmentWithRelations | null, prefill?: any) => {
     if (appt) {
       setEditingAppt(appt)
       // If the stored type isn't one of the predefined values, it was
@@ -253,12 +254,19 @@ export default function Appointments() {
     } else {
       setEditingAppt(null)
       setWizardData({
-        patient_id: '', doctor_id: '', unit_id: '',
-        date: activeFilter === 'tomorrow' ? tomorrowStr : todayStr,
-        start_time: '09:00', end_time: '09:30',
-        type: 'consultation', custom_type: '', status: 'scheduled',
-        notes: '', estimated_fee: '',
-        recurrence: 'none', recurrenceCount: '4',
+        patient_id: prefill?.patient_id || '',
+        doctor_id: prefill?.doctor_id || '',
+        unit_id: prefill?.unit_id || '',
+        date: prefill?.date || (activeFilter === 'tomorrow' ? tomorrowStr : todayStr),
+        start_time: prefill?.start_time || '09:00',
+        end_time: prefill?.end_time || '09:30',
+        type: prefill?.type || 'consultation',
+        custom_type: '',
+        status: 'scheduled',
+        notes: prefill?.notes || '',
+        estimated_fee: '',
+        recurrence: 'none',
+        recurrenceCount: '4',
       })
     }
     setWizardStep(0)
@@ -687,12 +695,33 @@ export default function Appointments() {
         >
           <Search size={16} />
         </button>
-        <button
-          onClick={() => { h.toggle(); setViewMode(viewMode === 'list' ? 'calendar' : 'list') }}
-          className={`p-2 rounded-xl border transition-all-smooth press-scale flex-shrink-0 ${viewMode === 'calendar' ? 'bg-primary-50 border-primary-200 text-primary-600' : 'bg-white border-slate-200 text-slate-500'}`}
-        >
-          {viewMode === 'calendar' ? <List size={16} /> : <Grid size={16} />}
-        </button>
+        {/* ── 3-way View Mode Toggle ── */}
+        <div className="flex items-center gap-1 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl p-1 flex-shrink-0">
+          <button
+            type="button"
+            onClick={() => { h.toggle(); setViewMode('list') }}
+            className={`p-1.5 rounded-lg transition-all-smooth ${viewMode === 'list' ? 'bg-primary-50 dark:bg-primary-950/40 text-primary-600 dark:text-primary-400 font-bold' : 'text-slate-400 hover:text-slate-600'}`}
+            title="نمای لیست نوبت‌ها"
+          >
+            <List size={16} />
+          </button>
+          <button
+            type="button"
+            onClick={() => { h.toggle(); setViewMode('calendar') }}
+            className={`p-1.5 rounded-lg transition-all-smooth ${viewMode === 'calendar' ? 'bg-primary-50 dark:bg-primary-950/40 text-primary-600 dark:text-primary-400 font-bold' : 'text-slate-400 hover:text-slate-600'}`}
+            title="تقویم ماهانه"
+          >
+            <Calendar size={16} />
+          </button>
+          <button
+            type="button"
+            onClick={() => { h.toggle(); setViewMode('operatory') }}
+            className={`p-1.5 rounded-lg transition-all-smooth ${viewMode === 'operatory' ? 'bg-primary-50 dark:bg-primary-950/40 text-primary-600 dark:text-primary-400 font-bold' : 'text-slate-400 hover:text-slate-600'}`}
+            title="جدول ستونی یونیت‌ها و صندلی‌ها"
+          >
+            <Grid size={16} />
+          </button>
+        </div>
       </div>
 
       {showSearch && (
@@ -753,6 +782,27 @@ export default function Appointments() {
             )}
           </div>
         </>
+      )}
+
+      {/* ── Multi-Chair Operatory Grid view (نمای ستونی یونیت‌ها و صندلی‌ها) ── */}
+      {viewMode === 'operatory' && (
+        <MultiChairGrid
+          selectedDate={selectedCalDate}
+          onDateChange={(d) => setSelectedCalDate(d)}
+          units={units}
+          doctors={doctors}
+          appointments={appointments}
+          onSelectAppointment={(appt) => openWizard(appt)}
+          onNewAppointmentAtSlot={(date, startTime, unitId, doctorId) => {
+            openWizard(null, {
+              date,
+              start_time: startTime,
+              end_time: addMinutes(startTime, 30),
+              unit_id: unitId || '',
+              doctor_id: doctorId || '',
+            })
+          }}
+        />
       )}
 
       {/* ── Appointment list ── */}

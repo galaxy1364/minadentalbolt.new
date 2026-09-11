@@ -9,8 +9,8 @@ export function Spinner({ size = 24 }: { size?: number }) {
   return <Loader2 size={size} className="animate-spin text-primary-500 mx-auto" />
 }
 
-export function Card({ children, className = '', style }: { children: React.ReactNode; className?: string; style?: React.CSSProperties }) {
-  return <div style={style} className={`bg-white dark:bg-slate-800 rounded-2xl card-shadow dark:card-shadow ${className}`}>{children}</div>
+export function Card({ children, className = '', style, onClick }: { children: React.ReactNode; className?: string; style?: React.CSSProperties; onClick?: () => void }) {
+  return <div style={style} onClick={onClick} className={`bg-white dark:bg-slate-800 rounded-2xl card-shadow dark:card-shadow ${className}`}>{children}</div>
 }
 
 export function StatCard({ icon, title, value, color = 'primary', subtitle }: { icon: React.ReactNode; title: string; value: string | number; color?: string; subtitle?: string }) {

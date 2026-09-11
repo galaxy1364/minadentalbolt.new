@@ -17,7 +17,7 @@ import { ModuleIconBadge } from './ModuleIconBadge'
 import { labOpenWork, appointmentsOpenWork, billingOpenWork, LEVEL_COLORS, type OpenWork } from '../lib/openWork'
 import { APP_VERSION } from '../lib/appVersion'
 import { toPersianDigits } from '../lib/persianDate'
-import { checkForUpdate, applyUpdate } from '../lib/updateCheck'
+import { checkForUpdate, applyUpdate, isAutoCheckEnabled, isAutoApplyEnabled } from '../lib/updateCheck'
 import {
   primaryModules, secondaryModules, allModules,
   getModuleByPath, setModuleTheme, type ModuleIdentity,
@@ -58,24 +58,28 @@ function DarkModeToggle() {
 
 // ── Sync indicator ──────────────────────────────────────
 // ── Update banner (manual + automatic) ──────────────────────────
-const AUTO_CHECK_KEY = 'minadent-auto-update-check'
-const AUTO_CHECK_INTERVAL = 15 * 60 * 1000 // 15 minutes
+const AUTO_CHECK_INTERVAL = 3 * 60 * 1000 // 3 minutes
 
 function UpdateBanner() {
   const [available, setAvailable] = useState(false)
   const [remoteVersion, setRemoteVersion] = useState<string | null>(null)
   const [dismissed, setDismissed] = useState(false)
   const [updating, setUpdating] = useState(false)
+  const [countdown, setCountdown] = useState<number | null>(null)
+  const [paused, setPaused] = useState(false)
+  const location = useLocation()
 
   const runCheck = useCallback(async () => {
-    const autoEnabled = localStorage.getItem(AUTO_CHECK_KEY) !== 'false'
-    if (!autoEnabled) return
+    if (!isAutoCheckEnabled()) return
     const result = await checkForUpdate()
     if (result.updateAvailable) {
       setAvailable(true)
       setRemoteVersion(result.remoteVersion)
+      if (isAutoApplyEnabled() && countdown === null && !paused) {
+        setCountdown(6)
+      }
     }
-  }, [])
+  }, [countdown, paused])
 
   useEffect(() => {
     runCheck()
@@ -85,30 +89,71 @@ function UpdateBanner() {
     return () => { clearInterval(interval); document.removeEventListener('visibilitychange', onVisible) }
   }, [runCheck])
 
+  useEffect(() => {
+    runCheck()
+  }, [location.pathname, runCheck])
+
+  useEffect(() => {
+    if (countdown === null || paused || dismissed || updating) return
+    if (countdown <= 0) {
+      setUpdating(true)
+      applyUpdate()
+      return
+    }
+    const timer = setTimeout(() => {
+      setCountdown((prev) => (prev !== null ? prev - 1 : null))
+    }, 1000)
+    return () => clearTimeout(timer)
+  }, [countdown, paused, dismissed, updating])
+
   if (!available || dismissed) return null
 
+  const autoApply = isAutoApplyEnabled()
+
   return (
-    <div className="px-3 pt-2">
-      <div className="flex items-center gap-2.5 px-3.5 py-2.5 rounded-2xl bg-gradient-to-l from-violet-600 to-sky-500 text-white shadow-md">
-        <Sparkles size={16} className="shrink-0" />
+    <div className="px-3 pt-2 animate-in fade-in slide-in-from-top-2 duration-300">
+      <div className="flex items-center gap-2.5 px-3.5 py-2.5 rounded-2xl bg-gradient-to-l from-violet-600 via-indigo-600 to-sky-500 text-white shadow-lg border border-white/10">
+        <Sparkles size={16} className="shrink-0 animate-pulse text-amber-300" />
         <div className="flex-1 min-w-0">
-          <p className="text-xs font-bold">نسخه‌ی جدیدی موجود است{remoteVersion ? ` (${remoteVersion})` : ''}</p>
-          <p className="text-[10px] text-white/80">برای دریافت آخرین بهبودها به‌روزرسانی کنید</p>
+          <p className="text-xs font-bold leading-tight">
+            نسخه‌ی جدیدی موجود است{remoteVersion ? ` (${toPersianDigits(remoteVersion)})` : ''}
+          </p>
+          <p className="text-[10px] text-white/80 truncate">
+            {autoApply && countdown !== null && !paused
+              ? `به‌روزرسانی خودکار تا ${toPersianDigits(countdown)} ثانیه دیگر...`
+              : 'شامل آخرین قابلیت‌ها و استانداردهای جهانی دندانپزشکی'}
+          </p>
         </div>
-        <button
-          onClick={async () => { h.confirm(); setUpdating(true); await applyUpdate() }}
-          disabled={updating}
-          className="shrink-0 px-3 py-1.5 rounded-xl bg-white/20 hover:bg-white/30 text-xs font-bold transition-all-smooth press-scale disabled:opacity-60"
-        >
-          {updating ? 'در حال بارگذاری...' : 'به‌روزرسانی'}
-        </button>
-        <button onClick={() => { h.cancel(); setDismissed(true) }} aria-label="بعداً" className="shrink-0 p-1 rounded-lg hover:bg-white/20">
-          <X size={14} />
-        </button>
+        <div className="flex items-center gap-1.5 shrink-0">
+          <button
+            onClick={async () => { h.confirm(); setUpdating(true); await applyUpdate() }}
+            disabled={updating}
+            className="px-3 py-1.5 rounded-xl bg-white/25 hover:bg-white/35 active:bg-white/40 text-xs font-bold transition-all-smooth press-scale disabled:opacity-60 shadow-sm"
+          >
+            {updating ? 'در حال دریافت...' : 'به‌روزرسانی فوری'}
+          </button>
+          {autoApply && countdown !== null && !paused ? (
+            <button
+              onClick={() => { h.tap(); setPaused(true); setCountdown(null) }}
+              title="مکث به‌روزرسانی خودکار جهت اتمام کار جاری"
+              className="px-2 py-1.5 rounded-xl bg-white/10 hover:bg-white/20 text-[11px] font-medium"
+            >
+              مکث
+            </button>
+          ) : null}
+          <button
+            onClick={() => { h.cancel(); setDismissed(true) }}
+            aria-label="بعداً"
+            className="p-1 rounded-lg hover:bg-white/20"
+          >
+            <X size={14} />
+          </button>
+        </div>
       </div>
     </div>
   )
 }
+
 
 function SyncIndicator() {
   const navigate = useNavigate()

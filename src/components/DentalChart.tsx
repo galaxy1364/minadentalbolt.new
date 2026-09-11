@@ -8,13 +8,13 @@ import type { ToothCondition, ToothSurface, ToothSurfaceCondition } from '../lib
 import { ToothGlyph as ToothSVG } from './ToothGlyph'
 import { toothLabel } from '../lib/toothLabel'
 import { createPortal } from 'react-dom'
-import { Smile, Plus, Activity, AlertCircle, Clock, Grid3x3 } from 'lucide-react'
+import { Smile, Plus, Activity, AlertCircle, Clock, Grid3x3, Sparkles } from 'lucide-react'
 import { h } from '../lib/haptics'
 import { ToothRecord, Treatment } from '../types'
 import { toPersianDigits, toJalaliStringPretty } from '../lib/persianDate'
 import { toothShape, hasRootFilling, hasCrownCap, toothKind, isUpperTooth, toothVisualLabel } from '../lib/toothVisual'
 import { surfaceSectors, centreLetter } from '../lib/surfaceGlyph'
-import { Badge } from './ui'
+import { Badge, showToast } from './ui'
 
 // ── Types ─────────────────────────────────────────────────────
 
@@ -398,6 +398,25 @@ interface DentalChartProps {
 export default function DentalChart({ toothRecords, treatments, onUpdateTooth, onAddTreatment, onToothSelect }: DentalChartProps) {
   const [selectedTooth, setSelectedTooth] = useState<ToothData | null>(null)
   const [showPrimary, setShowPrimary] = useState(false)
+  const [chairsideMode, setChairsideMode] = useState(false)
+  const [activeStamp, setActiveStamp] = useState<ToothCondition | null>('caries')
+
+  const handleToothClick = (data: ToothData, num: number) => {
+    onToothSelect?.(String(num))
+    if (chairsideMode && activeStamp) {
+      h.select()
+      onUpdateTooth(String(num), {
+        is_missing: activeStamp === 'missing' || activeStamp === 'extraction',
+        is_implant: activeStamp === 'implant',
+        condition: activeStamp,
+        notes: data.notes || '',
+        surfaces: JSON.stringify(data.surfaces),
+      })
+      showToast('info', `دندان ${toothLabel(num)}: ${conditionMeta[activeStamp].label} ثبت شد`)
+      return
+    }
+    setSelectedTooth(data)
+  }
 
   const allTeeth = useMemo(() => {
     const permanent = [...upperRight, ...upperLeft, ...lowerLeft, ...lowerRight]
@@ -553,7 +572,7 @@ export default function DentalChart({ toothRecords, treatments, onUpdateTooth, o
         return (
           <div
             key={num}
-            onClick={() => { setSelectedTooth(data); onToothSelect?.(String(num)) }}
+            onClick={() => handleToothClick(data, num)}
             className={`relative rounded-lg p-0.5 cursor-pointer transition-all-smooth hover:bg-slate-100 shrink-0 ${selectedTooth?.number === num ? 'bg-primary-50 ring-2 ring-primary-300' : ''} ${data.isPlannedOnly ? 'opacity-60' : ''}`}
           >
             <ToothSVG
@@ -600,8 +619,25 @@ export default function DentalChart({ toothRecords, treatments, onUpdateTooth, o
 
       {/* Controls */}
       <div className="flex items-center justify-between flex-wrap gap-2">
-        <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-primary-50 dark:bg-primary-900/30 text-primary-700 dark:text-primary-400 text-xs font-bold">
-          <Grid3x3 size={13} /> نماد پالمر (Palmer)
+        <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-primary-50 dark:bg-primary-900/30 text-primary-700 dark:text-primary-400 text-xs font-bold">
+            <Grid3x3 size={13} /> نماد پالمر (Palmer)
+          </div>
+          <button
+            type="button"
+            onClick={() => {
+              h.toggle()
+              setChairsideMode(!chairsideMode)
+            }}
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition-all press-scale border ${
+              chairsideMode
+                ? 'bg-amber-500 text-slate-950 border-amber-400 shadow-md'
+                : 'bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-700 hover:bg-slate-200'
+            }`}
+          >
+            <Sparkles size={14} className={chairsideMode ? 'animate-spin' : ''} />
+            {chairsideMode ? '✓ حالت کنار یونیت فعال' : 'حالت کنار یونیت (Chairside)'}
+          </button>
         </div>
         <label className="flex items-center gap-2 text-xs text-slate-500 cursor-pointer">
           <input
@@ -613,6 +649,50 @@ export default function DentalChart({ toothRecords, treatments, onUpdateTooth, o
           نمایش دندان‌های شیری
         </label>
       </div>
+
+      {/* Chairside Quick Stamp Bar */}
+      {chairsideMode && (
+        <div className="p-3.5 bg-amber-500/10 dark:bg-amber-950/40 border-2 border-amber-500/50 rounded-2xl space-y-2 animate-scale-in">
+          <div className="flex items-center justify-between text-xs">
+            <span className="font-bold text-amber-900 dark:text-amber-300 flex items-center gap-1.5">
+              <span className="w-2.5 h-2.5 rounded-full bg-amber-500 animate-pulse" />
+              حالت ثبت سریع لمسی کنار یونیت (با ۱ لمس روی هر دندان، وضعیت انتخاب‌شده ثبت می‌شود):
+            </span>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            {[
+              { value: 'healthy', label: 'سالم' },
+              { value: 'caries', label: 'پوسیدگی' },
+              { value: 'restored', label: 'ترمیم' },
+              { value: 'rct', label: 'عصب‌کشی' },
+              { value: 'crown', label: 'روکش' },
+              { value: 'extraction', label: 'کشیده' },
+              { value: 'implant', label: 'ایمپلنت' },
+            ].map((stamp) => {
+              const meta = conditionMeta[stamp.value as ToothCondition]
+              const isCurrent = activeStamp === stamp.value
+              return (
+                <button
+                  key={stamp.value}
+                  type="button"
+                  onClick={() => {
+                    h.select()
+                    setActiveStamp(stamp.value as ToothCondition)
+                  }}
+                  className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold transition-all press-scale min-h-[44px] ${
+                    isCurrent
+                      ? 'bg-primary-600 text-white shadow-md scale-105 ring-2 ring-primary-300'
+                      : 'bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700 hover:bg-slate-50'
+                  }`}
+                >
+                  <span className={`w-3 h-3 rounded-full ${meta.dot}`} />
+                  {stamp.label}
+                </button>
+              )
+            })}
+          </div>
+        </div>
+      )}
 
       {/* Permanent Teeth Chart */}
       <div className="bg-white rounded-2xl border border-slate-100 p-4 md:p-6">
