@@ -64,13 +64,14 @@ if ('serviceWorker' in navigator) {
       .catch(() => {})
   })
 
-  // Automatically refresh when a new service worker takes control (via skipWaiting + clients.claim)
+  // Only reload on controllerchange if the page was ALREADY controlled by an older service worker.
+  // On first visit / un-cached load, navigator.serviceWorker.controller is initially null, so
+  // claiming the page must NOT reload the page.
+  const hadPreviousController = !!navigator.serviceWorker.controller
   let refreshing = false
   navigator.serviceWorker.addEventListener('controllerchange', () => {
+    if (!hadPreviousController) return
     if (refreshing) return
-    const key = 'minadent-sw-controller-reload'
-    if (sessionStorage.getItem(key)) return
-    sessionStorage.setItem(key, '1')
     refreshing = true
     window.location.reload()
   })
