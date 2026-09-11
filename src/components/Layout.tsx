@@ -23,6 +23,7 @@ import {
   getModuleByPath, setModuleTheme, type ModuleIdentity,
 } from '../theme/modules'
 import { subscribeSync, initSyncEngine, syncNow, SyncStatus } from '../lib/sync'
+import { initRealtimeSync } from '../lib/realtimeSync'
 import { fetchPayments, fetchTreatments, fetchImplantCases, loadRolePermissionOverrides, fetchLabOrders, fetchAppointments } from '../lib/api'
 import { runAutoBackupIfNeeded } from '../lib/autoBackup'
 import { calcAllPatientBalances } from '../lib/finance'
@@ -366,8 +367,12 @@ function LayoutInner({ children }: { children: React.ReactNode }) {
   }, [location.pathname])
 
   useEffect(() => {
-    const cleanup = initSyncEngine()
-    return cleanup
+    const cleanupPolling = initSyncEngine()
+    const cleanupRealtime = initRealtimeSync()
+    return () => {
+      cleanupPolling()
+      cleanupRealtime()
+    }
   }, [])
 
   // Load DB-backed RBAC overrides once on mount so canAccess() (used just
