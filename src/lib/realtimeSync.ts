@@ -72,9 +72,11 @@ async function handleChange(payload: RealtimePayload): Promise<void> {
  * Returns a cleanup function (call it in useEffect return / unmount).
  */
 export function initRealtimeSync(): () => void {
-  if (!hasSupabaseCredentials) {
-    // No credentials → no server to subscribe to. The polling loop in
-    // sync.ts still handles the offline-first path correctly.
+  const anonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || ''
+  const isDummyKey = !anonKey || anonKey.includes('placeholder') || anonKey.includes('missing-key')
+  if (!hasSupabaseCredentials || isDummyKey) {
+    // No credentials or running with a dummy/test placeholder key → no server to subscribe to.
+    // The polling loop in sync.ts still handles the offline-first path correctly.
     return () => {}
   }
 

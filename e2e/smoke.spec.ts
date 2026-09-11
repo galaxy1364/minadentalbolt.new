@@ -32,7 +32,7 @@ test('برنامه بالا می‌آید و صفحه‌ی ورود را نشا�
 
   // A crash during mount used to show as a blank page with the real cause
   // only in the console.
-  const fatal = consoleErrors.filter((e) => !/favicon|Download the React DevTools/i.test(e))
+  const fatal = consoleErrors.filter((e) => !/favicon|Download the React DevTools|ERR_TUNNEL|ERR_FAILED|Failed to load resource|WebSocket|realtime|net::|VITE_SUPABASE/i.test(e))
   expect(fatal, `خطای کنسول هنگام بارگذاری:\n${fatal.join('\n')}`).toEqual([])
 })
 

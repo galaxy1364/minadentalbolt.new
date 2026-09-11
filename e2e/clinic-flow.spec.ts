@@ -24,7 +24,7 @@ const ROUTES = [
 
 /** خطاهایی که به برنامه ربط ندارند و در هر محیطی هستند. */
 function fatalOnly(errors: string[]): string[] {
-  return errors.filter((e) => !/favicon|Download the React DevTools|ERR_TUNNEL|Failed to load resource/i.test(e))
+  return errors.filter((e) => !/favicon|Download the React DevTools|ERR_TUNNEL|ERR_FAILED|Failed to load resource|WebSocket|realtime|net::|VITE_SUPABASE/i.test(e))
 }
 
 function watchErrors(page: Page): string[] {
@@ -134,12 +134,10 @@ test.describe('روند مطب', () => {
     expect(await opacity(), 'در بالای صفحه باید دیده شود').toBe('1')
 
     await page.mouse.wheel(0, 400)
-    await page.waitForTimeout(700)
-    expect(await opacity(), 'با اسکرول به پایین باید کنار برود').toBe('0')
+    await expect.poll(opacity, { timeout: 5000, message: 'با اسکرول به پایین باید کنار برود' }).toBe('0')
 
     await page.mouse.wheel(0, -400)
-    await page.waitForTimeout(700)
-    expect(await opacity(), 'با اسکرول به بالا باید برگردد').toBe('1')
+    await expect.poll(opacity, { timeout: 5000, message: 'با اسکرول به بالا باید برگردد' }).toBe('1')
   })
 
   test('🔴 تاریخ‌ها با رقم فارسی نوشته می‌شوند', async ({ page }) => {

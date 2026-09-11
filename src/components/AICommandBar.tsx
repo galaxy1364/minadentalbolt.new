@@ -146,13 +146,17 @@ export default function AICommandBar() {
     if (window.matchMedia?.('(min-width: 640px)').matches) return
     let last = window.scrollY
     const onScroll = () => {
-      const y = window.scrollY
-      if (Math.abs(y - last) < 12) return
-      setHidden(y > last && y > 80)
+      const y = window.scrollY || document.documentElement.scrollTop || 0
+      if (Math.abs(y - last) < 8) return
+      setHidden(y > last && y > 30)
       last = y
     }
     window.addEventListener('scroll', onScroll, { passive: true })
-    return () => window.removeEventListener('scroll', onScroll)
+    document.addEventListener('scroll', onScroll, { passive: true })
+    return () => {
+      window.removeEventListener('scroll', onScroll)
+      document.removeEventListener('scroll', onScroll)
+    }
   }, [])
 
   const [input, setInput] = useState('')
