@@ -1,7 +1,7 @@
 // DentalChart.tsx — Professional interactive dental chart with SVG tooth shapes
 // Supports: FDI numbering, surfaces, conditions, treatment history, primary teeth
 import { useState, useMemo, useEffect } from 'react'
-import { conditionMeta } from '../lib/toothConditions'
+import { conditionMeta, deriveToothConditions } from '../lib/toothConditions'
 import type { ToothCondition, ToothSurface, ToothSurfaceCondition } from '../lib/toothConditions'
 // MOD-FEAT-024: the tooth drawing now lives in its own file so every
 // tooth-selection surface can use the same picture.
@@ -405,36 +405,17 @@ export default function DentalChart({ toothRecords, treatments, onUpdateTooth, o
     return showPrimary ? [...permanent, ...primary] : permanent
   }, [showPrimary])
 
+  const toothConditionsMap = useMemo(() => {
+    return deriveToothConditions(toothRecords, treatments)
+  }, [toothRecords, treatments])
+
   const getToothData = (number: number): ToothData => {
     const record = toothRecords.find((r) => r.tooth_number === String(number))
     const toothTreatments = treatments.filter((t) => String(t.tooth_number) === String(number))
 
-    // Load saved surfaces from record
-    let savedSurfaces: ToothSurfaceCondition[] = []
-    try {
-      if (record?.surfaces) {
-        const parsed = JSON.parse(record.surfaces)
-        if (Array.isArray(parsed)) savedSurfaces = parsed
-      }
-    } catch {}
-
-    // Load saved condition from record, fall back to derivation from treatments
-    let condition: ToothCondition = 'healthy'
-    if (record?.condition && record.condition !== 'healthy') {
-      condition = record.condition as ToothCondition
-    } else if (record?.is_missing) {
-      condition = 'missing'
-    } else if (record?.is_implant) {
-      condition = 'implant'
-    } else if (toothTreatments.some((t) => t.procedure_name?.includes('عصب') || t.description?.includes('RCT'))) {
-      condition = 'rct'
-    } else if (toothTreatments.some((t) => t.procedure_name?.includes('روکش') || t.description?.includes('crown'))) {
-      condition = 'crown'
-    } else if (toothTreatments.some((t) => t.procedure_name?.includes('ترمیم') || t.description?.includes('restoration'))) {
-      condition = 'restored'
-    } else if (toothTreatments.some((t) => t.procedure_name?.includes('کشید') || t.description?.includes('extract'))) {
-      condition = 'extraction'
-    }
+    const derived = toothConditionsMap[number]
+    const condition: ToothCondition = derived?.condition ?? 'healthy'
+    const savedSurfaces: ToothSurfaceCondition[] = derived?.surfaces ?? []
 
     // Only meaningful for conditions DERIVED from treatments (not a
     // manually-set record condition like missing/implant) — true when

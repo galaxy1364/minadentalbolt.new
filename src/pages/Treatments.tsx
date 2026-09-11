@@ -26,8 +26,8 @@ import { toJalaliDisplay, toJalaliStringPretty, formatCurrency, formatNumber, to
 import { Encounter, EncounterWithRelations, Treatment, Procedure, Patient, Doctor, Laboratory, ToothRecord, LabOrder, InsuranceClaim, Payment, Cheque, Installment, ImplantCaseWithRelations } from '../types'
 import { Card, Button, Badge, Spinner, EmptyState, Tabs, Input, Select, Textarea, Modal, Wizard, showToast } from '../components/ui'
 import { PersianDateInput } from '../components/PersianDateInput'
-// MOD-FEAT-024: the same arch the chart draws, instead of a separate row of numbers.
 import { ToothArchSelect } from '../components/ToothArchSelect'
+import { deriveToothConditions } from '../lib/toothConditions'
 import { ModuleHeader, ModuleStatCard, ReorderableStatGrid } from '../components/ModuleHeader'
 import { useConfirmAction } from '../components/ConfirmAction'
 import { h } from '../lib/haptics'
@@ -343,6 +343,10 @@ export default function Treatments() {
   }, [detailEnc])
 
   // ── Derived Data ──────────────────────────────────────────────
+
+  const archConditions = useMemo(() => {
+    return deriveToothConditions(toothRecords, treatments)
+  }, [toothRecords, treatments])
 
   const patientMap = useMemo(() => new Map(patients.map((p) => [p.id, p])), [patients])
   const doctorMap = useMemo(() => new Map(doctors.map((d) => [d.id, d])), [doctors])
@@ -805,6 +809,7 @@ export default function Treatments() {
               doctor_id: payload.doctor_id, encounter_id: treatEncounterId,
               work_type: treatForm.lab_work_type || treatForm.procedure_name,
               tooth_number: treatForm.tooth_number || null,
+              tooth_surface: treatForm.tooth_surface || null,
               cost: treatForm.lab_cost ? Number(treatForm.lab_cost) : null,
               status: 'pending',
               shade: treatForm.lab_shade || null,
@@ -817,7 +822,19 @@ export default function Treatments() {
             if (labAction === 'cancel' || labAction === 'replace') {
               if (existingOrder) await updateLabOrder(existingOrder.id, { status: 'cancelled' })
             }
-            if (labAction === 'create' || labAction === 'replace') await sendToLab()
+            if (labAction === 'create' || labAction === 'replace') {
+              await sendToLab()
+            } else if (labAction === 'none' && existingOrder && treatForm.has_lab) {
+              await updateLabOrder(existingOrder.id, {
+                work_type: treatForm.lab_work_type || treatForm.procedure_name,
+                tooth_number: treatForm.tooth_number || null,
+                tooth_surface: treatForm.tooth_surface || null,
+                cost: treatForm.lab_cost ? Number(treatForm.lab_cost) : null,
+                shade: treatForm.lab_shade || null,
+                material: treatForm.lab_material || null,
+                notes: treatForm.notes || null,
+              })
+            }
           }
 
           const labMessage =
@@ -1417,7 +1434,7 @@ export default function Treatments() {
                     </button>
                   </div>
                 ) : (
-                  <ToothArchSelect label="دندان *" value={treatForm.tooth_number} onChange={(v) => setTreatForm((p) => ({ ...p, tooth_number: v }))} />
+                  <ToothArchSelect label="دندان *" value={treatForm.tooth_number} onChange={(v) => setTreatForm((p) => ({ ...p, tooth_number: v }))} conditions={archConditions} />
                 )}
                 {/* MOD-FEAT-026: a dropdown returns one value, so «MOD» —
                     the commonest restoration there is — could not be
@@ -1680,7 +1697,7 @@ export default function Treatments() {
           )}
 
           <Card className="p-4 space-y-3">
-            <ToothArchSelect value={bulkTooth} onChange={setBulkTooth} />
+            <ToothArchSelect value={bulkTooth} onChange={setBulkTooth} conditions={archConditions} />
             <div className="flex items-end gap-2">
               <div className="flex-1">
                 <Select

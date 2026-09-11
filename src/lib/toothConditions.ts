@@ -50,3 +50,84 @@ export const conditionMeta: Record<ToothCondition, { label: string; color: strin
   veneer: { label: 'ونیر', color: 'text-accent-600', bg: 'bg-accent-50', border: 'border-accent-300', dot: 'bg-accent-400', dotHex: '#fb923c' },
   sealant: { label: 'سیلنت', color: 'text-success-700', bg: 'bg-success-50', border: 'border-success-300', dot: 'bg-success-500', dotHex: '#22c55e' },
 }
+
+export interface ToothRecordLike {
+  tooth_number?: string | null
+  condition?: string | null
+  is_missing?: boolean | null
+  is_implant?: boolean | null
+  surfaces?: string | null
+}
+
+export interface TreatmentLike {
+  tooth_number?: string | null
+  procedure_name?: string | null
+  description?: string | null
+  status?: string
+}
+
+/**
+ * MOD-FEAT-043 | وضعیت یکپارچه‌ی هر دندان برای چارت و انتخابگر
+ *
+ * Calculates the clinical condition and surface statuses for each tooth
+ * from saved ToothRecords and Treatments. Pure function usable across
+ * DentalChart and ToothArchSelect.
+ */
+export function deriveToothConditions(
+  toothRecords: ToothRecordLike[] = [],
+  treatments: TreatmentLike[] = [],
+): Record<number, { condition: ToothCondition; surfaces: ToothSurfaceCondition[] }> {
+  const result: Record<number, { condition: ToothCondition; surfaces: ToothSurfaceCondition[] }> = {}
+
+  const toothNumbers = new Set<number>()
+  for (const r of toothRecords) {
+    if (r.tooth_number) {
+      const n = parseInt(r.tooth_number, 10)
+      if (!isNaN(n)) toothNumbers.add(n)
+    }
+  }
+  for (const t of treatments) {
+    if (t.tooth_number) {
+      const n = parseInt(t.tooth_number, 10)
+      if (!isNaN(n)) toothNumbers.add(n)
+    }
+  }
+
+  for (const number of toothNumbers) {
+    const record = toothRecords.find((r) => r.tooth_number === String(number))
+    const toothTreatments = treatments.filter((t) => String(t.tooth_number) === String(number))
+
+    let savedSurfaces: ToothSurfaceCondition[] = []
+    try {
+      if (record?.surfaces) {
+        const parsed = JSON.parse(record.surfaces)
+        if (Array.isArray(parsed)) savedSurfaces = parsed
+      }
+    } catch {}
+
+    let condition: ToothCondition = 'healthy'
+    if (record?.condition && record.condition !== 'healthy') {
+      condition = record.condition as ToothCondition
+    } else if (record?.is_missing) {
+      condition = 'missing'
+    } else if (record?.is_implant) {
+      condition = 'implant'
+    } else if (toothTreatments.some((t) => t.procedure_name?.includes('عصب') || t.description?.includes('RCT'))) {
+      condition = 'rct'
+    } else if (toothTreatments.some((t) => t.procedure_name?.includes('روکش') || t.description?.includes('crown'))) {
+      condition = 'crown'
+    } else if (toothTreatments.some((t) => t.procedure_name?.includes('ترمیم') || t.description?.includes('restoration'))) {
+      condition = 'restored'
+    } else if (toothTreatments.some((t) => t.procedure_name?.includes('کشید') || t.description?.includes('extract'))) {
+      condition = 'extraction'
+    }
+
+    result[number] = {
+      condition,
+      surfaces: savedSurfaces,
+    }
+  }
+
+  return result
+}
+
