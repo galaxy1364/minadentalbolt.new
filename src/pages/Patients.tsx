@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useMemo } from 'react'
 import { PatientDebtBar } from '../components/PatientDebtBar'
 import { useNavigate } from 'react-router-dom'
-import { Plus, Search, Edit2, Phone, Filter, Users, Award, AlertCircle, Smile, FileText, User, Heart, Shield, MapPin, Archive, Calendar } from 'lucide-react'
+import { Plus, Search, Edit2, Phone, Filter, Users, Award, AlertCircle, Smile, FileText, User, Heart, Shield, MapPin, Archive, Calendar, MessageSquare } from 'lucide-react'
 import { fetchPatients, createPatient, updatePatient, fetchDoctors, fetchPayments, fetchTreatments, fetchImplantCases, peekNextFileNumber } from '../lib/api'
 import { toJalaliStringPretty, formatCurrency, toPersianDigits } from '../lib/persianDate'
 import { Patient, Doctor, Payment, Treatment, ImplantCase } from '../types'
@@ -11,6 +11,7 @@ import { PersianDateInput } from '../components/PersianDateInput'
 import { ModuleHeader } from '../components/ModuleHeader'
 import { useConfirmAction, ConfirmActionConfig } from '../components/ConfirmAction'
 import { h } from '../lib/haptics'
+import { chimes } from '../lib/chimes'
 import { usePullToRefresh } from '../lib/usePullToRefresh'
 import { scoreFields } from '../lib/fuzzySearch'
 import { calcPatientBalance } from '../lib/finance'
@@ -194,14 +195,14 @@ export default function Patients() {
 
   // ── Preview + Confirm for create/edit ──
   const handleSave = () => {
-    if (!formData.first_name.trim() || !formData.last_name.trim()) { h.error(); showToast('error', 'نام و نام خانوادگی الزامی است'); return }
+    if (!formData.first_name.trim() || !formData.last_name.trim()) { chimes.playWarning(); h.error(); showToast('error', 'نام و نام خانوادگی الزامی است'); return }
     // Phone is used everywhere downstream — SMS reminders, appointment
     // confirmations, the whole notification system assumes every
     // patient has one. Letting it be skipped meant some patients could
     // silently never receive any reminder/alarm the rest of the app
     // promises, with no visible sign anything was missing.
-    if (!formData.phone.trim()) { h.error(); showToast('error', 'شماره تلفن الزامی است — پایه‌ی یادآوری‌ها و پیامک‌هاست'); return }
-    if (!formData.national_id.trim()) { h.error(); showToast('error', 'کد ملی الزامی است'); return }
+    if (!formData.phone.trim()) { chimes.playWarning(); h.error(); showToast('error', 'شماره تلفن الزامی است — پایه‌ی یادآوری‌ها و پیامک‌هاست'); return }
+    if (!formData.national_id.trim()) { chimes.playWarning(); h.error(); showToast('error', 'کد ملی الزامی است'); return }
 
     const vipMeta = getVipMeta(Number(formData.vip_level) || 0)
     const genderLabel = formData.gender ? (formData.gender === 'male' ? 'آقا' : 'خانم') : '—'
@@ -223,6 +224,7 @@ export default function Patients() {
       : null
 
     if (dupNationalId) {
+      chimes.playWarning()
       h.error()
       showToast('error', `این کد ملی قبلاً برای «${dupNationalId.first_name} ${dupNationalId.last_name}» ثبت شده — کد ملی نمی‌تواند تکراری باشد`)
       return
@@ -269,10 +271,22 @@ export default function Patients() {
           tags: formData.tags ? formData.tags.split(',').map((t) => t.trim()).filter(Boolean) : [],
           avatar_url: formData.avatar_url || null, credit_limit: null, referral_source: formData.referral_source || null,
         } as any
-        if (editingPatient) await updatePatient(editingPatient.id, payload)
-        else await createPatient(payload)
-        setModalOpen(false)
-        await loadData()
+        try {
+          if (editingPatient) {
+            await updatePatient(editingPatient.id, payload)
+            chimes.playSuccess()
+            showToast('success', 'اطلاعات پرونده بیمار به‌روزرسانی شد')
+          } else {
+            await createPatient(payload)
+            chimes.playSuccess()
+            showToast('success', 'پرونده بیمار جدید با موفقیت ثبت شد')
+          }
+          setModalOpen(false)
+          await loadData()
+        } catch {
+          chimes.playWarning()
+          showToast('error', 'خطا در ثبت اطلاعات بیمار')
+        }
       },
     })
   }
@@ -295,9 +309,15 @@ export default function Patients() {
       ],
       confirmLabel: 'غیرفعال کردن',
       onConfirm: async () => {
-        await updatePatient(patient.id, { is_active: false })
-        showToast('success', 'بیمار غیرفعال شد — سوابق حفظ شد')
-        await loadData()
+        try {
+          await updatePatient(patient.id, { is_active: false })
+          chimes.playPop()
+          showToast('success', 'بیمار غیرفعال شد — سوابق حفظ شد')
+          await loadData()
+        } catch {
+          chimes.playWarning()
+          showToast('error', 'خطا در غیرفعال‌سازی بیمار')
+        }
       },
     })
   }
@@ -509,6 +529,23 @@ export default function Patients() {
                     >
                       <Calendar size={14} />
                     </button>
+                    {(() => {
+                      const cleanPhone = patient.phone ? patient.phone.replace(/\D/g, '').replace(/^0/, '98') : null
+                      if (!cleanPhone) return null
+                      const waText = `سلام ${patient.first_name} ${patient.last_name} عزیز،\nپیام از طرف کلینیک دندانپزشکی مینادنت.\nجهت هماهنگی و پیگیری پرونده با ما در ارتباط باشید.`
+                      return (
+                        <a
+                          href={`https://wa.me/${cleanPhone}?text=${encodeURIComponent(waText)}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="p-1.5 rounded-lg text-emerald-600 hover:bg-emerald-50 hover:text-emerald-700 transition-all-smooth press-scale"
+                          title="ارسال پیام در واتساپ به بیمار"
+                          onClick={() => chimes.playPop()}
+                        >
+                          <MessageSquare size={14} />
+                        </a>
+                      )
+                    })()}
                     <button
                       onClick={() => openEditModal(patient)}
                       aria-label={`ویرایش ${patient.first_name} ${patient.last_name}`}

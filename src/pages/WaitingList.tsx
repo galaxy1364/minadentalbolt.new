@@ -359,7 +359,7 @@ export default function WaitingList() {
   }
 
   const handleSave = () => {
-    if (!formData.patient_id) { showToast('error', 'انتخاب بیمار الزامی است'); return }
+    if (!formData.patient_id) { chimes.playWarning(); showToast('error', 'انتخاب بیمار الزامی است'); return }
     const patient = patients.find((p) => p.id === formData.patient_id)
     const payload = {
       patient_id: formData.patient_id,
