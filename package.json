@@ -18,6 +18,7 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "verify": "node scripts/sync-version.mjs && tsc --noEmit && vitest run && vite build",
+    "deploy": "node scripts/deploy-vercel.mjs",
     "e2e": "playwright test",
     "e2e:ui": "playwright test --ui",
     "e2e:install": "playwright install --with-deps chromium",
