@@ -13,6 +13,8 @@ import { toPersianDigits, toJalaliStringPretty } from '../lib/persianDate'
 import { Card, Button, Badge, showToast } from './ui'
 import { Activity, AlertTriangle, Droplet, Plus, Save, Printer, CheckCircle } from 'lucide-react'
 import { buildPrintDocument } from '../lib/printDocument'
+import { h } from '../lib/haptics'
+import { chimes } from '../lib/chimes'
 
 interface PeriodontalChartProps {
   patientId: string
@@ -44,6 +46,11 @@ export function PeriodontalChart({ patientId, patientName, doctors, exam, onSave
   const currentToothData: PerioToothData = teethData[selectedTooth] || createEmptyPerioToothData(selectedTooth)
 
   const updateSite = (siteKey: 'db' | 'b' | 'mb' | 'dl' | 'l' | 'ml', field: 'pd' | 'bop' | 'suppuration' | 'gm', value: any) => {
+    if ((field === 'pd' && Number(value) >= 4) || (field === 'bop' && value === true)) {
+      h.warning()
+    } else {
+      h.light()
+    }
     setTeethData((prev) => {
       const tooth = prev[selectedTooth] || createEmptyPerioToothData(selectedTooth)
       const currentSite = tooth[siteKey] || { pd: 2, bop: false, suppuration: false, gm: 0, cal: 2 }
@@ -62,6 +69,7 @@ export function PeriodontalChart({ patientId, patientName, doctors, exam, onSave
   }
 
   const updateToothAttr = (field: 'mobility' | 'furcation', value: number) => {
+    h.tap()
     setTeethData((prev) => {
       const tooth = prev[selectedTooth] || createEmptyPerioToothData(selectedTooth)
       return {
@@ -78,8 +86,12 @@ export function PeriodontalChart({ patientId, patientName, doctors, exam, onSave
     setSaving(true)
     try {
       await onSave(teethData, notes, doctorId || null)
+      h.confirm()
+      chimes.playSuccess()
       showToast('success', 'آزمون پریودنتال با موفقیت ذخیره شد')
     } catch {
+      h.warning()
+      chimes.playWarning()
       showToast('error', 'خطا در ذخیره چارت پریودنتال')
     } finally {
       setSaving(false)
@@ -87,6 +99,8 @@ export function PeriodontalChart({ patientId, patientName, doctors, exam, onSave
   }
 
   const handlePrintPerio = () => {
+    h.tap()
+    chimes.playPop()
     const win = window.open('', '_blank', 'width=750,height=900')
     if (!win) return
     const styles = `
@@ -175,8 +189,8 @@ export function PeriodontalChart({ patientId, patientName, doctors, exam, onSave
       <button
         key={num}
         type="button"
-        onClick={() => setSelectedTooth(num)}
-        className={`w-9 h-11 rounded-xl flex flex-col items-center justify-center transition-all-smooth relative ${
+        onClick={() => { h.tap(); chimes.playPop(); setSelectedTooth(num) }}
+        className={`w-9 h-11 rounded-xl flex flex-col items-center justify-center transition-all-smooth relative press-scale ${
           isSelected
             ? 'bg-primary-600 text-white font-bold ring-2 ring-primary-300 scale-105 shadow-md'
             : hasDeep
