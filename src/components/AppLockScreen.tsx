@@ -7,6 +7,8 @@ import { Fingerprint, Delete } from 'lucide-react'
 import { MinadentLogo } from './MinadentLogo'
 import { verifyAppLockPin, hasBiometricRegistered, verifyBiometric } from '../lib/appLock'
 import { h } from '../lib/haptics'
+import { chimes } from '../lib/chimes'
+import { toPersianDigits } from '../lib/persianDate'
 
 export function AppLockScreen({ onUnlock }: { onUnlock: () => void }) {
   const [pin, setPin] = useState('')
@@ -18,7 +20,11 @@ export function AppLockScreen({ onUnlock }: { onUnlock: () => void }) {
     setTryingBiometric(true)
     const ok = await verifyBiometric()
     setTryingBiometric(false)
-    if (ok) { h.success(); onUnlock() }
+    if (ok) {
+      h.success()
+      chimes.playSuccess()
+      onUnlock()
+    }
   }
 
   useEffect(() => {
@@ -31,13 +37,29 @@ export function AppLockScreen({ onUnlock }: { onUnlock: () => void }) {
   useEffect(() => {
     if (pin.length !== 4) return
     verifyAppLockPin(pin).then((ok) => {
-      if (ok) { h.success(); onUnlock() }
-      else { h.error(); setError(true); setTimeout(() => { setPin(''); setError(false) }, 500) }
+      if (ok) {
+        h.success()
+        chimes.playSuccess()
+        onUnlock()
+      } else {
+        h.error()
+        chimes.playWarning()
+        setError(true)
+        setTimeout(() => { setPin(''); setError(false) }, 500)
+      }
     })
   }, [pin])
 
-  const press = (d: string) => { h.tap(); if (pin.length < 4) setPin((p) => p + d) }
-  const backspace = () => { h.tap(); setPin((p) => p.slice(0, -1)) }
+  const press = (d: string) => {
+    h.tap()
+    chimes.playPop()
+    if (pin.length < 4) setPin((p) => p + d)
+  }
+  const backspace = () => {
+    h.delete()
+    chimes.playPop()
+    setPin((p) => p.slice(0, -1))
+  }
 
   return (
     <div className="fixed inset-0 z-[300] bg-white dark:bg-slate-900 flex flex-col items-center justify-center px-6" dir="rtl">
@@ -53,14 +75,14 @@ export function AppLockScreen({ onUnlock }: { onUnlock: () => void }) {
 
       <div className="grid grid-cols-3 gap-4 w-full max-w-[280px]">
         {['1', '2', '3', '4', '5', '6', '7', '8', '9'].map((d) => (
-          <button key={d} onClick={() => press(d)} className="w-16 h-16 rounded-full bg-slate-100 dark:bg-slate-800 text-xl font-bold text-slate-700 dark:text-slate-200 mx-auto press-scale">{d}</button>
+          <button key={d} onClick={() => press(d)} className="w-16 h-16 rounded-full bg-slate-100 dark:bg-slate-800 text-xl font-bold text-slate-700 dark:text-slate-200 mx-auto press-scale">{toPersianDigits(d)}</button>
         ))}
         {hasBiometricRegistered() ? (
           <button onClick={tryBiometric} disabled={tryingBiometric} className="w-16 h-16 rounded-full flex items-center justify-center text-primary-600 mx-auto press-scale">
             <Fingerprint size={26} />
           </button>
         ) : <div />}
-        <button onClick={() => press('0')} className="w-16 h-16 rounded-full bg-slate-100 dark:bg-slate-800 text-xl font-bold text-slate-700 dark:text-slate-200 mx-auto press-scale">0</button>
+        <button onClick={() => press('0')} className="w-16 h-16 rounded-full bg-slate-100 dark:bg-slate-800 text-xl font-bold text-slate-700 dark:text-slate-200 mx-auto press-scale">{toPersianDigits('0')}</button>
         <button onClick={backspace} className="w-16 h-16 rounded-full flex items-center justify-center text-slate-400 mx-auto press-scale">
           <Delete size={22} />
         </button>

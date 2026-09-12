@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { h } from '../lib/haptics'
+import { chimes } from '../lib/chimes'
 
 /**
  * iOS 27 Bottom Sheet with Detents
@@ -45,7 +46,13 @@ export function BottomSheet({
 
   useEffect(() => {
     if (!open) return
-    const onEsc = (e: KeyboardEvent) => { if (e.key === 'Escape') { h.cancel(); onClose() } }
+    const onEsc = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        h.cancel()
+        chimes.playPop()
+        onClose()
+      }
+    }
     window.addEventListener('keydown', onEsc)
     return () => window.removeEventListener('keydown', onEsc)
   }, [open, onClose])
@@ -72,13 +79,16 @@ export function BottomSheet({
     if (dragY < -threshold && currentIdx < 2) {
       newDetent = detentOrder[currentIdx + 1]
       h.light()
+      chimes.playPop()
     } else if (dragY > threshold && currentIdx > 0) {
       newDetent = detentOrder[currentIdx - 1]
       h.light()
+      chimes.playPop()
     }
 
     if (startDetentRef.current === 'small' && dragY > 80) {
       h.cancel()
+      chimes.playPop()
       onClose()
       setDragY(0)
       return
@@ -98,7 +108,11 @@ export function BottomSheet({
     <>
       <div
         className="fixed inset-0 z-[55] bg-black/30 backdrop-blur-sm"
-        onClick={() => { h.cancel(); onClose() }}
+        onClick={() => {
+          h.cancel()
+          chimes.playPop()
+          onClose()
+        }}
         style={{ animation: 'page-in 0.25s ease-out' }}
       />
       <div
@@ -122,7 +136,11 @@ export function BottomSheet({
             <div className="flex items-center justify-between w-full px-5">
               <h3 className="text-base font-bold text-slate-800 dark:text-slate-100">{title}</h3>
               <button
-                onClick={() => { h.cancel(); onClose() }}
+                onClick={() => {
+                  h.cancel()
+                  chimes.playPop()
+                  onClose()
+                }}
                 aria-label="بستن"
                 className="p-1.5 rounded-xl bg-slate-100 dark:bg-slate-700 text-slate-500 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-600 transition-all-smooth press-scale"
               >

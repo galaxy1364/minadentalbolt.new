@@ -10,6 +10,7 @@ import { useEffect, useRef, useState } from 'react'
 import { BrowserMultiFormatReader } from '@zxing/library'
 import { X, Camera as CameraIcon, AlertCircle } from 'lucide-react'
 import { h } from '../lib/haptics'
+import { chimes } from '../lib/chimes'
 
 interface BarcodeScannerProps {
   onScan: (code: string) => void
@@ -32,12 +33,14 @@ export function BarcodeScanner({ onScan, onClose }: BarcodeScannerProps) {
       if (result && scanning) {
         setScanning(false)
         h.success()
+        chimes.playSuccess()
         onScan(result.getText())
       }
       // NotFoundException fires continuously while no code is in frame —
       // that's normal scanning, not a real error, so it's ignored here.
     }).catch((err) => {
       if (cancelled) return
+      chimes.playWarning()
       setError(err?.name === 'NotAllowedError' ? 'اجازه‌ی دسترسی به دوربین داده نشد' : 'دوربین در دسترس نیست')
     })
 
@@ -50,7 +53,16 @@ export function BarcodeScanner({ onScan, onClose }: BarcodeScannerProps) {
   return (
     <div className="fixed inset-0 z-[200] bg-black flex flex-col">
       <div className="flex items-center justify-between p-4">
-        <button onClick={() => { h.tap(); onClose() }} className="p-2 rounded-full bg-white/10 text-white"><X size={20} /></button>
+        <button
+          onClick={() => {
+            h.tap()
+            chimes.playPop()
+            onClose()
+          }}
+          className="p-2 rounded-full bg-white/10 text-white transition-all press-scale"
+        >
+          <X size={20} />
+        </button>
         <p className="text-white text-sm font-bold">اسکن بارکد</p>
         <div className="w-9" />
       </div>

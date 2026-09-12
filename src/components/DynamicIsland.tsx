@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react'
 import { createPortal } from 'react-dom'
 import { h } from '../lib/haptics'
+import { chimes } from '../lib/chimes'
 
 /**
  * iOS 27 Dynamic Island
@@ -31,6 +32,8 @@ export function DynamicIsland() {
   const timeoutRef = useRef<number>(0)
 
   const dismiss = useCallback(() => {
+    h.tap()
+    chimes.playPop()
     setState('collapsed')
     setTimeout(() => setNotification(null), 300)
   }, [])
@@ -38,6 +41,7 @@ export function DynamicIsland() {
   useEffect(() => {
     pushCallback = (n: IslandNotification) => {
       h.morph()
+      chimes.playPop()
       setNotification(n)
       setState('compact')
       setTimeout(() => setState('expanded'), 100)
