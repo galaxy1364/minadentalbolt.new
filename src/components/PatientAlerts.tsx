@@ -7,6 +7,8 @@ import { X, AlertTriangle, HeartPulse, Pill, Wallet } from 'lucide-react'
 import { buildPatientAlerts } from '../lib/patientAlerts'
 import type { PatientAlert, PatientAlertKind, AlertPatientFields, AlertBalance } from '../lib/patientAlerts'
 import { toPersianDigits } from '../lib/persianDate'
+import { chimes } from '../lib/chimes'
+import { h } from '../lib/haptics'
 
 const ICONS: Record<PatientAlertKind, React.ReactNode> = {
   allergy: <AlertTriangle size={16} />,
@@ -44,6 +46,15 @@ export function PatientAlerts({ patient, balance }: Props) {
   useEffect(() => { setDismissed(new Set()) }, [patient?.id])
 
   const visible = alerts.filter((a) => !dismissed.has(a.id))
+
+  // Alert dentist with clinical chime when high-risk medical alerts appear
+  useEffect(() => {
+    if (visible.some((a) => a.kind === 'allergy' || a.kind === 'condition')) {
+      chimes.playWarning()
+      h.warning()
+    }
+  }, [patient?.id])
+
   if (visible.length === 0) return null
 
   return (
@@ -56,7 +67,11 @@ export function PatientAlerts({ patient, balance }: Props) {
         <AlertCard
           key={alert.id}
           alert={alert}
-          onDismiss={() => setDismissed((prev) => new Set(prev).add(alert.id))}
+          onDismiss={() => {
+            chimes.playPop()
+            h.tap()
+            setDismissed((prev) => new Set(prev).add(alert.id))
+          }}
         />
       ))}
     </div>
@@ -79,7 +94,7 @@ function AlertCard({ alert, onDismiss }: { alert: PatientAlert; onDismiss: () =>
         type="button"
         onClick={onDismiss}
         aria-label={`بستن هشدار ${alert.title}`}
-        className="flex-shrink-0 p-1 rounded-lg hover:bg-white/20 transition-colors"
+        className="flex-shrink-0 p-1 rounded-lg hover:bg-white/20 transition-all-smooth press-scale"
       >
         <X size={14} />
       </button>

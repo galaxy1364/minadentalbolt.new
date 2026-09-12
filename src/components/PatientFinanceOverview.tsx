@@ -17,6 +17,7 @@ import { resolveAttribution } from '../lib/paymentAttribution'
 import { summariseCheques, type ChequeLike } from '../lib/chequeSummary'
 import { PatientDebtBar } from './PatientDebtBar'
 import { h } from '../lib/haptics'
+import { chimes } from '../lib/chimes'
 import { useOptionalAuth } from '../lib/auth'
 import { canEditFinancialPrice } from '../lib/permissions'
 import type { Payment, Treatment, Doctor, ImplantCase, PaymentPlan, Installment } from '../types'
@@ -125,10 +126,11 @@ export function PatientFinanceOverview({
           {onAddPayment && (
             <button
               onClick={() => {
+                chimes.playPop()
                 h.tap()
                 onAddPayment()
               }}
-              className="flex items-center gap-1 px-3 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white text-xs font-bold transition-all-smooth shadow-sm"
+              className="flex items-center gap-1 px-3 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white text-xs font-bold transition-all-smooth shadow-sm press-scale"
             >
               <Plus size={13} />
               <span>ثبت پرداخت</span>
@@ -138,10 +140,11 @@ export function PatientFinanceOverview({
           {onAddCheque && (
             <button
               onClick={() => {
+                chimes.playPop()
                 h.tap()
                 onAddCheque()
               }}
-              className="flex items-center gap-1 px-3 py-1.5 rounded-xl bg-amber-600 hover:bg-amber-700 active:scale-95 text-white text-xs font-bold transition-all-smooth shadow-sm"
+              className="flex items-center gap-1 px-3 py-1.5 rounded-xl bg-amber-600 hover:bg-amber-700 active:scale-95 text-white text-xs font-bold transition-all-smooth shadow-sm press-scale"
             >
               <Banknote size={13} />
               <span>ثبت چک</span>
@@ -151,10 +154,11 @@ export function PatientFinanceOverview({
           {onAddPlan && (
             <button
               onClick={() => {
+                chimes.playPop()
                 h.tap()
                 onAddPlan()
               }}
-              className="flex items-center gap-1 px-3 py-1.5 rounded-xl bg-violet-600 hover:bg-violet-700 active:scale-95 text-white text-xs font-bold transition-all-smooth shadow-sm"
+              className="flex items-center gap-1 px-3 py-1.5 rounded-xl bg-violet-600 hover:bg-violet-700 active:scale-95 text-white text-xs font-bold transition-all-smooth shadow-sm press-scale"
             >
               <CalendarClock size={13} />
               <span>طرح اقساط</span>
@@ -276,10 +280,11 @@ export function PatientFinanceOverview({
                               {onPayInstallment && (
                                 <button
                                   onClick={() => {
+                                    chimes.playSuccess()
                                     h.tap()
                                     onPayInstallment(inst, plan)
                                   }}
-                                  className="px-2.5 py-1 rounded-lg text-[10px] font-bold bg-violet-600 hover:bg-violet-700 active:scale-95 text-white transition-all-smooth shadow-sm"
+                                  className="px-2.5 py-1 rounded-lg text-[10px] font-bold bg-violet-600 hover:bg-violet-700 active:scale-95 text-white transition-all-smooth shadow-sm press-scale"
                                 >
                                   ثبت پرداخت
                                 </button>
@@ -372,10 +377,11 @@ export function PatientFinanceOverview({
                       {onClearCheque && (
                         <button
                           onClick={() => {
+                            chimes.playSuccess()
                             h.confirm()
                             onClearCheque(c)
                           }}
-                          className="px-2.5 py-1 rounded-lg text-[10px] font-bold bg-emerald-600 hover:bg-emerald-700 text-white transition-all-smooth shadow-sm"
+                          className="px-2.5 py-1 rounded-lg text-[10px] font-bold bg-emerald-600 hover:bg-emerald-700 text-white transition-all-smooth shadow-sm press-scale"
                         >
                           ثبت وصول
                         </button>
@@ -384,10 +390,11 @@ export function PatientFinanceOverview({
                       {!isBounced && onBounceCheque && (
                         <button
                           onClick={() => {
+                            chimes.playAlarm()
                             h.error()
                             onBounceCheque(c)
                           }}
-                          className="px-2 py-1 rounded-lg text-[10px] font-bold bg-red-100 hover:bg-red-200 text-red-700 dark:bg-red-900/40 dark:text-red-300 transition-colors"
+                          className="px-2 py-1 rounded-lg text-[10px] font-bold bg-red-100 hover:bg-red-200 text-red-700 dark:bg-red-900/40 dark:text-red-300 transition-all-smooth press-scale"
                         >
                           برگشت
                         </button>

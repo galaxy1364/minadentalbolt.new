@@ -2,6 +2,7 @@ import { useNavigate } from 'react-router-dom'
 import { Wallet, CreditCard, Banknote, ShieldAlert } from 'lucide-react'
 import { formatCurrency, toPersianDigits } from '../lib/persianDate'
 import { h } from '../lib/haptics'
+import { chimes } from '../lib/chimes'
 import type { PatientBalance } from '../lib/finance'
 import { summariseCheques, type ChequeLike } from '../lib/chequeSummary'
 import { toJalaliStringPretty } from '../lib/persianDate'
@@ -52,6 +53,7 @@ export function PatientDebtBar({ patientId, balance, variant = 'full', cheques }
     // The row itself opens the patient; without this the shortcut would
     // do two things at once.
     e.stopPropagation()
+    chimes.playPop()
     h.tap()
     navigate('/billing', {
       state: { openPaymentForPatientId: patientId, suggestedAmount: owed > 0 ? owed : undefined },
@@ -126,7 +128,11 @@ export function PatientChequeRows({ patientId, cheques }: { patientId: string; c
   const s = summariseCheques(cheques, patientId)
   if (!s.hasAny) return null
 
-  const open = () => { h.tap(); navigate('/billing', { state: { openChequesForPatientId: patientId } }) }
+  const open = () => {
+    chimes.playPop()
+    h.tap()
+    navigate('/billing', { state: { openChequesForPatientId: patientId } })
+  }
 
   return (
     <div className="mt-2 space-y-1.5">

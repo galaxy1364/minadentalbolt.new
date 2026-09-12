@@ -5,6 +5,7 @@ import {
   ChevronLeft, ShieldCheck, Sparkles, Zap,
 } from 'lucide-react'
 import { h, startContinuousHaptic, stopContinuousHaptic } from '../lib/haptics'
+import { chimes } from '../lib/chimes'
 
 // ─────────────────────────────────────────────────────────────────
 // Enterprise Multi-Step Wizard System
@@ -83,11 +84,13 @@ export function ConfirmAction({ config, onClose }: { config: ConfirmActionConfig
 
   const goToConfirm = useCallback(() => {
     h.transition()
+    chimes.playPop()
     setStep('confirm')
   }, [])
 
   const goBackToPreview = useCallback(() => {
     h.cancel()
+    chimes.playPop()
     setStep('preview')
   }, [])
 
@@ -101,10 +104,12 @@ export function ConfirmAction({ config, onClose }: { config: ConfirmActionConfig
       await config.onConfirm()
       setProgress(100)
       h.success()
+      chimes.playSuccess()
       setStep('done')
       setTimeout(() => { h.release(); onClose() }, 1100)
     } catch (err: any) {
       h.error()
+      chimes.playWarning()
       setError(err?.message || 'خطای ناشناخته')
       setStep('preview')
       setExecuting(false)
@@ -171,7 +176,7 @@ export function ConfirmAction({ config, onClose }: { config: ConfirmActionConfig
               <h3 className="text-lg font-extrabold text-slate-800 leading-tight">{config.title}</h3>
             </div>
             {!executing && step !== 'done' && (
-              <button onClick={() => { h.cancel(); onClose() }} className="p-2 rounded-xl bg-white/60 text-slate-500 hover:bg-white transition-all-smooth press-scale">
+              <button onClick={() => { h.cancel(); chimes.playPop(); onClose() }} className="p-2 rounded-xl bg-white/60 text-slate-500 hover:bg-white transition-all-smooth press-scale">
                 <X size={18} />
               </button>
             )}
@@ -234,7 +239,7 @@ export function ConfirmAction({ config, onClose }: { config: ConfirmActionConfig
             )}
 
             <div className="flex gap-2 mt-5">
-              <button onClick={() => { h.cancel(); onClose() }} className="flex-1 py-3.5 rounded-2xl bg-slate-100 text-slate-600 font-bold text-sm hover:bg-slate-200 transition-all-smooth press-scale">
+              <button onClick={() => { h.cancel(); chimes.playPop(); onClose() }} className="flex-1 py-3.5 rounded-2xl bg-slate-100 text-slate-600 font-bold text-sm hover:bg-slate-200 transition-all-smooth press-scale">
                 انصراف
               </button>
               <button onClick={goToConfirm} className={`flex-1 py-3.5 rounded-2xl font-bold text-sm text-white transition-all-smooth press-scale bg-gradient-to-br ${meta.color} shadow-lg`}>
@@ -305,7 +310,7 @@ export function ConfirmAction({ config, onClose }: { config: ConfirmActionConfig
               )}
             </div>
 
-            <button onClick={goBackToPreview} className="w-full mt-3 py-2.5 text-xs font-medium text-slate-500 hover:text-slate-700 flex items-center justify-center gap-1">
+            <button onClick={goBackToPreview} className="w-full mt-3 py-2.5 text-xs font-medium text-slate-500 hover:text-slate-700 flex items-center justify-center gap-1 press-scale">
               <ChevronLeft size={14} />
               بازگشت به پیش‌نمایش
             </button>
@@ -376,6 +381,7 @@ export function useConfirmAction() {
 
   const confirmAction = useCallback((cfg: ConfirmActionConfig) => {
     h.impact()
+    chimes.playPop()
     setConfig(cfg)
   }, [])
 
