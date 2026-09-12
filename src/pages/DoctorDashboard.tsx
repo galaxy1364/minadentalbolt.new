@@ -9,6 +9,7 @@ import { fetchAppointments, fetchTreatments, fetchWaitingList, fetchLabOrders } 
 import { toJalaliStringPretty, toPersianDigits, formatCurrency, timeParts } from '../lib/persianDate'
 import { Card, Badge } from '../components/ui'
 import { h } from '../lib/haptics'
+import { chimes } from '../lib/chimes'
 import type { AppointmentWithRelations, Treatment, WaitingListEntry, LabOrder } from '../types'
 
 export default function DoctorDashboard({ doctorId, doctorName }: { doctorId: string; doctorName: string }) {
@@ -115,7 +116,7 @@ export default function DoctorDashboard({ doctorId, doctorName }: { doctorId: st
         ) : (
           <div className="space-y-2">
             {todayAppointments.map((a) => (
-              <Card key={a.id} className="p-3 flex items-center gap-3 hover:card-shadow-sm transition-all-smooth cursor-pointer" onClick={() => { h.tap(); if (a.patient_id) navigate(`/patients/${a.patient_id}`) }}>
+              <Card key={a.id} className="p-3 flex items-center gap-3 hover:card-shadow-sm transition-all-smooth cursor-pointer press-scale" onClick={() => { h.select(); chimes.playPop(); if (a.patient_id) navigate(`/patients/${a.patient_id}`) }}>
                 <div className="w-11 h-11 rounded-xl bg-primary-50 dark:bg-primary-900/30 flex flex-col items-center justify-center shrink-0">
                   <Clock size={12} className="text-primary-500" />
                   <span className="text-[10px] font-bold text-primary-700 dark:text-primary-400">{timeParts(a.start_time).clock || a.start_time}</span>
@@ -145,15 +146,15 @@ export default function DoctorDashboard({ doctorId, doctorName }: { doctorId: st
       )}
 
       <div className="grid grid-cols-3 gap-2">
-        <button onClick={() => { h.tap(); navigate('/treatments') }} className="p-3 rounded-2xl bg-white dark:bg-slate-800 border border-slate-100 dark:border-slate-700 text-center hover:bg-slate-50 dark:hover:bg-slate-700/50 transition-all-smooth press-scale">
+        <button onClick={() => { h.tap(); chimes.playPop(); navigate('/treatments') }} className="p-3 rounded-2xl bg-white dark:bg-slate-800 border border-slate-100 dark:border-slate-700 text-center hover:bg-slate-50 dark:hover:bg-slate-700/50 transition-all-smooth press-scale">
           <Stethoscope size={18} className="mx-auto text-primary-500 mb-1" />
           <span className="text-[11px] text-slate-600 dark:text-slate-300">درمان</span>
         </button>
-        <button onClick={() => { h.tap(); navigate('/prescriptions') }} className="p-3 rounded-2xl bg-white dark:bg-slate-800 border border-slate-100 dark:border-slate-700 text-center hover:bg-slate-50 dark:hover:bg-slate-700/50 transition-all-smooth press-scale">
+        <button onClick={() => { h.tap(); chimes.playPop(); navigate('/prescriptions') }} className="p-3 rounded-2xl bg-white dark:bg-slate-800 border border-slate-100 dark:border-slate-700 text-center hover:bg-slate-50 dark:hover:bg-slate-700/50 transition-all-smooth press-scale">
           <Users size={18} className="mx-auto text-fuchsia-500 mb-1" />
           <span className="text-[11px] text-slate-600 dark:text-slate-300">نسخه</span>
         </button>
-        <button onClick={() => { h.tap(); navigate('/radiology') }} className="p-3 rounded-2xl bg-white dark:bg-slate-800 border border-slate-100 dark:border-slate-700 text-center hover:bg-slate-50 dark:hover:bg-slate-700/50 transition-all-smooth press-scale">
+        <button onClick={() => { h.tap(); chimes.playPop(); navigate('/radiology') }} className="p-3 rounded-2xl bg-white dark:bg-slate-800 border border-slate-100 dark:border-slate-700 text-center hover:bg-slate-50 dark:hover:bg-slate-700/50 transition-all-smooth press-scale">
           <Calendar size={18} className="mx-auto text-pink-500 mb-1" />
           <span className="text-[11px] text-slate-600 dark:text-slate-300">رادیولوژی</span>
         </button>

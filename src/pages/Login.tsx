@@ -4,6 +4,8 @@ import { Button } from '../components/ui'
 import { MinadentLogo } from '../components/MinadentLogo'
 import { useAuth } from '../lib/auth'
 import { supabase } from '../lib/supabase'
+import { h } from '../lib/haptics'
+import { chimes } from '../lib/chimes'
 
 type Mode = 'email' | 'phone'
 
@@ -34,33 +36,48 @@ export default function Login() {
 
     let identifier = ''
     if (mode === 'email') {
-      if (!email.trim()) { setError('ایمیل را وارد کنید'); return }
+      if (!email.trim()) { setError('ایمیل را وارد کنید'); chimes.playWarning(); return }
       identifier = email.trim()
     } else {
       const normalized = normalizeIranPhone(phone)
-      if (!normalized) { setError('شماره موبایل معتبر نیست (مثال: 0912xxxxxxx)'); return }
+      if (!normalized) { setError('شماره موبایل معتبر نیست (مثال: 0912xxxxxxx)'); chimes.playWarning(); return }
       identifier = normalized
     }
-    if (!password) { setError('رمز عبور را وارد کنید'); return }
+    if (!password) { setError('رمز عبور را وارد کنید'); chimes.playWarning(); return }
 
     setLoading(true)
     const { error: signInError } = await signIn(identifier, password)
     setLoading(false)
-    if (signInError) setError(signInError)
+    if (signInError) {
+      setError(signInError)
+      h.error()
+      chimes.playWarning()
+    } else {
+      h.success()
+      chimes.playSuccess()
+    }
   }
 
   const handleForgotPassword = async () => {
     setError('')
     if (mode === 'phone') {
       setError('بازیابی رمز فقط برای حساب‌های ایمیلی فعال است — برای شماره موبایل با مدیر کلینیک تماس بگیرید')
+      chimes.playWarning()
       return
     }
-    if (!email.trim()) { setError('ابتدا ایمیل خود را وارد کنید'); return }
+    if (!email.trim()) { setError('ابتدا ایمیل خود را وارد کنید'); chimes.playWarning(); return }
     setResetLoading(true)
     const { error: resetError } = await supabase.auth.resetPasswordForEmail(email.trim())
     setResetLoading(false)
-    if (resetError) setError('خطا در ارسال ایمیل بازیابی')
-    else setResetSent(true)
+    if (resetError) {
+      setError('خطا در ارسال ایمیل بازیابی')
+      h.error()
+      chimes.playWarning()
+    } else {
+      setResetSent(true)
+      h.success()
+      chimes.playSuccess()
+    }
   }
 
   return (
@@ -93,8 +110,8 @@ export default function Login() {
             <div className="flex items-center gap-1 p-1 rounded-2xl bg-slate-100 dark:bg-slate-800 mb-4">
               <button
                 type="button"
-                onClick={() => { setMode('email'); setError(''); setResetSent(false) }}
-                className={`flex-1 flex items-center justify-center gap-1.5 py-2 rounded-xl text-sm font-semibold transition-all ${
+                onClick={() => { h.tap(); chimes.playPop(); setMode('email'); setError(''); setResetSent(false) }}
+                className={`flex-1 flex items-center justify-center gap-1.5 py-2 rounded-xl text-sm font-semibold transition-all press-scale ${
                   mode === 'email' ? 'bg-white dark:bg-slate-700 text-violet-600 dark:text-violet-300 shadow-sm' : 'text-slate-500 dark:text-slate-400'
                 }`}
               >
@@ -102,8 +119,8 @@ export default function Login() {
               </button>
               <button
                 type="button"
-                onClick={() => { setMode('phone'); setError(''); setResetSent(false) }}
-                className={`flex-1 flex items-center justify-center gap-1.5 py-2 rounded-xl text-sm font-semibold transition-all ${
+                onClick={() => { h.tap(); chimes.playPop(); setMode('phone'); setError(''); setResetSent(false) }}
+                className={`flex-1 flex items-center justify-center gap-1.5 py-2 rounded-xl text-sm font-semibold transition-all press-scale ${
                   mode === 'phone' ? 'bg-white dark:bg-slate-700 text-violet-600 dark:text-violet-300 shadow-sm' : 'text-slate-500 dark:text-slate-400'
                 }`}
               >
