@@ -57,6 +57,15 @@ export default function DoctorDashboard({ doctorId, doctorName }: { doctorId: st
     )
   }
 
+  const statusLabels: Record<string, string> = {
+    scheduled: 'در انتظار',
+    confirmed: 'تایید شده',
+    in_chair: 'روی صندلی',
+    completed: 'تکمیل شد',
+    cancelled: 'لغو شد',
+    no_show: 'غیبت',
+  }
+
   return (
     <div className="space-y-5">
       <div>
@@ -106,7 +115,7 @@ export default function DoctorDashboard({ doctorId, doctorName }: { doctorId: st
         ) : (
           <div className="space-y-2">
             {todayAppointments.map((a) => (
-              <Card key={a.id} className="p-3 flex items-center gap-3">
+              <Card key={a.id} className="p-3 flex items-center gap-3 hover:card-shadow-sm transition-all-smooth cursor-pointer" onClick={() => { h.tap(); if (a.patient_id) navigate(`/patients/${a.patient_id}`) }}>
                 <div className="w-11 h-11 rounded-xl bg-primary-50 dark:bg-primary-900/30 flex flex-col items-center justify-center shrink-0">
                   <Clock size={12} className="text-primary-500" />
                   <span className="text-[10px] font-bold text-primary-700 dark:text-primary-400">{timeParts(a.start_time).clock || a.start_time}</span>
@@ -115,7 +124,7 @@ export default function DoctorDashboard({ doctorId, doctorName }: { doctorId: st
                   <p className="text-sm font-bold text-slate-800 dark:text-slate-100 truncate">{a.patient ? `${a.patient.first_name} ${a.patient.last_name}` : 'بیمار'}</p>
                   <p className="text-[11px] text-slate-400">{a.type || 'ویزیت'}</p>
                 </div>
-                <Badge color={a.status === 'completed' ? 'success' : a.status === 'confirmed' ? 'primary' : 'slate'}>{a.status}</Badge>
+                <Badge color={a.status === 'completed' ? 'success' : a.status === 'confirmed' ? 'primary' : 'slate'}>{statusLabels[a.status] || a.status}</Badge>
               </Card>
             ))}
           </div>
@@ -136,15 +145,15 @@ export default function DoctorDashboard({ doctorId, doctorName }: { doctorId: st
       )}
 
       <div className="grid grid-cols-3 gap-2">
-        <button onClick={() => navigate('/treatments')} className="p-3 rounded-2xl bg-white dark:bg-slate-800 border border-slate-100 dark:border-slate-700 text-center">
+        <button onClick={() => { h.tap(); navigate('/treatments') }} className="p-3 rounded-2xl bg-white dark:bg-slate-800 border border-slate-100 dark:border-slate-700 text-center hover:bg-slate-50 dark:hover:bg-slate-700/50 transition-all-smooth press-scale">
           <Stethoscope size={18} className="mx-auto text-primary-500 mb-1" />
           <span className="text-[11px] text-slate-600 dark:text-slate-300">درمان</span>
         </button>
-        <button onClick={() => navigate('/prescriptions')} className="p-3 rounded-2xl bg-white dark:bg-slate-800 border border-slate-100 dark:border-slate-700 text-center">
+        <button onClick={() => { h.tap(); navigate('/prescriptions') }} className="p-3 rounded-2xl bg-white dark:bg-slate-800 border border-slate-100 dark:border-slate-700 text-center hover:bg-slate-50 dark:hover:bg-slate-700/50 transition-all-smooth press-scale">
           <Users size={18} className="mx-auto text-fuchsia-500 mb-1" />
           <span className="text-[11px] text-slate-600 dark:text-slate-300">نسخه</span>
         </button>
-        <button onClick={() => navigate('/radiology')} className="p-3 rounded-2xl bg-white dark:bg-slate-800 border border-slate-100 dark:border-slate-700 text-center">
+        <button onClick={() => { h.tap(); navigate('/radiology') }} className="p-3 rounded-2xl bg-white dark:bg-slate-800 border border-slate-100 dark:border-slate-700 text-center hover:bg-slate-50 dark:hover:bg-slate-700/50 transition-all-smooth press-scale">
           <Calendar size={18} className="mx-auto text-pink-500 mb-1" />
           <span className="text-[11px] text-slate-600 dark:text-slate-300">رادیولوژی</span>
         </button>

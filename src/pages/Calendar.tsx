@@ -12,6 +12,7 @@ import { PersianCalendar } from '../components/PersianCalendar'
 import { Card, Spinner, EmptyState, Badge, Button } from '../components/ui'
 import { ModuleHeader } from '../components/ModuleHeader'
 import { h } from '../lib/haptics'
+import { chimes } from '../lib/chimes'
 import type { AppointmentWithRelations, LabOrder, TreatmentPhase, ImplantCaseWithRelations, Patient, Doctor, DoctorSchedule } from '../types'
 
 type CalEvent = {
@@ -197,7 +198,7 @@ export default function CalendarPage() {
 
       <PersianCalendar
         selectedDate={selectedDate}
-        onDateSelect={(d) => { h.select(); setSelectedDate(d) }}
+        onDateSelect={(d) => { h.select(); chimes.playPop(); setSelectedDate(d) }}
         appointments={allEvents.filter((e) => e.type === 'appointment').map((e) => ({ date: e.date, status: e.status || 'scheduled' }))}
         highlightDates={highlightDates}
       />

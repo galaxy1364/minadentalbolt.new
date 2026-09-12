@@ -7,6 +7,7 @@ import { fetchPayments, fetchPatients, fetchEncounters, fetchTreatments, fetchPr
 import { calcAllPatientBalances } from '../lib/finance'
 import { toJalaliString, toJalaliStringPretty, getJalaliMonthYear, formatCurrency, formatNumber, toPersianDigits, persianMonths, jsDateToPersianWeekday } from '../lib/persianDate'
 import { h } from '../lib/haptics'
+import { chimes } from '../lib/chimes'
 import { Payment, Patient, Encounter, Treatment, Procedure, Appointment, Expense } from '../types'
 import { Card, Button, Badge, Spinner, EmptyState, Tabs, showToast } from '../components/ui'
 import { ModuleHeader, ModuleStatCard, ReorderableStatGrid } from '../components/ModuleHeader'
@@ -311,8 +312,12 @@ export default function Reports() {
       a.download = `${filename}-${new Date().toISOString().slice(0, 10)}.csv`
       a.click()
       URL.revokeObjectURL(url)
+      chimes.playSuccess()
       showToast('success', 'فایل CSV دانلود شد')
-    } catch { showToast('error', 'خطا در ایجاد فایل') }
+    } catch {
+      chimes.playWarning()
+      showToast('error', 'خطا در ایجاد فایل')
+    }
   }, [h])
 
   const handleExportRevenue = () => {

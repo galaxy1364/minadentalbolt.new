@@ -13,6 +13,7 @@ import { ModuleHeader } from '../components/ModuleHeader'
 import { useConfirmAction } from '../components/ConfirmAction'
 import { scoreFields } from '../lib/fuzzySearch'
 import { h } from '../lib/haptics'
+import { chimes } from '../lib/chimes'
 
 export default function Archive() {
   const navigate = useNavigate()
@@ -121,6 +122,7 @@ export default function Archive() {
       confirmLabel: 'بازگردانی به لیست فعال',
       onConfirm: async () => {
         await updatePatient(p.id, { is_active: true })
+        chimes.playSuccess()
         showToast('success', 'بیمار بازگردانی شد')
         loadData()
       },
@@ -136,6 +138,7 @@ export default function Archive() {
       confirmLabel: 'بازگردانی به لیست فعال',
       onConfirm: async () => {
         await updateStaff(s.id, { is_active: true })
+        chimes.playSuccess()
         showToast('success', 'پرسنل بازگردانی شد')
         loadData()
       },
@@ -151,6 +154,7 @@ export default function Archive() {
       confirmLabel: 'بازگردانی به لیست فعال',
       onConfirm: async () => {
         await updateInsuranceCompany(c.id, { is_active: true })
+        chimes.playSuccess()
         showToast('success', 'شرکت بیمه بازگردانی شد')
         loadData()
       },
@@ -166,6 +170,7 @@ export default function Archive() {
       confirmLabel: 'بازگردانی به لیست فعال',
       onConfirm: async () => {
         await updateImplantCase(c.id, { is_active: true } as any)
+        chimes.playSuccess()
         showToast('success', 'مورد ایمپلنت بازگردانی شد')
         loadData()
       },
@@ -181,6 +186,7 @@ export default function Archive() {
       confirmLabel: 'بازگردانی به لیست فعال',
       onConfirm: async () => {
         await updateLab(l.id, { is_active: true } as any)
+        chimes.playSuccess()
         showToast('success', 'لابراتوار بازگردانی شد')
         loadData()
       },
@@ -254,6 +260,7 @@ export default function Archive() {
                       confirmLabel: 'فعال کن',
                       onConfirm: async () => {
                         await r.restore(r.id)
+                        chimes.playSuccess()
                         showToast('success', 'فعال شد')
                         await loadData()
                       },
