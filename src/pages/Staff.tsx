@@ -14,6 +14,7 @@ import { ROLES } from '../lib/permissions'
 import { scoreFields } from '../lib/fuzzySearch'
 import { useConfirmAction } from '../components/ConfirmAction'
 import { h } from '../lib/haptics'
+import { chimes } from '../lib/chimes'
 import { CurrencyInput } from '../components/CurrencyInput'
 
 /**
@@ -264,7 +265,11 @@ export default function Staff() {
             description: `تسویه سهم ${r.doctorName} — بازه ${toJalaliStringPretty(sharePeriodStart)} تا ${toJalaliStringPretty(sharePeriodEnd)}`,
           } as any)
           showToast('success', 'تسویه ثبت شد و در هزینه‌های کلینیک لحاظ شد')
-        } catch { showToast('error', 'خطا در ثبت تسویه') }
+          chimes.playSuccess()
+        } catch {
+          showToast('error', 'خطا در ثبت تسویه')
+          chimes.playWarning()
+        }
       },
     })
   }
@@ -320,6 +325,7 @@ export default function Staff() {
   const handleSave = () => {
     if (!formData.full_name.trim()) {
       showToast('error', 'نام و نام خانوادگی الزامی است')
+      chimes.playWarning()
       return
     }
     const payload: StaffInput = {
@@ -427,12 +433,18 @@ export default function Staff() {
 
           const outcome = staffSaveMessage(saveMode, loginOutcome, loginFailureReason)
           showToast(outcome.type, outcome.text)
+          if (outcome.type === 'success') {
+            chimes.playSuccess()
+          } else {
+            chimes.playWarning()
+          }
 
           setModalOpen(false)
           loadData()
         } catch (err) {
           console.error('Error saving staff:', err)
           showToast('error', 'خطا در ذخیره پرسنل')
+          chimes.playWarning()
         } finally {
           setSaving(false)
         }
@@ -454,6 +466,11 @@ export default function Staff() {
       onConfirm: async () => {
         await setStaffLoginActive(login.userId, !suspending)
         showToast('success', suspending ? 'حساب ورود تعلیق شد' : 'حساب ورود فعال شد')
+        if (suspending) {
+          chimes.playWarning()
+        } else {
+          chimes.playSuccess()
+        }
         await loadData()
       },
     })
@@ -479,6 +496,7 @@ export default function Staff() {
       onConfirm: async () => {
         await updateStaff(s.id, { is_active: false })
         showToast('success', 'پرسنل غیرفعال شد — سوابق حفظ شد')
+        chimes.playWarning()
         loadData()
       },
     })

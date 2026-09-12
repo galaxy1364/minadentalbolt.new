@@ -76,18 +76,22 @@ async function main() {
   let ready = false
   for (let i = 0; i < 30; i++) {
     await new Promise((r) => setTimeout(r, 6000))
-    const checkRes = await fetch(`https://api.vercel.com/v13/deployments/${deploymentId}?teamId=${teamId}`, {
-      headers: { Authorization: `Bearer ${token}` },
-    })
-    const checkData = await checkRes.json()
-    console.log(`   Status: ${checkData.readyState || 'BUILDING'} (${i * 6 + 6}s)`)
-    if (checkData.readyState === 'READY') {
-      ready = true
-      break
-    }
-    if (checkData.readyState === 'ERROR' || checkData.readyState === 'CANCELED') {
-      console.error('❌ Deployment failed on Vercel:', checkData.error || checkData.readyState)
-      process.exit(1)
+    try {
+      const checkRes = await fetch(`https://api.vercel.com/v13/deployments/${deploymentId}?teamId=${teamId}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      })
+      const checkData = await checkRes.json()
+      console.log(`   Status: ${checkData.readyState || 'BUILDING'} (${i * 6 + 6}s)`)
+      if (checkData.readyState === 'READY') {
+        ready = true
+        break
+      }
+      if (checkData.readyState === 'ERROR' || checkData.readyState === 'CANCELED') {
+        console.error('❌ Deployment failed on Vercel:', checkData.error || checkData.readyState)
+        process.exit(1)
+      }
+    } catch (pollErr) {
+      console.log(`   Status: PENDING_CHECK (${i * 6 + 6}s - ${pollErr.message || 'retrying'})`)
     }
   }
 
