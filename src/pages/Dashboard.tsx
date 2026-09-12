@@ -9,7 +9,7 @@ import {
   Clock, TrendingUp, TrendingDown, Smile, AlertTriangle, Package,
   ClipboardList, Wallet, Zap, ChevronLeft, Timer, Moon, Sun, Target, Settings2,
   CheckCircle2, ArrowUpRight, ArrowDownRight, Sparkles, Building2,
-  RefreshCw, Download, FileText, Bell, AlertCircle, Banknote, CalendarClock,
+  RefreshCw, Download, FileText, Bell, AlertCircle, Banknote, CalendarClock, MessageSquare,
 } from 'lucide-react'
 import {
   AreaChart, Area, XAxis, YAxis, Tooltip as RTooltip, ResponsiveContainer,
@@ -47,6 +47,7 @@ import { useAuth } from '../lib/auth'
 import DoctorDashboard from './DoctorDashboard'
 import { ErrorBoundary } from '../components/ErrorBoundary'
 import { h } from '../lib/haptics'
+import { chimes } from '../lib/chimes'
 import { staggerDelay } from '../lib/motion'
 import { usePullToRefresh } from '../lib/usePullToRefresh'
 
@@ -709,6 +710,8 @@ export default function Dashboard() {
   }, [labOrdersState, implantCases, phasesState, dismissals])
 
   const handleSnooze = (key: string, days: number) => {
+    h.tap()
+    chimes.playPop()
     const today = new Date().toISOString().slice(0, 10)
     // Keep only live snoozes, so the stored list cannot grow for ever.
     const next = [
@@ -722,16 +725,18 @@ export default function Dashboard() {
 
   const [sendingReminderId, setSendingReminderId] = useState<string | null>(null)
   const handleSendReminderSms = async (reminder: SmartReminder) => {
-    if (!reminder.patient.phone) { showToast('error', 'این بیمار شماره تلفن ثبت‌شده ندارد'); return }
+    if (!reminder.patient.phone) { chimes.playWarning(); showToast('error', 'این بیمار شماره تلفن ثبت‌شده ندارد'); return }
     setSendingReminderId(reminder.patient.id + reminder.category)
     try {
       const { error } = await supabase.functions.invoke('send-sms', {
         body: { to: reminder.patient.phone, message: reminder.smsMessage, type: 'reminder' },
       })
       if (error) throw error
-      showToast('success', 'پیامک ارسال شد')
+      chimes.playSuccess()
+      showToast('success', 'پیامک یادآوری ارسال شد')
     } catch (err) {
       console.error('SMS send error:', err)
+      chimes.playWarning()
       showToast('error', 'خطا در ارسال پیامک — تابع send-sms را بررسی کنید')
     } finally {
       setSendingReminderId(null)
@@ -971,12 +976,16 @@ export default function Dashboard() {
     return a.doctor.name || a.doctor.specialty || 'پزشک'
   }
 
-  const handleRefresh = useCallback(() => { loadData(true) }, [loadData])
+  const handleRefresh = useCallback(() => {
+    chimes.playPop()
+    loadData(true)
+  }, [loadData])
 
   const ptr = usePullToRefresh(async () => { await loadData(true) })
 
   const handleExportRevenue = () => {
     h.confirm()
+    chimes.playSuccess()
     exportCSV(
       `درآمد-${timeRange}-${new Date().toISOString().slice(0, 10)}.csv`,
       ['بازه', 'درآمد (تومان)'],
@@ -987,6 +996,7 @@ export default function Dashboard() {
 
   const handleExportAppointments = () => {
     h.confirm()
+    chimes.playSuccess()
     exportCSV(
       `نوبت‌ها-${new Date().toISOString().slice(0, 10)}.csv`,
       ['بیمار', 'پزشک', 'تاریخ', 'ساعت شروع', 'وضعیت'],
@@ -1712,19 +1722,34 @@ export default function Dashboard() {
                             <p className="text-sm font-semibold text-slate-800 dark:text-slate-100 truncate">{r.title}</p>
                             <p className="text-[11px] text-slate-500 dark:text-slate-400 truncate">{r.detail}</p>
                           </div>
-                          {r.smsMessage ? (
-                            <button
-                              onClick={(e) => { e.stopPropagation(); handleSendReminderSms(r) }}
-                              disabled={sendingReminderId === key}
-                              className="shrink-0 px-2.5 py-1.5 rounded-lg bg-primary-50 dark:bg-primary-900/30 text-primary-700 dark:text-primary-400 text-[11px] font-semibold hover:bg-primary-100 dark:hover:bg-primary-900/50 transition-all-smooth press-scale disabled:opacity-50"
-                            >
-                              {sendingReminderId === key ? '...' : 'ارسال پیامک'}
-                            </button>
-                          ) : (
-                            <span className="shrink-0 px-2.5 py-1.5 rounded-lg bg-slate-100 dark:bg-slate-700 text-slate-500 dark:text-slate-400 text-[11px] font-semibold">
-                              بستن وضعیت
-                            </span>
-                          )}
+                          <div className="flex items-center gap-1.5 shrink-0">
+                            {r.patient.phone && (
+                              <a
+                                href={`https://wa.me/${r.patient.phone.replace(/\D/g, '').replace(/^0/, '98')}?text=${encodeURIComponent(r.smsMessage || `سلام ${r.patient.first_name} عزیز، یادآوری از کلینیک دندانپزشکی مینادنت: ${r.detail}`)}`}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                onClick={(e) => e.stopPropagation()}
+                                className="px-2 py-1.5 rounded-lg bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-400 text-[11px] font-semibold hover:bg-emerald-100 dark:hover:bg-emerald-900/60 transition-all-smooth press-scale flex items-center gap-1"
+                                title="ارسال پیام واتس‌اپ"
+                              >
+                                <MessageSquare size={11} />
+                                <span>واتس‌اپ</span>
+                              </a>
+                            )}
+                            {r.smsMessage ? (
+                              <button
+                                onClick={(e) => { e.stopPropagation(); handleSendReminderSms(r) }}
+                                disabled={sendingReminderId === key}
+                                className="px-2.5 py-1.5 rounded-lg bg-primary-50 dark:bg-primary-900/30 text-primary-700 dark:text-primary-400 text-[11px] font-semibold hover:bg-primary-100 dark:hover:bg-primary-900/50 transition-all-smooth press-scale disabled:opacity-50"
+                              >
+                                {sendingReminderId === key ? '...' : 'ارسال پیامک'}
+                              </button>
+                            ) : (
+                              <span className="px-2.5 py-1.5 rounded-lg bg-slate-100 dark:bg-slate-700 text-slate-500 dark:text-slate-400 text-[11px] font-semibold">
+                                بستن وضعیت
+                              </span>
+                            )}
+                          </div>
                         </div>
                       )
                     })}
