@@ -2,7 +2,7 @@
 import { useState, useEffect, useCallback, useMemo } from 'react'
 import { createPortal } from 'react-dom'
 import { useNavigate } from 'react-router-dom'
-import { Image, Search, Filter, Eye, XCircle, Smile, Camera, Calendar, User, FileText, Download, ZoomIn, Plus, Edit2, Archive } from 'lucide-react'
+import { Image, Search, Filter, Eye, XCircle, Smile, Camera, Calendar, User, FileText, Download, ZoomIn, Plus, Edit2, Archive, MessageSquare } from 'lucide-react'
 import { PieChart, Pie, Cell, XAxis, YAxis, Tooltip as RTooltip, ResponsiveContainer, Legend } from 'recharts'
 import { fetchRadiologyImages, fetchPatients, createRadiologyImage, updateRadiologyImage } from '../lib/api'
 import { toJalaliDisplay, toJalaliStringPretty, formatNumber, toPersianDigits } from '../lib/persianDate'
@@ -13,6 +13,7 @@ import { PatientSelect } from '../components/PatientSelect'
 import { ModuleHeader, ModuleStatCard, ReorderableStatGrid } from '../components/ModuleHeader'
 import { useConfirmAction } from '../components/ConfirmAction'
 import { DentalRadiologyViewer } from '../components/DentalRadiologyViewer'
+import { chimes } from '../lib/chimes'
 
 // ============================================================================
 // Constants
@@ -90,7 +91,7 @@ export default function Radiology() {
   }
 
   const handleSaveImage = () => {
-    if (!uploadForm.patient_id) { showToast('error', 'انتخاب بیمار الزامی است'); return }
+    if (!uploadForm.patient_id) { chimes.playWarning(); showToast('error', 'انتخاب بیمار الزامی است'); return }
     const patientObj = patients.find((p) => p.id === uploadForm.patient_id)
     confirmAction({
       type: editingImage ? 'edit' : 'create',
@@ -111,6 +112,7 @@ export default function Radiology() {
               tooth_number: uploadForm.tooth_number || null, image_url: uploadForm.image_url || null,
               description: uploadForm.description || null, taken_at: uploadForm.taken_at || null, notes: uploadForm.notes || null,
             } as any)
+            chimes.playSuccess()
             showToast('success', 'تصویر ویرایش شد')
             setUploadModalOpen(false)
             await loadData()
@@ -129,10 +131,14 @@ export default function Radiology() {
             taken_at: uploadForm.taken_at || null,
             notes: uploadForm.notes || null,
           })
+          chimes.playSuccess()
           showToast('success', 'تصویر رادیولوژی ثبت شد')
           setUploadModalOpen(false)
           loadData()
-        } catch { showToast('error', 'خطا در ثبت تصویر') } finally { setSavingImage(false) }
+        } catch {
+          chimes.playWarning()
+          showToast('error', 'خطا در ثبت تصویر')
+        } finally { setSavingImage(false) }
       },
     })
   }
@@ -151,9 +157,13 @@ export default function Radiology() {
       onConfirm: async () => {
         try {
           await updateRadiologyImage(img.id, { is_active: false } as any)
+          chimes.playPop()
           showToast('success', 'تصویر آرشیو شد')
           loadData()
-        } catch { showToast('error', 'خطا در آرشیو کردن') }
+        } catch {
+          chimes.playWarning()
+          showToast('error', 'خطا در آرشیو کردن')
+        }
       },
     })
   }
@@ -486,6 +496,27 @@ export default function Radiology() {
                     دانلود
                   </a>
                 )}
+                {(() => {
+                  const phone = patientPhone(selectedImage)
+                  const cleanPhone = phone ? phone.replace(/\D/g, '').replace(/^0/, '98') : null
+                  if (!cleanPhone) return null
+                  const typeLabel = getTypeMeta(selectedImage.image_type).label
+                  const pName = patientName(selectedImage)
+                  const waText = `سلام ${pName} عزیز،\nتصویر رادیولوژی شما در کلینیک دندانپزشکی مینادنت:\nنوع رادیولوژی: ${typeLabel}${selectedImage.tooth_number ? `\nشماره دندان: ${toPersianDigits(selectedImage.tooth_number)}` : ''}\nتاریخ: ${toJalaliStringPretty(selectedImage.taken_at || selectedImage.created_at)}${selectedImage.image_url ? `\nلینک تصویر:\n${selectedImage.image_url}` : ''}\nبا آرزوی تندرستی - کلینیک مینادنت`
+                  return (
+                    <a
+                      href={`https://wa.me/${cleanPhone}?text=${encodeURIComponent(waText)}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="flex items-center gap-1 px-3 py-1.5 rounded-xl bg-emerald-50 text-emerald-600 hover:bg-emerald-100 text-sm font-medium transition-all-smooth press-scale"
+                      title="ارسال مشخصات تصویر در واتساپ"
+                      onClick={() => chimes.playPop()}
+                    >
+                      <MessageSquare size={14} />
+                      واتساپ
+                    </a>
+                  )
+                })()}
                 <Button variant="secondary" size="sm" onClick={() => openEditImageModal(selectedImage)}>
                   <Edit2 size={14} className="inline ml-1" />
                   ویرایش
