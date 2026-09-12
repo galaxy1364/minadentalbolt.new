@@ -6,7 +6,7 @@ import { useNavigate, useLocation } from 'react-router-dom'
 import {
   Activity, ClipboardList, Stethoscope, Search, Eye, Smile, Plus, Edit2, Trash2, Ban, Layers,
   DollarSign, FlaskConical, CheckCircle2, X, UserPlus, ChevronRight, Bone,
-  ChevronDown, Wallet, Receipt, CalendarClock, Users, Pill,
+  ChevronDown, Wallet, Receipt, CalendarClock, Users, Pill, MessageSquare,
 } from 'lucide-react'
 import { BarChart, Bar, XAxis, YAxis, Tooltip as RTooltip, ResponsiveContainer, Cell } from 'recharts'
 import {
@@ -31,6 +31,7 @@ import { deriveToothConditions } from '../lib/toothConditions'
 import { ModuleHeader, ModuleStatCard, ReorderableStatGrid } from '../components/ModuleHeader'
 import { useConfirmAction } from '../components/ConfirmAction'
 import { h } from '../lib/haptics'
+import { chimes } from '../lib/chimes'
 import { findLinkedLabOrder, decideLabHandoff } from '../lib/labHandoff'
 import { calcEncounterTotal } from '../lib/finance'
 import { startingStepIndex, toothStepMode, seededSummary } from '../lib/treatmentWizardFlow'
@@ -517,7 +518,7 @@ export default function Treatments() {
   // grow into something more specialized later without being tangled up
   // with the treatment wizard's own code path.
   const handleQuickTreatStart = async () => {
-    if (!quickTreatPatientId) { showToast('error', 'انتخاب بیمار الزامی است'); return }
+    if (!quickTreatPatientId) { chimes.playWarning(); showToast('error', 'انتخاب بیمار الزامی است'); return }
     setSavingQuickTreat(true)
     try {
       const newEnc = await createEncounter({
@@ -526,6 +527,7 @@ export default function Treatments() {
         chief_complaint: null, diagnosis: null, treatment_plan: null, notes: null,
         status: 'in_progress', total_amount: 0, discount_amount: 0,
       } as any)
+      chimes.playSuccess()
       setQuickTreatModalOpen(false)
       await loadData()
       if (quickModalMode === 'visit') {
@@ -538,10 +540,11 @@ export default function Treatments() {
         // set but with a null patient, breaking the chart silently.
         const fresh = await fetchEncounters(quickTreatPatientId)
         const found = fresh.find((e) => e.id === newEnc.id)
-        if (!found) { showToast('error', 'ویزیت ساخته شد اما بارگذاری آن ناموفق بود — از لیست ویزیت‌ها باز کنید'); return }
+        if (!found) { chimes.playWarning(); showToast('error', 'ویزیت ساخته شد اما بارگذاری آن ناموفق بود — از لیست ویزیت‌ها باز کنید'); return }
         setDetailEnc(found)
         return
-      }      setTreatEncounterId(newEnc.id)
+      }
+      setTreatEncounterId(newEnc.id)
       setTreatPatientId(quickTreatPatientId)
       setEditingTreat(null)
       setTreatWizardStep(0)
@@ -557,6 +560,7 @@ export default function Treatments() {
       // showing a generic toast with no way to pin down what broke.
       console.error('handleQuickTreatStart failed:', err)
       logError(err, 'react', `quickModalMode=${quickModalMode}`)
+      chimes.playWarning()
       showToast('error', 'خطا در شروع — جزئیات در تنظیمات ← گزارش خطاها ثبت شد')
     }
     finally { setSavingQuickTreat(false) }
@@ -581,8 +585,8 @@ export default function Treatments() {
   }
 
   const handleSaveEncounter = () => {
-    if (!encForm.patient_id) { h.error(); showToast('error', 'انتخاب بیمار الزامی است'); return }
-    if (!encForm.doctor_id) { h.error(); showToast('error', 'انتخاب پزشک الزامی است'); return }
+    if (!encForm.patient_id) { chimes.playWarning(); h.error(); showToast('error', 'انتخاب بیمار الزامی است'); return }
+    if (!encForm.doctor_id) { chimes.playWarning(); h.error(); showToast('error', 'انتخاب پزشک الزامی است'); return }
     const patient = patientMap.get(encForm.patient_id)
     const payload = {
       patient_id: encForm.patient_id, doctor_id: encForm.doctor_id,
@@ -608,9 +612,17 @@ export default function Treatments() {
         setSavingEnc(true)
         try {
           let savedEnc: Encounter | null = null
-          if (editingEnc) { await updateEncounter(editingEnc.id, payload); showToast('success', 'ویزیت ویرایش شد') }
-          else { savedEnc = await createEncounter(payload); showToast('success', 'ویزیت ثبت شد — حالا می‌توانید از چارت دندانی، درمان‌ها را ثبت کنید') }
-          setEncModalOpen(false); await loadData()
+          if (editingEnc) {
+            await updateEncounter(editingEnc.id, payload)
+            chimes.playSuccess()
+            showToast('success', 'ویزیت ویرایش شد')
+          } else {
+            savedEnc = await createEncounter(payload)
+            chimes.playSuccess()
+            showToast('success', 'ویزیت ثبت شد — حالا می‌توانید از چارت دندانی، درمان‌ها را ثبت کنید')
+          }
+          setEncModalOpen(false)
+          await loadData()
           // Previously this just closed back to the plain list — a
           // brand-new visit had zero connection to the tooth-chart /
           // checkbox-based treatment planner that already exists on the
@@ -620,8 +632,12 @@ export default function Treatments() {
           if (savedEnc) {
             setDetailEnc({ ...savedEnc, patient: patient ?? null, doctor: doctors.find((d) => d.id === savedEnc!.doctor_id) ?? null } as any)
           }
-        } catch { showToast('error', 'خطا در ذخیره') }
-        finally { setSavingEnc(false) }
+        } catch {
+          chimes.playWarning()
+          showToast('error', 'خطا در ذخیره')
+        } finally {
+          setSavingEnc(false)
+        }
       },
     })
   }
@@ -641,8 +657,15 @@ export default function Treatments() {
       ],
       confirmLabel: 'تایید لغو',
       onConfirm: async () => {
-        try { await updateEncounter(e.id, { status: 'cancelled' }); showToast('success', 'ویزیت لغو شد — در تایم‌لاین باقی ماند'); await loadData() }
-        catch { showToast('error', 'خطا در لغو') }
+        try {
+          await updateEncounter(e.id, { status: 'cancelled' })
+          chimes.playPop()
+          showToast('success', 'ویزیت لغو شد — در تایم‌لاین باقی ماند')
+          await loadData()
+        } catch {
+          chimes.playWarning()
+          showToast('error', 'خطا در لغو')
+        }
       },
     })
   }
@@ -746,7 +769,7 @@ export default function Treatments() {
 
   const handleSaveTreatment = () => {
     if (!treatEncounterId || !treatPatientId) return
-    if (!treatForm.procedure_name.trim()) { showToast('error', 'نام رویه الزامی است'); return }
+    if (!treatForm.procedure_name.trim()) { chimes.playWarning(); showToast('error', 'نام رویه الزامی است'); return }
     const total = calcTotal()
     const payload = {
       encounter_id: treatEncounterId, patient_id: treatPatientId,
@@ -847,6 +870,7 @@ export default function Treatments() {
             await updateTreatment(editingTreat.id, payload)
             await applyLabAction()
             await syncEncounterTotal(treatEncounterId)
+            chimes.playSuccess()
             showToast('success', `درمان ویرایش شد${labMessage}`)
           } else {
             await createTreatment(payload)
@@ -854,6 +878,7 @@ export default function Treatments() {
             // Every save gets confirmation now. Previously a treatment
             // saved without a lab produced no toast at all, so the only
             // signal it worked was the modal closing.
+            chimes.playSuccess()
             showToast('success', `درمان ثبت شد${labMessage}`)
             // NOTE: intentionally NOT auto-creating a "payment" here. A
             // Payment record must represent money actually received —
@@ -880,7 +905,10 @@ export default function Treatments() {
             const found = updated.find((e) => e.id === detailEnc.id)
             if (found) setDetailEnc(found)
           }
-        } catch { showToast('error', 'خطا در ذخیره') }
+        } catch {
+          chimes.playWarning()
+          showToast('error', 'خطا در ذخیره')
+        }
         finally { setSavingTreat(false) }
       },
     })
@@ -926,10 +954,14 @@ export default function Treatments() {
           await updateTreatment(t.id, { status: 'cancelled' })
           if (linkedOrder) await updateLabOrder(linkedOrder.id, { status: 'cancelled' })
           if (t.encounter_id) await syncEncounterTotal(t.encounter_id)
+          chimes.playPop()
           showToast('success', linkedOrder ? 'درمان لغو و سفارش لابراتوار مرتبط لغو شد' : 'درمان لغو شد — در پرونده باقی ماند')
           await loadData()
         }
-        catch { showToast('error', 'خطا در لغو') }
+        catch {
+          chimes.playWarning()
+          showToast('error', 'خطا در لغو')
+        }
       },
     })
   }
@@ -945,10 +977,14 @@ export default function Treatments() {
       } else {
         await createToothRecord({ patient_id: detailEnc.patient_id, tooth_number: toothNumber, is_missing: data.is_missing, is_implant: data.is_implant, notes: data.notes } as any)
       }
+      chimes.playSuccess()
       h.success()
       const recs = await fetchToothRecords(detailEnc.patient_id)
       setToothRecords(recs)
-    } catch { showToast('error', 'خطا در ذخیره دندان') }
+    } catch {
+      chimes.playWarning()
+      showToast('error', 'خطا در ذخیره دندان')
+    }
   }
 
   // ── Render ────────────────────────────────────────────────────
@@ -1119,6 +1155,24 @@ export default function Treatments() {
                               </div>
                               <span className="text-xs font-bold text-slate-700 dark:text-slate-200 shrink-0">{e.total_amount ? `${formatCurrency(e.total_amount)} ت` : '—'}</span>
                               <div className="flex items-center gap-1 shrink-0" onClick={(ev) => ev.stopPropagation()}>
+                                {(() => {
+                                  const cleanPhone = p?.phone ? p.phone.replace(/\D/g, '').replace(/^0/, '98') : null
+                                  if (!cleanPhone) return null
+                                  const docTitle = e.doctor ? (e.doctor.name || e.doctor.specialty || 'پزشک') : 'پزشک'
+                                  const waText = `سلام ${name} عزیز،\nخلاصه ویزیت درمانی شما در کلینیک مینادنت:\nتاریخ ویزیت: ${toJalaliDisplay(e.encounter_date)}\nپزشک معالج: دکتر ${docTitle}${e.diagnosis ? `\nتشخیص: ${e.diagnosis}` : ''}${e.total_amount ? `\nمبلغ: ${formatCurrency(e.total_amount)} تومان` : ''}\nبا آرزوی تندرستی - کلینیک تخصصی مینادنت`
+                                  return (
+                                    <a
+                                      href={`https://wa.me/${cleanPhone}?text=${encodeURIComponent(waText)}`}
+                                      target="_blank"
+                                      rel="noopener noreferrer"
+                                      className="p-1 rounded-lg bg-emerald-50 text-emerald-600 hover:bg-emerald-100 transition-all-smooth"
+                                      title="ارسال خلاصه ویزیت در واتساپ"
+                                      onClick={() => chimes.playPop()}
+                                    >
+                                      <MessageSquare size={14} />
+                                    </a>
+                                  )
+                                })()}
                                 <button onClick={() => setDetailEnc(e)} aria-label="باز کردن ویزیت" className="p-1 rounded-lg bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-200"><Eye size={14} /></button>
                                 <button onClick={() => openEncEditModal(e)} aria-label="ویرایش ویزیت" className="p-1 rounded-lg bg-sky-50 text-sky-600 hover:bg-sky-100"><Edit2 size={14} /></button>
                                 <button onClick={() => handleDeleteEncounter(e)} aria-label="لغو ویزیت" title="لغو ویزیت" className="p-1 rounded-lg bg-rose-50 text-rose-500 hover:bg-rose-100"><Ban size={14} /></button>
@@ -1288,6 +1342,26 @@ export default function Treatments() {
               {detailEnc.diagnosis && <span className="text-xs text-slate-500">تشخیص: {detailEnc.diagnosis}</span>}
               {detailEnc.total_amount && <span className="text-xs font-bold text-slate-700">{formatCurrency(detailEnc.total_amount)} ت</span>}
               <div className="mr-auto flex items-center gap-2">
+                {(() => {
+                  const pPhone = detailEnc.patient?.phone || patientMap.get(detailEnc.patient_id)?.phone
+                  const cleanPhone = pPhone ? pPhone.replace(/\D/g, '').replace(/^0/, '98') : null
+                  if (!cleanPhone) return null
+                  const pName = encounterPatientName(detailEnc)
+                  const dName = encounterDoctorName(detailEnc)
+                  const waText = `سلام ${pName} عزیز،\nخلاصه وضعیت پرونده درمانی شما در کلینیک مینادنت:\nتاریخ ویزیت: ${toJalaliStringPretty(detailEnc.encounter_date)}\nپزشک معالج: ${dName}${detailEnc.diagnosis ? `\nتشخیص: ${detailEnc.diagnosis}` : ''}${detailEnc.total_amount ? `\nمبلغ خدمات: ${formatCurrency(detailEnc.total_amount)} تومان` : ''}\nبا تشکر از اعتماد شما - کلینیک مینادنت`
+                  return (
+                    <a
+                      href={`https://wa.me/${cleanPhone}?text=${encodeURIComponent(waText)}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="flex items-center gap-1.5 text-xs text-emerald-700 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 px-2.5 py-1.5 rounded-lg transition-all-smooth press-scale"
+                      title="ارسال پرونده در واتساپ"
+                      onClick={() => chimes.playPop()}
+                    >
+                      <MessageSquare size={14} /> ارسال در واتساپ
+                    </a>
+                  )
+                })()}
                 <Button
                   size="sm"
                   variant="secondary"
