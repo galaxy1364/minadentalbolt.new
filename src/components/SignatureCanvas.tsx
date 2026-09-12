@@ -1,6 +1,8 @@
 // SignatureCanvas.tsx — Touch and mouse enabled digital signature pad for tablet/mobile
 import React, { useRef, useState, useEffect, useCallback } from 'react'
 import { RotateCcw, Check, PenTool } from 'lucide-react'
+import { h } from '../lib/haptics'
+import { chimes } from '../lib/chimes'
 
 interface SignatureCanvasProps {
   value?: string | null
@@ -124,6 +126,7 @@ export function SignatureCanvas({ value, onChange, label = 'امضای دیجی�
       lastPointRef.current = null
       const dataUrl = canvas.toDataURL('image/png')
       lastDrawnValueRef.current = dataUrl
+      h.light()
       onChange(dataUrl)
     }
 
@@ -150,6 +153,8 @@ export function SignatureCanvas({ value, onChange, label = 'امضای دیجی�
   }, [onChange])
 
   const handleClear = () => {
+    h.delete()
+    chimes.playPop()
     const canvas = canvasRef.current
     if (!canvas) return
     const ctx = canvas.getContext('2d')
@@ -178,7 +183,7 @@ export function SignatureCanvas({ value, onChange, label = 'امضای دیجی�
           <button
             type="button"
             onClick={handleClear}
-            className="flex items-center gap-1 text-[11px] text-error-500 hover:text-error-600 font-medium transition-colors"
+            className="flex items-center gap-1 text-[11px] text-error-500 hover:text-error-600 font-medium transition-colors press-scale"
           >
             <RotateCcw size={12} />
             پاک کردن امضا
