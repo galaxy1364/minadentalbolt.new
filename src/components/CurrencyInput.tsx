@@ -4,6 +4,7 @@
 // while still emitting/accepting a plain numeric string ('8000000')
 // so all existing save/calculation logic needs zero changes.
 import { useState, useEffect } from 'react'
+import { toEnglishDigits } from '../lib/persianDate'
 
 interface CurrencyInputProps {
   label?: string
@@ -34,7 +35,8 @@ export function CurrencyInput({ label, value, onChange, placeholder = '0', class
         dir="ltr"
         value={display}
         onChange={(e) => {
-          const digitsOnly = e.target.value.replace(/[^\d]/g, '')
+          const raw = toEnglishDigits(e.target.value)
+          const digitsOnly = raw.replace(/[^\d]/g, '')
           setDisplay(formatWithCommas(digitsOnly))
           onChange(digitsOnly)
         }}

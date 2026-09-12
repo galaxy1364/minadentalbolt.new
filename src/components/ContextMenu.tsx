@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react'
 import { createPortal } from 'react-dom'
 import { h } from '../lib/haptics'
+import { chimes } from '../lib/chimes'
 
 /**
  * iOS 27 Context Menu
@@ -29,6 +30,7 @@ export function useContextMenu(items: ContextMenuItem[]) {
 
   const open = useCallback((x: number, y: number) => {
     h.medium()
+    chimes.playPop()
     const menuWidth = 200
     const menuHeight = items.length * 44 + 16
     const clampedX = Math.min(Math.max(x - menuWidth / 2, 8), window.innerWidth - menuWidth - 8)
@@ -103,7 +105,12 @@ function ContextMenuOverlay({
           <button
             key={i}
             role="menuitem"
-            onClick={() => { h.select(); item.onClick(); onClose() }}
+            onClick={() => {
+              h.select()
+              chimes.playPop()
+              item.onClick()
+              onClose()
+            }}
             className={`w-full flex items-center gap-3 px-4 py-2.5 text-sm font-medium transition-colors hover:bg-slate-100/80 dark:hover:bg-slate-700/80 press-scale ${
               item.variant === 'danger'
                 ? 'text-error-600 dark:text-error-400'
