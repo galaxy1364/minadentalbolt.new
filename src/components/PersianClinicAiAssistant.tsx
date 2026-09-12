@@ -35,6 +35,7 @@ import {
 import { buildSchedule } from '../lib/installments'
 import { toPersianDigits, formatCurrency, toJalaliStringPretty } from '../lib/persianDate'
 import { h } from '../lib/haptics'
+import { chimes } from '../lib/chimes'
 import { showToast } from './ui'
 import { CLINIC_ID } from '../lib/supabase'
 
@@ -99,11 +100,13 @@ export function PersianClinicAiAssistant() {
         }
         setIsListening(false)
         h.confirm()
+        chimes.playPop()
       }
 
       recognizer.onerror = () => {
         setIsListening(false)
         h.warning()
+        chimes.playWarning()
       }
 
       recognizer.onend = () => {
@@ -116,6 +119,7 @@ export function PersianClinicAiAssistant() {
 
   const toggleListening = () => {
     if (!recognitionRef.current) {
+      chimes.playWarning()
       showToast('info', 'تشخیص گفتار در این مرورگر پشتیبانی نمی‌شود. لطفاً دستور را تایپ کنید.')
       return
     }
@@ -124,11 +128,13 @@ export function PersianClinicAiAssistant() {
       recognitionRef.current.stop()
       setIsListening(false)
       h.tap()
+      chimes.playPop()
     } else {
       try {
         recognitionRef.current.start()
         setIsListening(true)
         h.select()
+        chimes.playPop()
       } catch {
         setIsListening(false)
       }
@@ -138,6 +144,7 @@ export function PersianClinicAiAssistant() {
   const handleParse = (textToParse: string) => {
     if (!textToParse.trim()) return
     h.select()
+    chimes.playPop()
     const action = parseClinicCommand(textToParse)
     setParsedAction(action)
     setExecutionResult(null)
@@ -297,6 +304,7 @@ export function PersianClinicAiAssistant() {
       }
 
       h.confirm()
+      chimes.playSuccess()
       setExecutionResult({
         success: true,
         message: `عملیات با موفقیت در پرونده «${patient.first_name} ${patient.last_name}» ثبت گردید.`,
@@ -305,6 +313,7 @@ export function PersianClinicAiAssistant() {
       showToast('success', 'عملیات هوشمند با موفقیت انجام شد')
     } catch (err: any) {
       h.warning()
+      chimes.playWarning()
       setExecutionResult({
         success: false,
         message: err.message || 'خطا در ثبت اطلاعات در سامانه',
@@ -337,10 +346,11 @@ export function PersianClinicAiAssistant() {
         <button
           onClick={() => {
             h.select()
+            chimes.playPop()
             setIsOpen(true)
             setTimeout(() => inputRef.current?.focus(), 150)
           }}
-          className="group relative flex items-center gap-2.5 px-4 py-3 rounded-full bg-slate-900/80 dark:bg-white/90 text-white dark:text-slate-900 shadow-2xl backdrop-blur-xl border border-white/20 dark:border-slate-800/30 transition-all-smooth hover:scale-105 active:scale-95"
+          className="group relative flex items-center gap-2.5 px-4 py-3 rounded-full bg-slate-900/80 dark:bg-white/90 text-white dark:text-slate-900 shadow-2xl backdrop-blur-xl border border-white/20 dark:border-slate-800/30 transition-all-smooth hover:scale-105 active:scale-95 press-scale"
           title="دستیار هوشمند صوتی و متنی کلینیک مینا"
         >
           <div className="relative flex items-center justify-center">
@@ -380,9 +390,10 @@ export function PersianClinicAiAssistant() {
               <button
                 onClick={() => {
                   h.tap()
+                  chimes.playPop()
                   setIsOpen(false)
                 }}
-                className="w-8 h-8 rounded-full flex items-center justify-center text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition"
+                className="w-8 h-8 rounded-full flex items-center justify-center text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition press-scale"
               >
                 <X size={18} />
               </button>
@@ -455,7 +466,7 @@ export function PersianClinicAiAssistant() {
                     <button
                       key={idx}
                       onClick={() => handleQuickPrompt(chip)}
-                      className="text-[11px] px-2.5 py-1.5 rounded-xl bg-slate-100 hover:bg-primary-50 dark:bg-slate-800 dark:hover:bg-primary-950/40 text-slate-600 dark:text-slate-300 hover:text-primary-600 dark:hover:text-primary-400 border border-slate-200/60 dark:border-slate-700/60 transition text-right"
+                      className="text-[11px] px-2.5 py-1.5 rounded-xl bg-slate-100 hover:bg-primary-50 dark:bg-slate-800 dark:hover:bg-primary-950/40 text-slate-600 dark:text-slate-300 hover:text-primary-600 dark:hover:text-primary-400 border border-slate-200/60 dark:border-slate-700/60 transition text-right press-scale"
                     >
                       {chip}
                     </button>
@@ -511,14 +522,14 @@ export function PersianClinicAiAssistant() {
                     <button
                       onClick={handleConfirmAndExecute}
                       disabled={isExecuting}
-                      className="flex-1 py-2.5 rounded-xl bg-primary-600 hover:bg-primary-700 active:scale-95 text-white font-bold text-xs flex items-center justify-center gap-1.5 shadow-md transition disabled:opacity-50"
+                      className="flex-1 py-2.5 rounded-xl bg-primary-600 hover:bg-primary-700 active:scale-95 text-white font-bold text-xs flex items-center justify-center gap-1.5 shadow-md transition disabled:opacity-50 press-scale"
                     >
                       <CheckCircle2 size={16} />
                       {isExecuting ? 'در حال ثبت در پرونده...' : 'تأیید و اعمال نهایی'}
                     </button>
                     <button
-                      onClick={() => setParsedAction(null)}
-                      className="py-2.5 px-4 rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 font-medium text-xs transition"
+                      onClick={() => { chimes.playPop(); setParsedAction(null) }}
+                      className="py-2.5 px-4 rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 font-medium text-xs transition press-scale"
                     >
                       ویرایش / انصراف
                     </button>
