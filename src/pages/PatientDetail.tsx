@@ -22,6 +22,7 @@ import { PersianDateInput } from '../components/PersianDateInput'
 import { calcPlanProgress, groupByTooth, nextStatus } from '../lib/treatmentPlan'
 import { useConfirmAction } from '../components/ConfirmAction'
 import { h } from '../lib/haptics'
+import { chimes } from '../lib/chimes'
 import { calculateAge } from '../lib/patientUtils'
 import { db } from '../lib/db'
 import type { AuditLogEntry } from '../lib/db'
@@ -409,9 +410,11 @@ export default function PatientDetail() {
       const updated = await updatePatient(patient.id, payload)
       setPatient(updated)
       setEditModalOpen(false)
+      chimes.playSuccess()
       showToast('success', 'اطلاعات بیمار ویرایش شد')
     } catch (err) {
       console.error('Error saving patient:', err)
+      chimes.playWarning()
       showToast('error', 'خطا در ذخیره اطلاعات')
     } finally {
       setSaving(false)
@@ -428,9 +431,11 @@ export default function PatientDetail() {
       } else {
         await createToothRecord({ patient_id: patient.id, tooth_number: toothNumber, ...payload } as any)
       }
+      chimes.playSuccess()
       showToast('success', 'رکورد دندان ذخیره شد')
       await loadTabData()
     } catch (err) {
+      chimes.playWarning()
       showToast('error', 'خطا در ذخیره رکورد دندان')
     }
   }
@@ -575,11 +580,12 @@ export default function PatientDetail() {
         try {
           if (editingPhase) await updateTreatmentPhase(editingPhase.id, payload)
           else await createTreatmentPhase(payload)
+          chimes.playSuccess()
           showToast('success', editingPhase ? 'ویرایش شد' : 'فاز اضافه شد')
           setPhaseModalOpen(false)
           const updated = await fetchTreatmentPhases(id)
           setPhases(updated.sort((a, b) => a.phase_number - b.phase_number))
-        } catch { showToast('error', 'خطا در ذخیره') }
+        } catch { chimes.playWarning(); showToast('error', 'خطا در ذخیره') }
         finally { setSavingPhase(false) }
       },
     })
@@ -687,10 +693,11 @@ export default function PatientDetail() {
         try {
           if (editingConsent) await updateConsentForm(editingConsent.id, payload)
           else await createConsentForm(payload)
+          chimes.playSuccess()
           showToast('success', editingConsent ? 'ویرایش شد' : 'ثبت شد')
           setConsentModalOpen(false)
           if (id) setConsentForms((await fetchConsentForms(id)).filter((c) => c.is_active !== false))
-        } catch { showToast('error', 'خطا در ذخیره') }
+        } catch { chimes.playWarning(); showToast('error', 'خطا در ذخیره') }
         finally { setSavingConsent(false) }
       },
     })
@@ -752,11 +759,13 @@ export default function PatientDetail() {
         created_by: null,
       })
       h.confirm()
+      chimes.playSuccess()
       showToast('success', 'پرداخت با موفقیت ثبت و در پرونده اعمال شد')
       setPaymentModalOpen(false)
       loadTabData()
     } catch (err) {
       console.error(err)
+      chimes.playWarning()
       showToast('error', 'خطا در ثبت پرداخت')
     } finally {
       setSavingPayment(false)
@@ -818,11 +827,13 @@ export default function PatientDetail() {
         created_by: null,
       })
       h.confirm()
+      chimes.playSuccess()
       showToast('success', 'چک صیادی با موفقیت ثبت شد')
       setChequeModalOpen(false)
       loadTabData()
     } catch (err) {
       console.error(err)
+      chimes.playWarning()
       showToast('error', 'خطا در ثبت چک صیادی')
     } finally {
       setSavingCheque(false)
@@ -903,11 +914,13 @@ export default function PatientDetail() {
         guaranteeCheque
       )
       h.confirm()
+      chimes.playSuccess()
       showToast('success', 'طرح اقساط با موفقیت ثبت شد')
       setPlanModalOpen(false)
       loadTabData()
     } catch (err) {
       console.error(err)
+      chimes.playWarning()
       showToast('error', 'خطا در ثبت طرح اقساط')
     } finally {
       setSavingPlan(false)
@@ -947,10 +960,12 @@ export default function PatientDetail() {
             notes: `پرداخت قسط شماره ${installment.installment_number} (طرح اقساط)`,
           })
           h.confirm()
+          chimes.playSuccess()
           showToast('success', `قسط شماره ${toPersianDigits(installment.installment_number ?? 1)} وصول و در حساب بیمار اعمال شد`)
           loadTabData()
         } catch (err) {
           console.error(err)
+          chimes.playWarning()
           showToast('error', 'خطا در ثبت تسویه قسط')
         }
       },
@@ -989,10 +1004,12 @@ export default function PatientDetail() {
             notes: `وصول چک صیادی ${cheque.bank_name || ''} - شماره ${cheque.cheque_number || ''}`,
           })
           h.confirm()
+          chimes.playSuccess()
           showToast('success', 'چک صیادی با موفقیت وصول شد و در حساب بیمار منظور گردید')
           loadTabData()
         } catch (err) {
           console.error(err)
+          chimes.playWarning()
           showToast('error', 'خطا در ثبت وصول چک')
         }
       },
@@ -1016,6 +1033,7 @@ export default function PatientDetail() {
             status: 'bounced',
           })
           h.warning()
+          chimes.playAlarm()
           showToast('error', 'چک به عنوان برگشتی علامت‌گذاری شد')
           loadTabData()
         } catch (err) {
@@ -1198,8 +1216,10 @@ export default function PatientDetail() {
                 try {
                   const updated = await updatePatient(patient.id, { is_active: true } as any)
                   setPatient(updated)
+                  chimes.playSuccess()
                   showToast('success', 'پرونده با موفقیت از بایگانی خارج و فعال شد')
                 } catch {
+                  chimes.playWarning()
                   showToast('error', 'خطا در فعال‌سازی پرونده')
                 }
               }}
