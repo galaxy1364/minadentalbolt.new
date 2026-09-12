@@ -208,6 +208,7 @@ export default function WaitingList() {
           } catch {
             // SMS failure is silent
           }
+        }
         try { 
           await updateWaitingEntry(e.id, updates as any); 
           chimes.playSuccess();
