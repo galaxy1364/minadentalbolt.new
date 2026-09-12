@@ -6,6 +6,7 @@
 import { useRef, useState } from 'react'
 import { Camera, X, User } from 'lucide-react'
 import { h } from '../lib/haptics'
+import { chimes } from '../lib/chimes'
 
 function compressImage(file: File, maxSize = 320): Promise<string> {
   return new Promise((resolve, reject) => {
@@ -41,8 +42,10 @@ export function PatientPhotoUpload({ value, onChange }: { value: string; onChang
       const dataUrl = await compressImage(file)
       onChange(dataUrl)
       h.success()
+      chimes.playSuccess()
     } catch {
       h.error()
+      chimes.playWarning()
     } finally {
       setLoading(false)
     }
@@ -61,8 +64,12 @@ export function PatientPhotoUpload({ value, onChange }: { value: string; onChang
         {value && (
           <button
             type="button"
-            onClick={() => { h.tap(); onChange('') }}
-            className="absolute -top-1.5 -left-1.5 w-6 h-6 rounded-full bg-error-500 text-white flex items-center justify-center shadow"
+            onClick={() => {
+              h.delete()
+              chimes.playPop()
+              onChange('')
+            }}
+            className="absolute -top-1.5 -left-1.5 w-6 h-6 rounded-full bg-error-500 text-white flex items-center justify-center shadow transition-all press-scale"
           >
             <X size={12} />
           </button>
@@ -71,9 +78,13 @@ export function PatientPhotoUpload({ value, onChange }: { value: string; onChang
       <div>
         <button
           type="button"
-          onClick={() => { h.tap(); fileInputRef.current?.click() }}
+          onClick={() => {
+            h.tap()
+            chimes.playPop()
+            fileInputRef.current?.click()
+          }}
           disabled={loading}
-          className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-primary-50 dark:bg-primary-900/30 text-primary-700 dark:text-primary-400 text-xs font-bold disabled:opacity-50"
+          className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-primary-50 dark:bg-primary-900/30 text-primary-700 dark:text-primary-400 text-xs font-bold disabled:opacity-50 transition-all press-scale"
         >
           <Camera size={14} /> {loading ? 'در حال پردازش...' : value ? 'تغییر عکس' : 'افزودن عکس'}
         </button>

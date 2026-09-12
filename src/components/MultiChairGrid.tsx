@@ -14,6 +14,8 @@ import {
 import { AppointmentWithRelations, Unit, Doctor } from '../types'
 import { toJalaliStringPretty, toPersianDigits, getJalaliDateInfo, persianWeekdaysShort } from '../lib/persianDate'
 import { doctorColor } from '../lib/doctorColors'
+import { h } from '../lib/haptics'
+import { chimes } from '../lib/chimes'
 
 interface MultiChairGridProps {
   selectedDate: string
@@ -48,6 +50,8 @@ export function MultiChairGrid({
 
   // Navigate date
   const changeDateByDays = (days: number) => {
+    h.tap()
+    chimes.playPop()
     const d = new Date(selectedDate)
     d.setDate(d.getDate() + days)
     onDateChange(d.toISOString().slice(0, 10))
@@ -91,15 +95,19 @@ export function MultiChairGrid({
           <button
             type="button"
             onClick={() => changeDateByDays(1)}
-            className="p-1.5 rounded-xl border border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800 transition-all text-slate-600 dark:text-slate-300"
+            className="p-1.5 rounded-xl border border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800 transition-all text-slate-600 dark:text-slate-300 press-scale"
             title="روز بعد"
           >
             <ChevronRight size={16} />
           </button>
           <button
             type="button"
-            onClick={() => onDateChange(new Date().toISOString().slice(0, 10))}
-            className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${
+            onClick={() => {
+              h.tap()
+              chimes.playPop()
+              onDateChange(new Date().toISOString().slice(0, 10))
+            }}
+            className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all press-scale ${
               isToday
                 ? 'bg-primary-600 text-white shadow-sm'
                 : 'bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-200'
@@ -110,7 +118,7 @@ export function MultiChairGrid({
           <button
             type="button"
             onClick={() => changeDateByDays(-1)}
-            className="p-1.5 rounded-xl border border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800 transition-all text-slate-600 dark:text-slate-300"
+            className="p-1.5 rounded-xl border border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800 transition-all text-slate-600 dark:text-slate-300 press-scale"
             title="روز قبل"
           >
             <ChevronLeft size={16} />
@@ -130,8 +138,12 @@ export function MultiChairGrid({
         <div className="flex items-center gap-1 bg-slate-100 dark:bg-slate-800 p-1 rounded-xl text-xs">
           <button
             type="button"
-            onClick={() => setGroupBy('unit')}
-            className={`flex items-center gap-1 px-2.5 py-1 rounded-lg font-medium transition-all ${
+            onClick={() => {
+              h.toggle()
+              chimes.playPop()
+              setGroupBy('unit')
+            }}
+            className={`flex items-center gap-1 px-2.5 py-1 rounded-lg font-medium transition-all press-scale ${
               groupBy === 'unit'
                 ? 'bg-white dark:bg-slate-700 text-primary-600 dark:text-primary-300 shadow-sm'
                 : 'text-slate-600 dark:text-slate-400 hover:text-slate-800'
@@ -142,8 +154,12 @@ export function MultiChairGrid({
           </button>
           <button
             type="button"
-            onClick={() => setGroupBy('doctor')}
-            className={`flex items-center gap-1 px-2.5 py-1 rounded-lg font-medium transition-all ${
+            onClick={() => {
+              h.toggle()
+              chimes.playPop()
+              setGroupBy('doctor')
+            }}
+            className={`flex items-center gap-1 px-2.5 py-1 rounded-lg font-medium transition-all press-scale ${
               groupBy === 'doctor'
                 ? 'bg-white dark:bg-slate-700 text-primary-600 dark:text-primary-300 shadow-sm'
                 : 'text-slate-600 dark:text-slate-400 hover:text-slate-800'
@@ -219,7 +235,11 @@ export function MultiChairGrid({
                               return (
                                 <div
                                   key={appt.id}
-                                  onClick={() => onSelectAppointment(appt)}
+                                  onClick={() => {
+                                    h.tap()
+                                    chimes.playPop()
+                                    onSelectAppointment(appt)
+                                  }}
                                   className="p-2 rounded-xl border border-primary-200 dark:border-primary-800 bg-white dark:bg-slate-800 shadow-sm hover:shadow-md cursor-pointer transition-all-smooth press-scale"
                                   style={{
                                     borderRightWidth: '4px',
@@ -257,15 +277,17 @@ export function MultiChairGrid({
                         ) : (
                           <button
                             type="button"
-                            onClick={() =>
+                            onClick={() => {
+                              h.select()
+                              chimes.playPop()
                               onNewAppointmentAtSlot(
                                 selectedDate,
                                 hour,
                                 groupBy === 'unit' ? col.id : undefined,
                                 groupBy === 'doctor' ? col.id : undefined
                               )
-                            }
-                            className="w-full h-full min-h-[38px] rounded-lg opacity-0 group-hover:opacity-100 flex items-center justify-center gap-1 text-[10px] font-bold text-primary-600 dark:text-primary-400 hover:bg-primary-50 dark:hover:bg-primary-950/40 transition-all border border-dashed border-primary-300 dark:border-primary-700"
+                            }}
+                            className="w-full h-full min-h-[38px] rounded-lg opacity-0 group-hover:opacity-100 flex items-center justify-center gap-1 text-[10px] font-bold text-primary-600 dark:text-primary-400 hover:bg-primary-50 dark:hover:bg-primary-950/40 transition-all border border-dashed border-primary-300 dark:border-primary-700 press-scale"
                           >
                             <Plus size={12} />
                             رزرو {toPersianDigits(hour)}
