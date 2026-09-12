@@ -92,8 +92,8 @@ export function PersianClinicAiAssistant() {
         const parsed = JSON.parse(saved)
         if (typeof parsed.x === 'number' && typeof parsed.y === 'number') {
           return {
-            x: Math.max(12, Math.min(parsed.x, (typeof window !== 'undefined' ? window.innerWidth : 1024) - 180)),
-            y: Math.max(12, Math.min(parsed.y, (typeof window !== 'undefined' ? window.innerHeight : 768) - 70)),
+            x: Math.max(12, Math.min(parsed.x, (typeof window !== 'undefined' ? window.innerWidth : 1024) - 68)),
+            y: Math.max(12, Math.min(parsed.y, (typeof window !== 'undefined' ? window.innerHeight : 768) - 68)),
           }
         }
       }
@@ -118,8 +118,8 @@ export function PersianClinicAiAssistant() {
   useEffect(() => {
     const handleResize = () => {
       setPos((prev) => {
-        const btnWidth = triggerRef.current?.offsetWidth || 180
-        const btnHeight = triggerRef.current?.offsetHeight || 50
+        const btnWidth = triggerRef.current?.offsetWidth || 56
+        const btnHeight = triggerRef.current?.offsetHeight || 56
         const newX = Math.max(12, Math.min(prev.x, window.innerWidth - btnWidth - 12))
         const newY = Math.max(12, Math.min(prev.y, window.innerHeight - btnHeight - 12))
         if (newX !== prev.x || newY !== prev.y) {
@@ -164,8 +164,8 @@ export function PersianClinicAiAssistant() {
     }
 
     if (dragRef.current.hasMoved) {
-      const btnWidth = triggerRef.current?.offsetWidth || 180
-      const btnHeight = triggerRef.current?.offsetHeight || 50
+      const btnWidth = triggerRef.current?.offsetWidth || 56
+      const btnHeight = triggerRef.current?.offsetHeight || 56
       const newX = Math.max(8, Math.min(dragRef.current.initialX + dx, window.innerWidth - btnWidth - 8))
       const newY = Math.max(8, Math.min(dragRef.current.initialY + dy, window.innerHeight - btnHeight - 8))
       setPos({ x: newX, y: newY })
@@ -454,7 +454,7 @@ export function PersianClinicAiAssistant() {
 
   return (
     <>
-      {/* Floating Draggable iOS 27 Glassmorphic Action Trigger */}
+      {/* Floating Draggable 3D Living AI Sphere (Apple Intelligence Aesthetic) */}
       <div
         ref={triggerRef}
         style={{
@@ -465,7 +465,7 @@ export function PersianClinicAiAssistant() {
           touchAction: 'none',
         }}
         className={`select-none transition-transform duration-75 ${
-          isDragging ? 'cursor-grabbing scale-105 opacity-90' : 'cursor-grab'
+          isDragging ? 'cursor-grabbing scale-110' : 'cursor-grab'
         }`}
         onPointerDown={handlePointerDown}
         onPointerMove={handlePointerMove}
@@ -476,30 +476,44 @@ export function PersianClinicAiAssistant() {
         }}
       >
         <div
-          className="group relative flex items-center gap-2.5 px-3.5 py-2.5 sm:px-4 sm:py-3 rounded-full bg-slate-900/90 dark:bg-white/95 text-white dark:text-slate-900 shadow-2xl backdrop-blur-xl border border-white/20 dark:border-slate-800/30 hover:scale-105 active:scale-95 transition-all-smooth"
-          title="دستیار هوشمند مینا (برای جابجایی بکشید / برای گفتگو کلیک کنید)"
+          className="group relative w-12 h-12 sm:w-13 sm:h-13 rounded-full flex items-center justify-center transition-all-smooth hover:scale-110 active:scale-95"
+          title="دستیار هوشمند مینا (برای جابجایی بکشید / برای گفتگو لمس کنید)"
         >
-          {/* iOS-style drag grip dots */}
-          <div className="flex flex-col gap-0.5 opacity-40 group-hover:opacity-80 transition-opacity -mr-1">
-            <div className="flex gap-0.5">
-              <span className="w-1 h-1 rounded-full bg-current" />
-              <span className="w-1 h-1 rounded-full bg-current" />
-            </div>
-            <div className="flex gap-0.5">
-              <span className="w-1 h-1 rounded-full bg-current" />
-              <span className="w-1 h-1 rounded-full bg-current" />
-            </div>
-          </div>
+          {/* 1. Living Breathing Ambient Glow */}
+          <div className="absolute -inset-1 rounded-full bg-gradient-to-tr from-sky-500/50 via-indigo-500/50 to-purple-500/50 blur-md opacity-75 group-hover:opacity-100 animate-pulse pointer-events-none" />
 
-          <div className="relative flex items-center justify-center pointer-events-none">
-            <span className="absolute w-7 h-7 rounded-full bg-primary-400/40 animate-ping pointer-events-none" />
-            <div className="w-6 h-6 rounded-full bg-gradient-to-tr from-primary-500 to-indigo-500 flex items-center justify-center text-white shadow">
-              <Sparkles size={14} className="animate-spin-slow" />
+          {/* 2. Rotating Holographic Spectrum Ring */}
+          <div className="absolute -inset-0.5 rounded-full p-[1.5px] bg-gradient-to-r from-teal-400 via-sky-400 via-indigo-500 to-fuchsia-500 animate-spin-slow opacity-85 pointer-events-none" />
+
+          {/* 3. 3D Crystal Core Sphere */}
+          <div
+            className="relative w-full h-full rounded-full overflow-hidden flex items-center justify-center shadow-2xl ring-1 ring-white/40 dark:ring-white/20"
+            style={{
+              background: 'radial-gradient(circle at 35% 30%, #38bdf8 0%, #6366f1 45%, #8b5cf6 75%, #0f172a 100%)',
+              boxShadow: 'inset 0 2px 4px rgba(255,255,255,0.6), inset 0 -3px 6px rgba(0,0,0,0.5), 0 8px 20px -2px rgba(99,102,241,0.5)',
+            }}
+          >
+            {/* 4. Top 3D Specular Glass Reflection */}
+            <div
+              className="absolute top-1 left-1.5 w-6 h-2.5 rounded-full opacity-65 pointer-events-none"
+              style={{
+                background: 'radial-gradient(ellipse at center, rgba(255,255,255,0.85) 0%, rgba(255,255,255,0) 80%)',
+                transform: 'rotate(-20deg)',
+              }}
+            />
+
+            {/* 5. Central AI Star / Sparkles Icon with Glow */}
+            <div className="relative flex items-center justify-center text-white drop-shadow-[0_0_8px_rgba(255,255,255,0.9)] pointer-events-none">
+              <Sparkles size={21} className="animate-spin-slow" />
+            </div>
+
+            {/* 6. Discreet Micro-Grip Dots on bottom edge */}
+            <div className="absolute bottom-1 flex gap-0.5 opacity-40 pointer-events-none">
+              <span className="w-0.5 h-0.5 rounded-full bg-white/70" />
+              <span className="w-0.5 h-0.5 rounded-full bg-white/70" />
+              <span className="w-0.5 h-0.5 rounded-full bg-white/70" />
             </div>
           </div>
-          <span className="text-xs font-black tracking-tight pointer-events-none">
-            دستیار هوشمند مینا
-          </span>
         </div>
       </div>
 
