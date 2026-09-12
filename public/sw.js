@@ -115,6 +115,11 @@ self.addEventListener('fetch', (event) => {
   }
 
   if (url.origin === self.location.origin) {
+    // MOD-UPDATE-001: Never intercept or cache version.json — must always be fetched fresh from network
+    if (url.pathname === '/version.json') {
+      return
+    }
+
     if (request.mode === 'navigate') {
       event.respondWith(
         fetch(request)
