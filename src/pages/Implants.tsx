@@ -8,7 +8,7 @@ import { implantMilestones, nextImplantAction, implantDeadline, IMPLANT_MILESTON
 import { PatientSelect } from '../components/PatientSelect'
 import { toothLabel, toothLabelWithWord } from '../lib/toothLabel'
 import { useNavigate, useLocation } from 'react-router-dom'
-import { Smile, Plus, Search, Edit2, Eye, Filter, Package, Calendar, DollarSign, ShieldCheck, AlertTriangle, CheckCircle2, Clock, Activity, Layers, CalendarClock, ScanLine, Archive, Ban, X, ChevronLeft } from 'lucide-react'
+import { Smile, Plus, Search, Edit2, Eye, Filter, Package, Calendar, DollarSign, ShieldCheck, AlertTriangle, CheckCircle2, Clock, Activity, Layers, CalendarClock, ScanLine, Archive, Ban, X, ChevronLeft, MessageSquare } from 'lucide-react'
 import { downloadICSReminder } from '../lib/icsReminder'
 import { fetchImplantCases, createImplantCase, updateImplantCase, createImplantComponent, deactivateImplantComponent, fetchPatients, fetchDoctors, createExpense, fetchInventoryItems, fetchImplantCostItems, createImplantCostItem, updateImplantCostItem, fetchLabOrders } from '../lib/api'
 import { calcSurgeryShare, validateImplantCase, caseFinancials } from '../lib/implants'
@@ -16,6 +16,7 @@ import { BarcodeScanner } from '../components/BarcodeScanner'
 import { CLINIC_ID } from '../lib/supabase'
 import { toJalaliDisplay, toJalaliStringPretty, formatCurrency, formatNumber, toPersianDigits } from '../lib/persianDate'
 import { h } from '../lib/haptics'
+import { chimes } from '../lib/chimes'
 import { useConfirmAction } from '../components/ConfirmAction'
 import { ImplantCase, ImplantCaseWithRelations, ImplantComponent, Patient, Doctor, ImplantCostItem, LabOrder } from '../types'
 import { Wizard, Card, Button, Input, Select, Textarea, Badge, Spinner, EmptyState, showToast } from '../components/ui'
@@ -345,11 +346,23 @@ export default function Implants() {
         return
       }
       if (step === 'healing') { openEditCaseModal(c); return }
-      if (step === 'opg') { await updateImplantCase(c.id, { opg_reminder_date: today } as never); showToast('success', 'عکس OPG ثبت شد') }
-      else if (step === 'lab') { sendToLab(c); return }
-      else if (step === 'delivered') { await updateImplantCase(c.id, { crown_delivery_date: today } as never); showToast('success', 'تحویل روکش ثبت شد') }
+      if (step === 'opg') {
+        await updateImplantCase(c.id, { opg_reminder_date: today } as never)
+        chimes.playSuccess()
+        showToast('success', 'عکس OPG ثبت شد')
+      } else if (step === 'lab') {
+        sendToLab(c)
+        return
+      } else if (step === 'delivered') {
+        await updateImplantCase(c.id, { crown_delivery_date: today } as never)
+        chimes.playSuccess()
+        showToast('success', 'تحویل روکش ثبت شد')
+      }
       await loadData()
-    } catch { showToast('error', 'خطا در ثبت این گام') }
+    } catch {
+      chimes.playWarning()
+      showToast('error', 'خطا در ثبت این گام')
+    }
   }
 
   const sendToLab = (c: ImplantCaseWithRelations) => {
@@ -415,8 +428,15 @@ export default function Implants() {
       ],
       confirmLabel: 'غیرفعال کن',
       onConfirm: async () => {
-        try { await deactivateImplantComponent(comp.id); showToast('success', 'کامپوننت غیرفعال شد'); await loadData() }
-        catch { showToast('error', 'خطا در غیرفعال‌سازی') }
+        try {
+          await deactivateImplantComponent(comp.id)
+          chimes.playPop()
+          showToast('success', 'کامپوننت غیرفعال شد')
+          await loadData()
+        } catch {
+          chimes.playWarning()
+          showToast('error', 'خطا در غیرفعال‌سازی')
+        }
       },
     })
   }
@@ -458,9 +478,13 @@ export default function Implants() {
             description: `دستمزد جراحی ایمپلنت — ${patientName(c)} — دکتر ${doctorName}`,
           } as any)
           await updateImplantCase(c.id, { surgery_settled: true })
+          chimes.playSuccess()
           showToast('success', 'تسویه ثبت شد و در هزینه‌های کلینیک لحاظ شد')
           await loadData()
-        } catch { showToast('error', 'خطا در ثبت تسویه') }
+        } catch {
+          chimes.playWarning()
+          showToast('error', 'خطا در ثبت تسویه')
+        }
       },
     })
   }
@@ -489,16 +513,20 @@ export default function Implants() {
             description: `دستمزد پروتز ایمپلنت — ${patientName(c)} — دکتر ${doctorName}`,
           } as any)
           await updateImplantCase(c.id, { prosthesis_settled: true })
+          chimes.playSuccess()
           showToast('success', 'تسویه ثبت شد و در هزینه‌های کلینیک لحاظ شد')
           await loadData()
-        } catch { showToast('error', 'خطا در ثبت تسویه') }
+        } catch {
+          chimes.playWarning()
+          showToast('error', 'خطا در ثبت تسویه')
+        }
       },
     })
   }
 
   const handleSaveCase = () => {
-    if (!caseForm.patient_id) { showToast('error', 'انتخاب بیمار الزامی است'); return }
-    if (!caseForm.tooth_number.trim()) { showToast('error', 'شماره دندان الزامی است'); return }
+    if (!caseForm.patient_id) { chimes.playWarning(); showToast('error', 'انتخاب بیمار الزامی است'); return }
+    if (!caseForm.tooth_number.trim()) { chimes.playWarning(); showToast('error', 'شماره دندان الزامی است'); return }
     const payload = {
       patient_id: caseForm.patient_id, doctor_id: caseForm.doctor_id || null,
       tooth_number: caseForm.tooth_number, brand: caseForm.brand === 'other' ? (caseForm.custom_brand.trim() || 'سایر') : (caseForm.brand || null),
@@ -526,7 +554,7 @@ export default function Implants() {
     // were both accepted before, and those dates drive the warranty
     // window and the healing interval.
     const caseErrors = validateImplantCase(payload)
-    if (caseErrors.length) { showToast('error', caseErrors[0]); return }
+    if (caseErrors.length) { chimes.playWarning(); showToast('error', caseErrors[0]); return }
 
     const patient = patients.find((p) => p.id === caseForm.patient_id)
     confirmAction({
@@ -549,9 +577,13 @@ export default function Implants() {
           // MOD-FEAT-040: lines save with the case, in the same action — the
           // doctor modal taught us what a second save button does.
           await persistCostItems(caseId)
+          chimes.playSuccess()
           showToast('success', editingCase ? 'ویرایش شد' : 'ایجاد شد')
           setCaseModalOpen(false); await loadData()
-        } catch { showToast('error', 'خطا در ذخیره') }
+        } catch {
+          chimes.playWarning()
+          showToast('error', 'خطا در ذخیره')
+        }
         finally { setSaving(false) }
       },
     })
@@ -989,6 +1021,24 @@ export default function Implants() {
                       {c.prosthesis_settled ? 'پروتز تسویه شده' : 'ثبت تسویه پروتز'}
                     </button>
                   )}
+                  {(() => {
+                    const cleanPhone = c.patient?.phone ? c.patient.phone.replace(/\D/g, '').replace(/^0/, '98') : null
+                    if (!cleanPhone) return null
+                    const waText = `سلام ${patientName(c)} عزیز،\nپیگیری درمان ایمپلنت دندان ${c.tooth_number ? toothLabel(c.tooth_number) : '-'} شما در کلینیک مینادنت:\nمرحله جاری: ${meta.label}\nبرند پایه ایمپلنت: ${getBrandLabel(c.brand)}\nجهت هماهنگی مراحل بعدی درمان با ما در ارتباط باشید.`
+                    return (
+                      <a
+                        href={`https://wa.me/${cleanPhone}?text=${encodeURIComponent(waText)}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-emerald-50 text-emerald-600 text-xs hover:bg-emerald-100 transition-all-smooth press-scale"
+                        title="ارسال گزارش وضعیت ایمپلنت در واتساپ"
+                        onClick={() => chimes.playPop()}
+                      >
+                        <MessageSquare size={12} />
+                        واتساپ
+                      </a>
+                    )
+                  })()}
                   <button
                     onClick={() => openEditCaseModal(c)}
                     className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-primary-50 text-primary-700 text-xs hover:bg-primary-100 transition-all-smooth"
@@ -1010,8 +1060,15 @@ export default function Implants() {
                         fields: [{ label: 'بیمار', value: patientName(c), highlight: true }, { label: 'دندان', value: toPersianDigits(c.tooth_number || '-') }],
                         confirmLabel: 'تایید آرشیو',
                         onConfirm: async () => {
-                          try { await updateImplantCase(c.id, { is_active: false } as any); showToast('success', 'آرشیو شد — سوابق حفظ شد'); await loadData() }
-                          catch { showToast('error', 'خطا در آرشیو کردن') }
+                          try {
+                            await updateImplantCase(c.id, { is_active: false } as any)
+                            chimes.playPop()
+                            showToast('success', 'آرشیو شد — سوابق حفظ شد')
+                            await loadData()
+                          } catch {
+                            chimes.playWarning()
+                            showToast('error', 'خطا در آرشیو کردن')
+                          }
                         },
                       })
                     }}
