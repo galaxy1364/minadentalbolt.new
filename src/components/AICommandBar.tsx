@@ -4,6 +4,7 @@ import { useState, useRef, useEffect, useCallback, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Sparkles, X, ArrowRight, Mic, MicOff, Search } from 'lucide-react'
 import { h } from '../lib/haptics'
+import { chimes } from '../lib/chimes'
 import { db } from '../lib/db'
 import { createPatient, createAppointment, fetchDoctors, fetchUnits } from '../lib/api'
 import { toPersianDigits } from '../lib/persianDate'
@@ -182,6 +183,7 @@ export default function AICommandBar() {
       if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') {
         e.preventDefault()
         h.tap()
+        chimes.playPop()
         setOpen((v) => !v)
       }
     }
@@ -283,7 +285,11 @@ export default function AICommandBar() {
       if (result.route) {
         navigate(result.route)
       }
-    } catch { showToast('error', 'خطا در اجرای دستور') }
+      chimes.playSuccess()
+    } catch { 
+      chimes.playWarning()
+      showToast('error', 'خطا در اجرای دستور') 
+    }
     finally {
       setExecuting(false)
       setOpen(false)
@@ -294,6 +300,7 @@ export default function AICommandBar() {
 
   const openResult = (r: GlobalResult) => {
     h.confirm()
+    chimes.playPop()
     navigate(r.route)
     setOpen(false)
     // Clearing the input is enough to clear the list — it is derived.
@@ -330,6 +337,7 @@ export default function AICommandBar() {
   // ── Voice input (Web Speech API) ──
   const toggleVoice = () => {
     h.tap()
+    chimes.playPop()
 
     if (listening) {
       recognitionRef.current?.stop()
@@ -339,6 +347,7 @@ export default function AICommandBar() {
 
     const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition
     if (!SpeechRecognition) {
+      chimes.playWarning()
       showToast('error', 'مرورگر شما از ورودی صوتی پشتیبانی نمی‌کند')
       return
     }
@@ -353,11 +362,13 @@ export default function AICommandBar() {
       for (let i = 0; i < event.results.length; i++) {
         transcript += event.results[i][0].transcript
       }
+      chimes.playPop()
       handleParse(transcript)
     }
 
     recognition.onerror = () => {
       setListening(false)
+      chimes.playWarning()
       showToast('error', 'خطا در تشخیص صدا')
     }
 
@@ -373,7 +384,7 @@ export default function AICommandBar() {
   if (!open) {
     return (
       <button
-        onClick={() => { h.tap(); setOpen(true) }}
+        onClick={() => { h.tap(); chimes.playPop(); setOpen(true) }}
         /* MOD-FIX-031: this pill floats over the list at the bottom-left,
            which is exactly where an appointment card's status sits. It
            now slides out of the way while the user scrolls down through
@@ -522,8 +533,8 @@ export default function AICommandBar() {
                   {SUGGESTIONS.map((s, i) => (
                     <button
                       key={i}
-                      onClick={() => { h.tap(); handleParse(s) }}
-                      className="flex items-center gap-2.5 p-2.5 rounded-xl bg-slate-50 hover:bg-slate-100 transition-all-smooth text-right text-sm text-slate-700"
+                      onClick={() => { h.tap(); chimes.playPop(); handleParse(s) }}
+                      className="flex items-center gap-2.5 p-2.5 rounded-xl bg-slate-50 hover:bg-slate-100 transition-all-smooth text-right text-sm text-slate-700 press-scale"
                     >
                       <Sparkles size={14} className="text-primary-400 flex-shrink-0" />
                       {s}
