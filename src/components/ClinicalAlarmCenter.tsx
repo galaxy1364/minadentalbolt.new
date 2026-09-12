@@ -12,6 +12,7 @@ import {
   Search,
   ExternalLink,
   Phone,
+  MessageSquare,
 } from 'lucide-react'
 import { chimes } from '../lib/chimes'
 import {
@@ -203,8 +204,10 @@ export function ClinicalAlarmCenter({ open, onClose }: ClinicalAlarmCenterProps)
       })
       if (error) throw error
       h.confirm()
+      chimes.playSuccess()
       showToast('success', `پیامک یادآوری به ${item.patient.first_name} ارسال شد`)
     } catch {
+      chimes.playWarning()
       showToast('error', 'خطا در ارسال پیامک')
     } finally {
       setSendingId(null)
@@ -257,11 +260,12 @@ export function ClinicalAlarmCenter({ open, onClose }: ClinicalAlarmCenterProps)
             <button
               onClick={() => {
                 h.tap()
+                chimes.playPop()
                 refresh()
               }}
               disabled={loading}
               title="بروزرسانی داده‌ها"
-              className="w-8 h-8 rounded-lg flex items-center justify-center text-slate-500 hover:text-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors disabled:opacity-50"
+              className="w-8 h-8 rounded-lg flex items-center justify-center text-slate-500 hover:text-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors disabled:opacity-50 press-scale"
             >
               <RefreshCw size={15} className={loading ? 'animate-spin' : ''} />
             </button>
@@ -432,7 +436,7 @@ export function ClinicalAlarmCenter({ open, onClose }: ClinicalAlarmCenterProps)
                         <a
                           href={`tel:${item.patient.phone}`}
                           onClick={(e) => { e.stopPropagation(); h.tap() }}
-                          className="flex items-center gap-1 px-2 py-1 rounded-lg text-[11px] font-semibold bg-emerald-50 hover:bg-emerald-100 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 transition-colors"
+                          className="flex items-center gap-1 px-2 py-1 rounded-lg text-[11px] font-semibold bg-emerald-50 hover:bg-emerald-100 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 transition-colors press-scale"
                           title={`تماس مستقیم با ${item.patient.phone}`}
                         >
                           <Phone size={11} />
@@ -440,10 +444,24 @@ export function ClinicalAlarmCenter({ open, onClose }: ClinicalAlarmCenterProps)
                         </a>
                       )}
 
+                      {item.patient.phone && (
+                        <a
+                          href={`https://wa.me/${item.patient.phone.replace(/\D/g, '').replace(/^0/, '98')}?text=${encodeURIComponent(item.smsMessage || `سلام ${item.patient.first_name} عزیز، پیگیری از طرف کلینیک دندانپزشکی مینادنت.`)}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          onClick={(e) => { e.stopPropagation(); chimes.playPop() }}
+                          className="flex items-center gap-1 px-2 py-1 rounded-lg text-[11px] font-semibold bg-emerald-600/10 hover:bg-emerald-600/20 text-emerald-600 dark:text-emerald-400 transition-colors press-scale"
+                          title={`ارسال پیام در واتساپ به ${item.patient.phone}`}
+                        >
+                          <MessageSquare size={11} />
+                          <span className="hidden sm:inline">واتساپ</span>
+                        </a>
+                      )}
+
                       {item.actionPath && (
                         <button
                           onClick={() => handleNavigate(item.actionPath!)}
-                          className="flex items-center gap-1 px-2.5 py-1 rounded-lg text-[11px] font-semibold text-primary-600 hover:bg-primary-50 dark:hover:bg-primary-950/40 transition-colors"
+                          className="flex items-center gap-1 px-2.5 py-1 rounded-lg text-[11px] font-semibold text-primary-600 hover:bg-primary-50 dark:hover:bg-primary-950/40 transition-colors press-scale"
                         >
                           <span>اقدام مستقیم</span>
                           <ExternalLink size={11} />
