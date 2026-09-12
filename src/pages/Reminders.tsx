@@ -6,9 +6,10 @@
 import { useState, useEffect, useMemo } from 'react'
 import { PatientSelect } from '../components/PatientSelect'
 import { useNavigate } from 'react-router-dom'
-import { CalendarClock, Banknote, CreditCard, FlaskConical, Bone, Settings2, Bell, BellOff, Plus, StickyNote, Check, X as XIcon, Send } from 'lucide-react'
+import { CalendarClock, Banknote, CreditCard, FlaskConical, Bone, Settings2, Bell, BellOff, Plus, StickyNote, Check, X as XIcon, Send, MessageSquare } from 'lucide-react'
 import { ModuleHeader } from '../components/ModuleHeader'
 import { Card, Button, Badge, Spinner, EmptyState, Select, Modal, Input, Textarea, showToast } from '../components/ui'
+import { chimes } from '../lib/chimes'
 import { CurrencyInput } from '../components/CurrencyInput'
 import { PersianDateInput } from '../components/PersianDateInput'
 import { fetchCheques, fetchAllInstallments, fetchLabOrders, fetchImplantCases, fetchPatients, fetchManualReminders, createManualReminder, updateManualReminder, fetchAppointments, fetchPersonalFinanceItems } from '../lib/api'
@@ -214,14 +215,19 @@ export default function Reminders() {
       }
       if (editingReminder) {
         await updateManualReminder(editingReminder.id, payload)
+        chimes.playSuccess()
         showToast('success', 'یادآوری ویرایش شد')
       } else {
         await createManualReminder(payload)
+        chimes.playSuccess()
         showToast('success', 'یادآوری ثبت شد')
       }
       setModalOpen(false)
       await loadData()
-    } catch { showToast('error', 'خطا در ذخیره') }
+    } catch { 
+      chimes.playWarning()
+      showToast('error', 'خطا در ذخیره') 
+    }
     finally { setSaving(false) }
   }
 
@@ -231,9 +237,13 @@ export default function Reminders() {
     h.tap()
     try {
       await updateManualReminder(mr.id, { status })
+      chimes.playPop()
       showToast('success', status === 'completed' ? 'انجام‌شده علامت خورد' : 'لغو شد')
       await loadData()
-    } catch { showToast('error', 'خطا') }
+    } catch { 
+      chimes.playWarning()
+      showToast('error', 'خطا') 
+    }
   }
 
   const handleSendSms = async (it: ReminderItem) => {
@@ -250,8 +260,12 @@ export default function Reminders() {
     try {
       const { error } = await supabase.functions.invoke('send-sms', { body: { to: phone, message, type: 'reminder' } })
       if (error) throw error
+      chimes.playSuccess()
       showToast('success', 'پیامک یادآوری ارسال شد')
-    } catch { showToast('error', 'خطا در ارسال پیامک') }
+    } catch { 
+      chimes.playWarning()
+      showToast('error', 'خطا در ارسال پیامک') 
+    }
     finally { setSendingSmsId(null) }
   }
 
@@ -327,7 +341,7 @@ export default function Reminders() {
             const meta = categoryMeta[it.category]
             const isUrgent = it.daysLeft <= Number(leadDays)
             return (
-              <Card key={it.id} className={`p-3.5 ${isUrgent ? 'border-2 border-error-200' : ''}`}>
+              <Card key={it.id} className={`p-3.5 rounded-2xl bg-white/90 dark:bg-slate-900/90 backdrop-blur-md border ${isUrgent ? 'border-2 border-error-300 dark:border-error-700/80 shadow-sm' : 'border-slate-200/80 dark:border-slate-800'} hover:shadow-md transition-all`}>
                 <div className="flex items-center gap-3">
                   <div
                     className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 ${meta.color} ${it.manualSource ? 'cursor-pointer' : ''}`}
@@ -351,6 +365,28 @@ export default function Reminders() {
                     </div>
                   ) : (
                     <div className="flex items-center gap-1 shrink-0">
+                      {(() => {
+                        const pat = patients.find((p) => `${p.first_name} ${p.last_name}` === it.patientName)
+                        if (!pat?.phone) return null
+                        const cleanPhone = pat.phone.replace(/\D/g, '').replace(/^0/, '98')
+                        const when = it.daysLeft === 0 ? 'امروز' : it.daysLeft < 0 ? `${toPersianDigits(Math.abs(it.daysLeft))} روز پیش` : `${toPersianDigits(it.daysLeft)} روز دیگر`
+                        const categoryLabel: Record<ReminderItem['category'], string> = {
+                          cheque: 'چک', installment: 'قسط', lab: 'سفارش لابراتوار',
+                          implant: 'مرحله ایمپلنت', manual: 'یادآوری', appointment: 'نوبت', personal: 'مالی',
+                        }
+                        const waText = `${it.patientName} عزیز، یادآوری کلینیک مینادنت (${categoryLabel[it.category]}): ${it.title} — سررسید ${when}${it.amount ? ' — مبلغ ' + formatCurrency(it.amount) + ' تومان' : ''}.`
+                        return (
+                          <a
+                            href={`https://wa.me/${cleanPhone}?text=${encodeURIComponent(waText)}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="p-2 rounded-lg bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600 hover:bg-emerald-100 dark:hover:bg-emerald-900/40 transition-colors"
+                            title="ارسال پیام سریع در واتساپ / پیام‌رسان"
+                          >
+                            <MessageSquare size={16} />
+                          </a>
+                        )
+                      })()}
                       <button
                         onClick={() => handleSendSms(it)}
                         disabled={sendingSmsId === it.id}
