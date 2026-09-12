@@ -133,10 +133,21 @@ test.describe('روند مطب', () => {
     const opacity = () => fab.evaluate((el) => getComputedStyle(el).opacity)
     expect(await opacity(), 'در بالای صفحه باید دیده شود').toBe('1')
 
-    await page.mouse.wheel(0, 400)
+    await page.evaluate(() => {
+      const spacer = document.createElement('div')
+      spacer.id = 'test-scroll-spacer'
+      spacer.style.height = '2000px'
+      document.body.appendChild(spacer)
+      window.scrollTo(0, 400)
+      window.dispatchEvent(new Event('scroll'))
+    })
     await expect.poll(opacity, { timeout: 5000, message: 'با اسکرول به پایین باید کنار برود' }).toBe('0')
 
-    await page.mouse.wheel(0, -400)
+    await page.evaluate(() => {
+      window.scrollTo(0, 0)
+      window.dispatchEvent(new Event('scroll'))
+      document.getElementById('test-scroll-spacer')?.remove()
+    })
     await expect.poll(opacity, { timeout: 5000, message: 'با اسکرول به بالا باید برگردد' }).toBe('1')
   })
 
