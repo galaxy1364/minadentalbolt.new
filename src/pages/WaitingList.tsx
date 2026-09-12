@@ -597,7 +597,7 @@ export default function WaitingList() {
                         className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-error-50 text-error-600 text-xs hover:bg-error-100 transition-all-smooth press-scale"
                       >
                         <Ban size={12} />
-                        لغو
+                        حذف
                       </button>
                     </div>
                   </Card>
