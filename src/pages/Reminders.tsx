@@ -6,7 +6,7 @@
 import { useState, useEffect, useMemo } from 'react'
 import { PatientSelect } from '../components/PatientSelect'
 import { useNavigate } from 'react-router-dom'
-import { CalendarClock, Banknote, CreditCard, FlaskConical, Bone, Settings2, Bell, BellOff, Plus, StickyNote, Check, X as XIcon } from 'lucide-react'
+import { CalendarClock, Banknote, CreditCard, FlaskConical, Bone, Settings2, Bell, BellOff, Plus, StickyNote, Check, X as XIcon, Send } from 'lucide-react'
 import { ModuleHeader } from '../components/ModuleHeader'
 import { Card, Button, Badge, Spinner, EmptyState, Select, Modal, Input, Textarea, showToast } from '../components/ui'
 import { CurrencyInput } from '../components/CurrencyInput'
@@ -16,6 +16,7 @@ import { toJalaliStringPretty, toPersianDigits, formatCurrency } from '../lib/pe
 import { downloadICSReminder } from '../lib/icsReminder'
 import { requestNotificationPermission, getNotificationPermission, notifyOnceForReminder } from '../lib/notifications'
 import { h } from '../lib/haptics'
+import { supabase } from '../lib/supabase'
 import type { Patient, ManualReminder } from '../types'
 
 const LEAD_DAYS_KEY = 'minadent-reminder-lead-days'
@@ -48,6 +49,7 @@ export default function Reminders() {
   const [editingReminder, setEditingReminder] = useState<ManualReminder | null>(null)
   const [saving, setSaving] = useState(false)
   const [form, setForm] = useState({ patient_id: '', title: '', amount: '', due_date: '', notes: '' })
+  const [sendingSmsId, setSendingSmsId] = useState<string | null>(null)
 
   const loadData = () => {
     setLoading(true)
@@ -234,6 +236,25 @@ export default function Reminders() {
     } catch { showToast('error', 'خطا') }
   }
 
+  const handleSendSms = async (it: ReminderItem) => {
+    const phone = patients.find((p) => `${p.first_name} ${p.last_name}` === it.patientName)?.phone
+    if (!phone) { showToast('error', 'شماره تلفن این بیمار ثبت نشده'); return }
+    setSendingSmsId(it.id)
+    h.tap()
+    const categoryLabel: Record<ReminderItem['category'], string> = {
+      cheque: 'چک', installment: 'قسط', lab: 'سفارش لابراتوار',
+      implant: 'مرحله ایمپلنت', manual: 'یادآوری', appointment: 'نوبت', personal: 'مالی',
+    }
+    const when = it.daysLeft === 0 ? 'امروز' : it.daysLeft < 0 ? `${toPersianDigits(Math.abs(it.daysLeft))} روز پیش` : `${toPersianDigits(it.daysLeft)} روز دیگر`
+    const message = `${it.patientName} عزیز، یادآوری ${categoryLabel[it.category]}: ${it.title} — سررسید ${when}${it.amount ? ' — مبلغ ' + formatCurrency(it.amount) + ' تومان' : ''}. کلینیک مینادنت`
+    try {
+      const { error } = await supabase.functions.invoke('send-sms', { body: { to: phone, message, type: 'reminder' } })
+      if (error) throw error
+      showToast('success', 'پیامک یادآوری ارسال شد')
+    } catch { showToast('error', 'خطا در ارسال پیامک') }
+    finally { setSendingSmsId(null) }
+  }
+
 
   return (
     <div className="space-y-4">
@@ -329,13 +350,23 @@ export default function Reminders() {
                       <button onClick={() => handleResolve(it.manualSource!, 'cancelled')} title="لغو" className="p-2 rounded-lg bg-slate-100 dark:bg-slate-700 text-slate-500"><XIcon size={16} /></button>
                     </div>
                   ) : (
-                    <button
-                      onClick={() => downloadICSReminder({ title: `${it.title} — ${it.patientName}`, description: it.amount ? `مبلغ: ${formatCurrency(it.amount)} تومان` : undefined, dueDate: it.dueDate, filename: `reminder-${it.id}.ics` })}
-                      className="p-2 rounded-lg bg-primary-50 dark:bg-primary-900/30 text-primary-600 shrink-0"
-                      title="افزودن به تقویم گوشی"
-                    >
-                      <CalendarClock size={16} />
-                    </button>
+                    <div className="flex items-center gap-1 shrink-0">
+                      <button
+                        onClick={() => handleSendSms(it)}
+                        disabled={sendingSmsId === it.id}
+                        className="p-2 rounded-lg bg-success-50 dark:bg-success-900/30 text-success-600 disabled:opacity-50"
+                        title="ارسال پیامک یادآوری"
+                      >
+                        {sendingSmsId === it.id ? <Spinner size={16} /> : <Send size={16} />}
+                      </button>
+                      <button
+                        onClick={() => downloadICSReminder({ title: `${it.title} — ${it.patientName}`, description: it.amount ? `مبلغ: ${formatCurrency(it.amount)} تومان` : undefined, dueDate: it.dueDate, filename: `reminder-${it.id}.ics` })}
+                        className="p-2 rounded-lg bg-primary-50 dark:bg-primary-900/30 text-primary-600"
+                        title="افزودن به تقویم گوشی"
+                      >
+                        <CalendarClock size={16} />
+                      </button>
+                    </div>
                   )}
                 </div>
               </Card>

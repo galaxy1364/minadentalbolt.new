@@ -30,7 +30,11 @@ interface AuthState {
   clearNotice: () => void
 }
 
-const AuthContext = createContext<AuthState | null>(null)
+export const AuthContext = createContext<AuthState | null>(null)
+
+export function useOptionalAuth(): AuthState | null {
+  return useContext(AuthContext)
+}
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [session, setSession] = useState<Session | null>(null)

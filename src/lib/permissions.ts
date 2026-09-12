@@ -184,3 +184,25 @@ export function allowedSettingsSections(role: string | null | undefined): Settin
   if (!role || !(role in SETTINGS_ACCESS)) return PERSONAL
   return SETTINGS_ACCESS[role as Role]
 }
+
+/**
+ * Only clinic owner or manager can alter recorded prices, discounts,
+ * or financial tariff valuations once entered.
+ */
+export function canEditFinancialPrice(role: string | null | undefined): boolean {
+  if (!REQUIRE_LOGIN) return true
+  return role === 'owner' || role === 'manager'
+}
+
+/**
+ * Hard deleting financial or patient records is strictly prohibited across all roles.
+ * Only soft-deactivation (archive) is permitted for managers and owners.
+ */
+export function canHardDeleteRecord(): boolean {
+  return false
+}
+
+export function canArchiveRecord(role: string | null | undefined): boolean {
+  if (!REQUIRE_LOGIN) return true
+  return role === 'owner' || role === 'manager'
+}

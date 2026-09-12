@@ -5,7 +5,7 @@
 // means users keep getting an old JS bundle after a deploy, which can
 // leave the app failing to load entirely when the cached HTML and the
 // new assets no longer match.
-const CACHE_NAME = 'minadent-v1.232.1'
+const CACHE_NAME = 'minadent-v1.233.0'
 const STATIC_ASSETS = [
   '/',
   '/index.html',
@@ -40,17 +40,47 @@ self.addEventListener('activate', (event) => {
   self.clients.claim()
 })
 
+// Push notifications handling for clinical alerts, reminders, and bounced cheques
+self.addEventListener('push', (event) => {
+  let data = { title: 'مینادنت — کلینیک دندانپزشکی', body: 'اعلان جدید در سامانه ثبت شد', url: '/#/reminders' }
+  try {
+    if (event.data) {
+      const parsed = event.data.json()
+      data = { ...data, ...parsed }
+    }
+  } catch {
+    if (event.data) {
+      data.body = event.data.text()
+    }
+  }
+  const options = {
+    body: data.body,
+    icon: '/icon-192.png',
+    badge: '/favicon-32.png',
+    dir: 'rtl',
+    lang: 'fa',
+    data: data.url || '/#/reminders',
+    vibrate: [150, 50, 150],
+  }
+  event.waitUntil(self.registration.showNotification(data.title, options))
+})
+
 // Tapping a reminder notification focuses an already-open tab if one
 // exists, or opens a new one — standard PWA notification-click
 // behavior so the notification actually leads somewhere useful.
 self.addEventListener('notificationclick', (event) => {
   event.notification.close()
+  const targetUrl = event.notification.data || '/#/reminders'
   event.waitUntil(
     self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then((clientList) => {
       for (const client of clientList) {
-        if ('focus' in client) return client.focus()
+        if ('focus' in client) {
+          client.focus()
+          if ('navigate' in client && targetUrl) client.navigate(targetUrl)
+          return
+        }
       }
-      if (self.clients.openWindow) return self.clients.openWindow('/#/reminders')
+      if (self.clients.openWindow) return self.clients.openWindow(targetUrl)
     })
   )
 })

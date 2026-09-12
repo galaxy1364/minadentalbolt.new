@@ -6,7 +6,7 @@ import { useNavigate, useLocation } from 'react-router-dom'
 import {
   Activity, ClipboardList, Stethoscope, Search, Eye, Smile, Plus, Edit2, Trash2, Ban, Layers,
   DollarSign, FlaskConical, CheckCircle2, X, UserPlus, ChevronRight, Bone,
-  ChevronDown, Wallet, Receipt, CalendarClock, Users,
+  ChevronDown, Wallet, Receipt, CalendarClock, Users, Pill,
 } from 'lucide-react'
 import { BarChart, Bar, XAxis, YAxis, Tooltip as RTooltip, ResponsiveContainer, Cell } from 'recharts'
 import {
@@ -1286,7 +1286,25 @@ export default function Treatments() {
               <span className="text-xs text-slate-500">{toJalaliStringPretty(detailEnc.encounter_date)}</span>
               <span className="text-xs text-slate-500">پزشک: {encounterDoctorName(detailEnc)}</span>
               {detailEnc.diagnosis && <span className="text-xs text-slate-500">تشخیص: {detailEnc.diagnosis}</span>}
-              {detailEnc.total_amount && <span className="text-xs font-bold text-slate-700 mr-auto">{formatCurrency(detailEnc.total_amount)} ت</span>}
+              {detailEnc.total_amount && <span className="text-xs font-bold text-slate-700">{formatCurrency(detailEnc.total_amount)} ت</span>}
+              <div className="mr-auto flex items-center gap-2">
+                <Button
+                  size="sm"
+                  variant="secondary"
+                  onClick={() => {
+                    if (!detailEnc) return
+                    const handoff = buildChartHandoff('prescription', {
+                      patientId: detailEnc.patient_id,
+                      doctorId: detailEnc.doctor_id,
+                      toothNumber: lastSelectedTooth || '',
+                    })
+                    if (handoff) navigate(handoff.path, { state: handoff.state })
+                  }}
+                  className="flex items-center gap-1.5 text-xs text-emerald-700 bg-emerald-50 hover:bg-emerald-100 border-emerald-200"
+                >
+                  <Pill size={14} /> صدور نسخه
+                </Button>
+              </div>
             </div>
 
             {/* Dental Chart */}
@@ -1313,8 +1331,26 @@ export default function Treatments() {
             <div>
               <div className="flex items-center justify-between mb-3">
                 <h4 className="text-xs font-bold text-slate-500 uppercase tracking-wider flex items-center gap-1.5"><Stethoscope size={14} /> درمان‌ها</h4>
-                <Button size="sm" variant="secondary" onClick={() => openBulkModal(detailEnc.id, detailEnc.patient_id)} className="flex items-center gap-1"><Layers size={14} /> ثبت دسته‌ای</Button>
-                <Button size="sm" onClick={() => openTreatCreateModal(detailEnc.id, detailEnc.patient_id)} className="flex items-center gap-1"><Plus size={14} /> درمان جدید</Button>
+                <div className="flex items-center gap-2">
+                  <Button
+                    size="sm"
+                    variant="secondary"
+                    onClick={() => {
+                      if (!detailEnc) return
+                      const handoff = buildChartHandoff('prescription', {
+                        patientId: detailEnc.patient_id,
+                        doctorId: detailEnc.doctor_id,
+                        toothNumber: lastSelectedTooth || '',
+                      })
+                      if (handoff) navigate(handoff.path, { state: handoff.state })
+                    }}
+                    className="flex items-center gap-1 text-xs text-emerald-700 bg-emerald-50 hover:bg-emerald-100 border-emerald-200"
+                  >
+                    <Pill size={14} /> نسخه دارو
+                  </Button>
+                  <Button size="sm" variant="secondary" onClick={() => openBulkModal(detailEnc.id, detailEnc.patient_id)} className="flex items-center gap-1"><Layers size={14} /> ثبت دسته‌ای</Button>
+                  <Button size="sm" onClick={() => openTreatCreateModal(detailEnc.id, detailEnc.patient_id)} className="flex items-center gap-1"><Plus size={14} /> درمان جدید</Button>
+                </div>
               </div>
               {encounterTreatments.length === 0 ? (
                 <EmptyState icon={<Stethoscope size={24} />} title="درمانی ثبت نشده" />

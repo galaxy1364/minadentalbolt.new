@@ -2,7 +2,8 @@
 import { useState, useEffect, useCallback, useMemo } from 'react'
 import { PatientSelect } from '../components/PatientSelect'
 import { buildPrintDocument } from '../lib/printDocument'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useLocation } from 'react-router-dom'
+import { readChartHandoff } from '../lib/chartHandoff'
 import { Pill, FileText, Search, Plus, Eye, Edit2, TrendingUp, Smile, Printer, Ban, AlertTriangle, Calculator, ShieldAlert } from 'lucide-react'
 import { checkDrugInteractions, calculatePediatricDosage } from '../lib/drugSafety'
 import { AreaChart, Area, XAxis, YAxis, Tooltip as RTooltip, ResponsiveContainer } from 'recharts'
@@ -47,6 +48,7 @@ function getStatusMeta(status: string) {
 
 export default function Prescriptions() {
   const navigate = useNavigate()
+  const location = useLocation()
   const { confirmAction, ConfirmActionModal } = useConfirmAction()
 
   const [prescriptions, setPrescriptions] = useState<PrescriptionWithRelations[]>([])
@@ -115,6 +117,22 @@ export default function Prescriptions() {
   useEffect(() => {
     loadData()
   }, [loadData])
+
+  // Handle handoff from Treatments encounter or DentalChart
+  useEffect(() => {
+    const handoff = readChartHandoff(location.state)
+    if (!handoff) return
+    setFormData({
+      patient_id: handoff.patientId,
+      doctor_id: handoff.doctorId || '',
+      medications: '',
+      notes: handoff.toothNumber ? `مربوط به دندان ${handoff.toothNumber}` : '',
+    })
+    setEditingRx(null)
+    setRxWizardStep(0)
+    setModalOpen(true)
+    window.history.replaceState({}, '')
+  }, [location.state])
 
   // ===========================================================================
   // Derived Data

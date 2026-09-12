@@ -405,11 +405,32 @@ export default function Reports() {
         title="گزارش‌ها"
         subtitle="تحلیل و گزارش‌گیری عملکرد کلینیک"
         action={
-          <div className="flex gap-2">
-            <button onClick={handleExportRevenue} className="px-3 py-1.5 rounded-lg bg-white/20 text-white text-xs font-medium backdrop-blur-sm hover:bg-white/30 transition-all-smooth">درآمد</button>
-            <button onClick={handleExportPatients} className="px-3 py-1.5 rounded-lg bg-white/20 text-white text-xs font-medium backdrop-blur-sm hover:bg-white/30 transition-all-smooth">بیماران</button>
-            <button onClick={handleExportAppointments} className="px-3 py-1.5 rounded-lg bg-white/20 text-white text-xs font-medium backdrop-blur-sm hover:bg-white/30 transition-all-smooth">نوبت‌ها</button>
-          </div>
+          <button
+            onClick={() => {
+              if (activeTab === 'revenue') handleExportRevenue()
+              else if (activeTab === 'patients') handleExportPatients()
+              else if (activeTab === 'appointments') handleExportAppointments()
+              else if (activeTab === 'treatments') {
+                const data = treatments.map((t) => ({
+                  procedure: t.procedure_name || '',
+                  category: t.procedure_category ? (procedureCategoryLabels[t.procedure_category] || t.procedure_category) : 'سایر',
+                  status: t.status || '',
+                  price: t.total_price || 0,
+                  tooth: t.tooth_number || '',
+                }))
+                exportToCSV(data, 'گزارش-درمان‌ها', [
+                  { key: 'procedure', label: 'رویه' },
+                  { key: 'category', label: 'دسته' },
+                  { key: 'status', label: 'وضعیت' },
+                  { key: 'price', label: 'قیمت' },
+                  { key: 'tooth', label: 'دندان' },
+                ])
+              }
+            }}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white/20 text-white text-xs font-bold backdrop-blur-sm hover:bg-white/30 transition-all-smooth press-scale"
+          >
+            <Download size={14} /> خروجی CSV
+          </button>
         }
       />
 

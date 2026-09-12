@@ -15,10 +15,10 @@
  * می‌شد و دوباره پرسیده می‌شد.
  */
 
-export type ChartDestination = 'treatment' | 'lab' | 'implant'
+export type ChartDestination = 'treatment' | 'lab' | 'implant' | 'prescription'
 
 export interface ChartToothContext {
-  toothNumber: string
+  toothNumber?: string
   surface?: string | null
   patientId: string
   doctorId?: string | null
@@ -39,6 +39,7 @@ export interface ChartHandoff {
 const DESTINATION_PATHS: Record<Exclude<ChartDestination, 'treatment'>, string> = {
   lab: '/laboratory',
   implant: '/implants',
+  prescription: '/prescriptions',
 }
 
 /**
@@ -46,20 +47,21 @@ const DESTINATION_PATHS: Record<Exclude<ChartDestination, 'treatment'>, string> 
  *
  * 'treatment' returns null on purpose: a treatment is recorded inside the
  * visit that is already open, so navigating away would abandon it. Lab
- * orders and implant cases live in their own modules and genuinely need a
- * route change.
+ * orders, implant cases, and prescriptions live in their own modules and
+ * genuinely need a route change.
  */
 export function buildChartHandoff(
   destination: ChartDestination,
   ctx: ChartToothContext,
 ): ChartHandoff | null {
   if (destination === 'treatment') return null
-  if (!ctx.toothNumber || !ctx.patientId) return null
+  if (!ctx.patientId) return null
+  if (destination !== 'prescription' && !ctx.toothNumber) return null
 
   return {
     path: DESTINATION_PATHS[destination],
     state: {
-      quickStartToothNumber: String(ctx.toothNumber),
+      quickStartToothNumber: String(ctx.toothNumber || (destination === 'prescription' ? 'general' : '')),
       quickStartToothSurface: ctx.surface || null,
       quickStartPatientId: ctx.patientId,
       quickStartDoctorId: ctx.doctorId || null,

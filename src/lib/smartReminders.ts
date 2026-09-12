@@ -1,22 +1,53 @@
-import type { Patient, Encounter, Payment, Installment, AppointmentWithRelations, Treatment } from '../types'
-import { toPersianDigits } from './persianDate'
+import type { Patient, Encounter, Payment, Installment, AppointmentWithRelations, Treatment, Cheque, ImplantCase, LabOrder } from '../types'
+import { toPersianDigits, formatCurrency } from './persianDate'
 import { calcAllPatientBalances } from './finance'
+import { nextImplantAction } from './implantMilestones'
+import { daysUntilDue } from './labClinicMilestones'
 
-export type ReminderCategory = 'birthday' | 'debtor' | 'lapsed' | 'installment_due' | 'no_show' | 'unfinished_treatment' | 'unresolved_appointment'
+export type ReminderCategory =
+  | 'birthday'
+  | 'debtor'
+  | 'lapsed'
+  | 'installment_due'
+  | 'no_show'
+  | 'unfinished_treatment'
+  | 'unresolved_appointment'
+  | 'cheque_due'
+  | 'implant_stage_due'
+  | 'lab_overdue'
 
 export interface SmartReminder {
+  id?: string
   category: ReminderCategory
   patient: Patient
   title: string
   detail: string
   smsMessage: string
   priority: number // higher = more urgent, for sorting within a category
+  actionPath?: string
+  extraInfo?: string
+  dueDate?: string
+  patientName?: string
+  actionNeeded?: string
+  urgency?: 'urgent' | 'high' | 'medium' | 'low'
 }
 
 const MS_PER_DAY = 86400000
 
 function daysSince(dateStr: string): number {
   return Math.floor((Date.now() - new Date(dateStr).getTime()) / MS_PER_DAY)
+}
+
+export function toIsoDate(d: Date | string = new Date()): string {
+  if (typeof d === 'string') {
+    return d.slice(0, 10)
+  }
+  return d.toISOString().slice(0, 10)
+}
+
+export function toDateObj(d: Date | string = new Date()): Date {
+  if (d instanceof Date) return d
+  return new Date(d)
 }
 
 /** Patients whose birthday (month + day) is today. */
@@ -106,9 +137,9 @@ export function findLapsedPatients(
 export function findDueInstallments(
   installments: Installment[],
   patients: Patient[],
-  today = new Date(),
+  today: Date | string = new Date(),
 ): SmartReminder[] {
-  const todayStr = today.toISOString().slice(0, 10)
+  const todayStr = toIsoDate(today)
   const patientMap = new Map(patients.map((p) => [p.id, p]))
   const result: SmartReminder[] = []
   for (const i of installments) {
@@ -117,12 +148,15 @@ export function findDueInstallments(
     if (!p) continue
     const overdueDays = daysSince(i.due_date)
     result.push({
+      id: `installment-${i.id}`,
       category: 'installment_due',
       patient: p,
       title: `${p.first_name} ${p.last_name}`,
-      detail: overdueDays > 0 ? `قسط ${overdueDays} روز عقب افتاده — ${i.amount.toLocaleString('fa-IR')} ت` : `قسط امروز — ${i.amount.toLocaleString('fa-IR')} ت`,
-      smsMessage: `${p.first_name} عزیز، قسط ${i.amount.toLocaleString('fa-IR')} تومانی شما نزد کلینیک مینادنت سررسید شده است.`,
-      priority: overdueDays,
+      detail: overdueDays > 0 ? `قسط ${toPersianDigits(overdueDays)} روز عقب افتاده — ${formatCurrency(i.amount)} ت` : `قسط امروز — ${formatCurrency(i.amount)} ت`,
+      smsMessage: `${p.first_name} عزیز، قسط ${formatCurrency(i.amount)} تومانی شما نزد کلینیک مینادنت سررسید شده است.`,
+      priority: overdueDays > 0 ? 120000 + (overdueDays * 1000) : 95000,
+      actionPath: '/billing',
+      dueDate: i.due_date,
     })
   }
   return result.sort((a, b) => b.priority - a.priority)
@@ -136,6 +170,9 @@ export const REMINDER_CATEGORY_META: Record<ReminderCategory, { label: string; i
   no_show: { label: 'غیبت از نوبت', icon: '🚫', color: '#dc2626' },
   unfinished_treatment: { label: 'درمان ناتمام بدون نوبت بعدی', icon: '🦷', color: '#0891b2' },
   unresolved_appointment: { label: 'نوبت بدون وضعیت نهایی', icon: '❓', color: '#64748b' },
+  cheque_due: { label: 'چک سررسید و برگشتی', icon: '🧾', color: '#ea580c' },
+  implant_stage_due: { label: 'مرحله ایمپلنت', icon: '🔩', color: '#0284c7' },
+  lab_overdue: { label: 'سفارش لابراتوار', icon: '🔬', color: '#9333ea' },
 }
 
 /**
@@ -256,13 +293,291 @@ export function findNoShows(
     const p = patientMap.get(patientId)
     if (!p || !p.is_active) continue
     result.push({
+      id: `no-show-${noShowAppt.id}`,
       category: 'no_show',
       patient: p,
       title: `${p.first_name} ${p.last_name}`,
       detail: `غیبت در ${noShowAppt.date} — رزرو مجدد نشده`,
       smsMessage: `${p.first_name} عزیز، در نوبت اخیرتان در کلینیک مینادنت حضور نداشتید. لطفاً برای رزرو مجدد تماس بگیرید.`,
       priority: daysSince(noShowAppt.date),
+      actionPath: '/appointments',
     })
   }
   return result.sort((a, b) => b.priority - a.priority)
 }
+
+/**
+ * Cheques that are bounced, due today, or overdue.
+ */
+export function findDueCheques(
+  cheques: Cheque[],
+  patients: Patient[],
+  today: Date | string = new Date(),
+): SmartReminder[] {
+  const todayStr = toIsoDate(today)
+  const patientMap = new Map(patients.map((p) => [p.id, p]))
+  const result: SmartReminder[] = []
+
+  for (const c of cheques) {
+    if (c.status === 'cleared' || c.status === 'cancelled') continue
+    const p = patientMap.get(c.patient_id)
+    if (!p) continue
+
+    const isBounced = c.status === 'bounced'
+    const isOverdue = c.due_date < todayStr
+    const isDueToday = c.due_date === todayStr
+
+    if (!isBounced && !isOverdue && !isDueToday) continue
+
+    const overdueDays = isOverdue ? daysSince(c.due_date) : 0
+    let detail = ''
+    let priority = 0
+
+    if (isBounced) {
+      detail = `چک برگشتی به مبلغ ${formatCurrency(c.amount)} ت — شماره ${c.cheque_number || 'نامشخص'}`
+      priority = 200000 + Math.floor(c.amount / 10000)
+    } else if (isDueToday) {
+      detail = `چک سررسید امروز — ${formatCurrency(c.amount)} ت (${c.bank_name || 'بانک'})`
+      priority = 110000 + Math.floor(c.amount / 10000)
+    } else {
+      detail = `چک ${toPersianDigits(overdueDays)} روز گذشته از موعد (معوق) — ${formatCurrency(c.amount)} ت (${c.bank_name || 'بانک'})`
+      priority = 150000 + (overdueDays * 1000) + Math.floor(c.amount / 10000)
+    }
+
+    const smsMessage = isBounced
+      ? `${p.first_name} عزیز، چک شماره ${c.cheque_number || ''} شما برگشت خورده است. لطفاً جهت تعیین تکلیف با کلینیک مینادنت تماس بگیرید.`
+      : `${p.first_name} عزیز، چک شما به مبلغ ${formatCurrency(c.amount)} تومان سررسید شده است. کلینیک مینادنت`
+
+    result.push({
+      id: `cheque-${c.id}`,
+      category: 'cheque_due',
+      patient: p,
+      title: `${p.first_name} ${p.last_name}`,
+      patientName: `${p.first_name} ${p.last_name}`,
+      detail,
+      actionNeeded: detail,
+      smsMessage,
+      priority,
+      urgency: 'urgent',
+      actionPath: '/billing',
+      dueDate: c.due_date,
+      extraInfo: c.bank_name ? `${c.bank_name} - چک ${c.cheque_number || ''}` : undefined,
+    })
+  }
+
+  return result.sort((a, b) => b.priority - a.priority)
+}
+
+/**
+ * Implant cases needing next clinical action (healing complete, OPG needed, impression, lab order, crown delivery).
+ */
+export function findPendingImplantStages(
+  implants: ImplantCase[],
+  patients: Patient[],
+  today: Date | string = new Date(),
+): SmartReminder[] {
+  const todayStr = toIsoDate(today)
+  const patientMap = new Map(patients.map((p) => [p.id, p]))
+  const result: SmartReminder[] = []
+
+  for (const im of implants) {
+    if (im.is_active === false || im.success_status === 'failed') continue
+    if (
+      (im as any).status === 'completed' ||
+      (im as any).stage === 'completed' ||
+      !!(im as any).crown_delivered_at ||
+      !!(im as any).crown_delivery_date
+    ) {
+      continue
+    }
+    const p = patientMap.get(im.patient_id)
+    if (!p) continue
+
+    const action = nextImplantAction(im as any, todayStr)
+    if (!action) continue
+
+    // A normal waiting period is not an urgent unblocked clinical alarm
+    if (action.key === 'wait' || action.key === 'surgery') continue
+
+    let priority = 50
+    if (action.key === 'delivered') priority = 90
+    else if (action.key === 'lab') priority = 80
+    else if (action.key === 'impression') priority = 70
+    else if (action.key === 'opg') priority = 60
+
+    const detail = `ایمپلنت دندان ${im.tooth_number ? toPersianDigits(im.tooth_number) : ''}: ${action.label}`
+
+    result.push({
+      id: `implant-${im.id}`,
+      category: 'implant_stage_due',
+      patient: p,
+      title: `${p.first_name} ${p.last_name}`,
+      patientName: `${p.first_name} ${p.last_name}`,
+      detail,
+      actionNeeded: detail,
+      smsMessage: `${p.first_name} عزیز، موعد مرحله‌ی بعدی درمان ایمپلنت شما فرارسیده است. لطفاً جهت هماهنگی نوبت با کلینیک مینادنت تماس بگیرید.`,
+      priority,
+      urgency: 'urgent',
+      actionPath: '/implants',
+      extraInfo: im.brand ? `برند ${im.brand}` : undefined,
+    })
+  }
+
+  return result.sort((a, b) => b.priority - a.priority)
+}
+
+/**
+ * Lab orders that are overdue or arrived at clinic without a delivery appointment.
+ */
+export function findOverdueLabOrders(
+  labOrders: LabOrder[],
+  patients: Patient[],
+  today: Date | string = new Date(),
+): SmartReminder[] {
+  const todayStr = toIsoDate(today)
+  const patientMap = new Map(patients.map((p) => [p.id, p]))
+  const result: SmartReminder[] = []
+
+  for (const o of labOrders) {
+    if (o.status === 'cancelled' || o.status === 'delivered' || (o as any).delivered) continue
+    const p = patientMap.get(o.patient_id)
+    if (!p) continue
+
+    const deadline = o.deadline || (o as any).expected_delivery_date
+    const receivedAt = o.received_at || (o as any).delivery_date
+    const normalizedOrder = {
+      ...o,
+      deadline,
+      received_at: receivedAt,
+    }
+
+    const days = daysUntilDue(normalizedOrder as any, todayStr)
+    const isLate = days !== null && days < 0
+    const arrivedNoAppt = !!receivedAt && !o.delivery_appointment_id
+
+    if (!isLate && !arrivedNoAppt) continue
+
+    let detail = ''
+    let priority = 0
+
+    if (isLate) {
+      const lateDays = Math.abs(days!)
+      detail = `تأخیر تحویل لابراتوار — ${toPersianDigits(lateDays)} روز از موعد گذشته (${o.work_type || 'پروتز'})`
+      priority = 80000 + (lateDays * 1000)
+    } else if (arrivedNoAppt) {
+      detail = `کار لابراتوار رسیده — آماده تحویل به بیمار (نوبت تحویل ثبت نشده)`
+      priority = 90000
+    }
+
+    result.push({
+      id: `lab-${o.id}`,
+      category: 'lab_overdue',
+      patient: p,
+      title: `${p.first_name} ${p.last_name}`,
+      patientName: `${p.first_name} ${p.last_name}`,
+      detail,
+      actionNeeded: detail,
+      smsMessage: arrivedNoAppt
+        ? `${p.first_name} عزیز، کار پروتز دندان شما به کلینیک مینادنت رسیده است. لطفاً برای تعیین وقت تحویل تماس بگیرید.`
+        : '',
+      priority,
+      urgency: 'urgent',
+      actionPath: '/laboratory',
+      dueDate: deadline || undefined,
+      extraInfo: o.work_type || undefined,
+    })
+  }
+
+  return result.sort((a, b) => b.priority - a.priority)
+}
+
+export interface ClinicAlarmBundle {
+  all: SmartReminder[]
+  counts: Record<ReminderCategory, number>
+  total: number
+  hasUrgentFinancial: boolean
+  hasUrgentClinical: boolean
+  totalUrgentCount: number
+  countsByCategory: Record<ReminderCategory, number>
+  hasCriticalItems: boolean
+}
+
+export function getUrgentClinicAlarms(data: {
+  patients: Patient[]
+  cheques?: Cheque[]
+  installments?: Installment[]
+  labOrders?: LabOrder[]
+  implantCases?: ImplantCase[]
+  implants?: ImplantCase[]
+  appointments?: AppointmentWithRelations[]
+  treatments?: Treatment[]
+  payments?: Payment[]
+  encounters?: Encounter[]
+  today?: Date | string
+}): ClinicAlarmBundle {
+  const todayObj = toDateObj(data.today)
+  const todayStr = toIsoDate(data.today)
+  const patients = data.patients || []
+
+  const chequesDue = data.cheques ? findDueCheques(data.cheques, patients, todayStr) : []
+  const installmentsDue = data.installments ? findDueInstallments(data.installments, patients, todayStr) : []
+  const labOverdue = data.labOrders ? findOverdueLabOrders(data.labOrders, patients, todayStr) : []
+  const rawImplants = data.implantCases || data.implants
+  const implantDue = rawImplants ? findPendingImplantStages(rawImplants, patients, todayStr) : []
+  const birthdays = findBirthdays(patients, todayObj)
+  const debtors = data.treatments && data.payments ? findDebtors(patients, data.treatments, data.payments, data.implantCases) : []
+  const lapsed = data.encounters ? findLapsedPatients(patients, data.encounters) : []
+  const noShows = data.appointments ? findNoShows(data.appointments, patients) : []
+  const unresolvedAppts = data.appointments ? findUnresolvedPastAppointments(data.appointments, patients, todayObj) : []
+  const unfinishedTreatments = data.treatments && data.appointments ? findUnfinishedTreatmentFollowups(data.treatments, data.appointments, patients, todayObj) : []
+
+  const counts: Record<ReminderCategory, number> = {
+    cheque_due: chequesDue.length,
+    installment_due: installmentsDue.length,
+    lab_overdue: labOverdue.length,
+    implant_stage_due: implantDue.length,
+    birthday: birthdays.length,
+    debtor: debtors.length,
+    lapsed: lapsed.length,
+    no_show: noShows.length,
+    unresolved_appointment: unresolvedAppts.length,
+    unfinished_treatment: unfinishedTreatments.length,
+  }
+
+  const all: SmartReminder[] = [
+    ...chequesDue,
+    ...installmentsDue,
+    ...labOverdue,
+    ...implantDue,
+    ...noShows,
+    ...debtors.slice(0, 15),
+    ...unfinishedTreatments.slice(0, 15),
+    ...unresolvedAppts.slice(0, 15),
+    ...birthdays,
+    ...lapsed.slice(0, 10),
+  ].sort((a, b) => b.priority - a.priority)
+
+  const total =
+    chequesDue.length +
+    installmentsDue.length +
+    labOverdue.length +
+    implantDue.length +
+    noShows.length +
+    unresolvedAppts.length
+
+  const hasUrgentFinancial = chequesDue.length > 0 || installmentsDue.length > 0
+  const hasUrgentClinical = labOverdue.length > 0 || implantDue.length > 0
+  const hasCriticalItems = hasUrgentFinancial || hasUrgentClinical
+
+  return {
+    all,
+    counts,
+    total,
+    hasUrgentFinancial,
+    hasUrgentClinical,
+    totalUrgentCount: total,
+    countsByCategory: counts,
+    hasCriticalItems,
+  }
+}
+

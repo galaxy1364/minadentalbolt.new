@@ -1,7 +1,8 @@
 import { useState, useEffect, useCallback, useMemo } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
-import { Calendar, Clock, CheckCircle2, User, ChevronRight, ChevronLeft, Plus, Search, AlertCircle, Edit2, Stethoscope, DollarSign, FileText, Activity, List, Grid, X, UserPlus, Globe, Ban } from 'lucide-react'
+import { Calendar, Clock, CheckCircle2, User, ChevronRight, ChevronLeft, Plus, Search, AlertCircle, Edit2, Stethoscope, DollarSign, FileText, Activity, List, Grid, X, UserPlus, Globe, Ban, Printer } from 'lucide-react'
 import { fetchTreatments, fetchPayments, fetchImplantCases, fetchAppointments, createAppointment, updateAppointment, checkConflict, fetchPatients, updatePatient, fetchDoctors, fetchUnits, peekNextFileNumber, createPatient, createEncounter, fetchDoctorSchedules, fetchOnlineBookingRequests, rejectBookingRequest, updateLabOrder, updateImplantCase } from '../lib/api'
+import { supabase } from '../lib/supabase'
 import { toJalaliString, toJalaliStringPretty, getJalaliDateInfo, formatTime, timeParts, formatCurrency, toPersianDigits, persianWeekdaysShort, getHoliday, jsDateToPersianWeekday } from '../lib/persianDate'
 import { doctorColor } from '../lib/doctorColors'
 import { summariseDay, shiftsCapacityMinutes } from '../lib/dayMetrics'
@@ -83,7 +84,15 @@ export default function Appointments() {
   const [wizardOpen, setWizardOpen] = useState(false)
   const [wizardStep, setWizardStep] = useState(0)
   const [patientSearch, setPatientSearch] = useState('')
+  const [debouncedPatientSearch, setDebouncedPatientSearch] = useState('')
   const [showPatientResults, setShowPatientResults] = useState(false)
+
+  useEffect(() => {
+    const handler = setTimeout(() => {
+      setDebouncedPatientSearch(patientSearch)
+    }, 300)
+    return () => clearTimeout(handler)
+  }, [patientSearch])
   const [quickPatient, setQuickPatient] = useState({ first_name: '', last_name: '', phone: '' })
   const [editingAppt, setEditingAppt] = useState<AppointmentWithRelations | null>(null)
   const routerLocation = useLocation()
@@ -98,30 +107,38 @@ export default function Appointments() {
   useEffect(() => {
     const st = routerLocation.state as {
       quickStartPatientId?: string; quickStartDoctorId?: string | null
+      quickStartDate?: string; openWizard?: boolean
       labOrderId?: string; implantCaseId?: string; implantStep?: string
     } | null
-    if (!st?.quickStartPatientId) return
+    if (!st) return
 
-    // MOD-FIX-022: implant steps arrive here too. Surgery and impression
-    // are appointments; on save their date goes back to the case.
-    const implantStep = st.implantStep
-    const typeAndNote = implantStep === 'surgery_booked'
-      ? { type: 'surgery', notes: 'جراحی ایمپلنت' }
-      : implantStep === 'impression'
-        ? { type: 'impression', notes: 'قالب‌گیری ایمپلنت' }
-        : { type: 'delivery', notes: 'تحویل کار لابراتوار' }
+    if (st.quickStartDate) {
+      setSelectedCalDate(st.quickStartDate)
+    }
 
-    setWizardData((w) => ({
-      ...w,
-      patient_id: st.quickStartPatientId!,
-      doctor_id: st.quickStartDoctorId || w.doctor_id,
-      ...typeAndNote,
-    }))
-    setPendingLabOrderId(st.labOrderId ?? null)
-    setPendingImplant(st.implantCaseId && implantStep ? { caseId: st.implantCaseId, step: implantStep } : null)
-    setEditingAppt(null)
-    setWizardStep(0)
-    setWizardOpen(true)
+    if (st.quickStartPatientId || st.openWizard || st.quickStartDoctorId) {
+      const implantStep = st.implantStep
+      const typeAndNote = implantStep === 'surgery_booked'
+        ? { type: 'surgery', notes: 'جراحی ایمپلنت' }
+        : implantStep === 'impression'
+          ? { type: 'impression', notes: 'قالب‌گیری ایمپلنت' }
+          : implantStep
+            ? { type: 'delivery', notes: 'تحویل کار لابراتوار' }
+            : {}
+
+      setWizardData((w) => ({
+        ...w,
+        patient_id: st.quickStartPatientId || w.patient_id,
+        doctor_id: st.quickStartDoctorId || w.doctor_id,
+        date: st.quickStartDate || w.date,
+        ...typeAndNote,
+      }))
+      setPendingLabOrderId(st.labOrderId ?? null)
+      setPendingImplant(st.implantCaseId && implantStep ? { caseId: st.implantCaseId, step: implantStep } : null)
+      setEditingAppt(null)
+      setWizardStep(0)
+      setWizardOpen(true)
+    }
     // Clearing history state stops the wizard reopening on back-navigation.
     window.history.replaceState({}, '')
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -222,13 +239,13 @@ export default function Appointments() {
     // detour through Archive first. The one already on an appointment
     // being EDITED still always shows.
     const pool = patients
-    if (!patientSearch.trim()) return pool.filter((p) => p.is_active).slice(0, 8)
-    const q = patientSearch.toLowerCase().trim()
+    if (!debouncedPatientSearch.trim()) return pool.filter((p) => p.is_active).slice(0, 8)
+    const q = debouncedPatientSearch.toLowerCase().trim()
     return pool.filter((p) => {
       const name = `${p.first_name} ${p.last_name}`.toLowerCase()
       return name.includes(q) || (p.phone || '').includes(q) || (p.file_number || '').toLowerCase().includes(q) || (p.national_id || '').includes(q)
     }).slice(0, 10)
-  }, [patients, patientSearch, wizardData.patient_id])
+  }, [patients, debouncedPatientSearch, wizardData.patient_id])
 
   const patientName = (a: AppointmentWithRelations) => a.patient ? `${a.patient.first_name} ${a.patient.last_name}` : 'نامشخص'
   const doctorName = (a: AppointmentWithRelations) => a.doctor?.name ? `دکتر ${a.doctor.name}` : (a.doctor?.specialty ? `دکتر ${a.doctor.specialty}` : '—')
@@ -440,6 +457,32 @@ export default function Appointments() {
               // recoverable and must not look like the booking failed.
               showToast('error', 'نوبت ثبت شد ولی به سفارش لابراتوار وصل نشد')
             }
+          }
+          // ── MOD-FEAT-NEW-001: SMS تأیید خودکار هنگام ثبت نوبت ──────────
+          // A booking confirmation SMS is the single most-requested feature
+          // in real clinic software. The patient learns their appointment
+          // details the moment staff clicks confirm — no follow-up call needed.
+          // Fire-and-forget: SMS failure never blocks the booking itself.
+          try {
+            const patient = patients.find((p) => p.id === wizardData.patient_id)
+            const doctor  = doctors.find((d) => d.id === wizardData.doctor_id)
+            if (patient?.phone) {
+              const doctorLabel = doctor?.name ? `دکتر ${doctor.name}` : 'پزشک'
+              const dateLabel   = toJalaliStringPretty(wizardData.date)
+              const timeLabel   = formatTime(wizardData.start_time)
+              await supabase.functions.invoke('send-sms', {
+                body: {
+                  type: 'booking_confirmation',
+                  to: patient.phone,
+                  patientName: `${patient.first_name} ${patient.last_name}`,
+                  doctorName: doctorLabel,
+                  date: dateLabel,
+                  time: timeLabel,
+                },
+              })
+            }
+          } catch {
+            // SMS failure is silent — the booking is already saved.
           }
         }
         setPendingLabOrderId(null)
@@ -689,9 +732,34 @@ export default function Appointments() {
             </button>
           ))}
         </div>
+        {/* ── MOD-FEAT-NEW-002: پرینت نوبت‌نامه روزانه ── */}
+        <button
+          onClick={() => {
+            h.confirm()
+            const todayAppts = appointments
+              .filter((a) => a.date === todayStr)
+              .sort((a, b) => a.start_time.localeCompare(b.start_time))
+            const rows = todayAppts.map((a) => {
+              const p = a.patient ? `${a.patient.first_name} ${a.patient.last_name}` : 'نامشخص'
+              const d = a.doctor?.name ? `دکتر ${a.doctor.name}` : '—'
+              const t = getType(a.type).label
+              const s = getStatus(a.status).label
+              return `<tr><td>${a.start_time}</td><td>${p}</td><td>${d}</td><td>${t}</td><td>${s}</td><td>${a.unit?.name || '—'}</td></tr>`
+            }).join('')
+            const html = `<!DOCTYPE html><html lang="fa" dir="rtl"><head><meta charset="utf-8"><title>نوبت‌نامه ${toJalaliStringPretty(todayStr)}</title><style>*{font-family:Tahoma,sans-serif;direction:rtl}body{padding:20px}h1{font-size:16px;margin-bottom:12px;border-bottom:2px solid #000;padding-bottom:6px}table{width:100%;border-collapse:collapse;font-size:12px}th,td{border:1px solid #ccc;padding:6px 8px;text-align:right}th{background:#f0f0f0;font-weight:bold}tr:nth-child(even){background:#f9f9f9}@media print{button{display:none}}</style></head><body><h1>نوبت‌نامه — ${toJalaliStringPretty(todayStr)} (${toPersianDigits(todayAppts.length)} نوبت)</h1><table><thead><tr><th>ساعت</th><th>بیمار</th><th>پزشک</th><th>نوع</th><th>وضعیت</th><th>یونیت</th></tr></thead><tbody>${rows}</tbody></table></body></html>`
+            const w = window.open('', '_blank')
+            if (w) { w.document.write(html); w.document.close(); setTimeout(() => w.print(), 300) }
+          }}
+          className="p-2 rounded-xl bg-white border border-slate-200 text-slate-500 hover:text-primary-600 transition-all-smooth press-scale flex-shrink-0"
+          title="پرینت نوبت‌نامه امروز"
+          aria-label="پرینت نوبت‌نامه امروز"
+        >
+          <Printer size={16} />
+        </button>
         <button
           onClick={() => { h.tap(); setShowSearch(!showSearch) }}
           className="p-2 rounded-xl bg-white border border-slate-200 text-slate-500 hover:text-primary-600 transition-all-smooth press-scale flex-shrink-0"
+          aria-label="جستجو"
         >
           <Search size={16} />
         </button>

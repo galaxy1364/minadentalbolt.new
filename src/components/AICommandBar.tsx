@@ -211,12 +211,14 @@ export default function AICommandBar() {
         return p ? `${p.first_name} ${p.last_name}` : 'بیمار نامشخص'
       }
       const idx: SearchableRecord[] = [
-        ...patients.filter((p) => p.is_active !== false).map((p) => ({
+        ...patients.map((p) => ({
           kind: 'patient' as const, id: p.id,
-          title: `${p.first_name} ${p.last_name}`,
-          subtitle: p.phone || p.national_id || null,
+          title: `${p.first_name} ${p.last_name}${p.is_active === false ? ' (بایگانی)' : ''}`,
+          subtitle: p.is_active === false
+            ? `بایگانی شده • ${p.phone || (p.file_number ? `پرونده ${p.file_number}` : 'پرونده راکد')}`
+            : (p.phone || p.national_id || null),
           route: `/patients/${p.id}`,
-          keywords: [p.national_id, p.phone, p.file_number != null ? String(p.file_number) : null],
+          keywords: [p.national_id, p.phone, p.file_number != null ? String(p.file_number) : null, p.is_active === false ? 'بایگانی' : null, 'archive'],
         })),
         ...appointments.map((a) => ({
           kind: 'appointment' as const, id: a.id,

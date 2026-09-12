@@ -9,8 +9,29 @@ const corsHeaders = {
 
 interface SMSRequest {
   to: string;
-  message: string;
-  type?: 'reminder' | 'confirm' | 'followup' | 'general';
+  /** ارسال پیام خام */
+  message?: string;
+  type?: 'reminder' | 'confirm' | 'followup' | 'general' | 'booking_confirmation';
+  /** پیام ساختار‌یافته برای تأیید نوبت — به جای message خام */
+  patientName?: string;
+  doctorName?: string;
+  date?: string;
+  time?: string;
+}
+
+function buildMessage(req: SMSRequest): string {
+  if (req.type === 'booking_confirmation') {
+    return (
+      `${req.patientName ?? 'بیمار'} عزیز،\n` +
+      `نوبت شما با موفقیت ثبت شد:\n` +
+      `پزشک: ${req.doctorName ?? '—'}\n` +
+      `تاریخ: ${req.date ?? '—'}\n` +
+      `ساعت: ${req.time ?? '—'}\n\n` +
+      `در صورت نیاز به تغییر لطفاً تماس بگیرید.\n` +
+      `مطب دندانپزشکی`
+    );
+  }
+  return req.message ?? '';
 }
 
 interface SMSProvider {
@@ -136,7 +157,9 @@ Deno.serve(async (req: Request) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     );
 
-    const { to, message, type }: SMSRequest = await req.json();
+    const reqBody: SMSRequest = await req.json();
+    const { to, type } = reqBody;
+    const message = buildMessage(reqBody);
 
     if (!to || !message) {
       return new Response(
@@ -147,6 +170,7 @@ Deno.serve(async (req: Request) => {
 
     const provider = getProvider();
     const result = await provider.send(to, message);
+
 
     // Log the SMS
     const { error: logError } = await supabaseClient

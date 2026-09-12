@@ -5,14 +5,14 @@
 import { useState, useEffect, useMemo } from 'react'
 import { toothLabel, toothLabelWithWord } from '../lib/toothLabel'
 import { useNavigate } from 'react-router-dom'
-import { Calendar as CalIcon, Clock, FlaskConical, Layers, Bone, User, Users, CalendarPlus, DollarSign, BellRing } from 'lucide-react'
-import { fetchAppointments, fetchLabOrders, fetchTreatmentPhases, fetchImplantCases, fetchPatients } from '../lib/api'
+import { Calendar as CalIcon, Clock, FlaskConical, Layers, Bone, User, Users, CalendarPlus, DollarSign, BellRing, Stethoscope } from 'lucide-react'
+import { fetchAppointments, fetchLabOrders, fetchTreatmentPhases, fetchImplantCases, fetchPatients, fetchDoctors, fetchDoctorSchedules } from '../lib/api'
 import { toJalaliStringPretty, toPersianDigits, toJalaliString, getHoliday, todayLocalISO } from '../lib/persianDate'
 import { PersianCalendar } from '../components/PersianCalendar'
-import { Card, Spinner, EmptyState, Badge } from '../components/ui'
+import { Card, Spinner, EmptyState, Badge, Button } from '../components/ui'
 import { ModuleHeader } from '../components/ModuleHeader'
 import { h } from '../lib/haptics'
-import type { AppointmentWithRelations, LabOrder, TreatmentPhase, ImplantCaseWithRelations, Patient } from '../types'
+import type { AppointmentWithRelations, LabOrder, TreatmentPhase, ImplantCaseWithRelations, Patient, Doctor, DoctorSchedule } from '../types'
 
 type CalEvent = {
   id: string
@@ -33,20 +33,25 @@ export default function CalendarPage() {
   const [phases, setPhases] = useState<TreatmentPhase[]>([])
   const [implantCases, setImplantCases] = useState<ImplantCaseWithRelations[]>([])
   const [patients, setPatients] = useState<Patient[]>([])
+  const [doctors, setDoctors] = useState<Doctor[]>([])
+  const [doctorSchedules, setDoctorSchedules] = useState<DoctorSchedule[]>([])
   const [selectedDate, setSelectedDate] = useState(todayLocalISO())
 
   useEffect(() => {
     const load = async () => {
       setLoading(true)
       try {
-        const [appts, labs, ph, impl, pats] = await Promise.all([
+        const [appts, labs, ph, impl, pats, docs, scs] = await Promise.all([
           fetchAppointments(), fetchLabOrders(), fetchTreatmentPhases(), fetchImplantCases(), fetchPatients(),
+          fetchDoctors().catch(() => []), fetchDoctorSchedules().catch(() => []),
         ])
         setAppointments(appts)
         setLabOrders(labs as unknown as LabOrder[])
         setPhases(ph)
         setImplantCases(impl)
         setPatients(pats)
+        setDoctors(docs)
+        setDoctorSchedules(scs)
       } finally {
         setLoading(false)
       }
@@ -107,6 +112,33 @@ export default function CalendarPage() {
     () => Array.from(new Set(allEvents.filter((e) => e.type !== 'appointment').map((e) => e.date))),
     [allEvents],
   )
+
+  const selectedDayOfWeek = useMemo(() => {
+    if (!selectedDate) return 0
+    const [y, m, d] = selectedDate.split('-').map(Number)
+    const dt = new Date(y, m - 1, d)
+    return (dt.getDay() + 1) % 7
+  }, [selectedDate])
+
+  const weekdayNames = ['شنبه', 'یکشنبه', 'دوشنبه', 'سه‌شنبه', 'چهارشنبه', 'پنجشنبه', 'جمعه']
+
+  const onDutyDoctors = useMemo(() => {
+    const activeDocs = doctors.filter((d) => d.is_active)
+    return activeDocs.map((doc) => {
+      const schedule = doctorSchedules.find(
+        (s) => s.doctor_id === doc.id && s.day_of_week === selectedDayOfWeek && s.is_active
+      )
+      const apptCount = appointments.filter(
+        (a) => a.date === selectedDate && a.doctor_id === doc.id && a.status !== 'cancelled'
+      ).length
+      return {
+        doctor: doc,
+        schedule,
+        isOnDuty: !!schedule,
+        apptCount,
+      }
+    })
+  }, [doctors, doctorSchedules, selectedDayOfWeek, appointments, selectedDate])
 
   const eventTypeMeta: Record<CalEvent['type'], { icon: JSX.Element; color: string; label: string }> = {
     appointment: { icon: <CalIcon size={14} />, color: 'bg-amber-100 text-amber-700', label: 'نوبت' },
@@ -169,6 +201,90 @@ export default function CalendarPage() {
         appointments={allEvents.filter((e) => e.type === 'appointment').map((e) => ({ date: e.date, status: e.status || 'scheduled' }))}
         highlightDates={highlightDates}
       />
+
+      {/* کشیک و وضعیت حضور پزشکان */}
+      {onDutyDoctors.length > 0 && (
+        <div className="space-y-2">
+          <div className="flex items-center justify-between">
+            <h3 className="text-sm font-bold text-slate-700 dark:text-slate-200 flex items-center gap-2">
+              <Stethoscope size={15} className="text-primary-600" />
+              کشیک و شیفت پزشکان در {weekdayNames[selectedDayOfWeek]} ({toJalaliStringPretty(selectedDate)})
+            </h3>
+            <span className="text-xs text-slate-400">
+              {toPersianDigits(onDutyDoctors.filter((d) => d.isOnDuty).length)} پزشک حاضر
+            </span>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
+            {onDutyDoctors.map(({ doctor, schedule, isOnDuty, apptCount }) => (
+              <Card
+                key={doctor.id}
+                className={`p-3 border transition-all-smooth ${
+                  isOnDuty
+                    ? 'border-emerald-200/70 bg-gradient-to-br from-white to-emerald-50/20 dark:from-slate-800 dark:to-emerald-950/10'
+                    : 'border-slate-200/50 bg-white dark:bg-slate-800 opacity-60'
+                }`}
+              >
+                <div className="flex items-center justify-between gap-2">
+                  <div className="flex items-center gap-2.5 min-w-0">
+                    <div
+                      className="w-8 h-8 rounded-xl flex items-center justify-center text-xs font-bold text-white shrink-0 shadow-sm"
+                      style={{ backgroundColor: doctor.color || '#0ea5e9' }}
+                    >
+                      {doctor.name?.slice(0, 1) || 'د'}
+                    </div>
+                    <div className="min-w-0">
+                      <p className="text-sm font-bold text-slate-800 dark:text-slate-100 truncate">
+                        دکتر {doctor.name}
+                      </p>
+                      <p className="text-xs text-slate-500 truncate">
+                        {doctor.specialty || 'دندانپزشک'}
+                      </p>
+                    </div>
+                  </div>
+                  {isOnDuty ? (
+                    <Badge color="emerald">حاضر در شیفت</Badge>
+                  ) : (
+                    <Badge color="slate">عدم حضور</Badge>
+                  )}
+                </div>
+
+                {isOnDuty && schedule && (
+                  <div className="mt-2.5 pt-2 border-t border-slate-100 dark:border-slate-700 flex items-center justify-between text-xs">
+                    <span className="text-slate-600 dark:text-slate-300 flex items-center gap-1 font-medium">
+                      <Clock size={12} className="text-slate-400" />
+                      {toPersianDigits(schedule.start_time)} تا {toPersianDigits(schedule.end_time)}
+                    </span>
+                    <span className="text-slate-500">
+                      {toPersianDigits(apptCount)} نوبت رزرو شده
+                    </span>
+                  </div>
+                )}
+
+                {isOnDuty && (
+                  <Button
+                    size="sm"
+                    variant="secondary"
+                    onClick={() => {
+                      h.tap()
+                      navigate('/appointments', {
+                        state: {
+                          quickStartDate: selectedDate,
+                          quickStartDoctorId: doctor.id,
+                          openWizard: true,
+                        },
+                      })
+                    }}
+                    className="w-full mt-2 text-xs flex items-center justify-center gap-1 bg-primary-50 text-primary-700 hover:bg-primary-100 border-primary-200"
+                  >
+                    <CalendarPlus size={13} /> ثبت نوبت با دکتر {doctor.name}
+                  </Button>
+                )}
+              </Card>
+            ))}
+          </div>
+        </div>
+      )}
 
       <div className="space-y-2">
         <h3 className="text-sm font-bold text-slate-700 dark:text-slate-200 flex items-center gap-2">

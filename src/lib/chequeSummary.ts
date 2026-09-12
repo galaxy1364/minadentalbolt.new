@@ -32,6 +32,9 @@ export interface ChequeLike {
   status: string
   purpose: 'payment' | 'guarantee'
   payment_plan_id: string | null
+  bank_name?: string | null
+  cheque_number?: string | null
+  sayad_id?: string | null
 }
 
 /** وضعیت‌هایی که یعنی چک هنوز در جریان است. */

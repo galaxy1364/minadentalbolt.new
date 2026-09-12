@@ -9,7 +9,7 @@ import {
   Clock, TrendingUp, TrendingDown, Smile, AlertTriangle, Package,
   ClipboardList, Wallet, Zap, ChevronLeft, Timer, Moon, Sun, Target, Settings2,
   CheckCircle2, ArrowUpRight, ArrowDownRight, Sparkles, Building2,
-  RefreshCw, Download, FileText, Bell, AlertCircle
+  RefreshCw, Download, FileText, Bell, AlertCircle, Banknote, CalendarClock,
 } from 'lucide-react'
 import {
   AreaChart, Area, XAxis, YAxis, Tooltip as RTooltip, ResponsiveContainer,
@@ -21,6 +21,7 @@ import {
   fetchDashboardStats, fetchAppointments, fetchPatients, fetchPayments,
   fetchEncounters, fetchInventoryItems, fetchLabOrders, fetchWaitingList,
   fetchActivityFeed, fetchDoctors, fetchAllInstallments, fetchTreatments, fetchImplantCases,
+  fetchCheques,
 } from '../lib/api'
 import {
   toJalaliStringPretty, getJalaliMonthYear, formatCurrency, formatNumber,
@@ -28,13 +29,18 @@ import {
 } from '../lib/persianDate'
 import type {
   AppointmentWithRelations, Patient, Payment, DashboardStats, Doctor, LabOrder,
-  Encounter, Installment, TreatmentWithRelations, ImplantCase,
+  Encounter, Installment, TreatmentWithRelations, ImplantCase, Cheque,
 } from '../types'
 import { Card, Badge, EmptyState, showToast, Modal } from '../components/ui'
 import { buildClinicalFollowUps, applyDismissals, snoozeUntil } from '../lib/followUps'
 import type { Dismissal } from '../lib/followUps'
 import { fetchTreatmentPhases } from '../lib/api'
-import { findBirthdays, findDebtors, findLapsedPatients, findDueInstallments, findNoShows, findUnfinishedTreatmentFollowups, findUnresolvedPastAppointments, REMINDER_CATEGORY_META, SmartReminder } from '../lib/smartReminders'
+import {
+  findBirthdays, findDebtors, findLapsedPatients, findDueInstallments,
+  findNoShows, findUnfinishedTreatmentFollowups, findUnresolvedPastAppointments,
+  findDueCheques, findPendingImplantStages, findOverdueLabOrders,
+  REMINDER_CATEGORY_META, type SmartReminder, type ReminderCategory,
+} from '../lib/smartReminders'
 import { calcAllPatientBalances } from '../lib/finance'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../lib/auth'
@@ -524,6 +530,7 @@ export default function Dashboard() {
   const [autoRefresh, setAutoRefresh] = useState(true)
 
   const [labOrdersState, setLabOrdersState] = useState<LabOrder[]>([])
+  const [chequesState, setChequesState] = useState<Cheque[]>([])
 
   // ── Data Fetching ──────────────────────────────────────────────
 
@@ -531,7 +538,7 @@ export default function Dashboard() {
     if (isRefresh) { setRefreshing(true); if (!silent) h.tap() } else { setLoading(true) }
     try {
       const timeout = new Promise<never>((_, reject) => setTimeout(() => reject(new Error('Dashboard load timed out')), 15000))
-      const [s, appts, pats, pays, encs, items, labOrders, waiting, docs, feed, insts, trts, implCases] = await Promise.race([
+      const [s, appts, pats, pays, encs, items, labOrders, waiting, docs, feed, insts, trts, implCases, chqs] = await Promise.race([
         Promise.all([
           fetchDashboardStats(),
           fetchAppointments(),
@@ -546,14 +553,16 @@ export default function Dashboard() {
           fetchAllInstallments(),
           fetchTreatments(),
           fetchImplantCases(),
+          fetchCheques(),
         ]),
         timeout,
-      ]) as [DashboardStats, AppointmentWithRelations[], Patient[], Payment[], Encounter[], any[], any[], any[], Doctor[], any[], Installment[], TreatmentWithRelations[], ImplantCase[]]
+      ]) as [DashboardStats, AppointmentWithRelations[], Patient[], Payment[], Encounter[], any[], any[], any[], Doctor[], any[], Installment[], TreatmentWithRelations[], ImplantCase[], Cheque[]]
       setStats(s); setAppointments(appts); setPatients(pats); setPayments(pays)
       setDoctors(docs); setActivity(feed as ActivityItem[])
       setEncounters(encs); setInstallments(insts)
       setTreatments(trts)
       setImplantCases(implCases)
+      setChequesState(chqs || [])
       // Loaded for the clinical follow-up list; failure here must not
       // take the dashboard down with it.
       fetchTreatmentPhases().then(setPhasesState).catch(() => setPhasesState([]))
@@ -662,18 +671,21 @@ export default function Dashboard() {
       .sort((a, b) => a.start_time.localeCompare(b.start_time))
   }, [appointments, todayStr, doctorFilter])
 
-  // ── Smart reminders (birthdays, debtors, lapsed patients, due installments) ──
+  // ── Smart reminders (birthdays, debtors, lapsed patients, due installments, cheques, implants, labs) ──
   const smartReminders = useMemo(() => {
     return {
+      cheque_due: findDueCheques(chequesState, patients),
+      installment_due: findDueInstallments(installments, patients),
+      lab_overdue: findOverdueLabOrders(labOrdersState, patients),
+      implant_stage_due: findPendingImplantStages(implantCases, patients),
       birthday: findBirthdays(patients),
       debtor: findDebtors(patients, treatments, payments, implantCases),
       lapsed: findLapsedPatients(patients, encounters),
-      installment_due: findDueInstallments(installments, patients),
       no_show: findNoShows(appointments, patients),
       unresolved_appointment: findUnresolvedPastAppointments(appointments, patients),
       unfinished_treatment: findUnfinishedTreatmentFollowups(treatments, appointments, patients),
     }
-  }, [patients, encounters, installments, treatments, appointments, implantCases])
+  }, [patients, encounters, installments, treatments, appointments, implantCases, chequesState, labOrdersState])
 
   // ── Clinical follow-ups ──────────────────────────────────────
   // smartReminders covers the patient-facing side. Nothing covered the
@@ -858,8 +870,19 @@ export default function Dashboard() {
   // ── Notification center (aggregates every alert into one bell icon) ──
   const [notifCenterOpen, setNotifCenterOpen] = useState(false)
   const totalNotifCount =
-    smartReminders.birthday.length + smartReminders.debtor.length + smartReminders.lapsed.length + smartReminders.installment_due.length + smartReminders.no_show.length + smartReminders.unfinished_treatment.length + smartReminders.unresolved_appointment.length +
-    lowInventoryCount + overdueLabCount + waitingListCount
+    smartReminders.birthday.length +
+    smartReminders.debtor.length +
+    smartReminders.lapsed.length +
+    smartReminders.installment_due.length +
+    smartReminders.cheque_due.length +
+    smartReminders.implant_stage_due.length +
+    smartReminders.lab_overdue.length +
+    smartReminders.no_show.length +
+    smartReminders.unfinished_treatment.length +
+    smartReminders.unresolved_appointment.length +
+    lowInventoryCount +
+    overdueLabCount +
+    waitingListCount
 
   // ── Real Sparkline Data ────────────────────────────────────────
 
@@ -1298,8 +1321,44 @@ export default function Dashboard() {
       </div>
 
       {/* ═══ Alert Widgets ══════════════════════════════════════════ */}
-      {(outstandingBalance > 0 || lowInventoryCount > 0 || overdueLabCount > 0 || waitingListCount > 0) && (
+      {(outstandingBalance > 0 ||
+        lowInventoryCount > 0 ||
+        overdueLabCount > 0 ||
+        waitingListCount > 0 ||
+        smartReminders.cheque_due.length > 0 ||
+        smartReminders.installment_due.length > 0 ||
+        smartReminders.implant_stage_due.length > 0) && (
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-2.5">
+          {smartReminders.cheque_due.length > 0 && (
+            <AlertWidget
+              icon={<div className="w-full h-full rounded-xl bg-orange-100 dark:bg-orange-900/40 flex items-center justify-center text-orange-600 dark:text-orange-400"><Banknote size={20} /></div>}
+              label="چک‌های سررسید و برگشتی"
+              value={`${toPersianDigits(smartReminders.cheque_due.length)} فقره`}
+              color="border-orange-200 dark:border-orange-700 bg-orange-50 dark:bg-orange-900/20 text-orange-800 dark:text-orange-300"
+              onClick={() => navigate('/billing')}
+              delay={440}
+            />
+          )}
+          {smartReminders.installment_due.length > 0 && (
+            <AlertWidget
+              icon={<div className="w-full h-full rounded-xl bg-violet-100 dark:bg-violet-900/40 flex items-center justify-center text-violet-600 dark:text-violet-400"><CalendarClock size={20} /></div>}
+              label="اقساط سررسید شده"
+              value={`${toPersianDigits(smartReminders.installment_due.length)} قسط`}
+              color="border-violet-200 dark:border-violet-700 bg-violet-50 dark:bg-violet-900/20 text-violet-800 dark:text-violet-300"
+              onClick={() => navigate('/billing')}
+              delay={480}
+            />
+          )}
+          {smartReminders.implant_stage_due.length > 0 && (
+            <AlertWidget
+              icon={<div className="w-full h-full rounded-xl bg-sky-100 dark:bg-sky-900/40 flex items-center justify-center text-sky-600 dark:text-sky-400"><Activity size={20} /></div>}
+              label="ایمپلنت‌های آماده اقدام"
+              value={`${toPersianDigits(smartReminders.implant_stage_due.length)} مورد`}
+              color="border-sky-200 dark:border-sky-700 bg-sky-50 dark:bg-sky-900/20 text-sky-800 dark:text-sky-300"
+              onClick={() => navigate('/implants')}
+              delay={520}
+            />
+          )}
           {outstandingBalance > 0 && (
             <AlertWidget
               icon={<div className="w-full h-full rounded-xl bg-warning-100 dark:bg-warning-900/40 flex items-center justify-center text-warning-600 dark:text-warning-400"><Wallet size={20} /></div>}
@@ -1307,7 +1366,7 @@ export default function Dashboard() {
               value={`${formatCurrency(outstandingBalance)} ت`}
               color="border-warning-200 dark:border-warning-700 bg-warning-50 dark:bg-warning-900/20 text-warning-800 dark:text-warning-300"
               onClick={() => navigate('/billing')}
-              delay={500}
+              delay={560}
             />
           )}
           {lowInventoryCount > 0 && (
@@ -1317,7 +1376,7 @@ export default function Dashboard() {
               value={`${toPersianDigits(lowInventoryCount)} مورد`}
               color="border-error-200 dark:border-error-700 bg-error-50 dark:bg-error-900/20 text-error-800 dark:text-error-300"
               onClick={() => navigate('/inventory')}
-              delay={560}
+              delay={600}
             />
           )}
           {overdueLabCount > 0 && (
@@ -1327,7 +1386,7 @@ export default function Dashboard() {
               value={`${toPersianDigits(overdueLabCount)} مورد`}
               color="border-error-200 dark:border-error-700 bg-error-50 dark:bg-error-900/20 text-error-800 dark:text-error-300"
               onClick={() => navigate('/laboratory')}
-              delay={620}
+              delay={640}
             />
           )}
           {waitingListCount > 0 && (
@@ -1602,20 +1661,29 @@ export default function Dashboard() {
       )}
 
       {/* ═══ Smart Reminders ════════════════════════════════════════ */}
-      {(smartReminders.birthday.length + smartReminders.debtor.length + smartReminders.lapsed.length + smartReminders.installment_due.length) > 0 && (
+      {(smartReminders.birthday.length +
+        smartReminders.debtor.length +
+        smartReminders.lapsed.length +
+        smartReminders.installment_due.length +
+        smartReminders.cheque_due.length +
+        smartReminders.implant_stage_due.length +
+        smartReminders.lab_overdue.length +
+        smartReminders.no_show.length +
+        smartReminders.unfinished_treatment.length +
+        smartReminders.unresolved_appointment.length) > 0 && (
         <Card className="p-4 tile-in">
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-base font-bold text-slate-800 dark:text-slate-100 flex items-center gap-2">
               <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-amber-400 to-orange-500 flex items-center justify-center text-white">
                 <Bell size={16} />
               </div>
-              یادآوری‌های هوشمند امروز
+              یادآوری‌ها و هشدارهای کلینیک
             </h2>
           </div>
           <div className="space-y-4">
             {(Object.keys(REMINDER_CATEGORY_META) as (keyof typeof REMINDER_CATEGORY_META)[]).map((cat) => {
-              const items = smartReminders[cat]
-              if (items.length === 0) return null
+              const items = smartReminders[cat] as SmartReminder[] | undefined
+              if (!items || items.length === 0) return null
               const meta = REMINDER_CATEGORY_META[cat]
               return (
                 <div key={cat}>
@@ -1625,13 +1693,17 @@ export default function Dashboard() {
                     <Badge color="slate">{toPersianDigits(items.length)}</Badge>
                   </div>
                   <div className="space-y-1.5 max-h-[220px] overflow-y-auto pr-1 -mr-1">
-                    {items.slice(0, 10).map((r) => {
-                      const key = r.patient.id + r.category
+                    {items.slice(0, 10).map((r: SmartReminder) => {
+                      const key = r.id || r.patient.id + r.category
                       return (
                         <div
                           key={key}
                           className="flex items-center gap-2.5 p-2.5 rounded-xl bg-slate-50 dark:bg-slate-800/60 hover:bg-slate-100 dark:hover:bg-slate-800 transition-all-smooth cursor-pointer"
-                          onClick={() => cat === 'unresolved_appointment' ? navigate('/appointments') : navigate(`/patients/${r.patient.id}`)}
+                          onClick={() => {
+                            if (r.actionPath) navigate(r.actionPath)
+                            else if (cat === 'unresolved_appointment') navigate('/appointments')
+                            else navigate(`/patients/${r.patient.id}`)
+                          }}
                         >
                           <div className="w-8 h-8 rounded-full flex items-center justify-center text-white text-xs font-bold shrink-0" style={{ background: meta.color }}>
                             {r.patient.first_name[0]}
@@ -1859,11 +1931,25 @@ export default function Dashboard() {
                 <Badge color="warning">{toPersianDigits(smartReminders.lapsed.length)}</Badge>
               </button>
             )}
+            {smartReminders.cheque_due.length > 0 && (
+              <button onClick={() => { setNotifCenterOpen(false); navigate('/billing') }} className="w-full flex items-center gap-3 p-3 rounded-xl bg-orange-50 dark:bg-orange-900/20 text-right hover:bg-orange-100 dark:hover:bg-orange-900/40 transition-all-smooth">
+                <span className="text-lg">🧾</span>
+                <span className="flex-1 text-sm font-semibold text-orange-700 dark:text-orange-300">چک‌های سررسید و برگشتی</span>
+                <Badge color="error">{toPersianDigits(smartReminders.cheque_due.length)}</Badge>
+              </button>
+            )}
             {smartReminders.installment_due.length > 0 && (
               <button onClick={() => { setNotifCenterOpen(false); navigate('/billing') }} className="w-full flex items-center gap-3 p-3 rounded-xl bg-violet-50 dark:bg-violet-900/20 text-right hover:bg-violet-100 dark:hover:bg-violet-900/40 transition-all-smooth">
                 <span className="text-lg">📅</span>
-                <span className="flex-1 text-sm font-semibold text-violet-700 dark:text-violet-300">اقساط سررسید</span>
+                <span className="flex-1 text-sm font-semibold text-violet-700 dark:text-violet-300">اقساط سررسید شده</span>
                 <Badge color="secondary">{toPersianDigits(smartReminders.installment_due.length)}</Badge>
+              </button>
+            )}
+            {smartReminders.implant_stage_due.length > 0 && (
+              <button onClick={() => { setNotifCenterOpen(false); navigate('/implants') }} className="w-full flex items-center gap-3 p-3 rounded-xl bg-sky-50 dark:bg-sky-900/20 text-right hover:bg-sky-100 dark:hover:bg-sky-900/40 transition-all-smooth">
+                <span className="text-lg">🔩</span>
+                <span className="flex-1 text-sm font-semibold text-sky-700 dark:text-sky-300">ایمپلنت‌های آماده مرحله بعد</span>
+                <Badge color="primary">{toPersianDigits(smartReminders.implant_stage_due.length)}</Badge>
               </button>
             )}
             {smartReminders.no_show.length > 0 && (

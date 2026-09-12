@@ -1,13 +1,15 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react'
 import { HashRouter, Routes, Route, useNavigate, useLocation } from 'react-router-dom'
 import {
-  MoreHorizontal, X, Wifi, WifiOff, RefreshCw, Moon, Sun, LogOut, AlertTriangle, Sparkles,
+  MoreHorizontal, X, Wifi, WifiOff, RefreshCw, Moon, Sun, LogOut, AlertTriangle, Sparkles, Bell,
 } from 'lucide-react'
 import { Spinner, ToastContainer, Button } from './ui'
 import AICommandBar from './AICommandBar'
 import { DynamicIsland, pushIslandNotification } from './DynamicIsland'
 import { ErrorBoundary } from './ErrorBoundary'
 import { MinadentLogo } from './MinadentLogo'
+import { ClinicalAlarmCenter, useClinicAlarmSummary } from './ClinicalAlarmCenter'
+import { PersianClinicAiAssistant } from './PersianClinicAiAssistant'
 import Login from '../pages/Login'
 import { useAuth } from '../lib/auth'
 import { canAccess, REQUIRE_LOGIN } from '../lib/permissions'
@@ -402,10 +404,38 @@ function LogoutButton() {
   )
 }
 
+function HeaderAlarmButton({ onClick }: { onClick: () => void }) {
+  const { bundle } = useClinicAlarmSummary()
+  const hasUrgent = bundle.total > 0
+
+  return (
+    <button
+      onClick={() => {
+        h.pop()
+        onClick()
+      }}
+      aria-label="مرکز آلارم و هشدارهای بالینی"
+      title={hasUrgent ? `${toPersianDigits(bundle.total)} هشدار فعال بالینی و مالی` : 'مرکز آلارم و هشدارها'}
+      className="relative flex items-center justify-center w-9 h-9 rounded-xl glass border border-white/60 dark:border-white/10 text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white transition-all-smooth active:scale-90"
+    >
+      <Bell size={17} className={hasUrgent ? 'text-amber-500 animate-pulse' : ''} />
+      {hasUrgent && (
+        <span
+          className="absolute -top-1 -right-1 min-w-[17px] h-[17px] px-1 rounded-full bg-red-500 text-white text-[10px] font-bold flex items-center justify-center border-2 border-white dark:border-slate-900 shadow-sm"
+          aria-hidden="true"
+        >
+          {bundle.total > 99 ? '+۹۹' : toPersianDigits(bundle.total)}
+        </span>
+      )}
+    </button>
+  )
+}
+
 function LayoutInner({ children }: { children: React.ReactNode }) {
   const location = useLocation()
   const navigate = useNavigate()
   const currentItem = getModuleByPath(location.pathname)
+  const [alarmCenterOpen, setAlarmCenterOpen] = useState(false)
 
   useEffect(() => {
     setModuleTheme(currentItem)
@@ -460,6 +490,7 @@ function LayoutInner({ children }: { children: React.ReactNode }) {
             </div>
           </button>
           <div className="flex items-center gap-2">
+            <HeaderAlarmButton onClick={() => setAlarmCenterOpen(true)} />
             <DarkModeToggle />
             <LogoutButton />
             <SyncIndicator />
@@ -479,6 +510,8 @@ function LayoutInner({ children }: { children: React.ReactNode }) {
       <AICommandBar />
       <ToastContainer />
       <DynamicIsland />
+      <ClinicalAlarmCenter open={alarmCenterOpen} onClose={() => setAlarmCenterOpen(false)} />
+      <PersianClinicAiAssistant />
     </div>
   )
 }

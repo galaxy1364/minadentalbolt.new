@@ -5,7 +5,7 @@ import {
   Settings as SettingsIcon, Building2, Hash, MessageSquare, Package, Save, Smile,
   Cloud, Download, Upload, Vibrate, Volume2, Bell, Database, RefreshCw, Check,
   Smartphone, Shield, AlertTriangle, Eye, ChevronRight, Wifi, Plus, Edit2, Trash2, Archive, Delete,
-  Stethoscope, Wrench, ListOrdered, Tag, Copy, CheckCircle2, History, CloudOff, Sparkles, Megaphone, Fingerprint,
+  Stethoscope, Wrench, ListOrdered, Tag, Copy, CheckCircle2, History, CloudOff, Sparkles, Megaphone, Fingerprint, Share2,
 } from 'lucide-react'
 import { isAppLockEnabled, setAppLockPin, disableAppLock, isBiometricAvailable, registerBiometric, hasBiometricRegistered } from '../lib/appLock'
 import { MATERIAL_LEVELS, getMaterialLevel, setMaterialLevel, prefersReducedTransparency, type MaterialLevel } from '../lib/materials'
@@ -40,6 +40,7 @@ import { fetchAuditLog, clearAuditLog } from '../lib/auditLog'
 import { allModules } from '../theme/modules'
 import { canAccess, ROLES, getAllModulePaths, canOpenSettingsSection, SettingsSection, allowedSettingsSections } from '../lib/permissions'
 import { listBackupSnapshots, restoreFromSnapshot } from '../lib/autoBackup'
+import { exportToGoogleDriveFile } from '../lib/backupService'
 import { checkForUpdate, applyUpdate, isAutoCheckEnabled, setAutoCheckEnabled, isAutoApplyEnabled, setAutoApplyEnabled } from '../lib/updateCheck'
 import { APP_VERSION, BUILD_DATE } from '../lib/appVersion'
 import type { AuditLogEntry, BackupSnapshot } from '../lib/db'
@@ -644,6 +645,32 @@ export default function Settings() {
                 <span className="flex items-center justify-center gap-1.5 w-full py-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-sm font-medium transition-all-smooth press-scale cursor-pointer"><Upload size={16} /> بازیابی از فایل</span>
               </label>
             </div>
+          </Card>
+          {/* Google Drive JSON Export Card */}
+          <Card className="p-5 border border-emerald-200 dark:border-emerald-900/60 bg-emerald-50/20 dark:bg-emerald-950/10">
+            <h2 className="text-base font-bold text-slate-800 dark:text-slate-100 mb-2 flex items-center gap-2">
+              <Share2 size={18} className="text-emerald-600" /> پشتیبان سازگار با گوگل درایو (Google Drive)
+            </h2>
+            <p className="text-xs text-slate-500 mb-4 leading-relaxed">
+              تولید و دانلود بسته‌ی کامل پشتیبان رمزگذاری‌شده تمام جداول در قالب استاندارد JSON جهت ذخیره در Google Drive یا حافظه‌های خارجی.
+            </p>
+            <Button
+              variant="secondary"
+              onClick={async () => {
+                h.select()
+                try {
+                  const res = await exportToGoogleDriveFile()
+                  showToast('success', `فایل پشتیبان گوگل درایو (${res.filename}) آماده شد`)
+                  h.confirm()
+                } catch {
+                  showToast('error', 'خطا در ایجاد بسته گوگل درایو')
+                  h.warning()
+                }
+              }}
+              className="w-full flex items-center justify-center gap-2 border-emerald-300 text-emerald-700 dark:text-emerald-300 hover:bg-emerald-50"
+            >
+              <Download size={16} /> خروجی بسته گوگل درایو (JSON)
+            </Button>
           </Card>
           <AutoBackupCard />
         </div>

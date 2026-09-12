@@ -12,6 +12,7 @@ import { WaitingListEntry, WaitingListEntryWithRelations, Patient, Doctor, Unit 
 import { Wizard, Card, Button, Input, Select, Textarea, Badge, Spinner, EmptyState, showToast } from '../components/ui'
 import { PersianDateInput } from '../components/PersianDateInput'
 import { ModuleHeader, ModuleStatCard, ReorderableStatGrid } from '../components/ModuleHeader'
+import { supabase } from '../lib/supabase'
 
 // ============================================================================
 // Constants
@@ -189,8 +190,24 @@ export default function WaitingList() {
       confirmLabel: 'تایید',
       onConfirm: async () => {
         const updates: Partial<WaitingListEntry> = { status: newStatus }
-        if (newStatus === 'notified') updates.notified_at = new Date().toISOString()
-        try { await updateWaitingEntry(e.id, updates as any); showToast('success', 'وضعیت به‌روزرسانی شد'); await loadData() }
+        if (newStatus === 'notified') {
+          updates.notified_at = new Date().toISOString()
+          try {
+            const pat = patients.find((p) => p.id === e.patient_id)
+            if (pat?.phone) {
+              await supabase.functions.invoke('send-sms', {
+                body: {
+                  to: pat.phone,
+                  message: `بیمار گرامی ${pat.first_name} ${pat.last_name}، نوبت خالی در کلینیک دندانپزشکی مینادنت فراهم شد. جهت تعیین وقت با کلینیک تماس حاصل فرمایید.`,
+                  type: 'general',
+                },
+              })
+            }
+          } catch {
+            // SMS failure is silent
+          }
+        }
+        try { await updateWaitingEntry(e.id, updates as any); showToast('success', newStatus === 'notified' ? 'وضعیت به‌روزرسانی و پیامک اطلاع‌رسانی ارسال شد' : 'وضعیت به‌روزرسانی شد'); await loadData() }
         catch { showToast('error', 'خطا در به‌روزرسانی وضعیت') }
       },
     })
@@ -255,7 +272,31 @@ export default function WaitingList() {
             notes: e.reason || '',
           } as any)
           await updateWaitingEntry(e.id, { status: 'scheduled' } as any)
-          showToast('success', 'نوبت ایجاد شد و از لیست انتظار خارج شد')
+
+          // Send confirmation SMS
+          try {
+            const patient = patients.find((p) => p.id === e.patient_id)
+            const doctor = doctors.find((d) => d.id === e.doctor_id)
+            if (patient?.phone) {
+              const doctorLabel = doctor?.name ? `دکتر ${doctor.name}` : 'پزشک'
+              const dateLabel = toJalaliStringPretty(startDate)
+              const timeLabel = formatTime(startTime)
+              await supabase.functions.invoke('send-sms', {
+                body: {
+                  type: 'booking_confirmation',
+                  to: patient.phone,
+                  patientName: `${patient.first_name} ${patient.last_name}`,
+                  doctorName: doctorLabel,
+                  date: dateLabel,
+                  time: timeLabel,
+                },
+              })
+            }
+          } catch {
+            // SMS failure is silent
+          }
+
+          showToast('success', 'نوبت ایجاد شد، پیامک به بیمار ارسال شد و از لیست انتظار خارج شد')
           await loadData()
         } catch { showToast('error', 'خطا در ایجاد نوبت') }
       },

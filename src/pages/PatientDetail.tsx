@@ -11,11 +11,12 @@ import { buildDoctorLedger } from '../lib/doctorLedger'
 import { phasePlanProgress, phaseSchedule, validatePhase, nextPhaseNumber, comparePhaseCostToTreatments } from '../lib/phases'
 import { useState, useEffect, useCallback } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { ArrowRight, Edit2, Phone, Mail, MapPin, Calendar, CreditCard, Activity, FileText, Image as ImageIcon, Shield, Pill, Smile, Award, AlertCircle, Clock, CheckCircle2, Layers, Plus, Trash2, FileSignature, Printer, Bone, FlaskConical, Stethoscope } from 'lucide-react'
-import { fetchPatient, updatePatient, fetchTimeline, fetchTreatments, fetchAppointments, fetchPayments, fetchToothRecords, createToothRecord, updateToothRecord, fetchPrescriptions, fetchRadiologyImages, fetchEncounters, fetchDoctors, fetchImplantCases, fetchTreatmentPhases, createTreatmentPhase, updateTreatmentPhase, fetchConsentForms, createConsentForm, updateConsentForm, fetchLabOrders, updateTreatment, fetchCheques, fetchPerioExams, createPerioExam, updatePerioExam } from '../lib/api'
-import { toJalaliString, toJalaliStringPretty, formatCurrency, toPersianDigits, formatTime } from '../lib/persianDate'
+import { ArrowRight, Edit2, Phone, Mail, MapPin, Calendar, CreditCard, Activity, FileText, Image as ImageIcon, Shield, Pill, Smile, Award, AlertCircle, Clock, CheckCircle2, Layers, Plus, Trash2, FileSignature, Printer, Bone, FlaskConical, Stethoscope, Archive as ArchiveIcon, RotateCcw } from 'lucide-react'
+import { fetchPatient, updatePatient, fetchTimeline, fetchTreatments, fetchAppointments, fetchPayments, createPayment, fetchToothRecords, createToothRecord, updateToothRecord, fetchPrescriptions, fetchRadiologyImages, fetchEncounters, fetchDoctors, fetchImplantCases, fetchTreatmentPhases, createTreatmentPhase, updateTreatmentPhase, fetchConsentForms, createConsentForm, updateConsentForm, fetchLabOrders, updateTreatment, fetchCheques, createCheque, updateCheque, fetchPaymentPlans, createPaymentPlan, updatePaymentPlan, fetchAllInstallments, updateInstallment, fetchPerioExams, createPerioExam, updatePerioExam } from '../lib/api'
+import { toJalaliString, toJalaliStringPretty, formatCurrency, toPersianDigits, formatTime, toEnglishDigits } from '../lib/persianDate'
 import { calcPatientBalance } from '../lib/finance'
-import { Patient, Doctor, PatientTimeline, Treatment, Appointment, Payment, ToothRecord, Prescription, RadiologyImage, Encounter, ImplantCase, TreatmentPhase, ConsentForm, LabOrder, Cheque, PerioExam } from '../types'
+import { buildSchedule } from '../lib/installments'
+import { Patient, Doctor, PatientTimeline, Treatment, Appointment, Payment, ToothRecord, Prescription, RadiologyImage, Encounter, ImplantCase, TreatmentPhase, ConsentForm, LabOrder, Cheque, PerioExam, PaymentPlan, Installment } from '../types'
 import { Modal, Card, Button, Input, Select, Textarea, Badge, Spinner, EmptyState, Tabs, showToast, Wizard } from '../components/ui'
 import { PersianDateInput } from '../components/PersianDateInput'
 import { calcPlanProgress, groupByTooth, nextStatus } from '../lib/treatmentPlan'
@@ -160,6 +161,43 @@ export default function PatientDetail() {
   const [selectedRadImage, setSelectedRadImage] = useState<RadiologyImage | null>(null)
   const [encounters, setEncounters] = useState<Encounter[]>([])
   const [labOrders, setLabOrders] = useState<LabOrder[]>([])
+  const [paymentPlans, setPaymentPlans] = useState<PaymentPlan[]>([])
+  const [installments, setInstallments] = useState<Installment[]>([])
+
+  // Direct Financial Operations Modals
+  const [paymentModalOpen, setPaymentModalOpen] = useState(false)
+  const [savingPayment, setSavingPayment] = useState(false)
+  const [paymentForm, setPaymentForm] = useState({
+    amount: '',
+    method: 'card',
+    treatment_id: '',
+    doctor_id: '',
+    notes: '',
+  })
+
+  const [chequeModalOpen, setChequeModalOpen] = useState(false)
+  const [savingCheque, setSavingCheque] = useState(false)
+  const [chequeForm, setChequeForm] = useState({
+    amount: '',
+    bank_name: '',
+    cheque_number: '',
+    sayad_id: '',
+    due_date: new Date().toISOString().slice(0, 10),
+    drawer_name: '',
+    notes: '',
+  })
+
+  const [planModalOpen, setPlanModalOpen] = useState(false)
+  const [savingPlan, setSavingPlan] = useState(false)
+  const [planForm, setPlanForm] = useState({
+    total_amount: '',
+    number_of_installments: 3,
+    start_date: new Date().toISOString().slice(0, 10),
+    notes: '',
+    guarantee_sayad_id: '',
+    guarantee_bank: '',
+    guarantee_cheque_num: '',
+  })
 
   // Edit modal
   const [editModalOpen, setEditModalOpen] = useState(false)
@@ -249,7 +287,7 @@ export default function PatientDetail() {
   const loadTabData = useCallback(async () => {
     if (!id) return
     try {
-      const [tl, tr, ap, pm, tr_records, pres, radio, enc, implAll, ph, cf, labAll, chq, px] = await Promise.all([
+      const [tl, tr, ap, pm, tr_records, pres, radio, enc, implAll, ph, cf, labAll, chq, px, plans, instAll] = await Promise.all([
         fetchTimeline(id),
         fetchTreatments(undefined, id),
         fetchAppointments(),
@@ -266,6 +304,8 @@ export default function PatientDetail() {
         // has to be able to say one is in flight and when it is due.
         fetchCheques(),
         fetchPerioExams(id),
+        fetchPaymentPlans(id),
+        fetchAllInstallments(),
       ])
       setTimeline(tl)
       setCheques(chq.filter((c) => c.patient_id === id))
@@ -283,6 +323,8 @@ export default function PatientDetail() {
       // preserved, restorable, same pattern as radiology/implants/labs.
       setConsentForms(cf.filter((c) => c.is_active !== false))
       setPerioExams(px || [])
+      setPaymentPlans(plans)
+      setInstallments(instAll.filter((i) => i.patient_id === id || plans.some((p) => p.id === i.payment_plan_id)))
     } catch (err) {
       console.error('Error loading tab data:', err)
     }
@@ -658,6 +700,317 @@ export default function PatientDetail() {
     })
   }
 
+  // ── Direct Financial Operations (عملیات مستقیم مالی پرونده) ─────
+  const handleOpenPaymentModal = () => {
+    setPaymentForm({
+      amount: '',
+      method: 'card',
+      treatment_id: treatments[0]?.id || '',
+      doctor_id: patient?.primary_doctor_id || doctors[0]?.id || '',
+      notes: '',
+    })
+    setPaymentModalOpen(true)
+  }
+
+  const handleSavePayment = async () => {
+    if (!id || !patient) return
+    const numAmount = Number(paymentForm.amount)
+    if (!numAmount || numAmount <= 0) {
+      showToast('error', 'مبلغ پرداختی باید بیشتر از صفر باشد')
+      return
+    }
+    setSavingPayment(true)
+    try {
+      await createPayment({
+        clinic_id: '',
+        patient_id: id,
+        encounter_id: null,
+        implant_case_id: null,
+        amount: numAmount,
+        payment_method: paymentForm.method,
+        status: 'completed',
+        payment_date: new Date().toISOString().slice(0, 10),
+        notes: paymentForm.notes.trim() || null,
+        treatment_id: paymentForm.treatment_id || null,
+        doctor_id: paymentForm.doctor_id || null,
+        reference: null,
+        created_by: null,
+      })
+      h.confirm()
+      showToast('success', 'پرداخت با موفقیت ثبت و در پرونده اعمال شد')
+      setPaymentModalOpen(false)
+      loadTabData()
+    } catch (err) {
+      console.error(err)
+      showToast('error', 'خطا در ثبت پرداخت')
+    } finally {
+      setSavingPayment(false)
+    }
+  }
+
+  const handleOpenChequeModal = () => {
+    setChequeForm({
+      amount: '',
+      bank_name: '',
+      cheque_number: '',
+      sayad_id: '',
+      due_date: new Date().toISOString().slice(0, 10),
+      drawer_name: `${patient?.first_name || ''} ${patient?.last_name || ''}`.trim(),
+      notes: '',
+    })
+    setChequeModalOpen(true)
+  }
+
+  const handleSaveCheque = async () => {
+    if (!id || !patient) return
+    const numAmount = Number(chequeForm.amount)
+    if (!numAmount || numAmount <= 0) {
+      showToast('error', 'مبلغ چک باید بیشتر از صفر باشد')
+      return
+    }
+    if (!chequeForm.bank_name.trim()) {
+      showToast('error', 'نام بانک صادرکننده الزامی است')
+      return
+    }
+    if (!chequeForm.due_date) {
+      showToast('error', 'تاریخ سررسید چک الزامی است')
+      return
+    }
+    const cleanSayad = toEnglishDigits(chequeForm.sayad_id).replace(/\D/g, '')
+    if (cleanSayad && cleanSayad.length !== 16) {
+      showToast('error', 'شناسه صیادی باید دقیقاً ۱۶ رقم باشد')
+      return
+    }
+    setSavingCheque(true)
+    try {
+      await createCheque({
+        clinic_id: '',
+        patient_id: id,
+        amount: numAmount,
+        bank_name: chequeForm.bank_name.trim(),
+        branch: null,
+        cheque_number: chequeForm.cheque_number.trim() || null,
+        account_number: null,
+        issue_date: new Date().toISOString().slice(0, 10),
+        due_date: chequeForm.due_date,
+        payee_name: chequeForm.drawer_name.trim() || `${patient.first_name} ${patient.last_name}`,
+        sayad_id: cleanSayad || null,
+        status: 'pending',
+        purpose: 'payment',
+        payment_plan_id: null,
+        installment_id: null,
+        notes: chequeForm.notes.trim() || null,
+        created_by: null,
+      })
+      h.confirm()
+      showToast('success', 'چک صیادی با موفقیت ثبت شد')
+      setChequeModalOpen(false)
+      loadTabData()
+    } catch (err) {
+      console.error(err)
+      showToast('error', 'خطا در ثبت چک صیادی')
+    } finally {
+      setSavingCheque(false)
+    }
+  }
+
+  const handleOpenPlanModal = () => {
+    setPlanForm({
+      total_amount: '',
+      number_of_installments: 3,
+      start_date: new Date().toISOString().slice(0, 10),
+      notes: '',
+      guarantee_sayad_id: '',
+      guarantee_bank: '',
+      guarantee_cheque_num: '',
+    })
+    setPlanModalOpen(true)
+  }
+
+  const handleSavePlan = async () => {
+    if (!id || !patient) return
+    const numTotal = Number(planForm.total_amount)
+    if (!numTotal || numTotal <= 0) {
+      showToast('error', 'مبلغ کل طرح اقساط باید بیشتر از صفر باشد')
+      return
+    }
+    const numInstallments = Math.max(2, Math.min(24, Number(planForm.number_of_installments) || 2))
+    const cleanSayad = toEnglishDigits(planForm.guarantee_sayad_id).replace(/\D/g, '')
+    if (cleanSayad && cleanSayad.length !== 16) {
+      showToast('error', 'شناسه صیادی چک ضمانت باید ۱۶ رقم باشد')
+      return
+    }
+
+    setSavingPlan(true)
+    try {
+      const schedule = buildSchedule(numTotal, numInstallments, planForm.start_date)
+      const guaranteeCheque = (cleanSayad || planForm.guarantee_bank) ? {
+        clinic_id: '',
+        bank_name: planForm.guarantee_bank.trim() || 'بانک مرکزی',
+        branch: null,
+        cheque_number: planForm.guarantee_cheque_num.trim() || null,
+        account_number: null,
+        issue_date: new Date().toISOString().slice(0, 10),
+        due_date: schedule[schedule.length - 1]?.due_date || planForm.start_date,
+        payee_name: `${patient.first_name} ${patient.last_name}`,
+        sayad_id: cleanSayad || null,
+        status: 'pending',
+        notes: 'چک تضمین طرح اقساط',
+        patient_id: id,
+        installment_id: null,
+        created_by: null,
+      } : undefined
+
+      await createPaymentPlan(
+        {
+          clinic_id: '',
+          patient_id: id,
+          encounter_id: null,
+          total_amount: numTotal,
+          installment_count: numInstallments,
+          status: 'active',
+          start_date: planForm.start_date,
+          notes: planForm.notes.trim() || null,
+          created_by: null,
+        },
+        schedule.map((s) => ({
+          clinic_id: '',
+          patient_id: id,
+          payment_plan_id: '',
+          installment_number: s.installment_number,
+          amount: s.amount,
+          due_date: s.due_date,
+          payment_date: null,
+          status: 'pending',
+          reminder_sent: false,
+          notes: null,
+        })),
+        guaranteeCheque
+      )
+      h.confirm()
+      showToast('success', 'طرح اقساط با موفقیت ثبت شد')
+      setPlanModalOpen(false)
+      loadTabData()
+    } catch (err) {
+      console.error(err)
+      showToast('error', 'خطا در ثبت طرح اقساط')
+    } finally {
+      setSavingPlan(false)
+    }
+  }
+
+  const handlePayInstallment = (installment: Installment, _plan: PaymentPlan) => {
+    if (!id || !installment.id) return
+    confirmAction({
+      type: 'create',
+      title: 'تسویه و پرداخت قسط',
+      fields: [
+        { label: 'شماره قسط', value: toPersianDigits(installment.installment_number ?? 1), highlight: true },
+        { label: 'مبلغ قسط', value: `${formatCurrency(installment.amount || 0)} ت`, highlight: true },
+        { label: 'تاریخ موعد', value: toJalaliStringPretty(installment.due_date) },
+      ],
+      confirmLabel: 'تایید دریافت وجه قسط',
+      onConfirm: async () => {
+        try {
+          await updateInstallment(installment.id, {
+            status: 'paid',
+            payment_date: new Date().toISOString().slice(0, 10),
+          })
+          await createPayment({
+            clinic_id: '',
+            patient_id: id,
+            encounter_id: null,
+            implant_case_id: null,
+            treatment_id: null,
+            doctor_id: null,
+            reference: null,
+            created_by: null,
+            amount: installment.amount || 0,
+            payment_method: 'card',
+            status: 'completed',
+            payment_date: new Date().toISOString().slice(0, 10),
+            notes: `پرداخت قسط شماره ${installment.installment_number} (طرح اقساط)`,
+          })
+          h.confirm()
+          showToast('success', `قسط شماره ${toPersianDigits(installment.installment_number ?? 1)} وصول و در حساب بیمار اعمال شد`)
+          loadTabData()
+        } catch (err) {
+          console.error(err)
+          showToast('error', 'خطا در ثبت تسویه قسط')
+        }
+      },
+    })
+  }
+
+  const handleClearCheque = (cheque: any) => {
+    if (!id || !cheque.id) return
+    confirmAction({
+      type: 'edit',
+      title: 'ثبت وصول چک صیادی',
+      fields: [
+        { label: 'بانک و سریال', value: `${cheque.bank_name || 'بانک'} — سریال ${cheque.cheque_number || '-'}` },
+        { label: 'مبلغ چک', value: `${formatCurrency(cheque.amount || 0)} ت`, highlight: true },
+        { label: 'تاریخ سررسید', value: toJalaliStringPretty(cheque.due_date) },
+      ],
+      confirmLabel: 'تایید وصول چک',
+      onConfirm: async () => {
+        try {
+          await updateCheque(cheque.id, {
+            status: 'cleared',
+          })
+          await createPayment({
+            clinic_id: '',
+            patient_id: id,
+            encounter_id: null,
+            implant_case_id: null,
+            treatment_id: null,
+            doctor_id: null,
+            reference: null,
+            created_by: null,
+            amount: cheque.amount || 0,
+            payment_method: 'cheque',
+            status: 'completed',
+            payment_date: new Date().toISOString().slice(0, 10),
+            notes: `وصول چک صیادی ${cheque.bank_name || ''} - شماره ${cheque.cheque_number || ''}`,
+          })
+          h.confirm()
+          showToast('success', 'چک صیادی با موفقیت وصول شد و در حساب بیمار منظور گردید')
+          loadTabData()
+        } catch (err) {
+          console.error(err)
+          showToast('error', 'خطا در ثبت وصول چک')
+        }
+      },
+    })
+  }
+
+  const handleBounceCheque = (cheque: any) => {
+    if (!cheque.id) return
+    confirmAction({
+      type: 'status',
+      title: 'ثبت برگشت چک صیادی',
+      warning: 'این چک به عنوان برگشتی علامت‌گذاری شده و در آلارم‌های کلینیک نمایش داده می‌شود.',
+      fields: [
+        { label: 'بانک و سریال', value: `${cheque.bank_name || 'بانک'} — سریال ${cheque.cheque_number || '-'}` },
+        { label: 'مبلغ چک', value: `${formatCurrency(cheque.amount || 0)} ت`, highlight: true },
+      ],
+      confirmLabel: 'ثبت برگشت چک',
+      onConfirm: async () => {
+        try {
+          await updateCheque(cheque.id, {
+            status: 'bounced',
+          })
+          h.warning()
+          showToast('error', 'چک به عنوان برگشتی علامت‌گذاری شد')
+          loadTabData()
+        } catch (err) {
+          console.error(err)
+          showToast('error', 'خطا در ثبت برگشت چک')
+        }
+      },
+    })
+  }
+
   // Full patient-chart print — everything an insurance submission or a
   // legal/records request needs in one document: demographics, every
   // treatment with which doctor did it and when, every implant case
@@ -816,6 +1169,31 @@ export default function PatientDetail() {
 
     return (
       <Card className="p-4 md:p-6">
+        {!patient.is_active && (
+          <div className="mb-4 p-3 rounded-xl bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 flex items-center justify-between gap-3 flex-wrap">
+            <div className="flex items-center gap-2 text-xs text-amber-800 dark:text-amber-200">
+              <ArchiveIcon size={16} className="shrink-0 text-amber-600" />
+              <span>این پرونده در وضعیت <strong>بایگانی‌شده (راکد)</strong> قرار دارد و در جستجوها و نوبت‌دهی‌های عادی نمایش داده نمی‌شود.</span>
+            </div>
+            <Button
+              size="sm"
+              variant="secondary"
+              onClick={async () => {
+                h.tap()
+                try {
+                  const updated = await updatePatient(patient.id, { is_active: true } as any)
+                  setPatient(updated)
+                  showToast('success', 'پرونده با موفقیت از بایگانی خارج و فعال شد')
+                } catch {
+                  showToast('error', 'خطا در فعال‌سازی پرونده')
+                }
+              }}
+              className="text-xs flex items-center gap-1.5 bg-white dark:bg-slate-800 border-amber-300 hover:bg-amber-100 dark:hover:bg-slate-700"
+            >
+              <RotateCcw size={13} /> بازگردانی پرونده به فعال
+            </Button>
+          </div>
+        )}
         <div className="flex items-start gap-4 flex-wrap">
           {/* Back button */}
           <button
@@ -1633,13 +2011,6 @@ export default function PatientDetail() {
    * carry.
    */
   const renderPayments = () => {
-    if (payments.length === 0 && cheques.length === 0) {
-      return (
-        <Card className="p-6">
-          <EmptyState icon={<CreditCard size={32} />} title="پرداختی ثبت نشده" description="برای این بیمار پرداختی ثبت نشده است" />
-        </Card>
-      )
-    }
     return (
       <div className="space-y-4">
         {renderDoctorLedger()}
@@ -1652,6 +2023,14 @@ export default function PatientDetail() {
             doctors={doctors as never}
             implantCases={implantCases}
             cheques={cheques as never}
+            paymentPlans={paymentPlans}
+            installments={installments}
+            onAddPayment={handleOpenPaymentModal}
+            onAddCheque={handleOpenChequeModal}
+            onAddPlan={handleOpenPlanModal}
+            onPayInstallment={handlePayInstallment}
+            onClearCheque={handleClearCheque}
+            onBounceCheque={handleBounceCheque}
           />
         </Card>
       </div>
@@ -2160,6 +2539,252 @@ export default function PatientDetail() {
           <div className="flex justify-end gap-2 pt-2 border-t border-slate-100 dark:border-slate-700">
             <Button variant="secondary" onClick={() => setConsentModalOpen(false)}>انصراف</Button>
             <Button variant="primary" onClick={handleSaveConsent} disabled={savingConsent}>{savingConsent ? <Spinner size={16} /> : editingConsent ? 'ذخیره' : 'ثبت'}</Button>
+          </div>
+        </div>
+      </Modal>
+
+      {/* Direct Payment Modal (ثبت پرداخت مستقیم در پرونده) */}
+      <Modal
+        open={paymentModalOpen}
+        onClose={() => setPaymentModalOpen(false)}
+        title="ثبت دریافت وجه / پرداخت جدید"
+        size="md"
+      >
+        <div className="space-y-3.5">
+          <CurrencyInput
+            label="مبلغ پرداختی (تومان) *"
+            value={paymentForm.amount}
+            onChange={(v) => setPaymentForm({ ...paymentForm, amount: v })}
+          />
+
+          <div className="grid grid-cols-2 gap-3">
+            <Select
+              label="روش پرداخت"
+              value={paymentForm.method}
+              onChange={(v) => setPaymentForm({ ...paymentForm, method: v })}
+              options={paymentMethods}
+            />
+            <Select
+              label="پزشک معالج"
+              value={paymentForm.doctor_id}
+              onChange={(v) => setPaymentForm({ ...paymentForm, doctor_id: v })}
+              options={doctors.filter((d) => d.is_active).map((d) => ({
+                value: d.id,
+                label: `دکتر ${d.name || d.specialty || 'پزشک'}`,
+              }))}
+              placeholder="انتخاب پزشک..."
+            />
+          </div>
+
+          {treatments.length > 0 && (
+            <Select
+              label="مربوط به درمان (اختیاری)"
+              value={paymentForm.treatment_id}
+              onChange={(v) => setPaymentForm({ ...paymentForm, treatment_id: v })}
+              options={[
+                { value: '', label: 'پرداخت عمومی (بدون انتساب مستقیم به درمان)' },
+                ...treatments.map((t) => ({
+                  value: t.id,
+                  label: `${t.procedure_name || 'درمان'}${t.tooth_number ? ` — ${toothLabel(t.tooth_number)}` : ''} (${formatCurrency(t.total_price || 0)} ت)`,
+                })),
+              ]}
+            />
+          )}
+
+          <Textarea
+            label="توضیحات و بابت پرداخت"
+            value={paymentForm.notes}
+            onChange={(v) => setPaymentForm({ ...paymentForm, notes: v })}
+            placeholder="مثلاً: بیعانه درمان روکش، پرداخت نقدی، کارتخوان مطب..."
+            rows={2}
+          />
+
+          <div className="flex justify-end gap-2 pt-2 border-t border-slate-100 dark:border-slate-700">
+            <Button variant="secondary" onClick={() => setPaymentModalOpen(false)}>
+              انصراف
+            </Button>
+            <Button
+              variant="primary"
+              onClick={handleSavePayment}
+              disabled={savingPayment}
+            >
+              {savingPayment ? <Spinner size={16} /> : 'ثبت پرداخت'}
+            </Button>
+          </div>
+        </div>
+      </Modal>
+
+      {/* Direct Cheque Modal (ثبت دریافت چک صیادی) */}
+      <Modal
+        open={chequeModalOpen}
+        onClose={() => setChequeModalOpen(false)}
+        title="ثبت دریافت چک صیادی بنفش"
+        size="md"
+      >
+        <div className="space-y-3.5">
+          <CurrencyInput
+            label="مبلغ چک (تومان) *"
+            value={chequeForm.amount}
+            onChange={(v) => setChequeForm({ ...chequeForm, amount: v })}
+          />
+
+          <div className="grid grid-cols-2 gap-3">
+            <Input
+              label="نام بانک صادرکننده *"
+              value={chequeForm.bank_name}
+              onChange={(v) => setChequeForm({ ...chequeForm, bank_name: v })}
+              placeholder="مثلاً: ملت، صادرات، ملی، پاسارگاد"
+            />
+            <Input
+              label="شماره سریال چک"
+              value={chequeForm.cheque_number}
+              onChange={(v) => setChequeForm({ ...chequeForm, cheque_number: v })}
+              placeholder="شماره برگ چک"
+            />
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            <Input
+              label="شناسه صیادی (۱۶ رقم بنفش)"
+              value={chequeForm.sayad_id}
+              onChange={(v) => setChequeForm({ ...chequeForm, sayad_id: v })}
+              placeholder="۱۶ رقم بدون خط فاصله"
+            />
+            <PersianDateInput
+              label="تاریخ سررسید چک *"
+              value={chequeForm.due_date}
+              onChange={(v) => setChequeForm({ ...chequeForm, due_date: v })}
+            />
+          </div>
+
+          <Input
+            label="نام صاحب حساب / صادرکننده"
+            value={chequeForm.drawer_name}
+            onChange={(v) => setChequeForm({ ...chequeForm, drawer_name: v })}
+            placeholder="نام و نام خانوادگی صادرکننده"
+          />
+
+          <Textarea
+            label="توضیحات و بابت"
+            value={chequeForm.notes}
+            onChange={(v) => setChequeForm({ ...chequeForm, notes: v })}
+            placeholder="مثلاً: بابت جراحی ایمپلنت و پروتز..."
+            rows={2}
+          />
+
+          <div className="flex justify-end gap-2 pt-2 border-t border-slate-100 dark:border-slate-700">
+            <Button variant="secondary" onClick={() => setChequeModalOpen(false)}>
+              انصراف
+            </Button>
+            <Button
+              variant="primary"
+              onClick={handleSaveCheque}
+              disabled={savingCheque}
+            >
+              {savingCheque ? <Spinner size={16} /> : 'ثبت چک صیادی'}
+            </Button>
+          </div>
+        </div>
+      </Modal>
+
+      {/* Direct Payment Plan Modal (تعریف طرح اقساط) */}
+      <Modal
+        open={planModalOpen}
+        onClose={() => setPlanModalOpen(false)}
+        title="تعریف طرح اقساط درمان"
+        size="lg"
+      >
+        <div className="space-y-4">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+            <CurrencyInput
+              label="مبلغ کل طرح اقساط (تومان) *"
+              value={planForm.total_amount}
+              onChange={(v) => setPlanForm({ ...planForm, total_amount: v })}
+            />
+            <Input
+              label="تعداد اقساط (ماهانه) *"
+              type="number"
+              value={String(planForm.number_of_installments)}
+              onChange={(v) => setPlanForm({ ...planForm, number_of_installments: parseInt(v) || 2 })}
+            />
+            <PersianDateInput
+              label="تاریخ اولین سررسید *"
+              value={planForm.start_date}
+              onChange={(v) => setPlanForm({ ...planForm, start_date: v })}
+            />
+          </div>
+
+          {/* Real-time calculated installment schedule preview */}
+          {Number(planForm.total_amount) > 0 && planForm.number_of_installments >= 2 && (
+            <div className="p-3.5 rounded-2xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700">
+              <p className="text-xs font-bold text-slate-700 dark:text-slate-300 mb-2">
+                پیش‌نمایش جدول سررسید اقساط ماهانه شمسی:
+              </p>
+              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2">
+                {buildSchedule(Number(planForm.total_amount), planForm.number_of_installments, planForm.start_date).map((row) => (
+                  <div
+                    key={row.installment_number}
+                    className="p-2.5 rounded-xl bg-white dark:bg-slate-800 border border-slate-100 dark:border-slate-700 shadow-2xs text-xs"
+                  >
+                    <div className="flex justify-between items-center text-slate-500 dark:text-slate-400 font-medium">
+                      <span>قسط {toPersianDigits(row.installment_number)}</span>
+                      <span>{toJalaliStringPretty(row.due_date)}</span>
+                    </div>
+                    <p className="font-extrabold text-primary-600 dark:text-primary-400 mt-1">
+                      {formatCurrency(row.amount)} <span className="text-[10px] font-normal">ت</span>
+                    </p>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Guarantee Cheque Section */}
+          <div className="p-3.5 rounded-2xl bg-amber-50/70 dark:bg-amber-950/20 border border-amber-200/80 dark:border-amber-800/40 space-y-3">
+            <p className="text-xs font-bold text-amber-900 dark:text-amber-300">
+              مشخصات چک تضمین صیادی (ضمانت پرداخت اقساط):
+            </p>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+              <Input
+                label="بانک صادرکننده چک ضمانت"
+                value={planForm.guarantee_bank}
+                onChange={(v) => setPlanForm({ ...planForm, guarantee_bank: v })}
+                placeholder="مثلاً: پاسارگاد"
+              />
+              <Input
+                label="شناسه صیادی چک ضمانت (۱۶ رقم)"
+                value={planForm.guarantee_sayad_id}
+                onChange={(v) => setPlanForm({ ...planForm, guarantee_sayad_id: v })}
+                placeholder="۱۶ رقم شناسه بنفش"
+              />
+              <Input
+                label="شماره سریال چک ضمانت"
+                value={planForm.guarantee_cheque_num}
+                onChange={(v) => setPlanForm({ ...planForm, guarantee_cheque_num: v })}
+                placeholder="سریال چک"
+              />
+            </div>
+          </div>
+
+          <Textarea
+            label="توضیحات طرح اقساط"
+            value={planForm.notes}
+            onChange={(v) => setPlanForm({ ...planForm, notes: v })}
+            placeholder="مثلاً: اقساط ایمپلنت ۳ واحد فک بالا..."
+            rows={2}
+          />
+
+          <div className="flex justify-end gap-2 pt-2 border-t border-slate-100 dark:border-slate-700">
+            <Button variant="secondary" onClick={() => setPlanModalOpen(false)}>
+              انصراف
+            </Button>
+            <Button
+              variant="primary"
+              onClick={handleSavePlan}
+              disabled={savingPlan}
+            >
+              {savingPlan ? <Spinner size={16} /> : 'ثبت و فعال‌سازی طرح اقساط'}
+            </Button>
           </div>
         </div>
       </Modal>
