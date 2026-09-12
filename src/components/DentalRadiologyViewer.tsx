@@ -15,6 +15,8 @@ import {
   Eye,
   Crosshair,
 } from 'lucide-react'
+import { h } from '../lib/haptics'
+import { chimes } from '../lib/chimes'
 
 interface DentalRadiologyViewerProps {
   imageUrl: string
@@ -46,6 +48,8 @@ export function DentalRadiologyViewer({
   const containerRef = useRef<HTMLDivElement | null>(null)
 
   const handleReset = () => {
+    h.tap()
+    chimes.playPop()
     setBrightness(100)
     setContrast(100)
     setIsInverted(false)
@@ -58,6 +62,8 @@ export function DentalRadiologyViewer({
 
   // Presets
   const applyPreset = (preset: 'endo' | 'perio' | 'bone' | 'normal') => {
+    h.tap()
+    chimes.playPop()
     switch (preset) {
       case 'endo': // High contrast for root canal files & apex
         setBrightness(115)
@@ -102,6 +108,9 @@ export function DentalRadiologyViewer({
       const rect = containerRef.current.getBoundingClientRect()
       const clickX = e.clientX - rect.left
       const clickY = e.clientY - rect.top
+
+      h.light()
+      chimes.playPop()
 
       if (caliperPoints.length >= 2) {
         setCaliperPoints([{ x: clickX, y: clickY }])
@@ -171,28 +180,28 @@ export function DentalRadiologyViewer({
           <button
             type="button"
             onClick={() => applyPreset('endo')}
-            className="px-2 py-1 rounded-lg text-[11px] font-medium bg-slate-800 hover:bg-slate-700 text-amber-300 transition-all"
+            className="px-2 py-1 rounded-lg text-[11px] font-medium bg-slate-800 hover:bg-slate-700 text-amber-300 transition-all press-scale"
           >
             کانال/ریشه (Endo)
           </button>
           <button
             type="button"
             onClick={() => applyPreset('perio')}
-            className="px-2 py-1 rounded-lg text-[11px] font-medium bg-slate-800 hover:bg-slate-700 text-cyan-300 transition-all"
+            className="px-2 py-1 rounded-lg text-[11px] font-medium bg-slate-800 hover:bg-slate-700 text-cyan-300 transition-all press-scale"
           >
             تحلیل استخوان (Perio)
           </button>
           <button
             type="button"
             onClick={() => applyPreset('bone')}
-            className="px-2 py-1 rounded-lg text-[11px] font-medium bg-slate-800 hover:bg-slate-700 text-emerald-300 transition-all"
+            className="px-2 py-1 rounded-lg text-[11px] font-medium bg-slate-800 hover:bg-slate-700 text-emerald-300 transition-all press-scale"
           >
             تراکم استخوان
           </button>
           <button
             type="button"
             onClick={() => applyPreset('normal')}
-            className="px-2 py-1 rounded-lg text-[11px] font-medium bg-slate-800 hover:bg-slate-700 text-slate-300 transition-all"
+            className="px-2 py-1 rounded-lg text-[11px] font-medium bg-slate-800 hover:bg-slate-700 text-slate-300 transition-all press-scale"
           >
             عادی
           </button>
@@ -202,8 +211,8 @@ export function DentalRadiologyViewer({
         <div className="flex items-center gap-1.5">
           <button
             type="button"
-            onClick={() => setIsFullscreen(!isFullscreen)}
-            className="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 transition-all"
+            onClick={() => { h.tap(); setIsFullscreen(!isFullscreen) }}
+            className="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 transition-all press-scale"
             title={isFullscreen ? 'خروج از تمام‌صفحه' : 'تمام‌صفحه'}
           >
             {isFullscreen ? <Minimize2 size={15} /> : <Maximize2 size={15} />}
@@ -211,8 +220,8 @@ export function DentalRadiologyViewer({
           {onClose && (
             <button
               type="button"
-              onClick={onClose}
-              className="p-1.5 rounded-lg bg-slate-800 hover:bg-rose-900/60 hover:text-rose-200 text-slate-400 transition-all"
+              onClick={() => { h.cancel(); onClose() }}
+              className="p-1.5 rounded-lg bg-slate-800 hover:bg-rose-900/60 hover:text-rose-200 text-slate-400 transition-all press-scale"
             >
               ✕
             </button>
@@ -318,8 +327,8 @@ export function DentalRadiologyViewer({
         <div className="absolute bottom-3 left-3 flex items-center gap-1.5 p-1 bg-slate-900/90 backdrop-blur-md rounded-xl border border-slate-800 text-xs">
           <button
             type="button"
-            onClick={() => handleZoom(0.2)}
-            className="p-1.5 rounded-lg hover:bg-slate-800 text-slate-200 transition-all"
+            onClick={() => { h.tap(); handleZoom(0.2) }}
+            className="p-1.5 rounded-lg hover:bg-slate-800 text-slate-200 transition-all press-scale"
             title="بزرگنمایی"
           >
             <ZoomIn size={15} />
@@ -329,8 +338,8 @@ export function DentalRadiologyViewer({
           </span>
           <button
             type="button"
-            onClick={() => handleZoom(-0.2)}
-            className="p-1.5 rounded-lg hover:bg-slate-800 text-slate-200 transition-all"
+            onClick={() => { h.tap(); handleZoom(-0.2) }}
+            className="p-1.5 rounded-lg hover:bg-slate-800 text-slate-200 transition-all press-scale"
             title="کوچکنمایی"
           >
             <ZoomOut size={15} />
@@ -342,10 +351,12 @@ export function DentalRadiologyViewer({
           <button
             type="button"
             onClick={() => {
+              h.select()
+              chimes.playPop()
               setIsCaliperActive(!isCaliperActive)
               if (!isCaliperActive) setCaliperPoints([])
             }}
-            className={`p-1.5 rounded-lg transition-all flex items-center gap-1 text-[11px] ${
+            className={`p-1.5 rounded-lg transition-all flex items-center gap-1 text-[11px] press-scale ${
               isCaliperActive
                 ? 'bg-sky-600 text-white font-bold'
                 : 'hover:bg-slate-800 text-slate-300'
@@ -361,7 +372,7 @@ export function DentalRadiologyViewer({
           <button
             type="button"
             onClick={handleReset}
-            className="p-1.5 rounded-lg hover:bg-slate-800 text-slate-400 hover:text-slate-200 transition-all"
+            className="p-1.5 rounded-lg hover:bg-slate-800 text-slate-400 hover:text-slate-200 transition-all press-scale"
             title="بازنشانی به حالت پیش‌فرض"
           >
             <RotateCcw size={14} />
@@ -413,8 +424,12 @@ export function DentalRadiologyViewer({
         <div className="flex items-center justify-end gap-2">
           <button
             type="button"
-            onClick={() => setIsInverted(!isInverted)}
-            className={`px-3 py-1.5 rounded-xl border text-xs font-medium transition-all ${
+            onClick={() => {
+              h.tap()
+              chimes.playPop()
+              setIsInverted(!isInverted)
+            }}
+            className={`px-3 py-1.5 rounded-xl border text-xs font-medium transition-all press-scale ${
               isInverted
                 ? 'bg-amber-500 text-slate-950 border-amber-400 font-bold shadow-md'
                 : 'bg-slate-800 border-slate-700 text-slate-300 hover:bg-slate-700'
@@ -425,8 +440,12 @@ export function DentalRadiologyViewer({
 
           <button
             type="button"
-            onClick={() => setIsGrayscale(!isGrayscale)}
-            className={`px-3 py-1.5 rounded-xl border text-xs font-medium transition-all ${
+            onClick={() => {
+              h.tap()
+              chimes.playPop()
+              setIsGrayscale(!isGrayscale)
+            }}
+            className={`px-3 py-1.5 rounded-xl border text-xs font-medium transition-all press-scale ${
               isGrayscale
                 ? 'bg-sky-600 text-white border-sky-500 font-bold'
                 : 'bg-slate-800 border-slate-700 text-slate-300 hover:bg-slate-700'
