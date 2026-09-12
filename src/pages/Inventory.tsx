@@ -13,6 +13,7 @@ import { Wizard, Card, Button, Input, Select, Textarea, Badge, Spinner, EmptySta
 import { scoreFields } from '../lib/fuzzySearch'
 import { ModuleHeader, ModuleStatCard, ReorderableStatGrid } from '../components/ModuleHeader'
 import { CurrencyInput } from '../components/CurrencyInput'
+import { chimes } from '../lib/chimes'
 
 // ============================================================================
 // Constants
@@ -208,9 +209,21 @@ export default function Inventory() {
   }
 
   const handleSave = () => {
-    if (!formData.name.trim()) { showToast('error', 'نام اقلام الزامی است'); return }
-    if (formData.quantity && Number(formData.quantity) < 0) { showToast('error', 'موجودی نمی‌تواند منفی باشد'); return }
-    if (formData.min_quantity && Number(formData.min_quantity) < 0) { showToast('error', 'حداقل موجودی نمی‌تواند منفی باشد'); return }
+    if (!formData.name.trim()) {
+      showToast('error', 'نام اقلام الزامی است')
+      chimes.playWarning()
+      return
+    }
+    if (formData.quantity && Number(formData.quantity) < 0) {
+      showToast('error', 'موجودی نمی‌تواند منفی باشد')
+      chimes.playWarning()
+      return
+    }
+    if (formData.min_quantity && Number(formData.min_quantity) < 0) {
+      showToast('error', 'حداقل موجودی نمی‌تواند منفی باشد')
+      chimes.playWarning()
+      return
+    }
     const payload = {
       name: formData.name.trim(),
       brand: formData.brand || null, category_id: formData.category_id || null,
@@ -233,11 +246,22 @@ export default function Inventory() {
       onConfirm: async () => {
         setSaving(true)
         try {
-          if (editingItem) { await updateInventoryItem(editingItem.id, payload); showToast('success', 'ویرایش شد') }
-          else { await createInventoryItem(payload); showToast('success', 'ایجاد شد') }
-          setModalOpen(false); await loadData()
-        } catch { showToast('error', 'خطا در ذخیره') }
-        finally { setSaving(false) }
+          if (editingItem) {
+            await updateInventoryItem(editingItem.id, payload)
+            showToast('success', 'ویرایش شد')
+          } else {
+            await createInventoryItem(payload)
+            showToast('success', 'ایجاد شد')
+          }
+          chimes.playSuccess()
+          setModalOpen(false)
+          await loadData()
+        } catch {
+          showToast('error', 'خطا در ذخیره')
+          chimes.playWarning()
+        } finally {
+          setSaving(false)
+        }
       },
     })
   }
@@ -252,10 +276,12 @@ export default function Inventory() {
     if (scanMode === 'form') {
       setFormData((p) => ({ ...p, barcode: code }))
       showToast('success', 'بارکد ثبت شد')
+      chimes.playSuccess()
       return
     }
     const existing = items.find((i) => i.barcode === code)
     if (existing) {
+      chimes.playPop()
       confirmAction({
         type: 'status',
         title: 'اقلام موجود پیدا شد',
@@ -268,15 +294,34 @@ export default function Inventory() {
           try {
             await updateInventoryItem(existing.id, { quantity: (existing.quantity || 0) + 1 } as any)
             showToast('success', 'موجودی افزایش یافت')
+            chimes.playSuccess()
             await loadData()
-          } catch { showToast('error', 'خطا در به‌روزرسانی') }
+          } catch {
+            showToast('error', 'خطا در به‌روزرسانی')
+            chimes.playWarning()
+          }
         },
       })
     } else {
+      chimes.playPop()
       setEditingItem(null)
       setFormData({ name: '', brand: '', category_id: '', unit: 'piece', quantity: '1', min_quantity: '', unit_cost: '', supplier: '', location: '', notes: '', barcode: code })
       showToast('success', 'بارکد جدید — اطلاعات اقلام را کامل کنید')
       setModalOpen(true)
+    }
+  }
+
+  const handleQuickIncrement = async (item: InventoryItemWithRelations) => {
+    h.tap()
+    chimes.playPop()
+    try {
+      await updateInventoryItem(item.id, { quantity: (item.quantity || 0) + 1 } as any)
+      showToast('success', `موجودی ${item.name} به ${toPersianDigits((item.quantity || 0) + 1)} افزایش یافت`)
+      chimes.playSuccess()
+      await loadData()
+    } catch {
+      showToast('error', 'خطا در افزایش موجودی')
+      chimes.playWarning()
     }
   }
 
@@ -292,8 +337,15 @@ export default function Inventory() {
       ],
       confirmLabel: 'غیرفعال کن',
       onConfirm: async () => {
-        try { await deactivateInventoryItem(item.id); showToast('success', 'غیرفعال شد'); await loadData() }
-        catch { showToast('error', 'خطا در غیرفعال‌سازی') }
+        try {
+          await deactivateInventoryItem(item.id)
+          showToast('success', 'غیرفعال شد')
+          chimes.playWarning()
+          await loadData()
+        } catch {
+          showToast('error', 'خطا در غیرفعال‌سازی')
+          chimes.playWarning()
+        }
       },
     })
   }
@@ -426,7 +478,8 @@ export default function Inventory() {
                           <td className="px-4 py-3"><Badge color={stock.color}>{stock.label}</Badge></td>
                           <td className="px-4 py-3">
                             <div className="flex items-center gap-1">
-                              <button onClick={() => openEditModal(i)} className="p-1 rounded-lg bg-slate-100 text-slate-600 hover:bg-slate-200 transition-all-smooth press-scale"><Edit2 size={14} /></button>
+                              <button onClick={() => handleQuickIncrement(i)} aria-label="افزایش یک عدد موجودی" title="افزایش سریع موجودی (+۱)" className="p-1 rounded-lg bg-emerald-50 text-emerald-600 hover:bg-emerald-100 transition-all-smooth press-scale"><Plus size={14} /></button>
+                              <button onClick={() => openEditModal(i)} aria-label="ویرایش کالا" title="ویرایش" className="p-1 rounded-lg bg-slate-100 text-slate-600 hover:bg-slate-200 transition-all-smooth press-scale"><Edit2 size={14} /></button>
                               <button onClick={() => handleDelete(i)} aria-label="غیرفعال کردن کالا" title="غیرفعال کردن" className="p-1 rounded-lg bg-error-50 text-error-500 hover:bg-error-100 transition-all-smooth press-scale"><Archive size={14} /></button>
                             </div>
                           </td>

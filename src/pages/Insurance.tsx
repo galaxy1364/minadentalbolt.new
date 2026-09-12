@@ -1,7 +1,7 @@
 // Insurance.tsx - Persian RTL Dental Clinic Insurance Management
 import { useState, useEffect, useCallback, useMemo } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
-import { Shield, FileText, Search, Building2, Percent, Eye, Plus, Edit2, Phone, MapPin, Wallet, CheckCircle2, Ban, Archive } from 'lucide-react'
+import { Shield, FileText, Search, Building2, Percent, Eye, Plus, Edit2, Phone, MapPin, Wallet, CheckCircle2, Ban, Archive, MessageSquare } from 'lucide-react'
 import { PieChart, Pie, Cell, XAxis, YAxis, Tooltip as RTooltip, ResponsiveContainer, Legend } from 'recharts'
 import {
   fetchInsuranceCompanies, fetchInsuranceClaims,
@@ -20,6 +20,7 @@ import { ModuleHeader, ModuleStatCard, ReorderableStatGrid } from '../components
 import { CLINIC_ID } from '../lib/supabase'
 import { useConfirmAction } from '../components/ConfirmAction'
 import { h } from '../lib/haptics'
+import { chimes } from '../lib/chimes'
 
 const claimStatuses: { value: string; label: string; color: string }[] = [
   { value: 'draft', label: 'پیش‌نویس', color: 'slate' },
@@ -168,7 +169,11 @@ export default function Insurance() {
   }
 
   const handleSaveCompany = () => {
-    if (!companyForm.name.trim()) { showToast('error', 'نام شرکت الزامی است'); return }
+    if (!companyForm.name.trim()) {
+      showToast('error', 'نام شرکت الزامی است')
+      chimes.playWarning()
+      return
+    }
     const payload: InsuranceCompanyInput = {
       clinic_id: CLINIC_ID,
       name: companyForm.name.trim(),
@@ -201,9 +206,15 @@ export default function Insurance() {
             await createInsuranceCompany(payload)
             showToast('success', 'شرکت بیمه اضافه شد')
           }
+          chimes.playSuccess()
           setCompanyModalOpen(false)
           loadData()
-        } catch { showToast('error', 'خطا در ذخیره') } finally { setSavingCompany(false) }
+        } catch {
+          showToast('error', 'خطا در ذخیره')
+          chimes.playWarning()
+        } finally {
+          setSavingCompany(false)
+        }
       },
     })
   }
@@ -229,6 +240,7 @@ export default function Insurance() {
         onConfirm: async () => {
           await updateInsuranceCompany(c.id, { is_active: false })
           showToast('success', 'شرکت بیمه غیرفعال شد')
+          chimes.playWarning()
           loadData()
         },
       })
@@ -241,7 +253,12 @@ export default function Insurance() {
       warning: 'این عملیات قابل بازگشت نیست',
       fields: [{ label: 'نام', value: c.name, highlight: true }],
       confirmLabel: 'غیرفعال کن',
-      onConfirm: async () => { await deactivateInsuranceCompany(c.id); showToast('success', 'غیرفعال شد'); loadData() },
+      onConfirm: async () => {
+        await deactivateInsuranceCompany(c.id)
+        showToast('success', 'غیرفعال شد')
+        chimes.playWarning()
+        loadData()
+      },
     })
   }
 
@@ -268,7 +285,11 @@ export default function Insurance() {
   }
 
   const handleSaveClaim = () => {
-    if (!claimForm.patient_id) { showToast('error', 'انتخاب بیمار الزامی است'); return }
+    if (!claimForm.patient_id) {
+      showToast('error', 'انتخاب بیمار الزامی است')
+      chimes.playWarning()
+      return
+    }
     const payload: any = {
       clinic_id: CLINIC_ID,
       patient_id: claimForm.patient_id,
@@ -305,9 +326,15 @@ export default function Insurance() {
             await createInsuranceClaim(payload)
             showToast('success', 'ادعا ثبت شد')
           }
+          chimes.playSuccess()
           setClaimModalOpen(false)
           loadData()
-        } catch { showToast('error', 'خطا در ذخیره') } finally { setSavingClaim(false) }
+        } catch {
+          showToast('error', 'خطا در ذخیره')
+          chimes.playWarning()
+        } finally {
+          setSavingClaim(false)
+        }
       },
     })
   }
@@ -322,7 +349,12 @@ export default function Insurance() {
       warning: 'این ادعا هیچ‌وقت پاک نمی‌شود — فقط به‌عنوان لغو‌شده علامت می‌خورد و در سوابق باقی می‌ماند.',
       fields: [{ label: 'بیمار', value: claimPatientName(c), highlight: true }],
       confirmLabel: 'تایید لغو',
-      onConfirm: async () => { await updateInsuranceClaim(c.id, { status: 'cancelled' } as any); showToast('success', 'ادعا لغو شد — در سوابق باقی ماند'); loadData() },
+      onConfirm: async () => {
+        await updateInsuranceClaim(c.id, { status: 'cancelled' } as any)
+        showToast('success', 'ادعا لغو شد — در سوابق باقی ماند')
+        chimes.playWarning()
+        loadData()
+      },
     })
   }
 
@@ -339,6 +371,7 @@ export default function Insurance() {
     // balance twice for the same insurance settlement.
     if (c.payment_recorded_at) {
       showToast('error', `این مبلغ قبلاً در ${toJalaliStringPretty(c.payment_recorded_at)} ثبت شده است`)
+      chimes.playWarning()
       return
     }
     h.tap()
@@ -364,10 +397,36 @@ export default function Insurance() {
           } as any)
           await updateInsuranceClaim(c.id, { payment_recorded_at: new Date().toISOString() } as any)
           showToast('success', 'ثبت شد و مانده‌حساب بیمار به‌روز شد')
+          chimes.playSuccess()
           await loadData()
-        } catch { showToast('error', 'خطا در ثبت پرداخت') }
+        } catch {
+          showToast('error', 'خطا در ثبت پرداخت')
+          chimes.playWarning()
+        }
       },
     })
+  }
+
+  const handleSendWhatsAppClaim = (c: InsuranceClaimWithRelations) => {
+    h.tap()
+    chimes.playPop()
+    const patient = patients.find((p) => p.id === c.patient_id) || c.patient
+    const phone = patient?.phone
+    if (!phone) {
+      showToast('info', 'شماره تماس بیمار ثبت نشده است')
+      chimes.playWarning()
+      return
+    }
+    const cleanPhone = phone.replace(/\D/g, '')
+    const formattedPhone = cleanPhone.startsWith('0') ? '98' + cleanPhone.slice(1) : cleanPhone
+    const meta = getClaimStatusMeta(c.status)
+    const companyName = c.company?.name || 'بیمه تکمیلی'
+    const amountStr = c.amount ? `${formatCurrency(c.amount)} تومان` : 'مشخص نشده'
+    const approvedStr = c.approved_amount != null ? `${formatCurrency(c.approved_amount)} تومان` : 'در حال بررسی'
+
+    const message = `سلام ${claimPatientName(c)} عزیز\nگزارش وضعیت ادعای بیمه شما در کلینیک دندانپزشکی:\n\n🏢 شرکت بیمه: ${companyName}\n💰 مبلغ درخواستی: ${amountStr}\n✅ مبلغ تایید شده: ${approvedStr}\n📋 وضعیت ادعا: ${meta.label}\n\nبا آرزوی سلامتی شما - کلینیک دندانپزشکی`
+    window.open(`https://wa.me/${formattedPhone}?text=${encodeURIComponent(message)}`, '_blank')
+    showToast('success', 'پیام‌رسان واتساپ باز شد')
   }
 
   if (loading) {
@@ -516,6 +575,7 @@ export default function Insurance() {
                                   <button onClick={() => handleRecordClaimAsPayment(c)} title="ثبت به‌عنوان پرداخت (کاهش مانده‌حساب بیمار)" className="text-success-500 hover:text-success-700 hover:bg-success-50 p-1 rounded-lg transition-colors"><Wallet size={15} /></button>
                                 )
                               )}
+                              <button onClick={() => handleSendWhatsAppClaim(c)} aria-label="ارسال وضعیت به واتساپ بیمار" title="ارسال وضعیت ادعای بیمه به واتساپ بیمار" className="text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 p-1 rounded-lg transition-colors"><MessageSquare size={15} /></button>
                               <button onClick={() => openEditClaim(c)} className="text-slate-400 hover:text-primary-600 hover:bg-primary-50 p-1 rounded-lg transition-colors"><Edit2 size={15} /></button>
                               <button onClick={() => handleDeleteClaim(c)} aria-label="لغو ادعای بیمه" title="لغو" className="text-slate-400 hover:text-error-600 hover:bg-error-50 p-1 rounded-lg transition-colors"><Ban size={15} /></button>
                               <button onClick={() => navigate(`/patients/${c.patient_id}`)} className="text-primary-600 hover:text-primary-700 p-1 rounded-lg hover:bg-primary-50"><Eye size={15} /></button>
