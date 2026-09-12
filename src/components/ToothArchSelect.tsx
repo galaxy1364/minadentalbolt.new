@@ -23,6 +23,7 @@ import { upperRow, lowerRow, upperRowPrimary, lowerRowPrimary, isMidlineStart } 
 import type { ToothEntry } from '../lib/palmerArch'
 import type { ToothCondition, ToothSurfaceCondition } from '../lib/toothConditions'
 import { h } from '../lib/haptics'
+import { chimes } from '../lib/chimes'
 
 export interface ToothArchSelectProps {
   label?: string
@@ -69,8 +70,12 @@ export function ToothArchSelect({
           <button
             type="button"
             aria-label={`دندان ${toothLabel(t.fdi)}`}
-            onClick={() => { h.select(); onChange(String(t.fdi)) }}
-            className={`shrink-0 rounded-lg p-0.5 transition-all-smooth ${
+            onClick={() => {
+              chimes.playPop()
+              h.select()
+              onChange(String(t.fdi))
+            }}
+            className={`shrink-0 rounded-lg p-0.5 transition-all-smooth press-scale ${
               selected === t.fdi ? 'bg-primary-50 ring-2 ring-primary-400' : ''
             }`}
           >
@@ -94,8 +99,13 @@ export function ToothArchSelect({
         {allowPrimary && (
           <button
             type="button"
-            onClick={() => { h.tap(); setPrimary((p) => !p); onChange('') }}
-            className={`text-xs font-semibold px-2 py-1 rounded-lg transition-all-smooth ${
+            onClick={() => {
+              chimes.playPop()
+              h.toggle()
+              setPrimary((p) => !p)
+              onChange('')
+            }}
+            className={`text-xs font-semibold px-2 py-1 rounded-lg transition-all-smooth press-scale ${
               primary ? 'bg-primary-600 text-white' : 'text-primary-700 dark:text-primary-400'
             }`}
           >

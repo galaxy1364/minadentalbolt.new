@@ -8,6 +8,7 @@ import { Calendar as CalIcon, X as XIcon } from 'lucide-react'
 import { PersianCalendar } from './PersianCalendar'
 import { toJalaliStringPretty } from '../lib/persianDate'
 import { h } from '../lib/haptics'
+import { chimes } from '../lib/chimes'
 
 interface PersianDateInputProps {
   label?: string
@@ -25,22 +26,47 @@ export function PersianDateInput({ label, value, onChange, placeholder = 'انت
       {label && <label className="block text-xs font-medium text-slate-600 dark:text-slate-300 mb-1.5">{label}</label>}
       <button
         type="button"
-        onClick={() => { h.tap(); setOpen(true) }}
-        className="w-full flex items-center justify-between px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-600 bg-slate-50 dark:bg-slate-700 text-base text-slate-800 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-primary-400 transition-all-smooth"
+        onClick={() => {
+          chimes.playPop()
+          h.tap()
+          setOpen(true)
+        }}
+        className="w-full flex items-center justify-between px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-600 bg-slate-50 dark:bg-slate-700 text-base text-slate-800 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-primary-400 transition-all-smooth press-scale"
       >
         <span className={value ? '' : 'text-slate-400'}>{value ? toJalaliStringPretty(value) : placeholder}</span>
         <CalIcon size={16} className="text-slate-400 shrink-0" />
       </button>
 
       {open && (
-        <div className="fixed inset-0 z-[100] flex items-end sm:items-center justify-center bg-black/40 backdrop-blur-sm" onClick={() => setOpen(false)}>
+        <div
+          className="fixed inset-0 z-[100] flex items-end sm:items-center justify-center bg-black/40 backdrop-blur-sm"
+          onClick={() => {
+            chimes.playPop()
+            h.cancel()
+            setOpen(false)
+          }}
+        >
           <div className="w-full sm:max-w-sm bg-transparent" onClick={(e) => e.stopPropagation()}>
             <div className="flex justify-end px-4 pb-2">
-              <button onClick={() => setOpen(false)} className="p-2 rounded-full bg-white dark:bg-slate-800 shadow-ios text-slate-500"><XIcon size={16} /></button>
+              <button
+                onClick={() => {
+                  chimes.playPop()
+                  h.cancel()
+                  setOpen(false)
+                }}
+                className="p-2 rounded-full bg-white dark:bg-slate-800 shadow-ios text-slate-500 press-scale"
+              >
+                <XIcon size={16} />
+              </button>
             </div>
             <PersianCalendar
               selectedDate={value || new Date().toISOString().slice(0, 10)}
-              onDateSelect={(d) => { onChange(d); setOpen(false) }}
+              onDateSelect={(d) => {
+                chimes.playSuccess()
+                h.select()
+                onChange(d)
+                setOpen(false)
+              }}
             />
           </div>
         </div>

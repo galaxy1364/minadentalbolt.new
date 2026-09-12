@@ -4,6 +4,7 @@ import { isValidElement, cloneElement } from 'react'
 import { ChevronLeft, Settings2 } from 'lucide-react'
 import { modules } from '../theme/modules'
 import { h } from '../lib/haptics'
+import { chimes } from '../lib/chimes'
 import { ModuleIconBadge } from './ModuleIconBadge'
 
 export function ModuleHeader({ moduleKey, title, subtitle, action }: {
@@ -100,6 +101,7 @@ export function ReorderableStatGrid({ storageKey, items, className = 'flex items
     ;[next[idx], next[swap]] = [next[swap], next[idx]]
     setOrder(next)
     localStorage.setItem(fullKey, JSON.stringify(next))
+    chimes.playPop()
     h.tap()
   }
 
@@ -111,8 +113,12 @@ export function ReorderableStatGrid({ storageKey, items, className = 'flex items
     <div>
       <div className="flex justify-end mb-1.5">
         <button
-          onClick={() => { h.tap(); setEditing(!editing) }}
-          className={`flex items-center gap-1 text-[11px] font-bold px-2 py-1 rounded-lg transition-all-smooth ${editing ? 'bg-primary-100 dark:bg-primary-900/40 text-primary-700 dark:text-primary-300' : 'text-slate-400 dark:text-slate-500 hover:text-primary-500'}`}
+          onClick={() => {
+            chimes.playPop()
+            h.tap()
+            setEditing(!editing)
+          }}
+          className={`flex items-center gap-1 text-[11px] font-bold px-2 py-1 rounded-lg transition-all-smooth press-scale ${editing ? 'bg-primary-100 dark:bg-primary-900/40 text-primary-700 dark:text-primary-300' : 'text-slate-400 dark:text-slate-500 hover:text-primary-500'}`}
         >
           <Settings2 size={12} />
           {editing ? 'پایان چیدمان' : 'تنظیم چیدمان'}
@@ -128,7 +134,7 @@ export function ReorderableStatGrid({ storageKey, items, className = 'flex items
                   onClick={(e) => { e.stopPropagation(); move(item.key, 1) }}
                   disabled={i === sorted.length - 1}
                   aria-label="جابجایی به چپ"
-                  className="pointer-events-auto w-6 h-6 rounded-full bg-white dark:bg-slate-900 shadow-md flex items-center justify-center text-slate-500 disabled:opacity-30"
+                  className="pointer-events-auto w-6 h-6 rounded-full bg-white dark:bg-slate-900 shadow-md flex items-center justify-center text-slate-500 disabled:opacity-30 press-scale"
                 >
                   <ChevronLeft size={13} />
                 </button>
@@ -136,7 +142,7 @@ export function ReorderableStatGrid({ storageKey, items, className = 'flex items
                   onClick={(e) => { e.stopPropagation(); move(item.key, -1) }}
                   disabled={i === 0}
                   aria-label="جابجایی به راست"
-                  className="pointer-events-auto w-6 h-6 rounded-full bg-white dark:bg-slate-900 shadow-md flex items-center justify-center text-slate-500 disabled:opacity-30"
+                  className="pointer-events-auto w-6 h-6 rounded-full bg-white dark:bg-slate-900 shadow-md flex items-center justify-center text-slate-500 disabled:opacity-30 press-scale"
                 >
                   <ChevronLeft size={13} className="rotate-180" />
                 </button>

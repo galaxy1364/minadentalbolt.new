@@ -4,6 +4,8 @@ import { formatCurrency, toPersianDigits } from '../lib/persianDate'
 import type { Patient } from '../types'
 import type { PatientBalance } from '../lib/finance'
 import { buildPatientAlerts, alertChips } from '../lib/patientAlerts'
+import { h } from '../lib/haptics'
+import { chimes } from '../lib/chimes'
 
 /**
  * MOD-FEAT-025 | یک انتخابگر بیمار برای تمام برنامه
@@ -96,6 +98,14 @@ export function PatientSelect({
 
   const showSearch = selectable.length > 8
 
+  const handleChange = (patientId: string) => {
+    if (patientId) {
+      chimes.playPop()
+      h.select()
+    }
+    onChange(patientId)
+  }
+
   return (
     <div>
       {/* The search box appears only when the list is long enough to be
@@ -112,7 +122,7 @@ export function PatientSelect({
       <Select
         label={required ? `${label} *` : label}
         value={value}
-        onChange={onChange}
+        onChange={handleChange}
         options={options}
         placeholder={placeholder}
       />
