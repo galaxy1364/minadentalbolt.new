@@ -82,6 +82,119 @@ export function PersianClinicAiAssistant() {
 
   const recognitionRef = useRef<SpeechRecognitionInstance | null>(null)
   const inputRef = useRef<HTMLInputElement>(null)
+  const triggerRef = useRef<HTMLDivElement>(null)
+
+  // Floating trigger draggable position with persistent localStorage
+  const [pos, setPos] = useState<{ x: number; y: number }>(() => {
+    try {
+      const saved = localStorage.getItem('minadent_ai_trigger_pos')
+      if (saved) {
+        const parsed = JSON.parse(saved)
+        if (typeof parsed.x === 'number' && typeof parsed.y === 'number') {
+          return {
+            x: Math.max(12, Math.min(parsed.x, (typeof window !== 'undefined' ? window.innerWidth : 1024) - 180)),
+            y: Math.max(12, Math.min(parsed.y, (typeof window !== 'undefined' ? window.innerHeight : 768) - 70)),
+          }
+        }
+      }
+    } catch {
+      // ignore
+    }
+    // Default: left-6, and 110px above bottom to never cover bottom dock
+    const defaultY = typeof window !== 'undefined' ? Math.max(80, window.innerHeight - 120) : 600
+    return { x: 24, y: defaultY }
+  })
+
+  const [isDragging, setIsDragging] = useState(false)
+  const dragRef = useRef<{
+    startX: number
+    startY: number
+    initialX: number
+    initialY: number
+    hasMoved: boolean
+  } | null>(null)
+
+  // Keep inside window bounds on resize
+  useEffect(() => {
+    const handleResize = () => {
+      setPos((prev) => {
+        const btnWidth = triggerRef.current?.offsetWidth || 180
+        const btnHeight = triggerRef.current?.offsetHeight || 50
+        const newX = Math.max(12, Math.min(prev.x, window.innerWidth - btnWidth - 12))
+        const newY = Math.max(12, Math.min(prev.y, window.innerHeight - btnHeight - 12))
+        if (newX !== prev.x || newY !== prev.y) {
+          const next = { x: newX, y: newY }
+          try {
+            localStorage.setItem('minadent_ai_trigger_pos', JSON.stringify(next))
+          } catch {}
+          return next
+        }
+        return prev
+      })
+    }
+    window.addEventListener('resize', handleResize)
+    return () => window.removeEventListener('resize', handleResize)
+  }, [])
+
+  const handlePointerDown = (e: React.PointerEvent) => {
+    if (e.button !== 0) return
+    const el = e.currentTarget as HTMLElement
+    try {
+      el.setPointerCapture(e.pointerId)
+    } catch {}
+
+    dragRef.current = {
+      startX: e.clientX,
+      startY: e.clientY,
+      initialX: pos.x,
+      initialY: pos.y,
+      hasMoved: false,
+    }
+  }
+
+  const handlePointerMove = (e: React.PointerEvent) => {
+    if (!dragRef.current) return
+    const dx = e.clientX - dragRef.current.startX
+    const dy = e.clientY - dragRef.current.startY
+
+    if (!dragRef.current.hasMoved && Math.hypot(dx, dy) > 5) {
+      dragRef.current.hasMoved = true
+      setIsDragging(true)
+      h.light()
+    }
+
+    if (dragRef.current.hasMoved) {
+      const btnWidth = triggerRef.current?.offsetWidth || 180
+      const btnHeight = triggerRef.current?.offsetHeight || 50
+      const newX = Math.max(8, Math.min(dragRef.current.initialX + dx, window.innerWidth - btnWidth - 8))
+      const newY = Math.max(8, Math.min(dragRef.current.initialY + dy, window.innerHeight - btnHeight - 8))
+      setPos({ x: newX, y: newY })
+    }
+  }
+
+  const handlePointerUp = (e: React.PointerEvent) => {
+    if (!dragRef.current) return
+    const el = e.currentTarget as HTMLElement
+    try {
+      el.releasePointerCapture(e.pointerId)
+    } catch {}
+
+    if (dragRef.current.hasMoved) {
+      setIsDragging(false)
+      h.confirm()
+      chimes.playPop()
+      try {
+        localStorage.setItem('minadent_ai_trigger_pos', JSON.stringify(pos))
+      } catch {}
+    } else {
+      // Just a tap/click - open the assistant
+      h.select()
+      chimes.playPop()
+      setIsOpen(true)
+      setTimeout(() => inputRef.current?.focus(), 150)
+    }
+    dragRef.current = null
+  }
 
   // Initialize Web Speech API if supported
   useEffect(() => {
@@ -341,28 +454,53 @@ export function PersianClinicAiAssistant() {
 
   return (
     <>
-      {/* Floating iOS 27 Glassmorphic Action Trigger */}
-      <div className="fixed bottom-6 left-6 z-40">
-        <button
-          onClick={() => {
-            h.select()
-            chimes.playPop()
-            setIsOpen(true)
-            setTimeout(() => inputRef.current?.focus(), 150)
-          }}
-          className="group relative flex items-center gap-2.5 px-4 py-3 rounded-full bg-slate-900/80 dark:bg-white/90 text-white dark:text-slate-900 shadow-2xl backdrop-blur-xl border border-white/20 dark:border-slate-800/30 transition-all-smooth hover:scale-105 active:scale-95 press-scale"
-          title="دستیار هوشمند صوتی و متنی کلینیک مینا"
+      {/* Floating Draggable iOS 27 Glassmorphic Action Trigger */}
+      <div
+        ref={triggerRef}
+        style={{
+          position: 'fixed',
+          left: `${pos.x}px`,
+          top: `${pos.y}px`,
+          zIndex: 45,
+          touchAction: 'none',
+        }}
+        className={`select-none transition-transform duration-75 ${
+          isDragging ? 'cursor-grabbing scale-105 opacity-90' : 'cursor-grab'
+        }`}
+        onPointerDown={handlePointerDown}
+        onPointerMove={handlePointerMove}
+        onPointerUp={handlePointerUp}
+        onPointerCancel={() => {
+          setIsDragging(false)
+          dragRef.current = null
+        }}
+      >
+        <div
+          className="group relative flex items-center gap-2.5 px-3.5 py-2.5 sm:px-4 sm:py-3 rounded-full bg-slate-900/90 dark:bg-white/95 text-white dark:text-slate-900 shadow-2xl backdrop-blur-xl border border-white/20 dark:border-slate-800/30 hover:scale-105 active:scale-95 transition-all-smooth"
+          title="دستیار هوشمند مینا (برای جابجایی بکشید / برای گفتگو کلیک کنید)"
         >
-          <div className="relative flex items-center justify-center">
+          {/* iOS-style drag grip dots */}
+          <div className="flex flex-col gap-0.5 opacity-40 group-hover:opacity-80 transition-opacity -mr-1">
+            <div className="flex gap-0.5">
+              <span className="w-1 h-1 rounded-full bg-current" />
+              <span className="w-1 h-1 rounded-full bg-current" />
+            </div>
+            <div className="flex gap-0.5">
+              <span className="w-1 h-1 rounded-full bg-current" />
+              <span className="w-1 h-1 rounded-full bg-current" />
+            </div>
+          </div>
+
+          <div className="relative flex items-center justify-center pointer-events-none">
             <span className="absolute w-7 h-7 rounded-full bg-primary-400/40 animate-ping pointer-events-none" />
             <div className="w-6 h-6 rounded-full bg-gradient-to-tr from-primary-500 to-indigo-500 flex items-center justify-center text-white shadow">
               <Sparkles size={14} className="animate-spin-slow" />
             </div>
           </div>
-          <span className="text-xs font-black tracking-tight">
+          <span className="text-xs font-black tracking-tight pointer-events-none">
             دستیار هوشمند مینا
           </span>
-        </button>
+        </div>
       </div>
 
       {/* iOS 27 Ultra-Modern AI Modal */}
