@@ -10,6 +10,7 @@ import { toothLabel } from '../lib/toothLabel'
 import { createPortal } from 'react-dom'
 import { Smile, Plus, Activity, AlertCircle, Clock, Grid3x3, Sparkles } from 'lucide-react'
 import { h } from '../lib/haptics'
+import { chimes } from '../lib/chimes'
 import { ToothRecord, Treatment } from '../types'
 import { toPersianDigits, toJalaliStringPretty } from '../lib/persianDate'
 import { toothShape, hasRootFilling, hasCrownCap, toothKind, isUpperTooth, toothVisualLabel } from '../lib/toothVisual'
@@ -194,7 +195,14 @@ function ToothDetailPanel({
               <p className="text-xs text-slate-500">{conditionMeta[condition].label}</p>
             </div>
           </div>
-          <button onClick={onClose} className="p-2 rounded-lg hover:bg-slate-100 text-slate-400">
+          <button
+            onClick={() => {
+              h.tap()
+              chimes.playPop()
+              onClose()
+            }}
+            className="p-2 rounded-lg hover:bg-slate-100 text-slate-400 transition-all press-scale"
+          >
             <span className="text-xl">✕</span>
           </button>
         </div>
@@ -217,8 +225,12 @@ function ToothDetailPanel({
                 return (
                   <button
                     key={opt.value}
-                    onClick={() => setCondition(opt.value)}
-                    className={`px-3 py-2 rounded-xl border-2 text-xs font-medium transition-all-smooth ${
+                    onClick={() => {
+                      h.select()
+                      chimes.playPop()
+                      setCondition(opt.value)
+                    }}
+                    className={`px-3 py-2 rounded-xl border-2 text-xs font-medium transition-all-smooth press-scale ${
                       isActive ? `${meta.bg} ${meta.border} ${meta.color} scale-105` : 'bg-white border-slate-100 text-slate-500 hover:border-slate-200'
                     }`}
                   >
@@ -252,8 +264,12 @@ function ToothDetailPanel({
                   return (
                     <button
                       key={surface}
-                      onClick={() => setActiveSurface(isActive ? null : surface)}
-                      className={`flex flex-col items-center gap-1 py-2 rounded-xl border-2 transition-all-smooth ${isActive ? 'border-primary-400 bg-primary-50 scale-105' : `${meta.border} ${meta.bg}`}`}
+                      onClick={() => {
+                        h.tap()
+                        chimes.playPop()
+                        setActiveSurface(isActive ? null : surface)
+                      }}
+                      className={`flex flex-col items-center gap-1 py-2 rounded-xl border-2 transition-all-smooth press-scale ${isActive ? 'border-primary-400 bg-primary-50 scale-105' : `${meta.border} ${meta.bg}`}`}
                     >
                       <span className={`w-3 h-3 rounded-full ${meta.dot}`} />
                       <span className="text-[10px] font-bold text-slate-600 leading-tight text-center">{surfaceLabels[surface]}</span>
@@ -271,8 +287,13 @@ function ToothDetailPanel({
                       return (
                         <button
                           key={opt.value}
-                          onClick={() => { toggleSurfaceCondition(activeSurface, opt.value); setActiveSurface(null) }}
-                          className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium transition-all-smooth ${
+                          onClick={() => {
+                            h.select()
+                            chimes.playPop()
+                            toggleSurfaceCondition(activeSurface, opt.value)
+                            setActiveSurface(null)
+                          }}
+                          className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium transition-all-smooth press-scale ${
                             isSelected ? `${optMeta.bg} ${optMeta.border} border ${optMeta.color}` : 'bg-white text-slate-500 border border-slate-200 hover:bg-slate-100'
                           }`}
                         >
@@ -323,8 +344,12 @@ function ToothDetailPanel({
 
           {/* Save */}
           <button
-            onClick={() => onUpdate(condition, surfaceConditions, notes)}
-            className="w-full py-3 rounded-xl bg-primary-600 text-white font-medium text-sm hover:bg-primary-700 transition-all-smooth"
+            onClick={() => {
+              h.confirm()
+              chimes.playSuccess()
+              onUpdate(condition, surfaceConditions, notes)
+            }}
+            className="w-full py-3 rounded-xl bg-primary-600 text-white font-medium text-sm hover:bg-primary-700 transition-all-smooth press-scale shadow-sm active:scale-95"
           >
             ذخیره تغییرات
           </button>
@@ -343,24 +368,39 @@ function ToothDetailPanel({
               </p>
               {onAddTreatment && (
                 <button
-                  onClick={() => { onAddTreatment(String(tooth.number), firstSurface); onClose() }}
-                  className="w-full py-3 rounded-xl bg-accent-50 text-accent-700 font-medium text-sm hover:bg-accent-100 transition-all-smooth flex items-center justify-center gap-1.5 border border-accent-200"
+                  onClick={() => {
+                    h.tap()
+                    chimes.playPop()
+                    onAddTreatment(String(tooth.number), firstSurface)
+                    onClose()
+                  }}
+                  className="w-full py-3 rounded-xl bg-accent-50 text-accent-700 font-medium text-sm hover:bg-accent-100 transition-all-smooth flex items-center justify-center gap-1.5 border border-accent-200 press-scale"
                 >
                   <Plus size={16} /> افزودن درمان
                 </button>
               )}
               {onAddLabOrder && (
                 <button
-                  onClick={() => { onAddLabOrder(String(tooth.number), firstSurface); onClose() }}
-                  className="w-full py-3 rounded-xl bg-primary-50 text-primary-700 font-medium text-sm hover:bg-primary-100 transition-all-smooth flex items-center justify-center gap-1.5 border border-primary-200"
+                  onClick={() => {
+                    h.tap()
+                    chimes.playPop()
+                    onAddLabOrder(String(tooth.number), firstSurface)
+                    onClose()
+                  }}
+                  className="w-full py-3 rounded-xl bg-primary-50 text-primary-700 font-medium text-sm hover:bg-primary-100 transition-all-smooth flex items-center justify-center gap-1.5 border border-primary-200 press-scale"
                 >
                   <Plus size={16} /> سفارش لابراتوار
                 </button>
               )}
               {onAddImplantCase && (
                 <button
-                  onClick={() => { onAddImplantCase(String(tooth.number), firstSurface); onClose() }}
-                  className="w-full py-3 rounded-xl bg-slate-100 text-slate-700 font-medium text-sm hover:bg-slate-200 transition-all-smooth flex items-center justify-center gap-1.5 border border-slate-300"
+                  onClick={() => {
+                    h.tap()
+                    chimes.playPop()
+                    onAddImplantCase(String(tooth.number), firstSurface)
+                    onClose()
+                  }}
+                  className="w-full py-3 rounded-xl bg-slate-100 text-slate-700 font-medium text-sm hover:bg-slate-200 transition-all-smooth flex items-center justify-center gap-1.5 border border-slate-300 press-scale"
                 >
                   <Plus size={16} /> مورد ایمپلنت
                 </button>
@@ -395,7 +435,15 @@ interface DentalChartProps {
   onToothSelect?: (toothNumber: string) => void
 }
 
-export default function DentalChart({ toothRecords, treatments, onUpdateTooth, onAddTreatment, onToothSelect }: DentalChartProps) {
+export default function DentalChart({
+  toothRecords,
+  treatments,
+  onUpdateTooth,
+  onAddTreatment,
+  onAddLabOrder,
+  onAddImplantCase,
+  onToothSelect,
+}: DentalChartProps) {
   const [selectedTooth, setSelectedTooth] = useState<ToothData | null>(null)
   const [showPrimary, setShowPrimary] = useState(false)
   const [chairsideMode, setChairsideMode] = useState(false)
@@ -405,6 +453,7 @@ export default function DentalChart({ toothRecords, treatments, onUpdateTooth, o
     onToothSelect?.(String(num))
     if (chairsideMode && activeStamp) {
       h.select()
+      chimes.playSuccess()
       onUpdateTooth(String(num), {
         is_missing: activeStamp === 'missing' || activeStamp === 'extraction',
         is_implant: activeStamp === 'implant',
@@ -415,6 +464,8 @@ export default function DentalChart({ toothRecords, treatments, onUpdateTooth, o
       showToast('info', `دندان ${toothLabel(num)}: ${conditionMeta[activeStamp].label} ثبت شد`)
       return
     }
+    h.tap()
+    chimes.playPop()
     setSelectedTooth(data)
   }
 
@@ -464,6 +515,8 @@ export default function DentalChart({ toothRecords, treatments, onUpdateTooth, o
    * clinician is recording when they tap a surface during an exam.
    */
   const handleSurfaceToggle = (toothNumber: string, surface: ToothSurface) => {
+    h.tap()
+    chimes.playPop()
     const data = getToothData(Number(toothNumber))
     const existing = data.surfaces.find((x) => x.surface === surface)
     const target: ToothCondition = data.condition === 'healthy' ? 'caries' : data.condition
@@ -485,6 +538,8 @@ export default function DentalChart({ toothRecords, treatments, onUpdateTooth, o
 
   const handleUpdate = (condition: ToothCondition, surfaces: ToothSurfaceCondition[], notes: string) => {
     if (!selectedTooth) return
+    h.confirm()
+    chimes.playSuccess()
     onUpdateTooth(String(selectedTooth.number), {
       is_missing: condition === 'missing' || condition === 'extraction',
       is_implant: condition === 'implant',
@@ -573,7 +628,7 @@ export default function DentalChart({ toothRecords, treatments, onUpdateTooth, o
           <div
             key={num}
             onClick={() => handleToothClick(data, num)}
-            className={`relative rounded-lg p-0.5 cursor-pointer transition-all-smooth hover:bg-slate-100 shrink-0 ${selectedTooth?.number === num ? 'bg-primary-50 ring-2 ring-primary-300' : ''} ${data.isPlannedOnly ? 'opacity-60' : ''}`}
+            className={`relative rounded-lg p-0.5 cursor-pointer transition-all-smooth hover:bg-slate-100 shrink-0 press-scale ${selectedTooth?.number === num ? 'bg-primary-50 ring-2 ring-primary-300' : ''} ${data.isPlannedOnly ? 'opacity-60' : ''}`}
           >
             <ToothSVG
               number={num}
@@ -627,6 +682,7 @@ export default function DentalChart({ toothRecords, treatments, onUpdateTooth, o
             type="button"
             onClick={() => {
               h.toggle()
+              chimes.playPop()
               setChairsideMode(!chairsideMode)
             }}
             className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition-all press-scale border ${
@@ -643,7 +699,11 @@ export default function DentalChart({ toothRecords, treatments, onUpdateTooth, o
           <input
             type="checkbox"
             checked={showPrimary}
-            onChange={(e) => setShowPrimary(e.target.checked)}
+            onChange={(e) => {
+              h.toggle()
+              chimes.playPop()
+              setShowPrimary(e.target.checked)
+            }}
             className="rounded border-slate-300 text-primary-600 focus:ring-primary-500"
           />
           نمایش دندان‌های شیری
@@ -677,6 +737,7 @@ export default function DentalChart({ toothRecords, treatments, onUpdateTooth, o
                   type="button"
                   onClick={() => {
                     h.select()
+                    chimes.playPop()
                     setActiveStamp(stamp.value as ToothCondition)
                   }}
                   className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold transition-all press-scale min-h-[44px] ${
@@ -797,6 +858,8 @@ export default function DentalChart({ toothRecords, treatments, onUpdateTooth, o
           onClose={() => setSelectedTooth(null)}
           onUpdate={handleUpdate}
           onAddTreatment={onAddTreatment}
+          onAddLabOrder={onAddLabOrder}
+          onAddImplantCase={onAddImplantCase}
         />
       )}
     </div>
