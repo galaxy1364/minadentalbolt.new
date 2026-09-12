@@ -8,6 +8,7 @@ import {
 } from '../lib/api'
 import { toJalaliStringPretty, formatCurrency, toPersianDigits } from '../lib/persianDate'
 import { h } from '../lib/haptics'
+import { chimes } from '../lib/chimes'
 import { useConfirmAction } from '../components/ConfirmAction'
 import type { PersonalFinanceItem } from '../types'
 import { Wizard, Card, Button, Input, Select, Textarea, Badge, EmptyState, Tabs, showToast } from '../components/ui'
@@ -120,10 +121,14 @@ export default function PersonalFinance() {
         try {
           if (editing) await updatePersonalFinanceItem(editing.id, payload)
           else await createPersonalFinanceItem(payload)
+          chimes.playSuccess()
           showToast('success', editing ? 'ویرایش شد' : 'اضافه شد')
           setModalOpen(false)
           await loadData()
-        } catch { showToast('error', 'خطا در ذخیره') }
+        } catch { 
+          chimes.playWarning()
+          showToast('error', 'خطا در ذخیره') 
+        }
         finally { setSaving(false) }
       },
     })
@@ -139,6 +144,7 @@ export default function PersonalFinance() {
       confirmLabel: 'تایید حذف',
       onConfirm: async () => {
         await cancelPersonalFinanceItem(item.id)
+        chimes.playPop()
         showToast('success', 'لغو شد — در سوابق باقی ماند')
         await loadData()
       },
@@ -154,6 +160,7 @@ export default function PersonalFinance() {
       confirmLabel: 'تایید تسویه',
       onConfirm: async () => {
         await updatePersonalFinanceItem(item.id, { paid_amount: item.total_amount, status: 'completed' })
+        chimes.playSuccess()
         showToast('success', 'تسویه شد')
         await loadData()
       },
@@ -187,6 +194,7 @@ export default function PersonalFinance() {
           due_date: isNowComplete ? item.due_date : nextDueStr,
           status: isNowComplete ? 'completed' : 'active',
         })
+        chimes.playSuccess()
         showToast('success', isNowComplete ? 'تسویه کامل شد' : `ثبت شد — موعد بعدی: ${toJalaliStringPretty(nextDueStr)}`)
         await loadData()
       },
@@ -195,8 +203,7 @@ export default function PersonalFinance() {
 
   if (loading) {
     return (
-      <div className="space-y-4" aria-busy="true">
-        <div className="skeleton h-20 rounded-2xl" />
+      <div className="space-y-4">
         <div className="skeleton h-24 rounded-2xl" />
         <div className="space-y-2">{[0, 1, 2].map((i) => <div key={i} className="skeleton h-20 rounded-2xl" />)}</div>
       </div>
@@ -233,7 +240,7 @@ export default function PersonalFinance() {
             const progress = item.total_amount > 0 ? Math.min(100, (item.paid_amount / item.total_amount) * 100) : 0
             const meta = statusMeta[item.status] || statusMeta.active
             return (
-              <Card key={item.id} className="p-3.5">
+              <Card key={item.id} className="p-4 rounded-2xl bg-white/90 dark:bg-slate-900/90 backdrop-blur-md border border-slate-200/80 dark:border-slate-800 hover:shadow-md transition-all">
                 <div className="flex items-start justify-between gap-2">
                   <div className="min-w-0 flex-1">
                     <p className="text-sm font-bold text-slate-800 dark:text-slate-100 truncate">{item.title}</p>
@@ -252,12 +259,12 @@ export default function PersonalFinance() {
                 </div>
                 {item.monthly_amount != null && <p className="text-[11px] text-slate-400 mt-1.5">قسط ماهانه: {formatCurrency(item.monthly_amount)} ت</p>}
                 {item.cheque_number && <p className="text-[11px] text-slate-400 mt-0.5">شماره چک: {toPersianDigits(item.cheque_number)} {item.bank_name && `— ${item.bank_name}`}</p>}
-                <div className="flex gap-2 mt-2.5 pt-2.5 border-t border-slate-100 dark:border-slate-700">
+                <div className="flex flex-wrap gap-2 mt-2.5 pt-2.5 border-t border-slate-100 dark:border-slate-800">
                   {remaining > 0 && item.status === 'active' && (
-                    <button onClick={() => quickMarkPaid(item)} className="text-xs text-success-600 hover:underline">تسویه کامل</button>
+                    <button onClick={() => quickMarkPaid(item)} className="px-2.5 py-1 rounded-lg bg-success-50 dark:bg-success-950/40 text-success-700 dark:text-success-300 text-xs font-medium hover:bg-success-100 transition-colors">تسویه کامل</button>
                   )}
                   {remaining > 0 && item.status === 'active' && item.monthly_amount != null && item.monthly_amount > 0 && (
-                    <button onClick={() => quickMarkMonthPaid(item)} className="text-xs text-primary-600 hover:underline">ثبت پرداخت این ماه</button>
+                    <button onClick={() => quickMarkMonthPaid(item)} className="px-2.5 py-1 rounded-lg bg-primary-50 dark:bg-primary-950/40 text-primary-700 dark:text-primary-300 text-xs font-medium hover:bg-primary-100 transition-colors">ثبت پرداخت این ماه</button>
                   )}
                   {item.due_date && item.status === 'active' && (
                     <button
@@ -267,13 +274,13 @@ export default function PersonalFinance() {
                         dueDate: item.due_date!,
                         filename: `finance-reminder-${item.id}.ics`,
                       })}
-                      className="text-xs text-primary-600 hover:underline"
+                      className="px-2.5 py-1 rounded-lg bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 text-xs font-medium hover:bg-slate-200 transition-colors"
                     >
-                      <CalendarClock size={11} className="inline ml-0.5" /> یادآوری
+                      <CalendarClock size={12} className="inline ml-1" /> یادآوری
                     </button>
                   )}
-                  <button onClick={() => openEdit(item)} className="text-xs text-primary-600 hover:underline"><Edit2 size={11} className="inline ml-0.5" /> ویرایش</button>
-                  <button onClick={() => handleDelete(item)} className="text-xs text-error-500 hover:underline"><Ban size={11} className="inline ml-0.5" /> لغو</button>
+                  <button onClick={() => openEdit(item)} className="px-2.5 py-1 rounded-lg bg-slate-50 dark:bg-slate-800/80 text-slate-600 dark:text-slate-300 text-xs font-medium hover:bg-slate-100 transition-colors mr-auto"><Edit2 size={12} className="inline ml-1" /> ویرایش</button>
+                  <button onClick={() => handleDelete(item)} className="px-2.5 py-1 rounded-lg bg-error-50 dark:bg-error-950/40 text-error-600 dark:text-error-400 text-xs font-medium hover:bg-error-100 transition-colors"><Ban size={12} className="inline ml-1" /> لغو</button>
                 </div>
               </Card>
             )
