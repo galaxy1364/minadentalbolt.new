@@ -4,12 +4,13 @@ import { PatientSelect } from '../components/PatientSelect'
 import { buildPrintDocument } from '../lib/printDocument'
 import { useNavigate, useLocation } from 'react-router-dom'
 import { readChartHandoff } from '../lib/chartHandoff'
-import { Pill, FileText, Search, Plus, Eye, Edit2, TrendingUp, Smile, Printer, Ban, AlertTriangle, Calculator, ShieldAlert } from 'lucide-react'
+import { Pill, FileText, Search, Plus, Eye, Edit2, TrendingUp, Smile, Printer, Ban, AlertTriangle, Calculator, ShieldAlert, MessageSquare } from 'lucide-react'
 import { checkDrugInteractions, calculatePediatricDosage } from '../lib/drugSafety'
 import { AreaChart, Area, XAxis, YAxis, Tooltip as RTooltip, ResponsiveContainer } from 'recharts'
 import { fetchPrescriptions, createPrescription, updatePrescription, fetchPatients, fetchDoctors } from '../lib/api'
 import { toJalaliString, toJalaliStringPretty, getJalaliMonthYear, formatCurrency, formatNumber, toPersianDigits, persianMonths } from '../lib/persianDate'
 import { h } from '../lib/haptics'
+import { chimes } from '../lib/chimes'
 import { useConfirmAction } from '../components/ConfirmAction'
 import { Prescription, PrescriptionWithRelations, Patient, Doctor } from '../types'
 import { Wizard, Card, Button, Input, Select, Textarea, Badge, Spinner, EmptyState, showToast } from '../components/ui'
@@ -225,6 +226,8 @@ export default function Prescriptions() {
   }
 
   const handlePrint = (p: PrescriptionWithRelations) => {
+    chimes.playPop()
+    h.tap()
     const items = medicationsList(p)
     const win = window.open('', '_blank', 'width=650,height=800')
     if (!win) { showToast('error', 'اجازه‌ی باز کردن پنجره‌ی چاپ داده نشد'); return }
@@ -289,8 +292,8 @@ export default function Prescriptions() {
   }
 
   const handleSave = () => {
-    if (!formData.patient_id) { showToast('error', 'انتخاب بیمار الزامی است'); return }
-    if (!formData.medications.trim()) { showToast('error', 'ورود حداقل یک دارو الزامی است'); return }
+    if (!formData.patient_id) { chimes.playWarning(); showToast('error', 'انتخاب بیمار الزامی است'); return }
+    if (!formData.medications.trim()) { chimes.playWarning(); showToast('error', 'ورود حداقل یک دارو الزامی است'); return }
     const meds = formData.medications.split('\n').map((l) => l.trim()).filter(Boolean).map((line) => {
       const parts = line.split('|').map((s) => s.trim())
       return { name: parts[0] || '', dose: parts[1] || '', frequency: parts[2] || '' }
@@ -313,10 +316,21 @@ export default function Prescriptions() {
       onConfirm: async () => {
         setSaving(true)
         try {
-          if (editingRx) { await updatePrescription(editingRx.id, payload as any); showToast('success', 'نسخه ویرایش شد') }
-          else { await createPrescription({ ...payload, status: 'active' } as any); showToast('success', 'نسخه ایجاد شد') }
-          setModalOpen(false); await loadData()
-        } catch { showToast('error', 'خطا در ذخیره') }
+          if (editingRx) {
+            await updatePrescription(editingRx.id, payload as any)
+            chimes.playSuccess()
+            showToast('success', 'نسخه ویرایش شد')
+          } else {
+            await createPrescription({ ...payload, status: 'active' } as any)
+            chimes.playSuccess()
+            showToast('success', 'نسخه ایجاد شد')
+          }
+          setModalOpen(false)
+          await loadData()
+        } catch {
+          chimes.playWarning()
+          showToast('error', 'خطا در ذخیره')
+        }
         finally { setSaving(false) }
       },
     })
@@ -334,8 +348,16 @@ export default function Prescriptions() {
       ],
       confirmLabel: 'تایید لغو',
       onConfirm: async () => {
-        try { await updatePrescription(p.id, { status: 'cancelled' } as any); showToast('success', 'نسخه لغو شد — در سوابق باقی ماند'); await loadData() }
-        catch { showToast('error', 'خطا در لغو') }
+        try {
+          await updatePrescription(p.id, { status: 'cancelled' } as any)
+          chimes.playPop()
+          showToast('success', 'نسخه لغو شد — در سوابق باقی ماند')
+          await loadData()
+        }
+        catch {
+          chimes.playWarning()
+          showToast('error', 'خطا در لغو')
+        }
       },
     })
   }
@@ -450,6 +472,25 @@ export default function Prescriptions() {
                 <div className="flex items-center justify-between pt-3 border-t border-slate-100">
                   <span className="text-xs text-slate-500">{toJalaliStringPretty(p.created_at)}</span>
                   <div className="flex items-center gap-2">
+                    {(() => {
+                      const cleanPhone = p.patient?.phone ? p.patient.phone.replace(/\D/g, '').replace(/^0/, '98') : null
+                      if (!cleanPhone) return null
+                      const items = medicationsList(p)
+                      const medsFormatted = items.map((m, idx) => `${toPersianDigits(idx + 1)}. ${m.name || ''} ${m.dose ? `(${m.dose})` : ''} - ${m.frequency || ''}`).join('\n')
+                      const waText = `سلام ${patientName(p)} عزیز،\nاقلام نسخه‌ی دارویی شما در کلینیک دندانپزشکی مینادنت:\nپزشک: ${doctorName(p)}\nتاریخ: ${toJalaliStringPretty(p.created_at)}\n\n${medsFormatted}${p.notes ? `\n\nتوضیحات: ${p.notes}` : ''}\n\nلطفاً طبق دستور مصرف نمایید - کلینیک مینادنت`
+                      return (
+                        <a
+                          href={`https://wa.me/${cleanPhone}?text=${encodeURIComponent(waText)}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="px-2 py-1 rounded-lg bg-emerald-50 text-emerald-600 hover:bg-emerald-100 text-xs flex items-center gap-1 transition-all-smooth press-scale"
+                          title="ارسال اقلام نسخه در واتساپ"
+                          onClick={() => chimes.playPop()}
+                        >
+                          <MessageSquare size={13} /> واتساپ
+                        </a>
+                      )
+                    })()}
                     <button onClick={() => openEditModal(p)} className="text-slate-500 hover:text-slate-700 text-xs flex items-center gap-1"><Edit2 size={14} /> ویرایش</button>
                     <button onClick={() => handlePrint(p)} className="text-primary-600 hover:text-primary-700 text-xs flex items-center gap-1"><Printer size={14} /> چاپ</button>
                     <button onClick={() => handleDelete(p)} className="text-error-500 hover:text-error-700 text-xs flex items-center gap-1"><Ban size={14} /> لغو</button>
