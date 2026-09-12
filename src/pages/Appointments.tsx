@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useMemo } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
-import { Calendar, Clock, CheckCircle2, User, ChevronRight, ChevronLeft, Plus, Search, AlertCircle, Edit2, Stethoscope, DollarSign, FileText, Activity, List, Grid, X, UserPlus, Globe, Ban, Printer } from 'lucide-react'
+import { Calendar, Clock, CheckCircle2, User, ChevronRight, ChevronLeft, Plus, Search, AlertCircle, Edit2, Stethoscope, DollarSign, FileText, Activity, List, Grid, X, UserPlus, Globe, Ban, Printer, MessageSquare } from 'lucide-react'
 import { fetchTreatments, fetchPayments, fetchImplantCases, fetchAppointments, createAppointment, updateAppointment, checkConflict, fetchPatients, updatePatient, fetchDoctors, fetchUnits, peekNextFileNumber, createPatient, createEncounter, fetchDoctorSchedules, fetchOnlineBookingRequests, rejectBookingRequest, updateLabOrder, updateImplantCase } from '../lib/api'
 import { supabase } from '../lib/supabase'
 import { toJalaliString, toJalaliStringPretty, getJalaliDateInfo, formatTime, timeParts, formatCurrency, toPersianDigits, persianWeekdaysShort, getHoliday, jsDateToPersianWeekday } from '../lib/persianDate'
@@ -15,6 +15,7 @@ import { Modal, Card, Button, Input, Select, Textarea, EmptyState, showToast, Ba
 import { ModuleHeader } from '../components/ModuleHeader'
 import { useConfirmAction, ConfirmActionConfig } from '../components/ConfirmAction'
 import { h } from '../lib/haptics'
+import { chimes } from '../lib/chimes'
 import { usePullToRefresh } from '../lib/usePullToRefresh'
 import { PersianCalendar } from '../components/PersianCalendar'
 import { CurrencyInput } from '../components/CurrencyInput'
@@ -324,16 +325,16 @@ export default function Appointments() {
   }
 
   const wizardNext = () => {
-    if (wizardStep === 0 && !wizardData.patient_id) { h.error(); showToast('error', 'انتخاب بیمار الزامی است'); return }
-    if (wizardStep === 1 && !wizardData.doctor_id) { h.error(); showToast('error', 'انتخاب پزشک الزامی است'); return }
+    if (wizardStep === 0 && !wizardData.patient_id) { chimes.playWarning(); h.error(); showToast('error', 'انتخاب بیمار الزامی است'); return }
+    if (wizardStep === 1 && !wizardData.doctor_id) { chimes.playWarning(); h.error(); showToast('error', 'انتخاب پزشک الزامی است'); return }
     // Unit wasn't required even after a doctor was chosen — a real
     // scheduling gap, since which physical unit/chair the patient sees
     // matters just as much as which doctor once one is selected.
-    if (wizardStep === 1 && units.filter((u) => u.is_active).length > 0 && !wizardData.unit_id) { h.error(); showToast('error', 'انتخاب یونیت الزامی است'); return }
-    if (wizardStep === 2 && !wizardData.date) { h.error(); showToast('error', 'انتخاب تاریخ الزامی است'); return }
-    if (wizardStep === 2 && (!wizardData.start_time || !wizardData.end_time)) { h.error(); showToast('error', 'انتخاب ساعت شروع و پایان الزامی است'); return }
-    if (wizardStep === 2 && wizardData.start_time >= wizardData.end_time) { h.error(); showToast('error', 'ساعت پایان باید بعد از شروع باشد'); return }
-    if (wizardStep === 3 && !wizardData.type) { h.error(); showToast('error', 'انتخاب نوع نوبت الزامی است'); return }
+    if (wizardStep === 1 && units.filter((u) => u.is_active).length > 0 && !wizardData.unit_id) { chimes.playWarning(); h.error(); showToast('error', 'انتخاب یونیت الزامی است'); return }
+    if (wizardStep === 2 && !wizardData.date) { chimes.playWarning(); h.error(); showToast('error', 'انتخاب تاریخ الزامی است'); return }
+    if (wizardStep === 2 && (!wizardData.start_time || !wizardData.end_time)) { chimes.playWarning(); h.error(); showToast('error', 'انتخاب ساعت شروع و پایان الزامی است'); return }
+    if (wizardStep === 2 && wizardData.start_time >= wizardData.end_time) { chimes.playWarning(); h.error(); showToast('error', 'ساعت پایان باید بعد از شروع باشد'); return }
+    if (wizardStep === 3 && !wizardData.type) { chimes.playWarning(); h.error(); showToast('error', 'انتخاب نوع نوبت الزامی است'); return }
     h.confirm()
     setWizardStep((s) => Math.min(s + 1, 3))
   }
@@ -356,8 +357,8 @@ export default function Appointments() {
   // ── Preview + Confirm for create/edit ──
   const wizardSave = async () => {
     const conflict = await checkConflict(wizardData.doctor_id, wizardData.date, wizardData.start_time, wizardData.end_time, editingAppt?.id, wizardData.unit_id || null)
-    if (conflict === 'doctor') { h.error(); showToast('error', 'تداخل زمانی با نوبت دیگر این پزشک'); return }
-    if (conflict === 'unit') { h.error(); showToast('error', 'این یونیت/صندلی در این بازه‌ی زمانی رزرو شده است'); return }
+    if (conflict === 'doctor') { chimes.playWarning(); h.error(); showToast('error', 'تداخل زمانی با نوبت دیگر این پزشک'); return }
+    if (conflict === 'unit') { chimes.playWarning(); h.error(); showToast('error', 'این یونیت/صندلی در این بازه‌ی زمانی رزرو شده است'); return }
 
     const patient = patients.find((p) => p.id === wizardData.patient_id)
     const doctor = doctors.find((d) => d.id === wizardData.doctor_id)
@@ -502,6 +503,7 @@ export default function Appointments() {
             // SMS failure is silent — the booking is already saved.
           }
         }
+        chimes.playSuccess()
         setPendingLabOrderId(null)
         setWizardOpen(false)
         // The list defaults to "امروز" (today) — a newly-booked appointment
@@ -537,6 +539,7 @@ export default function Appointments() {
       ],
       onConfirm: async () => {
         await updateAppointment(appt.id, { status: newStatus })
+        chimes.playSuccess()
         if (offerEncounter) {
           const enc = await createEncounter({
             clinic_id: '', patient_id: appt.patient_id, doctor_id: appt.doctor_id || null,
@@ -571,6 +574,7 @@ export default function Appointments() {
       status: 'cancelled',
       notes: updatedNotes,
     })
+    chimes.playPop()
     setCancelModalAppt(null)
     showToast('info', 'نوبت لغو و علت در تاریخچه ثبت شد')
     await loadData()
@@ -970,6 +974,25 @@ export default function Appointments() {
 
                   {/* Quick action + delete */}
                   <div className="flex flex-col gap-1.5 items-center flex-shrink-0" onClick={(e) => e.stopPropagation()}>
+                    {/* Direct WhatsApp Reminder to Patient */}
+                    {(() => {
+                      const cleanPhone = appt.patient?.phone ? appt.patient.phone.replace(/\D/g, '').replace(/^0/, '98') : null
+                      if (!cleanPhone) return null
+                      const timeStr = `${toJalaliStringPretty(appt.date)} ساعت ${toPersianDigits(formatTime(appt.start_time))}`
+                      const waText = `سلام ${patientName(appt)} عزیز،\nیادآوری نوبت دندانپزشکی شما در کلینیک مینادنت:\nتاریخ و زمان: ${timeStr}\nپزشک: ${doctorName(appt)}\nلطفاً در زمان مقرر در کلینیک حضور داشته باشید.`
+                      return (
+                        <a
+                          href={`https://wa.me/${cleanPhone}?text=${encodeURIComponent(waText)}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="p-1.5 rounded-lg bg-emerald-50 text-emerald-600 hover:bg-emerald-100 transition-all-smooth press-scale"
+                          title="ارسال پیام یادآوری واتساپ به بیمار"
+                          onClick={() => chimes.playPop()}
+                        >
+                          <MessageSquare size={16} />
+                        </a>
+                      )
+                    })()}
                     {appt.status === 'scheduled' && (
                       <button onClick={() => quickStatus(appt, 'confirmed')} aria-label="تایید نوبت" className="p-1.5 rounded-lg bg-primary-50 text-primary-600 hover:bg-primary-100 transition-all-smooth press-scale" title="تایید نوبت">
                         <CheckCircle2 size={16} />
