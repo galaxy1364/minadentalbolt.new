@@ -10,6 +10,8 @@ import { fetchSmsTemplates, createSmsTemplate, updateSmsTemplate, deactivateSmsT
 import { supabase } from '../lib/supabase'
 import { toPersianDigits } from '../lib/persianDate'
 import { h } from '../lib/haptics'
+import { chimes } from '../lib/chimes'
+import { useConfirmAction } from '../components/ConfirmAction'
 import type { SmsTemplate, Patient } from '../types'
 
 const smsTemplateTypes: { value: string; label: string }[] = [
@@ -84,11 +86,31 @@ function CampaignTab({ patients, templates }: { patients: Patient[]; templates: 
     return pool
   }, [patients, targetType, targetTag, targetVip])
 
+  const { confirmAction, ConfirmActionModal } = useConfirmAction()
+
   const handleSend = () => {
-    if (!message.trim()) { showToast('error', 'متن پیامک را وارد کنید'); return }
-    if (recipients.length === 0) { showToast('error', 'هیچ گیرنده‌ای با این فیلتر پیدا نشد'); return }
-    if (!window.confirm(`پیامک برای ${recipients.length} بیمار ارسال شود؟ این عملیات قابل بازگشت نیست.`)) return
-    sendCampaign()
+    if (!message.trim()) { 
+      chimes.playWarning()
+      showToast('error', 'متن پیامک را وارد کنید')
+      return 
+    }
+    if (recipients.length === 0) { 
+      chimes.playWarning()
+      showToast('error', 'هیچ گیرنده‌ای با این فیلتر پیدا نشد')
+      return 
+    }
+    h.tap()
+    confirmAction({
+      type: 'create',
+      title: 'ارسال پیامک انبوه (کمپین)',
+      fields: [
+        { label: 'تعداد گیرندگان', value: `${toPersianDigits(recipients.length)} بیمار`, highlight: true },
+        { label: 'گروه هدف', value: targetType === 'all' ? 'همه بیماران فعال' : targetType === 'tag' ? `برچسب: ${targetTag}` : `سطح VIP: ${targetVip}` },
+        { label: 'متن پیامک', value: message },
+      ],
+      confirmLabel: 'تأیید و ارسال کمپین',
+      onConfirm: sendCampaign,
+    })
   }
 
   const sendCampaign = async () => {
@@ -104,9 +126,16 @@ function CampaignTab({ patients, templates }: { patients: Patient[]; templates: 
       await new Promise((r) => setTimeout(r, 300))
     }
     setSending(false)
-    if (failCount === recipients.length) showToast('error', 'هیچ پیامکی ارسال نشد — سرویس پیامک متصل نیست')
-    else if (failCount > 0) showToast('error', `${recipients.length - failCount} پیامک ارسال شد، ${failCount} مورد ناموفق`)
-    else showToast('success', `${recipients.length} پیامک با موفقیت ارسال شد`)
+    if (failCount === recipients.length) {
+      chimes.playWarning()
+      showToast('error', 'هیچ پیامکی ارسال نشد — سرویس پیامک متصل نیست')
+    } else if (failCount > 0) {
+      chimes.playWarning()
+      showToast('error', `${recipients.length - failCount} پیامک ارسال شد، ${failCount} مورد ناموفق`)
+    } else {
+      chimes.playSuccess()
+      showToast('success', `${recipients.length} پیامک با موفقیت ارسال شد`)
+    }
   }
 
   return (
@@ -159,12 +188,14 @@ function CampaignTab({ patients, templates }: { patients: Patient[]; templates: 
           <Megaphone size={16} className="inline ml-1" /> ارسال کمپین به {toPersianDigits(recipients.length)} نفر
         </Button>
       )}
+      {ConfirmActionModal}
     </Card>
   )
 }
 
 // ── Templates CRUD ─────────────────────────────────────────────────
 function TemplatesTab({ templates, onChange }: { templates: SmsTemplate[]; onChange: () => void }) {
+  const { confirmAction, ConfirmActionModal } = useConfirmAction()
   const [modalOpen, setModalOpen] = useState(false)
   const [editing, setEditing] = useState<SmsTemplate | null>(null)
   const [form, setForm] = useState({ name: '', type: 'appointment_reminder', template: '', is_active: 'true' })
@@ -174,23 +205,50 @@ function TemplatesTab({ templates, onChange }: { templates: SmsTemplate[]; onCha
   const openEdit = (t: SmsTemplate) => { h.tap(); setEditing(t); setForm({ name: t.name, type: t.type, template: t.template, is_active: t.is_active ? 'true' : 'false' }); setModalOpen(true) }
 
   const handleSave = async () => {
-    if (!form.name.trim() || !form.template.trim()) { showToast('error', 'نام و متن قالب الزامی است'); return }
+    if (!form.name.trim() || !form.template.trim()) { 
+      chimes.playWarning()
+      showToast('error', 'نام و متن قالب الزامی است')
+      return 
+    }
     setSaving(true)
     try {
       const payload = { name: form.name.trim(), type: form.type, template: form.template.trim(), is_active: form.is_active === 'true' } as any
       if (editing) await updateSmsTemplate(editing.id, payload)
       else await createSmsTemplate(payload)
+      chimes.playSuccess()
       showToast('success', editing ? 'قالب ویرایش شد' : 'قالب ایجاد شد')
       setModalOpen(false)
       onChange()
-    } catch { showToast('error', 'خطا در ذخیره') }
+    } catch { 
+      chimes.playWarning()
+      showToast('error', 'خطا در ذخیره') 
+    }
     finally { setSaving(false) }
   }
 
-  const handleDelete = async (t: SmsTemplate) => {
-    if (!window.confirm(`قالب «${t.name}» حذف شود؟`)) return
-    try { await deactivateSmsTemplate(t.id); showToast('success', 'غیرفعال شد'); onChange() }
-    catch { showToast('error', 'خطا در حذف') }
+  const handleDelete = (t: SmsTemplate) => {
+    h.warning()
+    confirmAction({
+      type: 'status',
+      title: 'غیرفعال‌سازی قالب پیامک',
+      warning: 'این قالب از لیست فعال خارج خواهد شد',
+      fields: [
+        { label: 'نام قالب', value: t.name, highlight: true },
+        { label: 'نوع', value: getTemplateTypeLabel(t.type) },
+      ],
+      confirmLabel: 'تأیید غیرفعال‌سازی',
+      onConfirm: async () => {
+        try {
+          await deactivateSmsTemplate(t.id)
+          chimes.playPop()
+          showToast('success', 'قالب غیرفعال شد')
+          onChange()
+        } catch {
+          chimes.playWarning()
+          showToast('error', 'خطا در حذف')
+        }
+      },
+    })
   }
 
   return (
@@ -235,6 +293,7 @@ function TemplatesTab({ templates, onChange }: { templates: SmsTemplate[]; onCha
           </div>
         </div>
       </Modal>
+      {ConfirmActionModal}
     </>
   )
 }
