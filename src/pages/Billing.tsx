@@ -8,7 +8,7 @@ import { validateCheque, chequeModeHint } from '../lib/chequeValidation'
 import { findDuplicatePayments, duplicateWarning } from '../lib/duplicatePayment'
 import { PatientFinanceOverview } from '../components/PatientFinanceOverview'
 import { useNavigate, useLocation } from 'react-router-dom'
-import { CreditCard, Plus, Search, DollarSign, TrendingUp, Wallet, Calendar, CalendarClock, CheckCircle2, AlertCircle, Edit2, Filter, Receipt, Banknote, Clock, Printer, Ban, Archive } from 'lucide-react'
+import { CreditCard, Plus, Search, DollarSign, TrendingUp, Wallet, Calendar, CalendarClock, CheckCircle2, AlertCircle, Edit2, Filter, Receipt, Banknote, Clock, Printer, Ban, Archive, MessageSquare } from 'lucide-react'
 import { ChevronDown } from 'lucide-react'
 import { BarChart, Bar, XAxis, YAxis, Tooltip as RTooltip, ResponsiveContainer, PieChart, Pie, Cell as RCell } from 'recharts'
 import { fetchPayments, createPayment, updatePayment, fetchEncounters, fetchCheques, createCheque, updateCheque, fetchPaymentPlans, createPaymentPlan, updatePaymentPlan, updateInstallment, fetchPatients, fetchExpenses, createExpense, updateExpense, deactivateExpense, fetchTreatments, fetchImplantCases, fetchDoctors } from '../lib/api'
@@ -16,6 +16,7 @@ import { buildSchedule, splitAmount, planProgress, reconcilePlan } from '../lib/
 import { checkOverpayment } from '../lib/finance'
 import { toJalaliDisplay, toJalaliStringPretty, formatCurrency, formatNumber, toPersianDigits, toEnglishDigits } from '../lib/persianDate'
 import { h } from '../lib/haptics'
+import { chimes } from '../lib/chimes'
 import { useConfirmAction } from '../components/ConfirmAction'
 import { Payment, Encounter, Cheque, PaymentPlan, PaymentPlanWithRelations, Patient, Expense, Treatment, ImplantCase, Installment } from '../types'
 import { calcAllPatientBalances } from '../lib/finance'
@@ -383,9 +384,9 @@ export default function Billing() {
   // ===========================================================================
 
   const handleSavePayment = () => {
-    if (!paymentForm.patient_id) { showToast('error', 'انتخاب بیمار الزامی است'); return }
-    if (!paymentForm.amount || Number(paymentForm.amount) <= 0) { showToast('error', 'مبلغ را وارد کنید'); return }
-    if (!paymentForm.payment_method) { showToast('error', 'انتخاب روش پرداخت الزامی است'); return }
+    if (!paymentForm.patient_id) { chimes.playWarning(); showToast('error', 'انتخاب بیمار الزامی است'); return }
+    if (!paymentForm.amount || Number(paymentForm.amount) <= 0) { chimes.playWarning(); showToast('error', 'مبلغ را وارد کنید'); return }
+    if (!paymentForm.payment_method) { chimes.playWarning(); showToast('error', 'انتخاب روش پرداخت الزامی است'); return }
     const patient = patientMap.get(paymentForm.patient_id)
     const fin = patientBalancesMap.get(paymentForm.patient_id)
     confirmAction({
@@ -421,16 +422,23 @@ export default function Billing() {
             reference: paymentForm.reference || null, notes: paymentForm.notes || null,
             status: paymentForm.status, payment_date: paymentForm.payment_date, created_by: null,
           } as any)
-          showToast('success', 'پرداخت ثبت شد'); setPaymentModalOpen(false); await loadData()
-        } catch { showToast('error', 'خطا در ثبت') }
-        finally { setSavingPayment(false) }
+          chimes.playSuccess()
+          showToast('success', 'پرداخت ثبت شد')
+          setPaymentModalOpen(false)
+          await loadData()
+        } catch {
+          chimes.playWarning()
+          showToast('error', 'خطا در ثبت')
+        } finally {
+          setSavingPayment(false)
+        }
       },
     })
   }
 
   const handleSaveCheque = () => {
-    if (!chequeForm.patient_id) { showToast('error', 'انتخاب بیمار الزامی است'); return }
-    if (!chequeForm.amount || Number(chequeForm.amount) <= 0) { showToast('error', 'مبلغ را وارد کنید'); return }
+    if (!chequeForm.patient_id) { chimes.playWarning(); showToast('error', 'انتخاب بیمار الزامی است'); return }
+    if (!chequeForm.amount || Number(chequeForm.amount) <= 0) { chimes.playWarning(); showToast('error', 'مبلغ را وارد کنید'); return }
     const patient = patientMap.get(chequeForm.patient_id)
     confirmAction({
       type: 'create',
@@ -459,25 +467,34 @@ export default function Billing() {
             payment_plan_id: chequeForm.isGuarantee ? (chequeForm.payment_plan_id || null) : null,
             status: chequeForm.status, created_by: null,
           } as any)
-          showToast('success', 'چک ثبت شد'); setChequeModalOpen(false); await loadData()
-        } catch { showToast('error', 'خطا در ثبت') }
-        finally { setSavingCheque(false) }
+          chimes.playSuccess()
+          showToast('success', 'چک ثبت شد')
+          setChequeModalOpen(false)
+          await loadData()
+        } catch {
+          chimes.playWarning()
+          showToast('error', 'خطا در ثبت')
+        } finally {
+          setSavingCheque(false)
+        }
       },
     })
   }
 
   const handleSavePlan = () => {
-    if (!planForm.patient_id) { showToast('error', 'انتخاب بیمار الزامی است'); return }
-    if (!planForm.total_amount || Number(planForm.total_amount) <= 0) { showToast('error', 'مبلغ کل را وارد کنید'); return }
+    if (!planForm.patient_id) { chimes.playWarning(); showToast('error', 'انتخاب بیمار الزامی است'); return }
+    if (!planForm.total_amount || Number(planForm.total_amount) <= 0) { chimes.playWarning(); showToast('error', 'مبلغ کل را وارد کنید'); return }
     const count = Number(planForm.installment_count)
-    if (count < 1) { showToast('error', 'تعداد اقساط باید حداقل ۱ باشد'); return }
+    if (count < 1) { chimes.playWarning(); showToast('error', 'تعداد اقساط باید حداقل ۱ باشد'); return }
     // Guarantee cheque is always mandatory for a payment plan — it secures
     // the full balance, separate from the cash-only monthly installments.
-    if (!planForm.guarantee_cheque_number.trim()) { showToast('error', 'شماره چک ضمانت الزامی است'); return }
-    if (!planForm.guarantee_due_date) { showToast('error', 'تاریخ سررسید چک ضمانت الزامی است'); return }
+    if (!planForm.guarantee_cheque_number.trim()) { chimes.playWarning(); showToast('error', 'شماره چک ضمانت الزامی است'); return }
+    if (!planForm.guarantee_due_date) { chimes.playWarning(); showToast('error', 'تاریخ سررسید چک ضمانت الزامی است'); return }
     const guaranteeSayadDigits = toEnglishDigits(planForm.guarantee_sayad_id || '').trim()
     if (guaranteeSayadDigits && (guaranteeSayadDigits.length !== 16 || !/^[0-9]+$/.test(guaranteeSayadDigits))) {
-      showToast('error', 'شناسه صیاد چک ضمانت باید ۱۶ رقم باشد'); return
+      chimes.playWarning()
+      showToast('error', 'شناسه صیاد چک ضمانت باید ۱۶ رقم باشد')
+      return
     }
     const patient = patientMap.get(planForm.patient_id)
     confirmAction({
@@ -530,9 +547,16 @@ export default function Billing() {
             payee_name: planForm.guarantee_payee_name || null,
             status: 'pending', notes: 'چک ضمانت طرح قسطی', created_by: null,
           } as any)
-          showToast('success', 'طرح قسطی و چک ضمانت ایجاد شد'); setPlanModalOpen(false); await loadData()
-        } catch { showToast('error', 'خطا') }
-        finally { setSavingPlan(false) }
+          chimes.playSuccess()
+          showToast('success', 'طرح قسطی و چک ضمانت ایجاد شد')
+          setPlanModalOpen(false)
+          await loadData()
+        } catch {
+          chimes.playWarning()
+          showToast('error', 'خطا')
+        } finally {
+          setSavingPlan(false)
+        }
       },
     })
   }
@@ -553,8 +577,15 @@ export default function Billing() {
       ],
       confirmLabel: 'تایید لغو',
       onConfirm: async () => {
-        try { await updateCheque(cheque.id, { status: 'cancelled' } as any); showToast('success', 'چک لغو شد — در سوابق باقی ماند'); await loadData() }
-        catch { showToast('error', 'خطا در لغو') }
+        try {
+          await updateCheque(cheque.id, { status: 'cancelled' } as any)
+          chimes.playPop()
+          showToast('success', 'چک لغو شد — در سوابق باقی ماند')
+          await loadData()
+        } catch {
+          chimes.playWarning()
+          showToast('error', 'خطا در لغو')
+        }
       },
     })
   }
@@ -574,8 +605,15 @@ export default function Billing() {
       ],
       confirmLabel: 'تایید لغو',
       onConfirm: async () => {
-        try { await updatePaymentPlan(plan.id, { status: 'cancelled' } as any); showToast('success', 'طرح قسطی لغو شد — در سوابق باقی ماند'); await loadData() }
-        catch { showToast('error', 'خطا در لغو') }
+        try {
+          await updatePaymentPlan(plan.id, { status: 'cancelled' } as any)
+          chimes.playPop()
+          showToast('success', 'طرح قسطی لغو شد — در سوابق باقی ماند')
+          await loadData()
+        } catch {
+          chimes.playWarning()
+          showToast('error', 'خطا در لغو')
+        }
       },
     })
   }
@@ -622,10 +660,13 @@ export default function Billing() {
               await updateInstallment((cheque as any).installment_id, { status: 'paid', payment_date: new Date().toISOString().slice(0, 10) })
             }
           }
+          chimes.playSuccess()
           showToast('success', willClear ? 'چک وصول شد و مانده‌حساب به‌روز شد' : 'وضعیت تغییر کرد')
           await loadData()
+        } catch {
+          chimes.playWarning()
+          showToast('error', 'خطا')
         }
-        catch { showToast('error', 'خطا') }
       },
     })
   }
@@ -661,10 +702,13 @@ export default function Billing() {
           if (allPaid && plan.status !== 'completed') {
             await updatePaymentPlan(plan.id, { status: 'completed' })
           }
+          chimes.playSuccess()
           showToast('success', allPaid ? 'قسط پرداخت شد و طرح قسطی تکمیل شد' : 'قسط پرداخت شد')
           await loadData()
+        } catch {
+          chimes.playWarning()
+          showToast('error', 'خطا')
         }
-        catch { showToast('error', 'خطا') }
       },
     })
   }
@@ -918,6 +962,24 @@ export default function Billing() {
                     </button>
                   )}
                   <button onClick={() => handlePrintReceipt(p)} className="flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs text-primary-600 hover:bg-primary-50 transition-colors"><Printer size={12} /> چاپ رسید</button>
+                  {(() => {
+                    const patient = patientMap.get(p.patient_id)
+                    const cleanPhone = patient?.phone ? patient.phone.replace(/\D/g, '').replace(/^0/, '98') : null
+                    if (!cleanPhone) return null
+                    const waReceiptText = `سلام ${patient ? `${patient.first_name} ${patient.last_name}` : 'بیمار'} عزیز،\nرسید دریافت وجه کلینیک دندانپزشکی مینادنت:\nمبلغ: ${formatCurrency(p.amount)} تومان\nروش: ${methodMeta.label}\nتاریخ: ${toJalaliStringPretty(p.payment_date)}\nبا تشکر از پرداخت شما.`
+                    return (
+                      <a
+                        href={`https://wa.me/${cleanPhone}?text=${encodeURIComponent(waReceiptText)}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="press-scale flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-medium text-emerald-700 bg-emerald-50 hover:bg-emerald-100 transition-colors"
+                        title="ارسال رسید به واتساپ بیمار"
+                        onClick={() => chimes.playPop()}
+                      >
+                        <MessageSquare size={12} /> ارسال واتساپ
+                      </a>
+                    )
+                  })()}
                   <button onClick={() => {
                     h.warning()
                     // Per clinic policy: a recorded payment is never
@@ -934,7 +996,17 @@ export default function Billing() {
                       warning: 'این پرداخت هیچ‌وقت پاک نمی‌شود — فقط لغو می‌شود و از مانده‌حساب کسر می‌گردد، سابقه‌اش برای همیشه باقی می‌ماند.',
                       fields: [{ label: 'مبلغ', value: `${formatCurrency(p.amount)} ت`, highlight: true }, { label: 'بیمار', value: getPatientName(p.patient_id) }],
                       confirmLabel: 'تایید لغو',
-                      onConfirm: async () => { try { await updatePayment(p.id, { status: 'failed' } as any); showToast('success', 'پرداخت لغو شد — مانده‌حساب اصلاح شد'); loadData() } catch { showToast('error', 'خطا در لغو') } },
+                      onConfirm: async () => {
+                        try {
+                          await updatePayment(p.id, { status: 'failed' } as any)
+                          chimes.playPop()
+                          showToast('success', 'پرداخت لغو شد — مانده‌حساب اصلاح شد')
+                          loadData()
+                        } catch {
+                          chimes.playWarning()
+                          showToast('error', 'خطا در لغو')
+                        }
+                      },
                     })
                   }} className="flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs text-slate-500 hover:text-error-600 hover:bg-error-50 transition-colors"><Ban size={12} /> لغو پرداخت</button>
                 </div>
@@ -961,11 +1033,16 @@ export default function Billing() {
         setSavingRegister(true)
         try {
           await openCashRegisterSession(opening)
+          chimes.playSuccess()
           showToast('success', 'صندوق باز شد')
           setOpeningBalanceInput('')
           await loadData()
-        } catch (err) { showToast('error', err instanceof Error ? err.message : 'خطا در باز کردن صندوق') }
-        finally { setSavingRegister(false) }
+        } catch (err) {
+          chimes.playWarning()
+          showToast('error', err instanceof Error ? err.message : 'خطا در باز کردن صندوق')
+        } finally {
+          setSavingRegister(false)
+        }
       },
     })
   }
@@ -1008,11 +1085,17 @@ export default function Billing() {
         setSavingRegister(true)
         try {
           await closeCashRegisterSession(openSession.id, expectedCashInDrawer, counted, closingNotes || null)
+          chimes.playSuccess()
           showToast('success', 'صندوق بسته شد')
-          setCountedBalanceInput(''); setClosingNotes('')
+          setCountedBalanceInput('')
+          setClosingNotes('')
           await loadData()
-        } catch { showToast('error', 'خطا در بستن صندوق') }
-        finally { setSavingRegister(false) }
+        } catch {
+          chimes.playWarning()
+          showToast('error', 'خطا در بستن صندوق')
+        } finally {
+          setSavingRegister(false)
+        }
       },
     })
   }
