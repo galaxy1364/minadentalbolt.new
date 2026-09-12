@@ -6,7 +6,7 @@ import { clinicMilestones, nextClinicAction, deadlineState, MILESTONE_COLORS } f
 import { LEVEL_COLORS } from '../lib/openWork'
 import { PatientSelect } from '../components/PatientSelect'
 import { toothLabel, toothLabelWithWord } from '../lib/toothLabel'
-import { FlaskConical, Plus, Search, Clock, CheckCircle2, AlertCircle, Edit2, Phone, Filter, TrendingUp, Package, CalendarClock, ChevronLeft, RotateCcw, Ban, Archive } from 'lucide-react'
+import { FlaskConical, Plus, Search, Clock, CheckCircle2, AlertCircle, Edit2, Phone, Filter, TrendingUp, Package, CalendarClock, ChevronLeft, RotateCcw, Ban, Archive, MessageSquare } from 'lucide-react'
 import { downloadICSReminder } from '../lib/icsReminder'
 import { fetchLabOrders, createLabOrder, updateLabOrder, fetchLabs, createLab, updateLab, fetchPatients, fetchDoctors, fetchTreatments, updateTreatment, updateImplantCase } from '../lib/api'
 import {
@@ -15,6 +15,7 @@ import {
 } from '../lib/labShelf'
 import { toJalaliDisplay, toJalaliStringPretty, formatCurrency, toPersianDigits } from '../lib/persianDate'
 import { h } from '../lib/haptics'
+import { chimes } from '../lib/chimes'
 import { useConfirmAction } from '../components/ConfirmAction'
 import type { LabOrder, Laboratory, Patient, Doctor, Treatment } from '../types'
 import { Wizard, Card, Button, Input, Select, Textarea, Badge, Spinner, EmptyState, showToast } from '../components/ui'
@@ -445,13 +446,13 @@ export default function Laboratory() {
   const labSummary = useMemo(() => summariseLab(labOrders, today), [labOrders, today])
 
   const handleSaveOrder = () => {
-    if (!orderForm.lab_id) { showToast('error', 'انتخاب لابراتوار الزامی است'); return }
-    if (!orderForm.patient_id) { showToast('error', 'انتخاب بیمار الزامی است'); return }
+    if (!orderForm.lab_id) { chimes.playWarning(); showToast('error', 'انتخاب لابراتوار الزامی است'); return }
+    if (!orderForm.patient_id) { chimes.playWarning(); showToast('error', 'انتخاب بیمار الزامی است'); return }
     // A required field must block, never merely warn.
     const shelfErrors = validateShelf({
       shelf: orderForm.shelf, shelf_number: orderForm.shelf_number, shelf_space: orderForm.shelf_space,
     })
-    if (shelfErrors.length) { showToast('error', shelfErrors[0]); return }
+    if (shelfErrors.length) { chimes.playWarning(); showToast('error', shelfErrors[0]); return }
     const payload = {
       lab_id: orderForm.lab_id,
       patient_id: orderForm.patient_id,
@@ -494,8 +495,11 @@ export default function Laboratory() {
       onConfirm: async () => {
         setSavingOrder(true)
         try {
-          if (editingOrder) { await updateLabOrder(editingOrder.id, payload); showToast('success', 'سفارش ویرایش شد') }
-          else {
+          if (editingOrder) {
+            await updateLabOrder(editingOrder.id, payload)
+            chimes.playSuccess()
+            showToast('success', 'سفارش ویرایش شد')
+          } else {
             const created = await createLabOrder(payload)
             // MOD-FEAT-041: close the loop with the implant case, so its
             // chain moves to «ارسال به لابراتوار» and the lab chain owns
@@ -503,18 +507,26 @@ export default function Laboratory() {
             if (pendingImplantCaseId && created?.id) {
               try {
                 await updateImplantCase(pendingImplantCaseId, { lab_order_id: created.id } as never)
+                chimes.playSuccess()
                 showToast('success', 'سفارش ثبت و به مورد ایمپلنت وصل شد')
               } catch {
+                chimes.playWarning()
                 showToast('error', 'سفارش ثبت شد ولی به مورد ایمپلنت وصل نشد')
               }
               setPendingImplantCaseId(null)
             } else {
+              chimes.playSuccess()
               showToast('success', 'سفارش ثبت شد')
             }
           }
-          setOrderModalOpen(false); await loadData()
-        } catch { showToast('error', 'خطا در ذخیره') }
-        finally { setSavingOrder(false) }
+          setOrderModalOpen(false)
+          await loadData()
+        } catch {
+          chimes.playWarning()
+          showToast('error', 'خطا در ذخیره')
+        } finally {
+          setSavingOrder(false)
+        }
       },
     })
   }
@@ -532,8 +544,15 @@ export default function Laboratory() {
       ],
       confirmLabel: 'تایید لغو',
       onConfirm: async () => {
-        try { await updateLabOrder(order.id, { status: 'cancelled' }); showToast('success', 'سفارش لغو شد'); await loadData() }
-        catch { showToast('error', 'خطا در لغو') }
+        try {
+          await updateLabOrder(order.id, { status: 'cancelled' })
+          chimes.playPop()
+          showToast('success', 'سفارش لغو شد')
+          await loadData()
+        } catch {
+          chimes.playWarning()
+          showToast('error', 'خطا در لغو')
+        }
       },
     })
   }
@@ -569,10 +588,13 @@ export default function Laboratory() {
         try {
           await updateLabOrder(order.id, updates)
           if (linkedTreatment) await updateTreatment(linkedTreatment.id, { status: 'completed' })
+          chimes.playSuccess()
           showToast('success', linkedTreatment ? 'وضعیت تغییر کرد و درمان مرتبط تکمیل شد' : 'وضعیت تغییر کرد')
           await loadData()
+        } catch {
+          chimes.playWarning()
+          showToast('error', 'خطا')
         }
-        catch { showToast('error', 'خطا') }
       },
     })
   }
@@ -594,9 +616,11 @@ export default function Laboratory() {
     try {
       if (step === 'sent') {
         await updateLabOrder(order.id, { sent_at: today, status: 'ordered' } as never)
+        chimes.playSuccess()
         showToast('success', 'ارسال به لابراتوار ثبت شد')
       } else if (step === 'arrived') {
         await updateLabOrder(order.id, { received_at: today, work_done: true } as never)
+        chimes.playSuccess()
         showToast('success', 'رسیدن کار به مطب ثبت شد')
       } else if (step === 'booked') {
         // The clinic still has to pick a slot, so this opens the module
@@ -607,10 +631,12 @@ export default function Laboratory() {
         return
       } else if (step === 'delivered') {
         await updateLabOrder(order.id, { delivered: true, status: 'delivered' } as never)
+        chimes.playSuccess()
         showToast('success', 'تحویل به بیمار ثبت شد')
       }
       await loadData()
     } catch {
+      chimes.playWarning()
       showToast('error', 'خطا در ثبت این گام')
     }
   }
@@ -634,7 +660,7 @@ export default function Laboratory() {
 
 
   const handleSaveLab = () => {
-    if (!labForm.name.trim()) { showToast('error', 'نام لابراتوار الزامی است'); return }
+    if (!labForm.name.trim()) { chimes.playWarning(); showToast('error', 'نام لابراتوار الزامی است'); return }
     confirmAction({
       type: editingLab ? 'edit' : 'create',
       title: editingLab ? 'ویرایش لابراتوار' : 'لابراتوار جدید',
@@ -649,6 +675,7 @@ export default function Laboratory() {
         try {
           if (editingLab) {
             await updateLab(editingLab.id, { name: labForm.name.trim(), type: labForm.type || null, contact_person: labForm.contact_person || null, phone: labForm.phone || null, email: labForm.email || null, address: labForm.address || null, notes: labForm.notes || null, default_for: labForm.default_for || null } as any)
+            chimes.playSuccess()
             showToast('success', 'لابراتوار ویرایش شد')
           } else {
             await createLab({
@@ -656,13 +683,18 @@ export default function Laboratory() {
               phone: labForm.phone || null, email: labForm.email || null, address: labForm.address || null,
               notes: labForm.notes || null, is_active: true, default_for: labForm.default_for || null,
             } as any)
+            chimes.playSuccess()
             showToast('success', 'لابراتوار ثبت شد')
           }
           setLabModalOpen(false)
           setLabForm({ name: '', type: '', contact_person: '', phone: '', email: '', address: '', notes: '', default_for: '' })
           await loadData()
-        } catch { showToast('error', 'خطا در ثبت') }
-        finally { setSavingLab(false) }
+        } catch {
+          chimes.playWarning()
+          showToast('error', 'خطا در ثبت')
+        } finally {
+          setSavingLab(false)
+        }
       },
     })
   }
@@ -728,15 +760,37 @@ export default function Laboratory() {
                   {location
                     ? <Badge color="primary">قفسه {toPersianDigits(location)}</Badge>
                     : <Badge color="warning">مکان ثبت نشده</Badge>}
+                  {(() => {
+                    const cleanPhone = patient?.phone ? patient.phone.replace(/\D/g, '').replace(/^0/, '98') : null
+                    if (!cleanPhone) return null
+                    const waText = `سلام ${patient ? `${patient.first_name} ${patient.last_name}` : 'بیمار'} عزیز، کار لابراتواری شما (${o.work_type || 'پروتز دندانی'}) به کلینیک تحویل داده شده و آماده تحویل است. لطفاً جهت تعیین نوبت مراجعه با کلینیک تماس حاصل فرمایید.`
+                    return (
+                      <a
+                        href={`https://wa.me/${cleanPhone}?text=${encodeURIComponent(waText)}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="press-scale inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-medium bg-emerald-50 text-emerald-700 hover:bg-emerald-100 border border-emerald-200 transition-colors"
+                        title="اطلاع‌رسانی به بیمار در واتساپ"
+                        onClick={() => chimes.playPop()}
+                      >
+                        <MessageSquare size={13} />
+                        اطلاع به بیمار
+                      </a>
+                    )
+                  })()}
                   <Button
                     size="sm"
                     variant="secondary"
                     onClick={async () => {
                       try {
                         await updateLabOrder(o.id, deliveryPatch() as any)
+                        chimes.playSuccess()
                         showToast('success', 'تحویل ثبت شد')
                         await loadData()
-                      } catch { showToast('error', 'خطا در ثبت تحویل') }
+                      } catch {
+                        chimes.playWarning()
+                        showToast('error', 'خطا در ثبت تحویل')
+                      }
                     }}
                   >
                     ثبت تحویل
@@ -943,6 +997,26 @@ export default function Laboratory() {
             )}
           </div>
           <div className="flex items-center gap-1">
+            {/* Quick WhatsApp message to patient */}
+            {(() => {
+              const patient = patientMap.get(order.patient_id)
+              const cleanPhone = patient?.phone ? patient.phone.replace(/\D/g, '').replace(/^0/, '98') : null
+              if (!cleanPhone) return null
+              const workLabel = workTypeMeta?.label || order.work_type || 'کار لابراتوار'
+              const waText = `سلام ${patient ? `${patient.first_name} ${patient.last_name}` : 'بیمار'} عزیز، وضعیت سفارش کار دندانپزشکی شما (${workLabel}) در کلینیک: «${statusMeta.label}». جهت هماهنگی لطفاً با کلینیک در تماس باشید.`
+              return (
+                <a
+                  href={`https://wa.me/${cleanPhone}?text=${encodeURIComponent(waText)}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="press-scale p-1.5 rounded-lg text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 transition-colors"
+                  title="ارسال پیام واتساپ به بیمار"
+                  onClick={() => chimes.playPop()}
+                >
+                  <MessageSquare size={14} />
+                </a>
+              )
+            })()}
             {/* Quick status change */}
             {order.status === 'ordered' && (
               <Button size="sm" variant="secondary" onClick={() => quickStatusChange(order, 'in_progress')}>
