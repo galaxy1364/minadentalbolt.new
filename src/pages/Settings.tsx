@@ -33,6 +33,7 @@ import {
 import { Card, Button, Input, Select, Textarea, Badge, Spinner, EmptyState, StatCard, Tabs, Modal, showToast } from '../components/ui'
 import { useConfirmAction } from '../components/ConfirmAction'
 import { h, setHapticsEnabled, setSoundEnabled, getHapticsEnabled, getSoundEnabled } from '../lib/haptics'
+import { chimes } from '../lib/chimes'
 import { CLINIC_ID } from '../lib/supabase'
 import { DOCTOR_COLOR_PALETTE } from '../lib/doctorColors'
 import { getErrorLog, clearErrorLog, LoggedError } from '../lib/errorLog'
@@ -182,11 +183,13 @@ export default function Settings() {
   // ── Persist general/fileNumber to localStorage ──
   const handleSaveGeneral = () => {
     h.confirm()
+    chimes.playSuccess()
     try { localStorage.setItem('minadent_general', JSON.stringify(generalForm)) } catch {}
     showToast('success', 'تنظیمات عمومی ذخیره شد')
   }
   const handleSaveFileNumber = () => {
     h.confirm()
+    chimes.playSuccess()
     try { localStorage.setItem('minadent_fileNumber', JSON.stringify(fileNumberForm)) } catch {}
     showToast('success', 'تنظیمات شماره پرونده ذخیره شد')
   }
@@ -208,7 +211,8 @@ export default function Settings() {
   const toggleSound = () => {
     const v = !soundOn; setSoundOn(v); setSoundEnabled(v)
     try { localStorage.setItem('minadent_sound', String(v)) } catch {}
-    if (v) h.pop(); showToast('success', v ? 'صدا فعال شد' : 'صدا غیرفعال شد')
+    if (v) { h.pop(); chimes.playSuccess() }
+    showToast('success', v ? 'صدا فعال شد' : 'صدا غیرفعال شد')
   }
 
   const handleCloudBackup = () => {
@@ -361,12 +365,13 @@ export default function Settings() {
       // MOD-FIX-020: the week is part of the doctor, so it saves with the
       // doctor. Before this it had its own button that nobody pressed.
       await persistSchedule(doctorId)
+      chimes.playSuccess()
       showToast('success', editingDoctor ? 'پزشک و برنامه‌ی کاری ذخیره شد' : 'پزشک اضافه شد')
       setDoctorModal(false); loadData()
-    } catch { showToast('error', 'خطا در ذخیره') } finally { setSavingDoctor(false) }
+    } catch { chimes.playWarning(); showToast('error', 'خطا در ذخیره') } finally { setSavingDoctor(false) }
   }
   const handleDeleteDoctor = (d: Doctor) => {
-    confirmAction({ type: 'status', title: 'غیرفعال کردن پزشک', fields: [{ label: 'تخصص', value: d.specialty || '', highlight: true }], confirmLabel: 'غیرفعال کن', onConfirm: async () => { await deactivateDoctor(d.id); showToast('success', 'غیرفعال شد'); loadData() } })
+    confirmAction({ type: 'status', title: 'غیرفعال کردن پزشک', fields: [{ label: 'تخصص', value: d.specialty || '', highlight: true }], confirmLabel: 'غیرفعال کن', onConfirm: async () => { await deactivateDoctor(d.id); chimes.playPop(); showToast('success', 'غیرفعال شد'); loadData() } })
   }
 
   // ── Unit handlers ──
@@ -377,13 +382,13 @@ export default function Settings() {
     setSavingUnit(true)
     try {
       const payload: UnitInput = { clinic_id: CLINIC_ID, name: unitForm.name.trim(), number: Number(unitForm.number) || 1, is_active: unitForm.is_active === 'true' }
-      if (editingUnit) { await updateUnit(editingUnit.id, payload); showToast('success', 'یونیت ویرایش شد') }
-      else { await createUnit(payload); showToast('success', 'یونیت اضافه شد') }
+      if (editingUnit) { await updateUnit(editingUnit.id, payload); chimes.playSuccess(); showToast('success', 'یونیت ویرایش شد') }
+      else { await createUnit(payload); chimes.playSuccess(); showToast('success', 'یونیت اضافه شد') }
       setUnitModal(false); loadData()
-    } catch { showToast('error', 'خطا در ذخیره') } finally { setSavingUnit(false) }
+    } catch { chimes.playWarning(); showToast('error', 'خطا در ذخیره') } finally { setSavingUnit(false) }
   }
   const handleDeleteUnit = (u: Unit) => {
-    confirmAction({ type: 'status', title: 'غیرفعال کردن یونیت', fields: [{ label: 'نام', value: u.name || '', highlight: true }], confirmLabel: 'غیرفعال کن', onConfirm: async () => { await deactivateUnit(u.id); showToast('success', 'غیرفعال شد'); loadData() } })
+    confirmAction({ type: 'status', title: 'غیرفعال کردن یونیت', fields: [{ label: 'نام', value: u.name || '', highlight: true }], confirmLabel: 'غیرفعال کن', onConfirm: async () => { await deactivateUnit(u.id); chimes.playPop(); showToast('success', 'غیرفعال شد'); loadData() } })
   }
 
   // ── Procedure handlers ──
@@ -394,13 +399,13 @@ export default function Settings() {
     setSavingProc(true)
     try {
       const payload: ProcedureInput = { clinic_id: CLINIC_ID, code: procForm.code.trim(), name: procForm.name.trim(), category: procForm.category, default_price: procForm.default_price ? Number(procForm.default_price) : null, description: procForm.description || null, is_active: procForm.is_active === 'true' }
-      if (editingProc) { await updateProcedure(editingProc.id, payload); showToast('success', 'رویه ویرایش شد') }
-      else { await createProcedure(payload); showToast('success', 'رویه اضافه شد') }
+      if (editingProc) { await updateProcedure(editingProc.id, payload); chimes.playSuccess(); showToast('success', 'رویه ویرایش شد') }
+      else { await createProcedure(payload); chimes.playSuccess(); showToast('success', 'رویه اضافه شد') }
       setProcModal(false); loadData()
-    } catch { showToast('error', 'خطا در ذخیره') } finally { setSavingProc(false) }
+    } catch { chimes.playWarning(); showToast('error', 'خطا در ذخیره') } finally { setSavingProc(false) }
   }
   const handleDeleteProc = (p: Procedure) => {
-    confirmAction({ type: 'status', title: 'غیرفعال کردن رویه', fields: [{ label: 'نام', value: p.name, highlight: true }, { label: 'کد', value: p.code }], confirmLabel: 'غیرفعال کن', onConfirm: async () => { await deactivateProcedure(p.id); showToast('success', 'غیرفعال شد'); loadData() } })
+    confirmAction({ type: 'status', title: 'غیرفعال کردن رویه', fields: [{ label: 'نام', value: p.name, highlight: true }, { label: 'کد', value: p.code }], confirmLabel: 'غیرفعال کن', onConfirm: async () => { await deactivateProcedure(p.id); chimes.playPop(); showToast('success', 'غیرفعال شد'); loadData() } })
   }
 
   // ── Package handlers ──
@@ -411,13 +416,13 @@ export default function Settings() {
     setSavingPkg(true)
     try {
       const payload: TreatmentPackageInput = { clinic_id: CLINIC_ID, name: pkgForm.name.trim(), description: pkgForm.description || null, included_procedures: null, total_price: pkgForm.total_price ? Number(pkgForm.total_price) : null, discount_percentage: pkgForm.discount_percentage ? Number(pkgForm.discount_percentage) : null, is_active: pkgForm.is_active === 'true' }
-      if (editingPkg) { await updateTreatmentPackage(editingPkg.id, payload); showToast('success', 'پکیج ویرایش شد') }
-      else { await createTreatmentPackage(payload); showToast('success', 'پکیج اضافه شد') }
+      if (editingPkg) { await updateTreatmentPackage(editingPkg.id, payload); chimes.playSuccess(); showToast('success', 'پکیج ویرایش شد') }
+      else { await createTreatmentPackage(payload); chimes.playSuccess(); showToast('success', 'پکیج اضافه شد') }
       setPkgModal(false); loadData()
-    } catch { showToast('error', 'خطا در ذخیره') } finally { setSavingPkg(false) }
+    } catch { chimes.playWarning(); showToast('error', 'خطا در ذخیره') } finally { setSavingPkg(false) }
   }
   const handleDeletePkg = (p: TreatmentPackage) => {
-    confirmAction({ type: 'status', title: 'غیرفعال کردن پکیج', fields: [{ label: 'نام', value: p.name, highlight: true }], confirmLabel: 'غیرفعال کن', onConfirm: async () => { await deactivateTreatmentPackage(p.id); showToast('success', 'غیرفعال شد'); loadData() } })
+    confirmAction({ type: 'status', title: 'غیرفعال کردن پکیج', fields: [{ label: 'نام', value: p.name, highlight: true }], confirmLabel: 'غیرفعال کن', onConfirm: async () => { await deactivateTreatmentPackage(p.id); chimes.playPop(); showToast('success', 'غیرفعال شد'); loadData() } })
   }
 
   // ── Category handlers ──
@@ -428,10 +433,10 @@ export default function Settings() {
     setSavingCat(true)
     try {
       const payload: InventoryCategoryInput = { clinic_id: CLINIC_ID, name: catForm.name.trim(), description: catForm.description || null }
-      if (editingCat) { await updateInventoryCategory(editingCat.id, payload); showToast('success', 'دسته‌بندی ویرایش شد') }
-      else { await createInventoryCategory(payload); showToast('success', 'دسته‌بندی اضافه شد') }
+      if (editingCat) { await updateInventoryCategory(editingCat.id, payload); chimes.playSuccess(); showToast('success', 'دسته‌بندی ویرایش شد') }
+      else { await createInventoryCategory(payload); chimes.playSuccess(); showToast('success', 'دسته‌بندی اضافه شد') }
       setCatModal(false); loadData()
-    } catch { showToast('error', 'خطا در ذخیره') } finally { setSavingCat(false) }
+    } catch { chimes.playWarning(); showToast('error', 'خطا در ذخیره') } finally { setSavingCat(false) }
   }
   const handleDeleteCat = (c: InventoryCategory) => {
     confirmAction({ type: 'status', title: 'غیرفعال کردن دسته‌بندی', fields: [{ label: 'نام', value: c.name, highlight: true }], confirmLabel: 'غیرفعال کن', onConfirm: async () => { await deactivateInventoryCategory(c.id); showToast('success', 'غیرفعال شد'); loadData() } })
@@ -752,11 +757,43 @@ export default function Settings() {
             </div>
           </Card>
           <Card className="p-5">
-            <h3 className="text-sm font-bold text-slate-800 mb-3">تست بازخورد</h3>
-            <div className="grid grid-cols-3 gap-2">
-              <button onClick={() => h.tap()} className="p-3 rounded-xl bg-primary-50 text-primary-600 text-xs font-bold text-center transition-all-smooth press-scale">ضربه سبک</button>
-              <button onClick={() => h.success()} className="p-3 rounded-xl bg-success-50 text-success-600 text-xs font-bold text-center transition-all-smooth press-scale">موفقیت</button>
-              <button onClick={() => h.error()} className="p-3 rounded-xl bg-error-50 text-error-600 text-xs font-bold text-center transition-all-smooth press-scale">خطا</button>
+            <div className="flex items-center justify-between mb-3">
+              <h3 className="text-sm font-bold text-slate-800">تست بازخورد بالینی و هپتیک</h3>
+              <span className="text-[11px] text-slate-400">لرزش و افکت‌های صوتی کلینیک</span>
+            </div>
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
+              <button
+                type="button"
+                onClick={() => { h.tap(); chimes.playPop() }}
+                className="p-3.5 rounded-xl bg-slate-50 hover:bg-slate-100 text-slate-700 text-xs font-bold text-center transition-all-smooth press-scale border border-slate-200/60 flex flex-col items-center gap-1.5"
+              >
+                <span>👆 کلیک نرم</span>
+                <span className="text-[10px] font-normal text-slate-400">Pop Chime</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => { h.success(); chimes.playSuccess() }}
+                className="p-3.5 rounded-xl bg-success-50 hover:bg-success-100 text-success-700 text-xs font-bold text-center transition-all-smooth press-scale border border-success-200/60 flex flex-col items-center gap-1.5"
+              >
+                <span>✅ موفقیت</span>
+                <span className="text-[10px] font-normal text-success-500">Success Chime</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => { h.warning(); chimes.playWarning() }}
+                className="p-3.5 rounded-xl bg-warning-50 hover:bg-warning-100 text-warning-700 text-xs font-bold text-center transition-all-smooth press-scale border border-warning-200/60 flex flex-col items-center gap-1.5"
+              >
+                <span>⚠️ هشدار</span>
+                <span className="text-[10px] font-normal text-warning-500">Warning Chime</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => { h.error(); chimes.playAlarm() }}
+                className="p-3.5 rounded-xl bg-error-50 hover:bg-error-100 text-error-700 text-xs font-bold text-center transition-all-smooth press-scale border border-error-200/60 flex flex-col items-center gap-1.5"
+              >
+                <span>🚨 آلارم بحرانی</span>
+                <span className="text-[10px] font-normal text-error-500">Alarm Chime</span>
+              </button>
             </div>
           </Card>
         </div>

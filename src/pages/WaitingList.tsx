@@ -549,7 +549,7 @@ export default function WaitingList() {
                       <button
                         onClick={() => handleStatusChange(e, 'notified')}
                         disabled={e.status === 'notified' || e.status === 'scheduled' || e.status === 'cancelled'}
-                        className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-primary-50 text-primary-700 text-xs hover:bg-primary-100 disabled:opacity-40 transition-all-smooth"
+                        className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-primary-50 text-primary-700 text-xs hover:bg-primary-100 disabled:opacity-40 transition-all-smooth press-scale"
                       >
                         <Bell size={12} />
                         اطلاع
@@ -557,7 +557,7 @@ export default function WaitingList() {
                       <button
                         onClick={() => handleStatusChange(e, 'scheduled')}
                         disabled={e.status === 'scheduled' || e.status === 'cancelled'}
-                        className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-success-50 text-success-700 text-xs hover:bg-success-100 disabled:opacity-40 transition-all-smooth"
+                        className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-success-50 text-success-700 text-xs hover:bg-success-100 disabled:opacity-40 transition-all-smooth press-scale"
                       >
                         <CheckCircle2 size={12} />
                         زمان‌بندی
@@ -565,14 +565,14 @@ export default function WaitingList() {
                       <button
                         onClick={() => handleStatusChange(e, 'cancelled')}
                         disabled={e.status === 'cancelled'}
-                        className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-error-50 text-error-700 text-xs hover:bg-error-100 disabled:opacity-40 transition-all-smooth"
+                        className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-error-50 text-error-700 text-xs hover:bg-error-100 disabled:opacity-40 transition-all-smooth press-scale"
                       >
                         <XCircle size={12} />
                         لغو
                       </button>
                       <button
-                        onClick={() => navigate(`/patients/${e.patient_id}`)}
-                        className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-slate-50 text-slate-600 text-xs hover:bg-slate-100 transition-all-smooth mr-auto"
+                        onClick={() => { h.select(); navigate(`/patients/${e.patient_id}`) }}
+                        className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-slate-50 text-slate-600 text-xs hover:bg-slate-100 transition-all-smooth press-scale mr-auto"
                       >
                         <Smile size={12} />
                         پرونده
@@ -580,21 +580,21 @@ export default function WaitingList() {
                       <button
                         onClick={() => handleConvertToAppointment(e)}
                         disabled={e.status === 'scheduled' || e.status === 'cancelled'}
-                        className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-primary-50 text-primary-600 text-xs hover:bg-primary-100 disabled:opacity-40 transition-all-smooth"
+                        className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-primary-50 text-primary-600 text-xs hover:bg-primary-100 disabled:opacity-40 transition-all-smooth press-scale"
                       >
                         <Calendar size={12} />
                         تبدیل به نوبت
                       </button>
                       <button
                         onClick={() => openEditModal(e)}
-                        className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-slate-50 text-slate-600 text-xs hover:bg-slate-100 transition-all-smooth"
+                        className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-slate-50 text-slate-600 text-xs hover:bg-slate-100 transition-all-smooth press-scale"
                       >
                         <Edit2 size={12} />
                         ویرایش
                       </button>
                       <button
                         onClick={() => handleDelete(e)}
-                        className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-error-50 text-error-600 text-xs hover:bg-error-100 transition-all-smooth"
+                        className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-error-50 text-error-600 text-xs hover:bg-error-100 transition-all-smooth press-scale"
                       >
                         <Ban size={12} />
                         لغو
