@@ -16,6 +16,8 @@ import {
 import type { PatientPolicy } from '../lib/insurance'
 import type { InsuranceClaim, InsuranceCompany } from '../types'
 import { formatNumber, toPersianDigits } from '../lib/persianDate'
+import { chimes } from '../lib/chimes'
+import { h } from '../lib/haptics'
 
 interface Props {
   patientId: string
@@ -75,7 +77,11 @@ export function InsurancePanel({ patientId, previewCost }: Props) {
   }, [previewCost, active, claims, today])
 
   const save = async () => {
-    if (errors.length) return
+    if (errors.length) {
+      chimes.playWarning()
+      h.warning()
+      return
+    }
     await createPatientPolicy({
       patient_id: patientId,
       company_id: form.company_id || null,
@@ -87,6 +93,8 @@ export function InsurancePanel({ patientId, previewCost }: Props) {
       is_active: true,
       notes: null,
     })
+    chimes.playSuccess()
+    h.confirm()
     showToast('success', 'بیمه ثبت شد')
     setForm(emptyForm)
     setAdding(false)
@@ -104,7 +112,14 @@ export function InsurancePanel({ patientId, previewCost }: Props) {
             <h3 className="font-bold text-slate-800">بیمه‌های بیمار</h3>
             <Badge color="slate">{toPersianDigits(active.length)} فعال</Badge>
           </div>
-          <Button onClick={() => setAdding((v) => !v)}>
+          <Button
+            className="press-scale"
+            onClick={() => {
+              chimes.playPop()
+              h.tap()
+              setAdding((v) => !v)
+            }}
+          >
             {adding ? <><X size={16} /> بستن</> : <><Plus size={16} /> بیمه جدید</>}
           </Button>
         </div>
@@ -147,7 +162,7 @@ export function InsurancePanel({ patientId, previewCost }: Props) {
           )}
           {/* Disabled purely on the shared validator — a required field
               must block, never merely warn. */}
-          <Button className="mt-3" onClick={save} disabled={errors.length > 0}>ثبت بیمه</Button>
+          <Button className="mt-3 press-scale" onClick={save} disabled={errors.length > 0}>ثبت بیمه</Button>
         </Card>
       )}
 
@@ -172,7 +187,17 @@ export function InsurancePanel({ patientId, previewCost }: Props) {
                   </div>
                   {p.policy_number && <p className="text-xs text-slate-500 mt-0.5" dir="ltr">{p.policy_number}</p>}
                 </div>
-                <Button variant="ghost" size="sm" onClick={async () => { await archivePatientPolicy(p.id); await load() }}>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="press-scale"
+                  onClick={async () => {
+                    chimes.playPop()
+                    h.delete()
+                    await archivePatientPolicy(p.id)
+                    await load()
+                  }}
+                >
                   غیرفعال کردن
                 </Button>
               </div>

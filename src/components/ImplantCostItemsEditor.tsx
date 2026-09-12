@@ -8,6 +8,7 @@ import {
   type CostItemLike, type CostGroup,
 } from '../lib/implantCosting'
 import { h } from '../lib/haptics'
+import { chimes } from '../lib/chimes'
 import type { Doctor } from '../types'
 
 /**
@@ -53,6 +54,7 @@ export function ImplantCostItemsEditor({ items, onChange, doctors, fixturePrice 
   const isOn = (kind: string) => active.some((i) => i.kind === kind)
 
   const toggle = (kind: string) => {
+    chimes.playPop()
     h.select()
     // «سایر» can appear more than once — every "other" is a different
     // thing. Every named kind appears at most once; tap again removes it.
@@ -74,7 +76,8 @@ export function ImplantCostItemsEditor({ items, onChange, doctors, fixturePrice 
     onChange(items.map((i) => (i._key === key ? { ...i, ...patch } : i)))
 
   const remove = (key: string) => {
-    h.warning()
+    chimes.playPop()
+    h.delete()
     // Existing lines are deactivated, never deleted — same rule as every
     // table. A brand-new line that was never saved can simply go.
     onChange(items.flatMap((i) => (i._key !== key ? [i] : i.id ? [{ ...i, is_active: false }] : [])))
@@ -132,7 +135,7 @@ export function ImplantCostItemsEditor({ items, onChange, doctors, fixturePrice 
                   ) : (
                     <span className="flex-1 min-w-0 text-xs font-bold text-slate-700 dark:text-slate-200 truncate">{item.label}</span>
                   )}
-                  <button type="button" onClick={() => remove(item._key)} aria-label={`حذف ${item.label}`} className="p-1 rounded-lg text-slate-400 hover:text-error-600">
+                  <button type="button" onClick={() => remove(item._key)} aria-label={`حذف ${item.label}`} className="p-1 rounded-lg text-slate-400 hover:text-error-600 press-scale transition-all-smooth">
                     <X size={14} />
                   </button>
                 </div>

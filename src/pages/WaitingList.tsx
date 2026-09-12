@@ -421,7 +421,7 @@ export default function WaitingList() {
         moduleKey="waitingList"
         title="لیست انتظار"
         subtitle="مدیریت بیماران در انتظار نوبت"
-        action={<Button onClick={openCreateModal} variant="primary"><Plus size={16} className="inline ml-1" /> افزودن به لیست</Button>}
+        action={<Button onClick={openCreateModal} variant="primary" className="press-scale"><Plus size={16} className="inline ml-1" /> افزودن به لیست</Button>}
       />
 
       {/* Stats Cards */}
@@ -458,7 +458,7 @@ export default function WaitingList() {
             ))}
           </select>
           {(searchQuery || filterStatus) && (
-            <Button variant="ghost" size="sm" onClick={() => { setSearchQuery(''); setFilterStatus('') }}>
+            <Button variant="ghost" size="sm" className="press-scale" onClick={() => { h.tap(); chimes.playPop(); setSearchQuery(''); setFilterStatus('') }}>
               پاک کردن
             </Button>
           )}
@@ -474,7 +474,7 @@ export default function WaitingList() {
                 icon={<Clock size={28} />}
                 title="ورودی در لیست انتظار نیست"
                 description="با افزودن بیمار به لیست شروع کنید"
-                action={<Button onClick={openCreateModal} variant="primary" size="sm"><Plus size={14} className="inline ml-1" />افزودن</Button>}
+                action={<Button onClick={openCreateModal} variant="primary" size="sm" className="press-scale"><Plus size={14} className="inline ml-1" />افزودن</Button>}
               />
             </Card>
           ) : (
@@ -515,8 +515,8 @@ export default function WaitingList() {
                         <div className="flex items-center gap-3">
                           <a
                             href={`tel:${patientPhone(e)}`}
-                            onClick={(e) => e.stopPropagation()}
-                            className="flex items-center gap-1 hover:text-primary-600 transition-colors font-mono"
+                            onClick={(ev) => { ev.stopPropagation(); h.tap(); chimes.playPop() }}
+                            className="flex items-center gap-1 hover:text-primary-600 transition-colors font-mono press-scale"
                             dir="ltr"
                             title="تماس تلفنی با بیمار"
                           >
@@ -527,8 +527,8 @@ export default function WaitingList() {
                             href={`https://wa.me/${patientPhone(e)!.replace(/\D/g, '').replace(/^0/, '98')}?text=${encodeURIComponent(`سلام ${patientName(e)} عزیز، وقت خالی در کلینیک دندانپزشکی مینادنت برای شما فراهم شد. جهت تعیین و ثبت نوبت، لطفاً با کلینیک تماس حاصل فرمایید.`)}`}
                             target="_blank"
                             rel="noopener noreferrer"
-                            onClick={(e) => e.stopPropagation()}
-                            className="flex items-center gap-1 text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50 dark:hover:bg-emerald-950/30 px-2 py-0.5 rounded-lg text-[11px] font-medium transition-colors"
+                            onClick={(ev) => { ev.stopPropagation(); h.tap(); chimes.playPop() }}
+                            className="flex items-center gap-1 text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50 dark:hover:bg-emerald-950/30 px-2 py-0.5 rounded-lg text-[11px] font-medium transition-colors press-scale"
                             title="ارسال پیام سریع در پیام‌رسان / واتساپ"
                           >
                             <MessageSquare size={12} />

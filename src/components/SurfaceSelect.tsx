@@ -1,5 +1,6 @@
 import { SURFACE_ORDER, SURFACE_NAMES, parseSurfaces, toggleSurface, surfaceLabel } from '../lib/toothSurfaces'
 import { h } from '../lib/haptics'
+import { chimes } from '../lib/chimes'
 
 /**
  * MOD-FEAT-026 | انتخاب سطوح دندان
@@ -42,8 +43,12 @@ export function SurfaceSelect({ label = 'سطوح دندان', value, onChange, 
               type="button"
               aria-pressed={on}
               aria-label={SURFACE_NAMES[code]}
-              onClick={() => { h.select(); onChange(toggleSurface(value, code)) }}
-              className={`flex-1 py-2.5 rounded-xl border text-sm font-bold transition-all-smooth ${
+              onClick={() => {
+                chimes.playPop()
+                h.select()
+                onChange(toggleSurface(value, code))
+              }}
+              className={`flex-1 py-2.5 rounded-xl border text-sm font-bold transition-all-smooth press-scale ${
                 on
                   ? 'bg-primary-600 text-white border-primary-600'
                   : 'bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 border-slate-200 dark:border-slate-600'
