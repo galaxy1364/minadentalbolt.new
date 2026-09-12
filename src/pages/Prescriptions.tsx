@@ -14,6 +14,7 @@ import { useConfirmAction } from '../components/ConfirmAction'
 import { Prescription, PrescriptionWithRelations, Patient, Doctor } from '../types'
 import { Wizard, Card, Button, Input, Select, Textarea, Badge, Spinner, EmptyState, showToast } from '../components/ui'
 import { ModuleHeader, ModuleStatCard, ReorderableStatGrid } from '../components/ModuleHeader'
+import { DENTAL_DRUG_PRESETS, DrugPreset } from '../lib/drugPresets'
 
 // ============================================================================
 // Constants
@@ -90,6 +91,16 @@ export default function Prescriptions() {
       medicationsText: formData.medications,
     })
   }, [selectedPatient, formData.medications])
+
+  const applyPreset = (preset: DrugPreset) => {
+    h.confirm()
+    const lines = preset.items.map((it) => `${it.drug_name} | ${it.dosage} | ${it.frequency} (${it.instructions})`).join('\n')
+    setFormData((prev) => ({
+      ...prev,
+      medications: prev.medications ? `${prev.medications.trim()}\n${lines}` : lines,
+    }))
+    showToast('success', `پک «${preset.title}» به نسخه اضافه شد`)
+  }
 
   // ===========================================================================
   // Data Fetching
@@ -544,6 +555,26 @@ export default function Prescriptions() {
                     ))}
                   </div>
                 )}
+
+                {/* 1-Click Clinical Dental Drug Presets */}
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 dark:text-slate-200 mb-1.5">
+                    پکیج‌های درمانی پرتکرار دندانپزشکی (افزودن سریع با ۱ کلیک):
+                  </label>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 mb-3">
+                    {DENTAL_DRUG_PRESETS.map((p) => (
+                      <button
+                        key={p.id}
+                        type="button"
+                        onClick={() => applyPreset(p)}
+                        className={`p-2.5 rounded-xl border text-right transition-all hover:scale-[1.01] active:scale-[0.99] ${p.badgeColor}`}
+                      >
+                        <p className="text-xs font-bold mb-0.5">{p.title}</p>
+                        <p className="text-[10px] opacity-80 line-clamp-1">{p.description}</p>
+                      </button>
+                    ))}
+                  </div>
+                </div>
 
                 {/* Quick Add Buttons + Pediatric Calculator Toggle */}
                 <div>

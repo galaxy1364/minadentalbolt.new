@@ -20,6 +20,7 @@ import { PersianCalendar } from '../components/PersianCalendar'
 import { CurrencyInput } from '../components/CurrencyInput'
 import { MultiChairGrid } from '../components/MultiChairGrid'
 import { buildPrintDocument } from '../lib/printDocument'
+import { detectSpecialty, CANCELLATION_REASONS } from '../lib/appointmentColorMap'
 
 const typeMeta: Record<string, { label: string; color: string; bg: string; dot: string }> = {
   consultation:  { label: 'مشاوره',      color: 'text-primary-700',  bg: 'bg-primary-50',  dot: 'bg-primary-500' },
@@ -80,6 +81,9 @@ export default function Appointments() {
   const [showSearch, setShowSearch] = useState(false)
   const [viewMode, setViewMode] = useState<'list' | 'calendar' | 'operatory'>('list')
   const [selectedCalDate, setSelectedCalDate] = useState(new Date().toISOString().slice(0, 10))
+  const [cancelModalAppt, setCancelModalAppt] = useState<AppointmentWithRelations | null>(null)
+  const [cancelReason, setCancelReason] = useState<string>(CANCELLATION_REASONS[0].label)
+  const [cancelNote, setCancelNote] = useState<string>('')
 
   // Wizard state
   const [wizardOpen, setWizardOpen] = useState(false)
@@ -552,25 +556,24 @@ export default function Appointments() {
     })
   }
 
-  // ── Preview + Confirm for delete ──
+  // ── Smart Clinical Cancellation with Reason ──
   const handleDelete = (appt: AppointmentWithRelations) => {
-    // Per clinic policy: appointment history is never permanently
-    // deleted — 'لغو شد' (cancelled) already exists as a real status and
-    // keeps the record (and the fact that this slot happened/was booked)
-    // fully intact, instead of erasing it.
-    confirmAction({
-      type: 'status',
-      title: 'لغو نوبت',
-      warning: 'این نوبت هیچ‌وقت پاک نمی‌شود — فقط به‌عنوان لغو‌شده علامت می‌خورد.',
-      fields: [
-        { label: 'بیمار', value: patientName(appt), icon: <User size={16} />, highlight: true },
-        { label: 'تاریخ', value: toJalaliStringPretty(appt.date), icon: <Calendar size={16} /> },
-        { label: 'ساعت', value: toPersianDigits(appt.start_time), icon: <Clock size={16} /> },
-        { label: 'نوع', value: getType(appt.type).label },
-      ],
-      confirmLabel: 'تایید لغو',
-      onConfirm: async () => { await updateAppointment(appt.id, { status: 'cancelled' }); await loadData() },
+    setCancelReason(CANCELLATION_REASONS[0].label)
+    setCancelNote('')
+    setCancelModalAppt(appt)
+  }
+
+  const confirmCancelWithReason = async () => {
+    if (!cancelModalAppt) return
+    const noteSuffix = ` [علت لغو: ${cancelReason}${cancelNote.trim() ? ` - ${cancelNote.trim()}` : ''}]`
+    const updatedNotes = ((cancelModalAppt.notes || '') + noteSuffix).trim()
+    await updateAppointment(cancelModalAppt.id, {
+      status: 'cancelled',
+      notes: updatedNotes,
     })
+    setCancelModalAppt(null)
+    showToast('info', 'نوبت لغو و علت در تاریخچه ثبت شد')
+    await loadData()
   }
 
   const ptr = usePullToRefresh(async () => { await loadData() })
@@ -920,12 +923,13 @@ export default function Appointments() {
           {filtered.map((appt) => {
             const tm = getType(appt.type)
             const sm = getStatus(appt.status)
+            const spec = detectSpecialty(appt.type || appt.notes || tm.label)
             const isToday = appt.date === todayStr
             return (
               <div
                 key={appt.id}
                 className="appt-card p-3.5 stagger-item"
-                style={{ borderRight: `3px solid ${doctorColor(doctors.find((d) => d.id === appt.doctor_id)?.color, 0)}` }}
+                style={{ borderRight: `4px solid ${spec.accentColor}` }}
                 onClick={() => openWizard(appt)}
               >
                 <div className="flex items-start gap-3">
@@ -947,10 +951,13 @@ export default function Appointments() {
                     <div className="flex items-center gap-2 mb-1">
                       <h3 className="font-bold text-sm text-slate-800 truncate">{patientName(appt)}</h3>
                     </div>
-                    <div className="flex items-center gap-2 flex-wrap mb-2">
+                    <div className="flex items-center gap-1.5 flex-wrap mb-2">
                       <span className={`status-pill ${tm.bg} ${tm.color}`}>
                         <span className={`w-1.5 h-1.5 rounded-full ${tm.dot} ml-1`} />
                         {tm.label}
+                      </span>
+                      <span className={`text-[10px] px-2 py-0.5 rounded-lg border font-bold ${spec.badgeClass}`}>
+                        {spec.label}
                       </span>
                       <span className={`status-pill ${sm.bg} ${sm.color}`}>{sm.label}</span>
                     </div>
@@ -1473,6 +1480,66 @@ export default function Appointments() {
                   <CheckCircle2 size={16} /> ثبت نوبت
                 </Button>
               )}
+            </div>
+          </div>
+        </Modal>
+      )}
+
+      {/* ── مدال ثبت استاندارد دلیل لغو نوبت ── */}
+      {cancelModalAppt && (
+        <Modal
+          open={!!cancelModalAppt}
+          onClose={() => setCancelModalAppt(null)}
+          title="لغو نوبت و ثبت علت در پرونده"
+          size="md"
+        >
+          <div className="space-y-4">
+            <div className="p-3.5 rounded-2xl bg-slate-50 dark:bg-slate-700/50 border border-slate-200/60 dark:border-slate-700 text-sm space-y-1.5">
+              <p className="font-bold text-slate-800 dark:text-slate-100">{patientName(cancelModalAppt)}</p>
+              <div className="flex items-center gap-3 text-xs text-slate-500 dark:text-slate-400">
+                <span>{toJalaliStringPretty(cancelModalAppt.date)}</span>
+                <span>ساعت {toPersianDigits(cancelModalAppt.start_time)}</span>
+                <span>{doctorName(cancelModalAppt)}</span>
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-xs font-bold text-slate-600 dark:text-slate-300 mb-2">علت لغو نوبت *</label>
+              <div className="grid grid-cols-1 gap-1.5 max-h-48 overflow-y-auto dock-scroll p-1">
+                {CANCELLATION_REASONS.map((r) => (
+                  <button
+                    key={r.id}
+                    type="button"
+                    onClick={() => setCancelReason(r.label)}
+                    className={`flex items-center justify-between p-2.5 rounded-xl text-xs font-medium transition-all ${
+                      cancelReason === r.label
+                        ? 'bg-rose-50 dark:bg-rose-950/40 text-rose-700 dark:text-rose-300 border border-rose-300 dark:border-rose-800 font-bold'
+                        : 'bg-slate-100 dark:bg-slate-700/60 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-600'
+                    }`}
+                  >
+                    <span>{r.label}</span>
+                    {cancelReason === r.label && <CheckCircle2 size={15} className="text-rose-600" />}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div>
+              <Input
+                label="توضیحات تکمیلی (اختیاری)"
+                value={cancelNote}
+                onChange={setCancelNote}
+                placeholder="توضیح بیشتر یا پیگیری منشی..."
+              />
+            </div>
+
+            <div className="flex gap-2 justify-end pt-2 border-t border-slate-100 dark:border-slate-700">
+              <Button variant="secondary" onClick={() => setCancelModalAppt(null)}>
+                انصراف
+              </Button>
+              <Button variant="danger" onClick={confirmCancelWithReason}>
+                <Ban size={15} /> تایید لغو نوبت
+              </Button>
             </div>
           </div>
         </Modal>

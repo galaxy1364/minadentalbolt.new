@@ -11,7 +11,9 @@ import {
   RefreshCw,
   Search,
   ExternalLink,
+  Phone,
 } from 'lucide-react'
+import { chimes } from '../lib/chimes'
 import {
   fetchPatients,
   fetchCheques,
@@ -139,12 +141,15 @@ export function ClinicalAlarmCenter({ open, onClose }: ClinicalAlarmCenterProps)
   // Escape key listener to close
   useEffect(() => {
     if (!open) return
+    if (bundle.hasCriticalItems || bundle.totalUrgentCount > 0) {
+      chimes.playAlarm()
+    }
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape') onClose()
     }
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [open, onClose])
+  }, [open, onClose, bundle.hasCriticalItems, bundle.totalUrgentCount])
 
   const filteredItems = useMemo(() => {
     let list = bundle.all
@@ -422,6 +427,18 @@ export function ClinicalAlarmCenter({ open, onClose }: ClinicalAlarmCenterProps)
                       >
                         مشاهده پرونده
                       </button>
+
+                      {item.patient.phone && (
+                        <a
+                          href={`tel:${item.patient.phone}`}
+                          onClick={(e) => { e.stopPropagation(); h.tap() }}
+                          className="flex items-center gap-1 px-2 py-1 rounded-lg text-[11px] font-semibold bg-emerald-50 hover:bg-emerald-100 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 transition-colors"
+                          title={`تماس مستقیم با ${item.patient.phone}`}
+                        >
+                          <Phone size={11} />
+                          <span className="hidden sm:inline">تماس</span>
+                        </a>
+                      )}
 
                       {item.actionPath && (
                         <button

@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react'
 import { createPortal } from 'react-dom'
 import { X, AlertCircle, CheckCircle2, Info, Loader2, ChevronRight, ChevronLeft } from 'lucide-react'
 import { h } from '../lib/haptics'
+import { chimes } from '../lib/chimes'
 import { toPersianDigits } from '../lib/persianDate'
 import { matchRanges } from '../lib/fuzzySearch'
 
@@ -10,7 +11,7 @@ export function Spinner({ size = 24 }: { size?: number }) {
 }
 
 export function Card({ children, className = '', style, onClick }: { children: React.ReactNode; className?: string; style?: React.CSSProperties; onClick?: () => void }) {
-  return <div style={style} onClick={onClick} className={`bg-white dark:bg-slate-800 rounded-2xl card-shadow dark:card-shadow ${className}`}>{children}</div>
+  return <div style={style} onClick={onClick} className={`bg-white dark:bg-slate-800 rounded-2xl border border-slate-200/60 dark:border-slate-700/60 card-shadow dark:card-shadow transition-all duration-200 ${className}`}>{children}</div>
 }
 
 export function StatCard({ icon, title, value, color = 'primary', subtitle }: { icon: React.ReactNode; title: string; value: string | number; color?: string; subtitle?: string }) {
@@ -64,7 +65,7 @@ export function Button({ children, onClick, variant = 'primary', size = 'md', cl
       disabled={disabled}
       title={title}
       aria-label={ariaLabel}
-      className={`rounded-xl font-medium transition-all-smooth press-scale disabled:opacity-50 disabled:cursor-not-allowed ${variants[variant]} ${sizes[size]} ${className}`}
+      className={`rounded-xl font-medium transition-all duration-150 active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed ${variants[variant]} ${sizes[size]} ${className}`}
     >
       {children}
     </button>
@@ -366,9 +367,16 @@ export function showToast(type: 'success' | 'error' | 'info', message: string) {
   currentToasts = [...currentToasts, { id, type, message }]
   toastListeners.forEach((l) => l(currentToasts))
   // Haptic + sound on toast
-  if (type === 'success') h.success()
-  else if (type === 'error') h.error()
-  else h.light()
+  if (type === 'success') {
+    h.success()
+    chimes.playSuccess()
+  } else if (type === 'error') {
+    h.error()
+    chimes.playWarning()
+  } else {
+    h.light()
+    chimes.playPop()
+  }
   setTimeout(() => {
     currentToasts = currentToasts.filter((t) => t.id !== id)
     toastListeners.forEach((l) => l(currentToasts))
