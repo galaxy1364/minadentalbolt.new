@@ -473,7 +473,8 @@ export default function Prescriptions() {
                   <span className="text-xs text-slate-500">{toJalaliStringPretty(p.created_at)}</span>
                   <div className="flex items-center gap-2">
                     {(() => {
-                      const cleanPhone = p.patient?.phone ? p.patient.phone.replace(/\D/g, '').replace(/^0/, '98') : null
+                      const pat = patients.find((pt) => pt.id === p.patient_id)
+                      const cleanPhone = pat?.phone ? pat.phone.replace(/\D/g, '').replace(/^0/, '98') : null
                       if (!cleanPhone) return null
                       const items = medicationsList(p)
                       const medsFormatted = items.map((m, idx) => `${toPersianDigits(idx + 1)}. ${m.name || ''} ${m.dose ? `(${m.dose})` : ''} - ${m.frequency || ''}`).join('\n')
