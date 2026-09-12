@@ -13,6 +13,7 @@ import { Wizard, Card, Button, Input, Select, Textarea, Badge, Spinner, EmptySta
 import { PersianDateInput } from '../components/PersianDateInput'
 import { ModuleHeader, ModuleStatCard, ReorderableStatGrid } from '../components/ModuleHeader'
 import { supabase } from '../lib/supabase'
+import { addMinutes } from '../lib/timeSlots'
 
 // ============================================================================
 // Constants
@@ -250,8 +251,7 @@ export default function WaitingList() {
           const today = new Date().toISOString().split('T')[0]
           const startDate = e.preferred_date || today
           const startTime = e.preferred_time || '09:00'
-          const [sh, sm] = startTime.split(':').map(Number)
-          const endTime = `${String(sh + 1).padStart(2, '0')}:${String(sm).padStart(2, '0')}`
+          const endTime = addMinutes(startTime, 30)
           const unitId = units[0]?.id || null
 
           if (e.doctor_id) {
@@ -469,10 +469,16 @@ export default function WaitingList() {
                         </span>
                       )}
                       {patientPhone(e) && (
-                        <span className="flex items-center gap-1" dir="ltr">
+                        <a
+                          href={`tel:${patientPhone(e)}`}
+                          onClick={(e) => e.stopPropagation()}
+                          className="flex items-center gap-1 hover:text-primary-600 transition-colors"
+                          dir="ltr"
+                          title="تماس تلفنی با بیمار"
+                        >
                           <Phone size={12} />
                           {toPersianDigits(patientPhone(e)!)}
-                        </span>
+                        </a>
                       )}
                       {e.notified_at && (
                         <span className="flex items-center gap-1 text-success-600">
@@ -517,7 +523,8 @@ export default function WaitingList() {
                       </button>
                       <button
                         onClick={() => handleConvertToAppointment(e)}
-                        className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-primary-50 text-primary-600 text-xs hover:bg-primary-100 transition-all-smooth"
+                        disabled={e.status === 'scheduled' || e.status === 'cancelled'}
+                        className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-primary-50 text-primary-600 text-xs hover:bg-primary-100 disabled:opacity-40 transition-all-smooth"
                       >
                         <Calendar size={12} />
                         تبدیل به نوبت

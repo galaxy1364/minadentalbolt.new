@@ -19,6 +19,7 @@ import { usePullToRefresh } from '../lib/usePullToRefresh'
 import { PersianCalendar } from '../components/PersianCalendar'
 import { CurrencyInput } from '../components/CurrencyInput'
 import { MultiChairGrid } from '../components/MultiChairGrid'
+import { buildPrintDocument } from '../lib/printDocument'
 
 const typeMeta: Record<string, { label: string; color: string; bg: string; dot: string }> = {
   consultation:  { label: 'مشاوره',      color: 'text-primary-700',  bg: 'bg-primary-50',  dot: 'bg-primary-500' },
@@ -136,7 +137,7 @@ export default function Appointments() {
       setPendingLabOrderId(st.labOrderId ?? null)
       setPendingImplant(st.implantCaseId && implantStep ? { caseId: st.implantCaseId, step: implantStep } : null)
       setEditingAppt(null)
-      setWizardStep(0)
+      setWizardStep(st.quickStartDoctorId ? 2 : st.quickStartPatientId ? 1 : 0)
       setWizardOpen(true)
     }
     // Clearing history state stops the wizard reopening on back-navigation.
@@ -270,10 +271,11 @@ export default function Appointments() {
       })
     } else {
       setEditingAppt(null)
+      const activeUnits = units.filter((u) => u.is_active)
       setWizardData({
         patient_id: prefill?.patient_id || '',
         doctor_id: prefill?.doctor_id || '',
-        unit_id: prefill?.unit_id || '',
+        unit_id: prefill?.unit_id || (activeUnits.length === 1 ? activeUnits[0].id : ''),
         date: prefill?.date || (activeFilter === 'tomorrow' ? tomorrowStr : todayStr),
         start_time: prefill?.start_time || '09:00',
         end_time: prefill?.end_time || '09:30',
@@ -415,7 +417,18 @@ export default function Appointments() {
         } as any
 
         if (editingAppt) {
-          await updateAppointment(editingAppt.id, { ...basePayload, date: wizardData.date })
+          await updateAppointment(editingAppt.id, {
+            patient_id: wizardData.patient_id,
+            doctor_id: wizardData.doctor_id || null,
+            unit_id: wizardData.unit_id || null,
+            date: wizardData.date,
+            start_time: wizardData.start_time,
+            end_time: wizardData.end_time,
+            type: wizardData.type === 'other' ? (wizardData.custom_type.trim() || 'سایر') : wizardData.type,
+            status: wizardData.status,
+            notes: wizardData.notes || null,
+            estimated_fee: wizardData.estimated_fee ? Number(wizardData.estimated_fee) : null,
+          })
         } else if (isRecurring) {
           // Each occurrence gets its own conflict check — a series
           // shouldn't silently double-book a date that's already taken;
@@ -732,7 +745,7 @@ export default function Appointments() {
             </button>
           ))}
         </div>
-        {/* ── MOD-FEAT-NEW-002: پرینت نوبت‌نامه روزانه ── */}
+        {/* ── MOD-FEAT-NEW-002: پرینت نوبت‌نامه روزانه با پوسته امن PWA ── */}
         <button
           onClick={() => {
             h.confirm()
@@ -744,11 +757,30 @@ export default function Appointments() {
               const d = a.doctor?.name ? `دکتر ${a.doctor.name}` : '—'
               const t = getType(a.type).label
               const s = getStatus(a.status).label
-              return `<tr><td>${a.start_time}</td><td>${p}</td><td>${d}</td><td>${t}</td><td>${s}</td><td>${a.unit?.name || '—'}</td></tr>`
+              return `<tr><td>${toPersianDigits(a.start_time)}</td><td>${p}</td><td>${d}</td><td>${t}</td><td>${s}</td><td>${a.unit?.name || '—'}</td></tr>`
             }).join('')
-            const html = `<!DOCTYPE html><html lang="fa" dir="rtl"><head><meta charset="utf-8"><title>نوبت‌نامه ${toJalaliStringPretty(todayStr)}</title><style>*{font-family:Tahoma,sans-serif;direction:rtl}body{padding:20px}h1{font-size:16px;margin-bottom:12px;border-bottom:2px solid #000;padding-bottom:6px}table{width:100%;border-collapse:collapse;font-size:12px}th,td{border:1px solid #ccc;padding:6px 8px;text-align:right}th{background:#f0f0f0;font-weight:bold}tr:nth-child(even){background:#f9f9f9}@media print{button{display:none}}</style></head><body><h1>نوبت‌نامه — ${toJalaliStringPretty(todayStr)} (${toPersianDigits(todayAppts.length)} نوبت)</h1><table><thead><tr><th>ساعت</th><th>بیمار</th><th>پزشک</th><th>نوع</th><th>وضعیت</th><th>یونیت</th></tr></thead><tbody>${rows}</tbody></table></body></html>`
+            const doc = buildPrintDocument({
+              title: `نوبت‌نامه ${toJalaliStringPretty(todayStr)}`,
+              styles: `
+                h1 { font-size: 16px; margin-bottom: 12px; border-bottom: 2px solid #0d9488; padding-bottom: 6px; color: #0d9488; }
+                table { width: 100%; border-collapse: collapse; font-size: 12px; margin-top: 10px; }
+                th, td { border: 1px solid #cbd5e1; padding: 6px 8px; text-align: right; }
+                th { background: #f1f5f9; font-weight: bold; color: #334155; }
+                tr:nth-child(even) { background: #f8fafc; }
+              `,
+              bodyHtml: `
+                <h1>نوبت‌نامه — ${toJalaliStringPretty(todayStr)} (${toPersianDigits(todayAppts.length)} نوبت)</h1>
+                <table>
+                  <thead>
+                    <tr><th>ساعت</th><th>بیمار</th><th>پزشک</th><th>نوع</th><th>وضعیت</th><th>یونیت</th></tr>
+                  </thead>
+                  <tbody>${rows}</tbody>
+                </table>
+              `,
+              shareText: `نوبت‌نامه روزانه کلینیک مینادنت — ${toJalaliStringPretty(todayStr)}\nتعداد نوبت‌ها: ${toPersianDigits(todayAppts.length)}`,
+            })
             const w = window.open('', '_blank')
-            if (w) { w.document.write(html); w.document.close(); setTimeout(() => w.print(), 300) }
+            if (w) { w.document.write(doc); w.document.close(); }
           }}
           className="p-2 rounded-xl bg-white border border-slate-200 text-slate-500 hover:text-primary-600 transition-all-smooth press-scale flex-shrink-0"
           title="پرینت نوبت‌نامه امروز"
@@ -932,12 +964,22 @@ export default function Appointments() {
                   {/* Quick action + delete */}
                   <div className="flex flex-col gap-1.5 items-center flex-shrink-0" onClick={(e) => e.stopPropagation()}>
                     {appt.status === 'scheduled' && (
-                      <button onClick={() => quickStatus(appt, 'confirmed')} aria-label="تایید نوبت" className="p-1.5 rounded-lg bg-primary-50 text-primary-600 hover:bg-primary-100 transition-all-smooth press-scale" title="تایید">
+                      <button onClick={() => quickStatus(appt, 'confirmed')} aria-label="تایید نوبت" className="p-1.5 rounded-lg bg-primary-50 text-primary-600 hover:bg-primary-100 transition-all-smooth press-scale" title="تایید نوبت">
                         <CheckCircle2 size={16} />
                       </button>
                     )}
                     {appt.status === 'confirmed' && (
-                      <button onClick={() => quickStatus(appt, 'completed')} aria-label="تکمیل نوبت" className="p-1.5 rounded-lg bg-success-50 text-success-600 hover:bg-success-100 transition-all-smooth press-scale" title="تکمیل">
+                      <>
+                        <button onClick={() => quickStatus(appt, 'in_chair')} aria-label="نشاندن روی یونیت" className="p-1.5 rounded-lg bg-warning-50 text-warning-600 hover:bg-warning-100 transition-all-smooth press-scale" title="نشاندن روی صندلی یونیت">
+                          <Stethoscope size={16} />
+                        </button>
+                        <button onClick={() => quickStatus(appt, 'completed')} aria-label="تکمیل نوبت" className="p-1.5 rounded-lg bg-success-50 text-success-600 hover:bg-success-100 transition-all-smooth press-scale" title="تکمیل">
+                          <CheckCircle2 size={16} />
+                        </button>
+                      </>
+                    )}
+                    {appt.status === 'in_chair' && (
+                      <button onClick={() => quickStatus(appt, 'completed')} aria-label="تکمیل نوبت" className="p-1.5 rounded-lg bg-success-50 text-success-600 hover:bg-success-100 transition-all-smooth press-scale" title="تکمیل نوبت و شروع درمان">
                         <CheckCircle2 size={16} />
                       </button>
                     )}
@@ -1150,7 +1192,9 @@ export default function Appointments() {
                       // silently keeping a stale selection risked booking
                       // a conflict the wizard's own conflict-check
                       // wouldn't catch until much later.
-                      setWizardData((p) => ({ ...p, doctor_id: v, unit_id: '', start_time: '09:00', end_time: '09:30' }))
+                      const activeUnits = units.filter((u) => u.is_active)
+                      const defaultUnitId = activeUnits.length === 1 ? activeUnits[0].id : ''
+                      setWizardData((p) => ({ ...p, doctor_id: v, unit_id: defaultUnitId, start_time: '09:00', end_time: '09:30' }))
                     }}
                     options={(() => {
                       // Marked, not filtered: clinics do book outside

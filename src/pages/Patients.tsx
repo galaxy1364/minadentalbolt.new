@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useMemo } from 'react'
 import { PatientDebtBar } from '../components/PatientDebtBar'
 import { useNavigate } from 'react-router-dom'
-import { Plus, Search, Edit2, Phone, Filter, Users, Award, AlertCircle, Smile, FileText, User, Heart, Shield, MapPin, Archive } from 'lucide-react'
+import { Plus, Search, Edit2, Phone, Filter, Users, Award, AlertCircle, Smile, FileText, User, Heart, Shield, MapPin, Archive, Calendar } from 'lucide-react'
 import { fetchPatients, createPatient, updatePatient, fetchDoctors, fetchPayments, fetchTreatments, fetchImplantCases, peekNextFileNumber } from '../lib/api'
 import { toJalaliStringPretty, formatCurrency, toPersianDigits } from '../lib/persianDate'
 import { Patient, Doctor, Payment, Treatment, ImplantCase } from '../types'
@@ -15,6 +15,7 @@ import { usePullToRefresh } from '../lib/usePullToRefresh'
 import { scoreFields } from '../lib/fuzzySearch'
 import { calcPatientBalance } from '../lib/finance'
 import { calculateAge } from '../lib/patientUtils'
+import { isNegativeValue } from '../lib/patientAlerts'
 
 const vipLevels: { value: number; label: string; color: string; icon: string }[] = [
   { value: 0, label: 'عادی', color: 'slate', icon: '' },
@@ -201,7 +202,6 @@ export default function Patients() {
     // promises, with no visible sign anything was missing.
     if (!formData.phone.trim()) { h.error(); showToast('error', 'شماره تلفن الزامی است — پایه‌ی یادآوری‌ها و پیامک‌هاست'); return }
     if (!formData.national_id.trim()) { h.error(); showToast('error', 'کد ملی الزامی است'); return }
-    if (!formData.phone2.trim()) { h.error(); showToast('error', 'شماره منزل الزامی است'); return }
 
     const vipMeta = getVipMeta(Number(formData.vip_level) || 0)
     const genderLabel = formData.gender ? (formData.gender === 'male' ? 'آقا' : 'خانم') : '—'
@@ -444,8 +444,8 @@ export default function Patients() {
             const vipMeta = getVipMeta(patient.vip_level)
             const age = calculateAge(patient.birth_date)
             const fin = patientFinances.get(patient.id) || { balance: 0, paid: 0, totalCost: 0 }
-            const hasAllergies = patient.allergies && patient.allergies.trim().length > 0
-            const hasConditions = patient.medical_conditions && patient.medical_conditions.trim().length > 0
+            const hasAllergies = !isNegativeValue(patient.allergies)
+            const hasConditions = !isNegativeValue(patient.medical_conditions)
 
             return (
               <div
@@ -477,9 +477,15 @@ export default function Patients() {
                       {age !== null && <span>{toPersianDigits(age)} سال</span>}
                       {patient.gender && <span>{patient.gender === 'male' ? 'آقا' : 'خانم'}</span>}
                       {patient.phone && (
-                        <span className="flex items-center gap-0.5" dir="ltr">
+                        <a
+                          href={`tel:${patient.phone}`}
+                          onClick={(e) => e.stopPropagation()}
+                          className="flex items-center gap-0.5 hover:text-primary-600 transition-colors"
+                          dir="ltr"
+                          title="تماس تلفنی با بیمار"
+                        >
                           <Phone size={10} /> <HighlightText text={toPersianDigits(patient.phone)} query={searchQuery} />
-                        </span>
+                        </a>
                       )}
                     </div>
                   </div>
@@ -487,8 +493,26 @@ export default function Patients() {
                   {/* Financial + edit + delete */}
                   <div className="flex items-center gap-1.5 flex-shrink-0" onClick={(e) => e.stopPropagation()}>
                     <button
+                      onClick={() => {
+                        h.tap()
+                        navigate('/appointments', {
+                          state: {
+                            quickStartPatientId: patient.id,
+                            quickStartDoctorId: patient.primary_doctor_id,
+                            openWizard: true,
+                          },
+                        })
+                      }}
+                      aria-label={`رزرو نوبت برای ${patient.first_name} ${patient.last_name}`}
+                      title="رزرو نوبت برای این بیمار"
+                      className="p-1.5 rounded-lg text-primary-600 hover:bg-primary-50 hover:text-primary-700 transition-all-smooth press-scale"
+                    >
+                      <Calendar size={14} />
+                    </button>
+                    <button
                       onClick={() => openEditModal(patient)}
                       aria-label={`ویرایش ${patient.first_name} ${patient.last_name}`}
+                      title="ویرایش پرونده"
                       className="p-1.5 rounded-lg text-slate-400 hover:bg-slate-100 hover:text-slate-600 transition-all-smooth press-scale"
                     >
                       <Edit2 size={14} />
@@ -519,9 +543,19 @@ export default function Patients() {
 
                 {/* Medical alerts row */}
                 {(hasAllergies || hasConditions || !patient.is_active) && (
-                  <div className="flex items-center gap-1.5 mt-2 pt-2 border-t border-slate-100">
-                    {hasAllergies && <span className="status-pill bg-error-50 text-error-600"><AlertCircle size={10} className="ml-0.5" /> حساسیت</span>}
-                    {hasConditions && <span className="status-pill bg-warning-50 text-warning-600"><AlertCircle size={10} className="ml-0.5" /> بیماری زمینه‌ای</span>}
+                  <div className="flex items-center gap-1.5 mt-2 pt-2 border-t border-slate-100 flex-wrap">
+                    {hasAllergies && (
+                      <span className="status-pill bg-error-50 text-error-600 border border-error-100 flex items-center gap-1">
+                        <AlertCircle size={10} className="text-error-500" />
+                        <span>حساسیت{patient.allergies ? `: ${patient.allergies}` : ''}</span>
+                      </span>
+                    )}
+                    {hasConditions && (
+                      <span className="status-pill bg-warning-50 text-warning-700 border border-warning-100 flex items-center gap-1">
+                        <Heart size={10} className="text-warning-500" />
+                        <span>بیماری زمینه‌ای{patient.medical_conditions ? `: ${patient.medical_conditions}` : ''}</span>
+                      </span>
+                    )}
                     {!patient.is_active && <span className="status-pill bg-slate-100 text-slate-500">غیرفعال</span>}
                   </div>
                 )}
@@ -558,11 +592,11 @@ export default function Patients() {
               <h4 className="text-xs font-bold text-slate-500 mb-3 uppercase tracking-wider">اطلاعات شخصی</h4>
               <PatientPhotoUpload value={formData.avatar_url} onChange={(url) => setFormData((p) => ({ ...p, avatar_url: url }))} />
               <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mt-3">
-                <Input label="نام" value={formData.first_name} onChange={(v) => setFormData((p) => ({ ...p, first_name: v }))} placeholder="نام" />
-                <Input label="نام خانوادگی" value={formData.last_name} onChange={(v) => setFormData((p) => ({ ...p, last_name: v }))} placeholder="نام خانوادگی" />
+                <Input label="نام *" value={formData.first_name} onChange={(v) => setFormData((p) => ({ ...p, first_name: v }))} placeholder="نام" />
+                <Input label="نام خانوادگی *" value={formData.last_name} onChange={(v) => setFormData((p) => ({ ...p, last_name: v }))} placeholder="نام خانوادگی" />
                 <Input label="کد ملی *" value={formData.national_id} onChange={(v) => setFormData((p) => ({ ...p, national_id: v }))} placeholder="کد ملی" dir="ltr" />
                 <Input label="تلفن *" value={formData.phone} onChange={(v) => setFormData((p) => ({ ...p, phone: v }))} placeholder="09xxxxxxxxx" dir="ltr" />
-                <Input label="شماره منزل *" value={formData.phone2} onChange={(v) => setFormData((p) => ({ ...p, phone2: v }))} placeholder="تلفن ثابت منزل" dir="ltr" />
+                <Input label="شماره منزل" value={formData.phone2} onChange={(v) => setFormData((p) => ({ ...p, phone2: v }))} placeholder="تلفن ثابت منزل" dir="ltr" />
                 <Input label="ایمیل" type="email" value={formData.email} onChange={(v) => setFormData((p) => ({ ...p, email: v }))} placeholder="email@example.com" dir="ltr" />
                 <PersianDateInput label="تاریخ تولد" value={formData.birth_date} onChange={(v) => setFormData((p) => ({ ...p, birth_date: v }))} />
                 <Select label="جنسیت" value={formData.gender} onChange={(v) => setFormData((p) => ({ ...p, gender: v }))} options={genderOptions} placeholder="انتخاب" />

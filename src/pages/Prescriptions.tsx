@@ -126,10 +126,10 @@ export default function Prescriptions() {
       patient_id: handoff.patientId,
       doctor_id: handoff.doctorId || '',
       medications: '',
-      notes: handoff.toothNumber ? `مربوط به دندان ${handoff.toothNumber}` : '',
+      notes: handoff.toothNumber && handoff.toothNumber !== 'general' ? `مربوط به دندان ${handoff.toothNumber}` : '',
     })
     setEditingRx(null)
-    setRxWizardStep(0)
+    setRxWizardStep(1)
     setModalOpen(true)
     window.history.replaceState({}, '')
   }, [location.state])

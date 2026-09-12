@@ -69,6 +69,21 @@ const appointmentStatuses: { value: string; label: string; color: string }[] = [
   { value: 'no_show', label: 'حضور نداشت', color: 'error' },
 ]
 
+const apptTypeLabels: Record<string, string> = {
+  general: 'عمومی',
+  surgery: 'جراحی',
+  cosmetic: 'زیبایی',
+  orthodontics: 'ارتودنسی',
+  implant: 'ایمپلنت',
+  follow_up: 'ویزیت مجدد',
+  checkup: 'معاینه',
+  emergency: 'اورژانس',
+  cleaning: 'جرم‌گیری',
+  extraction: 'کشیدن دندان',
+  root_canal: 'عصب‌کشی',
+  other: 'سایر',
+}
+
 const paymentMethods: { value: string; label: string }[] = [
   { value: 'cash', label: 'نقدی' },
   { value: 'card', label: 'کارت' },
@@ -1227,9 +1242,24 @@ export default function PatientDetail() {
                 <span className="font-mono text-xs">پرونده: {patient.file_number}</span>
               )}
               {patient.phone && (
-                <span className="flex items-center gap-1">
-                  <Phone size={12} /> <span dir="ltr">{toPersianDigits(patient.phone)}</span>
-                </span>
+                <div className="flex items-center gap-1.5">
+                  <a
+                    href={`tel:${patient.phone}`}
+                    className="flex items-center gap-1 text-primary-600 hover:text-primary-700 hover:underline transition-colors"
+                    title="تماس تلفنی با بیمار"
+                  >
+                    <Phone size={12} /> <span dir="ltr">{toPersianDigits(patient.phone)}</span>
+                  </a>
+                  <a
+                    href={`https://wa.me/${patient.phone.replace(/^0/, '98')}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-[10px] px-1.5 py-0.5 rounded bg-success-50 text-success-700 hover:bg-success-100 transition-colors font-medium"
+                    title="ارسال پیام واتس‌اپ"
+                  >
+                    واتس‌اپ
+                  </a>
+                </div>
               )}
               {age !== null && <span>{toPersianDigits(age)} سال</span>}
               {patient.gender && <span>{patient.gender === 'male' ? 'آقا' : 'خانم'}</span>}
@@ -1262,8 +1292,23 @@ export default function PatientDetail() {
             )}
           </div>
 
-          {/* Edit button */}
-          <div className="flex gap-2">
+          {/* Action buttons */}
+          <div className="flex gap-2 flex-wrap">
+            <Button
+              variant="primary"
+              onClick={() => {
+                h.tap()
+                navigate('/appointments', {
+                  state: {
+                    quickStartPatientId: patient.id,
+                    quickStartDoctorId: patient.primary_doctor_id,
+                    openWizard: true,
+                  },
+                })
+              }}
+            >
+              <Calendar size={16} /> نوبت جدید
+            </Button>
             <Button variant="secondary" onClick={handlePrintFullChart}>
               <Printer size={16} /> چاپ پرونده
             </Button>
@@ -1865,10 +1910,29 @@ export default function PatientDetail() {
   // ====================================================================================
 
   const renderAppointments = () => {
+    const handleNewAppointment = () => {
+      navigate('/appointments', {
+        state: {
+          quickStartPatientId: patient?.id,
+          quickStartDoctorId: patient?.primary_doctor_id,
+          openWizard: true,
+        },
+      })
+    }
+
     if (appointments.length === 0) {
       return (
-        <Card className="p-6">
-          <EmptyState icon={<Calendar size={32} />} title="نوبتی ثبت نشده" description="برای این بیمار نوبتی ثبت نشده است" />
+        <Card className="p-6 text-center">
+          <EmptyState
+            icon={<Calendar size={32} />}
+            title="نوبتی ثبت نشده"
+            description="برای این بیمار هنوز نوبتی ثبت نشده است"
+            action={
+              <Button size="sm" variant="primary" onClick={handleNewAppointment} className="flex items-center gap-1.5 mt-2">
+                <Calendar size={14} /> ثبت اولین نوبت
+              </Button>
+            }
+          />
         </Card>
       )
     }
@@ -1877,22 +1941,55 @@ export default function PatientDetail() {
     const past = appointments.filter((a) => a.date < now).sort((a, b) => b.date.localeCompare(a.date))
     return (
       <div className="space-y-4">
+        <div className="flex items-center justify-between gap-3">
+          <h3 className="text-sm font-bold text-slate-700">نوبت‌های بیمار</h3>
+          <Button
+            size="sm"
+            variant="primary"
+            onClick={handleNewAppointment}
+            className="flex items-center gap-1.5 text-xs"
+          >
+            <Calendar size={14} /> نوبت جدید برای این بیمار
+          </Button>
+        </div>
+
         {upcoming.length > 0 && (
           <div>
-            <h3 className="text-sm font-bold text-slate-700 mb-2">نوبت‌های آینده</h3>
+            <h3 className="text-xs font-semibold text-slate-500 mb-2">نوبت‌های آینده ({upcoming.length})</h3>
             <div className="space-y-2">
               {upcoming.map((a) => {
                 const statusMeta = appointmentStatuses.find((s) => s.value === a.status) || appointmentStatuses[0]
+                const doc = doctors.find((d) => d.id === a.doctor_id)
+                const typeName = (a.type && apptTypeLabels[a.type]) || a.type || 'ویزیت'
                 return (
-                  <Card key={a.id} className="p-3">
+                  <Card key={a.id} className="p-3 hover:border-primary-200 transition-colors">
                     <div className="flex items-center justify-between gap-3 flex-wrap">
                       <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 rounded-xl bg-primary-50 text-primary-600 flex items-center justify-center">
+                        <div className="w-10 h-10 rounded-xl bg-primary-50 text-primary-600 flex items-center justify-center shrink-0">
                           <Calendar size={18} />
                         </div>
                         <div>
-                          <p className="text-sm font-medium text-slate-800">{toJalaliStringPretty(a.date)}</p>
-                          <p className="text-xs text-slate-500">{formatTime(a.start_time)} - {formatTime(a.end_time)}</p>
+                          <div className="flex items-center gap-2">
+                            <p className="text-sm font-medium text-slate-800">{toJalaliStringPretty(a.date)}</p>
+                            <span className="text-xs px-2 py-0.5 rounded-full bg-slate-100 text-slate-600 font-medium">
+                              {typeName}
+                            </span>
+                          </div>
+                          <div className="flex items-center gap-2 mt-0.5 text-xs text-slate-500">
+                            <span>{formatTime(a.start_time)} - {formatTime(a.end_time)}</span>
+                            {doc && (
+                              <>
+                                <span>•</span>
+                                <span className="text-primary-600 font-medium">دکتر {doc.name || doc.specialty}</span>
+                              </>
+                            )}
+                            {a.notes && (
+                              <>
+                                <span>•</span>
+                                <span className="text-slate-400 truncate max-w-xs">{a.notes}</span>
+                              </>
+                            )}
+                          </div>
                         </div>
                       </div>
                       <Badge color={statusMeta.color}>{statusMeta.label}</Badge>
@@ -1905,20 +2002,41 @@ export default function PatientDetail() {
         )}
         {past.length > 0 && (
           <div>
-            <h3 className="text-sm font-bold text-slate-700 mb-2">نوبت‌های گذشته</h3>
+            <h3 className="text-xs font-semibold text-slate-400 mb-2">نوبت‌های گذشته ({past.length})</h3>
             <div className="space-y-2">
               {past.map((a) => {
                 const statusMeta = appointmentStatuses.find((s) => s.value === a.status) || appointmentStatuses[0]
+                const doc = doctors.find((d) => d.id === a.doctor_id)
+                const typeName = (a.type && apptTypeLabels[a.type]) || a.type || 'ویزیت'
                 return (
-                  <Card key={a.id} className="p-3 opacity-70">
+                  <Card key={a.id} className="p-3 opacity-75">
                     <div className="flex items-center justify-between gap-3 flex-wrap">
                       <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 rounded-xl bg-slate-100 text-slate-500 flex items-center justify-center">
+                        <div className="w-10 h-10 rounded-xl bg-slate-100 text-slate-500 flex items-center justify-center shrink-0">
                           <Calendar size={18} />
                         </div>
                         <div>
-                          <p className="text-sm font-medium text-slate-700">{toJalaliStringPretty(a.date)}</p>
-                          <p className="text-xs text-slate-400">{formatTime(a.start_time)} - {formatTime(a.end_time)}</p>
+                          <div className="flex items-center gap-2">
+                            <p className="text-sm font-medium text-slate-700">{toJalaliStringPretty(a.date)}</p>
+                            <span className="text-xs px-2 py-0.5 rounded-full bg-slate-100 text-slate-500">
+                              {typeName}
+                            </span>
+                          </div>
+                          <div className="flex items-center gap-2 mt-0.5 text-xs text-slate-400">
+                            <span>{formatTime(a.start_time)} - {formatTime(a.end_time)}</span>
+                            {doc && (
+                              <>
+                                <span>•</span>
+                                <span>دکتر {doc.name || doc.specialty}</span>
+                              </>
+                            )}
+                            {a.notes && (
+                              <>
+                                <span>•</span>
+                                <span className="truncate max-w-xs">{a.notes}</span>
+                              </>
+                            )}
+                          </div>
                         </div>
                       </div>
                       <Badge color={statusMeta.color}>{statusMeta.label}</Badge>
@@ -2062,50 +2180,161 @@ export default function PatientDetail() {
   // ===========================================================================
 
   const renderPrescriptions = () => {
+    const handleNewPrescription = () => {
+      navigate('/prescriptions', {
+        state: {
+          quickStartPatientId: patient?.id,
+          quickStartDoctorId: patient?.primary_doctor_id,
+          quickStartToothNumber: 'general',
+        },
+      })
+    }
+
+    const handlePrintPrescription = (pres: any) => {
+      const doc = doctors.find((d) => d.id === pres.doctor_id)
+      const win = window.open('', '_blank')
+      if (!win) {
+        showToast('error', 'امکان باز کردن پنجره چاپ وجود ندارد — پاپ‌آپ مرورگر را فعال کنید')
+        return
+      }
+      const meds = pres.medications
+      let medList: { name: string; dose?: string; frequency?: string }[] = []
+      if (Array.isArray(meds)) {
+        medList = meds.map((m: any) => typeof m === 'string' ? { name: m } : { name: m.name || '', dose: m.dose, frequency: m.frequency })
+      } else if (meds && typeof meds === 'object') {
+        medList = ((meds as any).items || Object.values(meds)).map((m: any) => typeof m === 'string' ? { name: m } : { name: m?.name || '', dose: m?.dose, frequency: m?.frequency })
+      }
+
+      const rxStyles = `
+        body { font-family: system-ui, -apple-system, sans-serif; direction: rtl; padding: 24px; color: #1e293b; line-height: 1.6; }
+        .header { border-bottom: 2px solid #0284c7; padding-bottom: 12px; margin-bottom: 20px; display: flex; justify-content: space-between; align-items: center; }
+        .header h1 { font-size: 18px; margin: 0; color: #0284c7; }
+        .meta { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; font-size: 13px; margin-bottom: 16px; background: #f8fafc; padding: 12px; border-radius: 8px; }
+        table { width: 100%; border-collapse: collapse; margin-top: 16px; }
+        th, td { border: 1px solid #cbd5e1; padding: 8px 12px; text-align: right; font-size: 13px; }
+        th { background: #f1f5f9; font-weight: bold; }
+        .footer { margin-top: 40px; padding-top: 16px; border-top: 1px dashed #cbd5e1; display: flex; justify-content: space-between; font-size: 12px; color: #64748b; }
+        .notes { margin-top: 16px; padding: 10px; background: #f8fafc; border-radius: 6px; font-size: 12px; }
+      `
+      const rxBody = `
+        <div class="header">
+          <h1>نسخه دارویی کلینیک دندانپزشکی مینا</h1>
+          <span>تاریخ: ${toJalaliStringPretty(pres.created_at)}</span>
+        </div>
+        <div class="meta">
+          <div><b>نام بیمار:</b> ${patient ? `${patient.first_name} ${patient.last_name}` : '—'}</div>
+          <div><b>پزشک معالج:</b> ${doc ? `دکتر ${doc.name || doc.specialty || 'پزشک'}` : '—'}</div>
+          <div><b>کد پرونده:</b> ${patient?.file_number || '—'}</div>
+          <div><b>کد ملی:</b> ${patient?.national_id || '—'}</div>
+        </div>
+        <table>
+          <thead>
+            <tr>
+              <th>ردیف</th>
+              <th>نام دارو</th>
+              <th>دوز / مشخصات</th>
+              <th>دستور مصرف</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${medList.map((m, idx) => `
+              <tr>
+                <td>${toPersianDigits(idx + 1)}</td>
+                <td>${m.name || '—'}</td>
+                <td>${m.dose || '—'}</td>
+                <td>${m.frequency || '—'}</td>
+              </tr>
+            `).join('')}
+          </tbody>
+        </table>
+        ${pres.notes ? `<div class="notes"><b>توضیحات و دستورات پزشک:</b> ${pres.notes}</div>` : ''}
+        <div class="footer">
+          <span>سیستم مدیریت کلینیک دندانپزشکی مینادنت</span>
+          <span>مهر و امضای پزشک معالج</span>
+        </div>
+      `
+      win.document.write(buildPrintDocument({ title: `نسخه دارویی — ${patient?.first_name} ${patient?.last_name}`, styles: rxStyles, bodyHtml: rxBody }))
+      win.document.close()
+      win.focus()
+    }
+
     if (prescriptions.length === 0) {
       return (
-        <Card className="p-6">
-          <EmptyState icon={<Pill size={32} />} title="نسخه‌ای ثبت نشده" description="برای این بیمار نسخه‌ای ثبت نشده است" />
+        <Card className="p-6 text-center">
+          <EmptyState
+            icon={<Pill size={32} />}
+            title="نسخه‌ای ثبت نشده"
+            description="برای این بیمار هنوز نسخه‌ای ثبت نشده است"
+            action={
+              <Button size="sm" variant="primary" onClick={handleNewPrescription} className="flex items-center gap-1.5 mt-2">
+                <Pill size={14} /> ثبت اولین نسخه
+              </Button>
+            }
+          />
         </Card>
       )
     }
     return (
-      <div className="space-y-2">
-        {prescriptions.map((p) => {
-          const pres = p as any
-          const doctor = doctors.find((d) => d.id === pres.doctor_id)
-          const meds = pres.medications
-          let medList: string[] = []
-          if (Array.isArray(meds)) {
-            medList = meds.map((m: any) => typeof m === 'string' ? m : m.name || '')
-          } else if (meds && typeof meds === 'object') {
-            medList = Object.values(meds).map((m: any) => typeof m === 'string' ? m : m?.name || '')
-          }
-          return (
-            <Card key={pres.id} className="p-4">
-              <div className="flex items-center justify-between gap-3 mb-2">
-                <div className="flex items-center gap-2">
-                  <div className="w-9 h-9 rounded-xl bg-primary-50 text-primary-600 flex items-center justify-center">
-                    <Pill size={16} />
+      <div className="space-y-3">
+        <div className="flex items-center justify-between gap-3">
+          <h3 className="text-sm font-bold text-slate-700">نسخه‌های دارویی بیمار ({prescriptions.length})</h3>
+          <Button
+            size="sm"
+            variant="primary"
+            onClick={handleNewPrescription}
+            className="flex items-center gap-1.5 text-xs"
+          >
+            <Pill size={14} /> ثبت نسخه جدید
+          </Button>
+        </div>
+
+        <div className="space-y-2">
+          {prescriptions.map((p) => {
+            const pres = p as any
+            const doctor = doctors.find((d) => d.id === pres.doctor_id)
+            const meds = pres.medications
+            let medList: string[] = []
+            if (Array.isArray(meds)) {
+              medList = meds.map((m: any) => typeof m === 'string' ? m : m.name || '')
+            } else if (meds && typeof meds === 'object') {
+              medList = Object.values(meds).map((m: any) => typeof m === 'string' ? m : m?.name || '')
+            }
+            return (
+              <Card key={pres.id} className="p-4 hover:border-primary-200 transition-colors">
+                <div className="flex items-center justify-between gap-3 mb-2 flex-wrap">
+                  <div className="flex items-center gap-2">
+                    <div className="w-9 h-9 rounded-xl bg-primary-50 text-primary-600 flex items-center justify-center">
+                      <Pill size={16} />
+                    </div>
+                    <div>
+                      <p className="text-sm font-medium text-slate-800">نسخه دارویی</p>
+                      <p className="text-xs text-slate-500">{doctor ? `دکتر ${doctor.name || doctor.specialty || 'پزشک'}` : 'نامشخص'} - {toJalaliStringPretty(pres.created_at)}</p>
+                    </div>
                   </div>
-                  <div>
-                    <p className="text-sm font-medium text-slate-800">نسخه</p>
-                    <p className="text-xs text-slate-500">{doctor ? `دکتر ${doctor.name || doctor.specialty || 'پزشک'}` : 'نامشخص'} - {toJalaliStringPretty(pres.created_at)}</p>
+                  <div className="flex items-center gap-2">
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      onClick={() => handlePrintPrescription(pres)}
+                      className="text-xs text-slate-500 hover:text-primary-600 flex items-center gap-1"
+                    >
+                      <Printer size={13} /> چاپ نسخه
+                    </Button>
+                    <Badge color={pres.status === 'active' ? 'success' : 'slate'}>{pres.status === 'active' ? 'فعال' : pres.status}</Badge>
                   </div>
                 </div>
-                <Badge color={pres.status === 'active' ? 'success' : 'slate'}>{pres.status === 'active' ? 'فعال' : pres.status}</Badge>
-              </div>
-              {medList.length > 0 && (
-                <div className="flex items-center gap-1.5 flex-wrap mt-2">
-                  {medList.map((m, i) => m && (
-                    <span key={i} className="px-2 py-1 rounded-md bg-slate-100 text-slate-600 text-xs">{m}</span>
-                  ))}
-                </div>
-              )}
-              {pres.notes && <p className="text-xs text-slate-400 mt-2">{pres.notes}</p>}
-            </Card>
-          )
-        })}
+                {medList.length > 0 && (
+                  <div className="flex items-center gap-1.5 flex-wrap mt-2">
+                    {medList.map((m, i) => m && (
+                      <span key={i} className="px-2 py-1 rounded-md bg-slate-100 text-slate-700 text-xs font-medium">{m}</span>
+                    ))}
+                  </div>
+                )}
+                {pres.notes && <p className="text-xs text-slate-500 mt-2 bg-slate-50 p-2 rounded-lg">{pres.notes}</p>}
+              </Card>
+            )
+          })}
+        </div>
       </div>
     )
   }
