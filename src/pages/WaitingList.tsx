@@ -2,11 +2,12 @@
 import { useState, useEffect, useCallback, useMemo } from 'react'
 import { PatientSelect } from '../components/PatientSelect'
 import { useNavigate } from 'react-router-dom'
-import { Clock, Search, Plus, Phone, Bell, CheckCircle2, XCircle, Calendar, Smile, AlertCircle, Edit2, Ban } from 'lucide-react'
+import { Clock, Search, Plus, Phone, Bell, CheckCircle2, XCircle, Calendar, Smile, AlertCircle, Edit2, Ban, MessageSquare } from 'lucide-react'
 import { BarChart, Bar, XAxis, YAxis, Tooltip as RTooltip, ResponsiveContainer, Cell } from 'recharts'
 import { fetchWaitingList, createWaitingEntry, updateWaitingEntry, cancelWaitingEntry, fetchPatients, fetchDoctors, createAppointment, fetchUnits, checkConflict } from '../lib/api'
 import { toJalaliDisplay, toJalaliStringPretty, formatTime, formatNumber, toPersianDigits } from '../lib/persianDate'
 import { h } from '../lib/haptics'
+import { chimes } from '../lib/chimes'
 import { useConfirmAction } from '../components/ConfirmAction'
 import { WaitingListEntry, WaitingListEntryWithRelations, Patient, Doctor, Unit } from '../types'
 import { Wizard, Card, Button, Input, Select, Textarea, Badge, Spinner, EmptyState, showToast } from '../components/ui'
@@ -207,9 +208,16 @@ export default function WaitingList() {
           } catch {
             // SMS failure is silent
           }
+        try { 
+          await updateWaitingEntry(e.id, updates as any); 
+          chimes.playSuccess();
+          showToast('success', newStatus === 'notified' ? 'وضعیت به‌روزرسانی و پیامک اطلاع‌رسانی ارسال شد' : 'وضعیت به‌روزرسانی شد'); 
+          await loadData() 
         }
-        try { await updateWaitingEntry(e.id, updates as any); showToast('success', newStatus === 'notified' ? 'وضعیت به‌روزرسانی و پیامک اطلاع‌رسانی ارسال شد' : 'وضعیت به‌روزرسانی شد'); await loadData() }
-        catch { showToast('error', 'خطا در به‌روزرسانی وضعیت') }
+        catch { 
+          chimes.playWarning();
+          showToast('error', 'خطا در به‌روزرسانی وضعیت') 
+        }
       },
     })
   }
@@ -226,8 +234,16 @@ export default function WaitingList() {
       ],
       confirmLabel: 'تایید لغو',
       onConfirm: async () => {
-        try { await cancelWaitingEntry(e.id); showToast('success', 'لغو شد'); await loadData() }
-        catch { showToast('error', 'خطا در لغو') }
+        try { 
+          await cancelWaitingEntry(e.id); 
+          chimes.playPop();
+          showToast('success', 'لغو شد'); 
+          await loadData() 
+        }
+        catch { 
+          chimes.playWarning();
+          showToast('error', 'خطا در لغو') 
+        }
       },
     })
   }
@@ -256,8 +272,18 @@ export default function WaitingList() {
 
           if (e.doctor_id) {
             const conflict = await checkConflict(e.doctor_id, startDate, startTime, endTime, undefined, unitId)
-            if (conflict === 'doctor') { h.error(); showToast('error', 'این پزشک در این بازه‌ی زمانی نوبت دیگری دارد — تاریخ/ساعت را تغییر دهید'); return }
-            if (conflict === 'unit') { h.error(); showToast('error', 'یونیت/صندلی در این بازه‌ی زمانی رزرو شده است'); return }
+            if (conflict === 'doctor') { 
+              h.error(); 
+              chimes.playWarning();
+              showToast('error', 'این پزشک در این بازه‌ی زمانی نوبت دیگری دارد — تاریخ/ساعت را تغییر دهید'); 
+              return 
+            }
+            if (conflict === 'unit') { 
+              h.error(); 
+              chimes.playWarning();
+              showToast('error', 'یونیت/صندلی در این بازه‌ی زمانی رزرو شده است'); 
+              return 
+            }
           }
 
           await createAppointment({
@@ -296,9 +322,13 @@ export default function WaitingList() {
             // SMS failure is silent
           }
 
+          chimes.playSuccess()
           showToast('success', 'نوبت ایجاد شد، پیامک به بیمار ارسال شد و از لیست انتظار خارج شد')
           await loadData()
-        } catch { showToast('error', 'خطا در ایجاد نوبت') }
+        } catch { 
+          chimes.playWarning()
+          showToast('error', 'خطا در ایجاد نوبت') 
+        }
       },
     })
   }
@@ -351,10 +381,22 @@ export default function WaitingList() {
       onConfirm: async () => {
         setSaving(true)
         try {
-          if (editingEntry) { await updateWaitingEntry(editingEntry.id, payload as any); showToast('success', 'ویرایش شد') }
-          else { await createWaitingEntry({ ...payload, status: 'waiting' } as any); showToast('success', 'افزوده شد') }
-          setModalOpen(false); await loadData()
-        } catch { showToast('error', 'خطا در ذخیره') }
+          if (editingEntry) { 
+            await updateWaitingEntry(editingEntry.id, payload as any); 
+            chimes.playSuccess();
+            showToast('success', 'ویرایش شد') 
+          }
+          else { 
+            await createWaitingEntry({ ...payload, status: 'waiting' } as any); 
+            chimes.playSuccess();
+            showToast('success', 'افزوده شد') 
+          }
+          setModalOpen(false); 
+          await loadData()
+        } catch { 
+          chimes.playWarning();
+          showToast('error', 'خطا در ذخیره') 
+        }
         finally { setSaving(false) }
       },
     })
@@ -442,25 +484,25 @@ export default function WaitingList() {
                 const pColor = priorityColors[priority] || 'slate'
                 const pLabel = priorityLabels[priority] || 'متوسط'
                 return (
-                  <Card key={e.id} className="p-4 hover:card-shadow-lg transition-all-smooth">
+                  <Card key={e.id} className="p-4 rounded-2xl bg-white/90 dark:bg-slate-900/90 backdrop-blur-md border border-slate-200/80 dark:border-slate-800 hover:shadow-lg transition-all duration-200">
                     <div className="flex items-start justify-between gap-3">
                       <div className="flex items-center gap-3 min-w-0 flex-1">
-                        <div className="w-11 h-11 rounded-xl bg-warning-100 flex items-center justify-center text-warning-700 flex-shrink-0">
+                        <div className="w-11 h-11 rounded-xl bg-amber-100 dark:bg-amber-950/50 flex items-center justify-center text-amber-700 dark:text-amber-300 flex-shrink-0">
                           <Clock size={20} />
                         </div>
                         <div className="min-w-0 flex-1">
                           <div className="flex items-center gap-2 flex-wrap">
-                            <h3 className="font-bold text-slate-800 truncate">{patientName(e)}</h3>
+                            <h3 className="font-bold text-slate-800 dark:text-slate-100 truncate">{patientName(e)}</h3>
                             <Badge color={pColor}>{pLabel}</Badge>
                             <Badge color={meta.color}>{meta.label}</Badge>
                           </div>
-                          <p className="text-xs text-slate-500 mt-0.5">پزشک: {doctorName(e)}</p>
-                          {e.reason && <p className="text-sm text-slate-600 mt-1">{e.reason}</p>}
+                          <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">پزشک: {doctorName(e)}</p>
+                          {e.reason && <p className="text-sm text-slate-600 dark:text-slate-300 mt-1">{e.reason}</p>}
                         </div>
                       </div>
                     </div>
 
-                    <div className="flex items-center gap-4 mt-3 pt-3 border-t border-slate-100 text-xs text-slate-500">
+                    <div className="flex flex-wrap items-center gap-4 mt-3 pt-3 border-t border-slate-100 dark:border-slate-800/80 text-xs text-slate-500 dark:text-slate-400">
                       {e.preferred_date && (
                         <span className="flex items-center gap-1">
                           <Calendar size={12} />
@@ -469,16 +511,29 @@ export default function WaitingList() {
                         </span>
                       )}
                       {patientPhone(e) && (
-                        <a
-                          href={`tel:${patientPhone(e)}`}
-                          onClick={(e) => e.stopPropagation()}
-                          className="flex items-center gap-1 hover:text-primary-600 transition-colors"
-                          dir="ltr"
-                          title="تماس تلفنی با بیمار"
-                        >
-                          <Phone size={12} />
-                          {toPersianDigits(patientPhone(e)!)}
-                        </a>
+                        <div className="flex items-center gap-3">
+                          <a
+                            href={`tel:${patientPhone(e)}`}
+                            onClick={(e) => e.stopPropagation()}
+                            className="flex items-center gap-1 hover:text-primary-600 transition-colors font-mono"
+                            dir="ltr"
+                            title="تماس تلفنی با بیمار"
+                          >
+                            <Phone size={12} />
+                            {toPersianDigits(patientPhone(e)!)}
+                          </a>
+                          <a
+                            href={`https://wa.me/${patientPhone(e)!.replace(/\D/g, '').replace(/^0/, '98')}?text=${encodeURIComponent(`سلام ${patientName(e)} عزیز، وقت خالی در کلینیک دندانپزشکی مینادنت برای شما فراهم شد. جهت تعیین و ثبت نوبت، لطفاً با کلینیک تماس حاصل فرمایید.`)}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            onClick={(e) => e.stopPropagation()}
+                            className="flex items-center gap-1 text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50 dark:hover:bg-emerald-950/30 px-2 py-0.5 rounded-lg text-[11px] font-medium transition-colors"
+                            title="ارسال پیام سریع در پیام‌رسان / واتساپ"
+                          >
+                            <MessageSquare size={12} />
+                            پیام سریع
+                          </a>
+                        </div>
                       )}
                       {e.notified_at && (
                         <span className="flex items-center gap-1 text-success-600">
