@@ -6,11 +6,12 @@
 // other table in this app stays locked to authenticated-only.
 import { useState } from 'react'
 import { createClient } from '@supabase/supabase-js'
-import { CheckCircle2, Calendar, Phone, User, MessageSquare } from 'lucide-react'
+import { CheckCircle2, Calendar, Phone, User, MessageSquare, ArrowRight } from 'lucide-react'
 import { MinadentLogo } from '../components/MinadentLogo'
 import { PersianCalendar } from '../components/PersianCalendar'
-import { toJalaliStringPretty } from '../lib/persianDate'
+import { toJalaliStringPretty, toPersianDigits } from '../lib/persianDate'
 import { h } from '../lib/haptics'
+import { chimes } from '../lib/chimes'
 
 const CLINIC_ID = 'a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11'
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || 'https://gkxkihdibkmpryopbkkz.supabase.co'
@@ -19,6 +20,14 @@ const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || ''
 // is public and unauthenticated by design, so it must never touch the
 // staff app's own login session in localStorage.
 const publicClient = createClient(supabaseUrl, supabaseAnonKey, { auth: { persistSession: false } })
+
+function normalizePhone(str: string): string {
+  return str
+    .replace(/[۰-۹]/g, (d) => '۰۱۲۳۴۵۶۷۸۹'.indexOf(d).toString())
+    .replace(/[٠-٩]/g, (d) => '٠١٢٣٤٥٦٧٨٩'.indexOf(d).toString())
+    .replace(/\s+/g, '')
+    .trim()
+}
 
 export default function PublicBooking() {
   const [fullName, setFullName] = useState('')
@@ -34,13 +43,23 @@ export default function PublicBooking() {
 
   const handleSubmit = async () => {
     setError('')
-    if (!fullName.trim() || !phone.trim()) { setError('نام و شماره تماس الزامی است'); return }
+    const cleanPhone = normalizePhone(phone)
+    if (!fullName.trim() || !cleanPhone) { 
+      chimes.playWarning()
+      setError('نام و شماره تماس الزامی است')
+      return 
+    }
+    if (!/^09\d{9}$/.test(cleanPhone)) {
+      chimes.playWarning()
+      setError('شماره موبایل نامعتبر است (مثال: ۰۹۱۲۳۴۵۶۷۸۹)')
+      return
+    }
     setSubmitting(true)
     try {
       const { error: insertError } = await publicClient.from('online_booking_requests').insert({
         clinic_id: CLINIC_ID,
         full_name: fullName.trim(),
-        phone: phone.trim(),
+        phone: cleanPhone,
         preferred_date: date || null,
         preferred_time: time || null,
         reason: reason.trim() || null,
@@ -48,23 +67,45 @@ export default function PublicBooking() {
       })
       if (insertError) throw insertError
       h.success()
+      chimes.playSuccess()
       setDone(true)
     } catch {
+      chimes.playWarning()
       setError('خطا در ثبت درخواست — لطفاً دوباره تلاش کنید یا با مطب تماس بگیرید')
     } finally {
       setSubmitting(false)
     }
   }
 
+  const resetForm = () => {
+    h.tap()
+    setFullName('')
+    setPhone('')
+    setDate('')
+    setTime('')
+    setReason('')
+    setDone(false)
+    setError('')
+  }
+
   if (done) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-primary-50 to-white p-6" dir="rtl">
-        <div className="max-w-sm w-full text-center">
-          <div className="w-16 h-16 rounded-full bg-success-100 flex items-center justify-center mx-auto mb-4">
-            <CheckCircle2 size={32} className="text-success-600" />
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-primary-50 via-white to-primary-50 p-6" dir="rtl">
+        <div className="max-w-sm w-full bg-white/90 backdrop-blur-xl border border-slate-200/80 rounded-3xl p-6 text-center shadow-xl">
+          <div className="w-16 h-16 rounded-2xl bg-emerald-100 flex items-center justify-center mx-auto mb-4 text-emerald-600 shadow-sm">
+            <CheckCircle2 size={36} />
           </div>
-          <h1 className="text-lg font-extrabold text-slate-800 mb-2">درخواست شما ثبت شد</h1>
-          <p className="text-sm text-slate-500">همکاران ما به‌زودی برای هماهنگی نهایی نوبت با شما تماس می‌گیرند.</p>
+          <h1 className="text-xl font-extrabold text-slate-800 mb-2">درخواست شما با موفقیت ثبت شد</h1>
+          <p className="text-xs text-slate-500 leading-relaxed mb-6">
+            همکاران ما در کلینیک مینادنت به‌زودی جهت هماهنگی نهایی نوبت با شماره <span className="font-mono font-bold text-primary-600 dir-ltr inline-block">{toPersianDigits(normalizePhone(phone))}</span> تماس حاصل خواهند کرد.
+          </p>
+          <button
+            onClick={resetForm}
+            className="w-full py-3 rounded-2xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs transition-colors flex items-center justify-center gap-1.5"
+          >
+            <span>ثبت درخواست نوبت جدید</span>
+            <ArrowRight size={14} className="rotate-180" />
+          </button>
         </div>
       </div>
     )
