@@ -97,7 +97,7 @@ export default function PublicBooking() {
           </div>
           <h1 className="text-xl font-extrabold text-slate-800 mb-2">درخواست شما با موفقیت ثبت شد</h1>
           <p className="text-xs text-slate-500 leading-relaxed mb-6">
-            همکاران ما در کلینیک مینادنت به‌زودی جهت هماهنگی نهایی نوبت با شماره <span className="font-mono font-bold text-primary-600 dir-ltr inline-block">{toPersianDigits(normalizePhone(phone))}</span> تماس حاصل خواهند کرد.
+            همکاران ما در کلینیک دندانپزشکی مینا به‌زودی جهت هماهنگی نهایی نوبت با شماره <span className="font-mono font-bold text-primary-600 dir-ltr inline-block">{toPersianDigits(normalizePhone(phone))}</span> تماس حاصل خواهند کرد.
           </p>
           <button
             onClick={resetForm}
