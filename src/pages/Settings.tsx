@@ -96,7 +96,7 @@ export default function Settings() {
   const [categories, setCategories] = useState<InventoryCategory[]>([])
   const [loading, setLoading] = useState(true)
 
-  const [generalForm, setGeneralForm] = useState({ clinic_name: 'کلینیک دندانپزشکی مینادنت', address: '', phone: '', email: '' })
+  const [generalForm, setGeneralForm] = useState({ clinic_name: 'کلینیک دندانپزشکی مینا', address: '', phone: '', email: '' })
   const [fileNumberForm, setFileNumberForm] = useState({ prefix: 'MIN', next_number: '1001', format: 'PREFIX-NUMBER' })
   const [posForm, setPosForm] = useState({ ip: '192.168.1.100', port: '8080', enabled: false })
 
