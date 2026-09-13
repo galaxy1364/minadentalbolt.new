@@ -522,7 +522,7 @@ export default function Patients() {
                     {(() => {
                       const cleanPhone = patient.phone ? patient.phone.replace(/\D/g, '').replace(/^0/, '98') : null
                       if (!cleanPhone) return null
-                      const waText = `سلام ${patient.first_name} ${patient.last_name} عزیز،\nپیام از طرف کلینیک دندانپزشکی مینادنت.\nجهت هماهنگی و پیگیری پرونده با ما در ارتباط باشید.`
+                      const waText = `سلام ${patient.first_name} ${patient.last_name} عزیز،\nپیام از طرف کلینیک دندانپزشکی مینا.\nجهت هماهنگی و پیگیری پرونده با ما در ارتباط باشید.`
                       return (
                         <a
                           href={`https://wa.me/${cleanPhone}?text=${encodeURIComponent(waText)}`}

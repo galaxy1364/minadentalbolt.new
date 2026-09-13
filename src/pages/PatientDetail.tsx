@@ -1144,7 +1144,7 @@ export default function PatientDetail() {
         @media print { body { padding: 10px; } .section { page-break-inside: avoid; } }
       `
     const chartBody = `
-        <div class="header"><h1>کلینیک دندانپزشکی مینادنت</h1><p>پرونده‌ی کامل بیمار — تاریخ چاپ: ${toJalaliStringPretty(new Date().toISOString())}</p></div>
+        <div class="header"><h1>کلینیک دندانپزشکی مینا</h1><p>پرونده‌ی کامل بیمار — تاریخ چاپ: ${toJalaliStringPretty(new Date().toISOString())}</p></div>
 
         <div class="meta-grid">
           <span><b>نام:</b> ${patient.first_name} ${patient.last_name}</span>
@@ -1190,13 +1190,13 @@ export default function PatientDetail() {
           </div>
         </div>
 
-        <div class="footer">این سند به‌صورت خودکار از سامانه‌ی مدیریت کلینیک مینادنت تولید شده است.</div>
+        <div class="footer">این سند به‌صورت خودکار از سامانه‌ی مدیریت کلینیک دندانپزشکی مینا تولید شده است.</div>
       `
     // Plain-text summary for «ارسال برای بیمار». Deliberately short: a
     // whole chart pasted into a message is unreadable, and a patient
     // record is not something to scatter across chat apps by default.
     const shareText = [
-      `کلینیک دندانپزشکی مینادنت`,
+      `کلینیک دندانپزشکی مینا`,
       `بیمار: ${patient.first_name} ${patient.last_name}`,
       `پرونده: ${patient.file_number || '—'}`,
       `تعداد درمان: ${toPersianDigits(sortedTreatments.length)}`,
@@ -1258,7 +1258,7 @@ export default function PatientDetail() {
     const bodyHtml = `
       <div class="header">
         <h1>پیش‌فاکتور طرح درمان مرحله‌ای</h1>
-        <p>کلینیک دندانپزشکی مینادنت</p>
+        <p>کلینیک دندانپزشکی مینا</p>
       </div>
       <div class="info-grid">
         <div><strong>نام بیمار:</strong> ${patient.first_name} ${patient.last_name}</div>
@@ -2422,7 +2422,7 @@ export default function PatientDetail() {
         </table>
         ${pres.notes ? `<div class="notes"><b>توضیحات و دستورات پزشک:</b> ${pres.notes}</div>` : ''}
         <div class="footer">
-          <span>سیستم مدیریت کلینیک دندانپزشکی مینادنت</span>
+          <span>کلینیک دندانپزشکی مینا</span>
           <span>مهر و امضای پزشک معالج</span>
         </div>
       `

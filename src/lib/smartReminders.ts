@@ -66,7 +66,7 @@ export function findBirthdays(patients: Patient[], today = new Date()): SmartRem
       patient: p,
       title: `${p.first_name} ${p.last_name}`,
       detail: 'امروز تولد این بیمار است 🎂',
-      smsMessage: `${p.first_name} عزیز، تولدتان مبارک! کلینیک مینادنت 🎉`,
+      smsMessage: `${p.first_name} عزیز، تولدتان مبارک! کلینیک دندانپزشکی مینا 🎉`,
       priority: 1,
     }))
 }
@@ -94,7 +94,7 @@ export function findDebtors(
       patient: p,
       title: `${p.first_name} ${p.last_name}`,
       detail: `${fin.balance.toLocaleString('fa-IR')} تومان بدهی`,
-      smsMessage: `${p.first_name} عزیز، مانده حساب شما نزد کلینیک مینادنت ${fin.balance.toLocaleString('fa-IR')} تومان است. لطفاً برای تسویه اقدام فرمایید.`,
+      smsMessage: `${p.first_name} عزیز، مانده حساب شما نزد کلینیک دندانپزشکی مینا ${fin.balance.toLocaleString('fa-IR')} تومان است. لطفاً برای تسویه اقدام فرمایید.`,
       priority: fin.balance,
     })
   }
@@ -127,7 +127,7 @@ export function findLapsedPatients(
       patient: p,
       title: `${p.first_name} ${p.last_name}`,
       detail: `${Math.floor(days / 30)} ماه است مراجعه نکرده`,
-      smsMessage: `${p.first_name} عزیز، مدتی است به کلینیک مینادنت مراجعه نکرده‌اید. برای وقت ویزیت با ما تماس بگیرید.`,
+      smsMessage: `${p.first_name} عزیز، مدتی است به کلینیک دندانپزشکی مینا مراجعه نکرده‌اید. برای وقت ویزیت با ما تماس بگیرید.`,
       priority: days,
     })
   }
@@ -154,7 +154,7 @@ export function findDueInstallments(
       patient: p,
       title: `${p.first_name} ${p.last_name}`,
       detail: overdueDays > 0 ? `قسط ${toPersianDigits(overdueDays)} روز عقب افتاده — ${formatCurrency(i.amount)} ت` : `قسط امروز — ${formatCurrency(i.amount)} ت`,
-      smsMessage: `${p.first_name} عزیز، قسط ${formatCurrency(i.amount)} تومانی شما نزد کلینیک مینادنت سررسید شده است.`,
+      smsMessage: `${p.first_name} عزیز، قسط ${formatCurrency(i.amount)} تومانی شما نزد کلینیک دندانپزشکی مینا سررسید شده است.`,
       priority: overdueDays > 0 ? 120000 + (overdueDays * 1000) : 95000,
       actionPath: '/billing',
       dueDate: i.due_date,
@@ -251,7 +251,7 @@ export function findUnfinishedTreatmentFollowups(
       patient: p,
       title: `${p.first_name} ${p.last_name}`,
       detail: `${toPersianDigits(info.count)} مرحله‌ی درمان ناتمام — نوبت بعدی رزرو نشده`,
-      smsMessage: `${p.first_name} عزیز، طرح درمان شما در کلینیک مینادنت هنوز کامل نشده. برای هماهنگی نوبت بعدی تماس بگیرید.`,
+      smsMessage: `${p.first_name} عزیز، طرح درمان شما در کلینیک دندانپزشکی مینا هنوز کامل نشده. برای هماهنگی نوبت بعدی تماس بگیرید.`,
       priority: daysSince(info.latest),
     })
   }
@@ -299,7 +299,7 @@ export function findNoShows(
       patient: p,
       title: `${p.first_name} ${p.last_name}`,
       detail: `غیبت در ${noShowAppt.date} — رزرو مجدد نشده`,
-      smsMessage: `${p.first_name} عزیز، در نوبت اخیرتان در کلینیک مینادنت حضور نداشتید. لطفاً برای رزرو مجدد تماس بگیرید.`,
+      smsMessage: `${p.first_name} عزیز، در نوبت اخیرتان در کلینیک دندانپزشکی مینا حضور نداشتید. لطفاً برای رزرو مجدد تماس بگیرید.`,
       priority: daysSince(noShowAppt.date),
       actionPath: '/appointments',
     })
@@ -346,8 +346,8 @@ export function findDueCheques(
     }
 
     const smsMessage = isBounced
-      ? `${p.first_name} عزیز، چک شماره ${c.cheque_number || ''} شما برگشت خورده است. لطفاً جهت تعیین تکلیف با کلینیک مینادنت تماس بگیرید.`
-      : `${p.first_name} عزیز، چک شما به مبلغ ${formatCurrency(c.amount)} تومان سررسید شده است. کلینیک مینادنت`
+      ? `${p.first_name} عزیز، چک شماره ${c.cheque_number || ''} شما برگشت خورده است. لطفاً جهت تعیین تکلیف با کلینیک دندانپزشکی مینا تماس بگیرید.`
+      : `${p.first_name} عزیز، چک شما به مبلغ ${formatCurrency(c.amount)} تومان سررسید شده است. کلینیک دندانپزشکی مینا`
 
     result.push({
       id: `cheque-${c.id}`,
@@ -479,7 +479,7 @@ export function findOverdueLabOrders(
       detail,
       actionNeeded: detail,
       smsMessage: arrivedNoAppt
-        ? `${p.first_name} عزیز، کار پروتز دندان شما به کلینیک مینادنت رسیده است. لطفاً برای تعیین وقت تحویل تماس بگیرید.`
+        ? `${p.first_name} عزیز، کار پروتز دندان شما به کلینیک دندانپزشکی مینا رسیده است. لطفاً برای تعیین وقت تحویل تماس بگیرید.`
         : '',
       priority,
       urgency: 'urgent',

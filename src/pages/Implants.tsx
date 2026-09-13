@@ -1024,7 +1024,7 @@ export default function Implants() {
                   {(() => {
                     const cleanPhone = c.patient?.phone ? c.patient.phone.replace(/\D/g, '').replace(/^0/, '98') : null
                     if (!cleanPhone) return null
-                    const waText = `سلام ${patientName(c)} عزیز،\nپیگیری درمان ایمپلنت دندان ${c.tooth_number ? toothLabel(c.tooth_number) : '-'} شما در کلینیک مینادنت:\nمرحله جاری: ${meta.label}\nبرند پایه ایمپلنت: ${getBrandLabel(c.brand)}\nجهت هماهنگی مراحل بعدی درمان با ما در ارتباط باشید.`
+                    const waText = `سلام ${patientName(c)} عزیز،\nپیگیری درمان ایمپلنت دندان ${c.tooth_number ? toothLabel(c.tooth_number) : '-'} شما در کلینیک دندانپزشکی مینا:\nمرحله جاری: ${meta.label}\nبرند پایه ایمپلنت: ${getBrandLabel(c.brand)}\nجهت هماهنگی مراحل بعدی درمان با ما در ارتباط باشید.`
                     return (
                       <a
                         href={`https://wa.me/${cleanPhone}?text=${encodeURIComponent(waText)}`}

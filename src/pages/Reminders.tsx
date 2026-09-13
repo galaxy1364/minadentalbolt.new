@@ -256,7 +256,7 @@ export default function Reminders() {
       implant: 'مرحله ایمپلنت', manual: 'یادآوری', appointment: 'نوبت', personal: 'مالی',
     }
     const when = it.daysLeft === 0 ? 'امروز' : it.daysLeft < 0 ? `${toPersianDigits(Math.abs(it.daysLeft))} روز پیش` : `${toPersianDigits(it.daysLeft)} روز دیگر`
-    const message = `${it.patientName} عزیز، یادآوری ${categoryLabel[it.category]}: ${it.title} — سررسید ${when}${it.amount ? ' — مبلغ ' + formatCurrency(it.amount) + ' تومان' : ''}. کلینیک مینادنت`
+    const message = `${it.patientName} عزیز، یادآوری ${categoryLabel[it.category]}: ${it.title} — سررسید ${when}${it.amount ? ' — مبلغ ' + formatCurrency(it.amount) + ' تومان' : ''}. کلینیک دندانپزشکی مینا`
     try {
       const { error } = await supabase.functions.invoke('send-sms', { body: { to: phone, message, type: 'reminder' } })
       if (error) throw error
@@ -374,7 +374,7 @@ export default function Reminders() {
                           cheque: 'چک', installment: 'قسط', lab: 'سفارش لابراتوار',
                           implant: 'مرحله ایمپلنت', manual: 'یادآوری', appointment: 'نوبت', personal: 'مالی',
                         }
-                        const waText = `${it.patientName} عزیز، یادآوری کلینیک مینادنت (${categoryLabel[it.category]}): ${it.title} — سررسید ${when}${it.amount ? ' — مبلغ ' + formatCurrency(it.amount) + ' تومان' : ''}.`
+                        const waText = `${it.patientName} عزیز، یادآوری کلینیک دندانپزشکی مینا (${categoryLabel[it.category]}): ${it.title} — سررسید ${when}${it.amount ? ' — مبلغ ' + formatCurrency(it.amount) + ' تومان' : ''}.`
                         return (
                           <a
                             href={`https://wa.me/${cleanPhone}?text=${encodeURIComponent(waText)}`}

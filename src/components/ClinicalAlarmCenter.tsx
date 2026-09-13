@@ -446,7 +446,7 @@ export function ClinicalAlarmCenter({ open, onClose }: ClinicalAlarmCenterProps)
 
                       {item.patient.phone && (
                         <a
-                          href={`https://wa.me/${item.patient.phone.replace(/\D/g, '').replace(/^0/, '98')}?text=${encodeURIComponent(item.smsMessage || `سلام ${item.patient.first_name} عزیز، پیگیری از طرف کلینیک دندانپزشکی مینادنت.`)}`}
+                          href={`https://wa.me/${item.patient.phone.replace(/\D/g, '').replace(/^0/, '98')}?text=${encodeURIComponent(item.smsMessage || `سلام ${item.patient.first_name} عزیز، پیگیری از طرف کلینیک دندانپزشکی مینا.`)}`}
                           target="_blank"
                           rel="noopener noreferrer"
                           onClick={(e) => { e.stopPropagation(); chimes.playPop() }}

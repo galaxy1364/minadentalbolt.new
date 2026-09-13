@@ -1771,7 +1771,7 @@ export default function Dashboard() {
                           <div className="flex items-center gap-1.5 shrink-0">
                             {r.patient.phone && (
                               <a
-                                href={`https://wa.me/${r.patient.phone.replace(/\D/g, '').replace(/^0/, '98')}?text=${encodeURIComponent(r.smsMessage || `سلام ${r.patient.first_name} عزیز، یادآوری از کلینیک دندانپزشکی مینادنت: ${r.detail}`)}`}
+                                href={`https://wa.me/${r.patient.phone.replace(/\D/g, '').replace(/^0/, '98')}?text=${encodeURIComponent(r.smsMessage || `سلام ${r.patient.first_name} عزیز، یادآوری از کلینیک دندانپزشکی مینا: ${r.detail}`)}`}
                                 target="_blank"
                                 rel="noopener noreferrer"
                                 onClick={(e) => e.stopPropagation()}

@@ -1390,7 +1390,7 @@ export default function Treatments() {
                   if (!cleanPhone) return null
                   const pName = encounterPatientName(detailEnc)
                   const dName = encounterDoctorName(detailEnc)
-                  const waText = `سلام ${pName} عزیز،\nخلاصه وضعیت پرونده درمانی شما در کلینیک مینادنت:\nتاریخ ویزیت: ${toJalaliStringPretty(detailEnc.encounter_date)}\nپزشک معالج: ${dName}${detailEnc.diagnosis ? `\nتشخیص: ${detailEnc.diagnosis}` : ''}${detailEnc.total_amount ? `\nمبلغ خدمات: ${formatCurrency(detailEnc.total_amount)} تومان` : ''}\nبا تشکر از اعتماد شما - کلینیک مینادنت`
+                  const waText = `سلام ${pName} عزیز،\nخلاصه وضعیت پرونده درمانی شما در کلینیک دندانپزشکی مینا:\nتاریخ ویزیت: ${toJalaliStringPretty(detailEnc.encounter_date)}\nپزشک معالج: ${dName}${detailEnc.diagnosis ? `\nتشخیص: ${detailEnc.diagnosis}` : ''}${detailEnc.total_amount ? `\nمبلغ خدمات: ${formatCurrency(detailEnc.total_amount)} تومان` : ''}\nبا تشکر از اعتماد شما - کلینیک دندانپزشکی مینا`
                   return (
                     <a
                       href={`https://wa.me/${cleanPhone}?text=${encodeURIComponent(waText)}`}

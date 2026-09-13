@@ -976,7 +976,7 @@ export default function Billing() {
                     const patient = patientMap.get(p.patient_id)
                     const cleanPhone = patient?.phone ? patient.phone.replace(/\D/g, '').replace(/^0/, '98') : null
                     if (!cleanPhone) return null
-                    const waReceiptText = `سلام ${patient ? `${patient.first_name} ${patient.last_name}` : 'بیمار'} عزیز،\nرسید دریافت وجه کلینیک دندانپزشکی مینادنت:\nمبلغ: ${formatCurrency(p.amount)} تومان\nروش: ${methodMeta.label}\nتاریخ: ${toJalaliStringPretty(p.payment_date)}\nبا تشکر از پرداخت شما.`
+                    const waReceiptText = `سلام ${patient ? `${patient.first_name} ${patient.last_name}` : 'بیمار'} عزیز،\nرسید دریافت وجه کلینیک دندانپزشکی مینا:\nمبلغ: ${formatCurrency(p.amount)} تومان\nروش: ${methodMeta.label}\nتاریخ: ${toJalaliStringPretty(p.payment_date)}\nبا تشکر از پرداخت شما.`
                     return (
                       <a
                         href={`https://wa.me/${cleanPhone}?text=${encodeURIComponent(waReceiptText)}`}

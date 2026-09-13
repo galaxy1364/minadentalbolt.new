@@ -782,7 +782,7 @@ export default function Appointments() {
                   <tbody>${rows}</tbody>
                 </table>
               `,
-              shareText: `نوبت‌نامه روزانه کلینیک مینادنت — ${toJalaliStringPretty(todayStr)}\nتعداد نوبت‌ها: ${toPersianDigits(todayAppts.length)}`,
+              shareText: `نوبت‌نامه روزانه کلینیک دندانپزشکی مینا — ${toJalaliStringPretty(todayStr)}\nتعداد نوبت‌ها: ${toPersianDigits(todayAppts.length)}`,
             })
             const w = window.open('', '_blank')
             if (w) { w.document.write(doc); w.document.close(); }
@@ -979,7 +979,7 @@ export default function Appointments() {
                       const cleanPhone = appt.patient?.phone ? appt.patient.phone.replace(/\D/g, '').replace(/^0/, '98') : null
                       if (!cleanPhone) return null
                       const timeStr = `${toJalaliStringPretty(appt.date)} ساعت ${toPersianDigits(formatTime(appt.start_time))}`
-                      const waText = `سلام ${patientName(appt)} عزیز،\nیادآوری نوبت دندانپزشکی شما در کلینیک مینادنت:\nتاریخ و زمان: ${timeStr}\nپزشک: ${doctorName(appt)}\nلطفاً در زمان مقرر در کلینیک حضور داشته باشید.`
+                      const waText = `سلام ${patientName(appt)} عزیز،\nیادآوری نوبت دندانپزشکی شما در کلینیک دندانپزشکی مینا:\nتاریخ و زمان: ${timeStr}\nلطفاً در زمان مقرر در کلینیک حضور داشته باشید.`
                       return (
                         <a
                           href={`https://wa.me/${cleanPhone}?text=${encodeURIComponent(waText)}`}

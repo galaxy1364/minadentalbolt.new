@@ -201,7 +201,7 @@ export default function WaitingList() {
               await supabase.functions.invoke('send-sms', {
                 body: {
                   to: pat.phone,
-                  message: `بیمار گرامی ${pat.first_name} ${pat.last_name}، نوبت خالی در کلینیک دندانپزشکی مینادنت فراهم شد. جهت تعیین وقت با کلینیک تماس حاصل فرمایید.`,
+                  message: `بیمار گرامی ${pat.first_name} ${pat.last_name}، نوبت خالی در کلینیک دندانپزشکی مینا فراهم شد. جهت تعیین وقت با کلینیک تماس حاصل فرمایید.`,
                   type: 'general',
                 },
               })
@@ -532,7 +532,7 @@ export default function WaitingList() {
                             {toPersianDigits(patientPhone(e)!)}
                           </a>
                           <a
-                            href={`https://wa.me/${patientPhone(e)!.replace(/\D/g, '').replace(/^0/, '98')}?text=${encodeURIComponent(`سلام ${patientName(e)} عزیز، وقت خالی در کلینیک دندانپزشکی مینادنت برای شما فراهم شد. جهت تعیین و ثبت نوبت، لطفاً با کلینیک تماس حاصل فرمایید.`)}`}
+                            href={`https://wa.me/${patientPhone(e)!.replace(/\D/g, '').replace(/^0/, '98')}?text=${encodeURIComponent(`سلام ${patientName(e)} عزیز، وقت خالی در کلینیک دندانپزشکی مینا برای شما فراهم شد. جهت تعیین و ثبت نوبت، لطفاً با کلینیک تماس حاصل فرمایید.`)}`}
                             target="_blank"
                             rel="noopener noreferrer"
                             onClick={(ev) => { ev.stopPropagation(); h.tap(); chimes.playPop() }}
