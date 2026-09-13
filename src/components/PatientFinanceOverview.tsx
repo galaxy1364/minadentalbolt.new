@@ -10,10 +10,12 @@ import {
   Clock,
   ChevronDown,
   Lock,
+  AlertCircle,
 } from 'lucide-react'
 import { formatCurrency, toJalaliStringPretty, toPersianDigits } from '../lib/persianDate'
 import { calcPatientBalance } from '../lib/finance'
 import { resolveAttribution } from '../lib/paymentAttribution'
+import { toothLabelWithWord } from '../lib/toothLabel'
 import { summariseCheques, type ChequeLike } from '../lib/chequeSummary'
 import { PatientDebtBar } from './PatientDebtBar'
 import { h } from '../lib/haptics'
@@ -39,6 +41,7 @@ export interface PatientFinanceOverviewProps {
   onPayInstallment?: (installment: Installment, plan: PaymentPlan) => void
   onClearCheque?: (cheque: ChequeLike) => void
   onBounceCheque?: (cheque: ChequeLike) => void
+  hasMedicalAlerts?: boolean
 }
 
 export function PatientFinanceOverview({
@@ -58,6 +61,7 @@ export function PatientFinanceOverview({
   onPayInstallment,
   onClearCheque,
   onBounceCheque,
+  hasMedicalAlerts = false,
 }: PatientFinanceOverviewProps) {
   const todayStr = useMemo(() => new Date().toISOString().slice(0, 10), [])
 
@@ -108,7 +112,15 @@ export function PatientFinanceOverview({
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 pb-2 border-b border-slate-100 dark:border-slate-800">
         <div className="flex items-center gap-2">
           <div>
-            <p className="text-sm font-bold text-slate-800 dark:text-slate-100">{patientName}</p>
+            <div className="flex items-center gap-2">
+              <p className="text-sm font-bold text-slate-800 dark:text-slate-100">{patientName}</p>
+              {hasMedicalAlerts && (
+                <span className="inline-flex items-center gap-1 text-[10px] font-bold text-red-700 bg-red-100 px-1.5 py-0.5 rounded border border-red-200">
+                  <AlertCircle size={12} className="animate-pulse" />
+                  دارای هشدار پزشکی
+                </span>
+              )}
+            </div>
             <p className="text-[11px] text-slate-500">مدیریت مالی، چک‌ها و طرح اقساط</p>
           </div>
           {!canEdit && (
@@ -449,6 +461,59 @@ export function PatientFinanceOverview({
                 </div>
               )
             })}
+          </div>
+        )}
+      </section>
+
+      {/* ── تاریخچه‌ی درمان‌ها (Treatments History) ──────────────────── */}
+      <section className="space-y-2">
+        <h4 className="flex items-center gap-1.5 text-xs font-bold text-slate-700 dark:text-slate-200">
+          <ShieldAlert size={14} className="text-blue-500" />
+          <span>تاریخچه‌ی درمان‌ها ({toPersianDigits(treatments.filter((t) => t.patient_id === patientId).length)})</span>
+        </h4>
+
+        {treatments.filter((t) => t.patient_id === patientId).length === 0 ? (
+          <p className="text-xs text-slate-500 px-3 py-4 text-center bg-slate-50 dark:bg-slate-800/40 rounded-xl">
+            درمانی ثبت نشده
+          </p>
+        ) : (
+          <div className="space-y-1.5 max-h-[300px] overflow-y-auto pr-0.5">
+            {treatments
+              .filter((t) => t.patient_id === patientId)
+              .sort((a, b) => String(b.created_at).localeCompare(String(a.created_at)))
+              .map((t) => {
+                const tooth = t.tooth_number ? ` — ${toothLabelWithWord(t.tooth_number)}` : ''
+                const total = t.total_price || 0
+                const insShare = t.insurance_share || 0
+                const patShare = t.patient_share ?? total
+
+                return (
+                  <div key={t.id} className="px-3 py-2 rounded-xl bg-slate-50 dark:bg-slate-800 flex flex-col gap-1.5">
+                    <div className="flex items-center justify-between gap-2">
+                      <p className="text-xs font-bold text-slate-800 dark:text-slate-100">
+                        {t.procedure_name || 'رویه'}{tooth}
+                      </p>
+                      <span className="text-xs font-bold text-slate-800 dark:text-slate-100 shrink-0">
+                        {formatCurrency(total)} ت
+                      </span>
+                    </div>
+                    
+                    {insShare > 0 ? (
+                      <div className="flex items-center justify-between text-[11px] bg-blue-50 dark:bg-blue-900/20 px-2 py-1.5 rounded-lg border border-blue-100 dark:border-blue-900/50">
+                        <span className="text-blue-700 dark:text-blue-300">سهم بیمه: {formatCurrency(insShare)} ت</span>
+                        <span className="text-slate-700 dark:text-slate-300 font-bold">سهم بیمار: {formatCurrency(patShare)} ت</span>
+                      </div>
+                    ) : (
+                      <div className="flex items-center justify-between text-[10px]">
+                        <span className="text-slate-500">سهم بیمار (آزاد)</span>
+                        <span className="text-slate-600 dark:text-slate-300 font-bold">{formatCurrency(patShare)} ت</span>
+                      </div>
+                    )}
+                    
+                    <p className="text-[10px] text-slate-500">{toJalaliStringPretty(t.created_at)}</p>
+                  </div>
+                )
+              })}
           </div>
         )}
       </section>

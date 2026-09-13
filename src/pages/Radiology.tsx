@@ -10,9 +10,11 @@ import { RadiologyImage, Patient } from '../types'
 import { Card, Button, Badge, Spinner, EmptyState, Modal, Wizard, Input, Select, Textarea, showToast } from '../components/ui'
 import { PersianDateInput } from '../components/PersianDateInput'
 import { PatientSelect } from '../components/PatientSelect'
+import { ToothArchSelect } from '../components/ToothArchSelect'
 import { ModuleHeader, ModuleStatCard, ReorderableStatGrid } from '../components/ModuleHeader'
 import { useConfirmAction } from '../components/ConfirmAction'
 import { DentalRadiologyViewer } from '../components/DentalRadiologyViewer'
+import { toothLabel } from '../lib/toothLabel'
 import { chimes } from '../lib/chimes'
 
 // ============================================================================
@@ -99,7 +101,7 @@ export default function Radiology() {
       fields: [
         { label: 'بیمار', value: patientObj ? `${patientObj.first_name} ${patientObj.last_name}` : '-', highlight: true },
         { label: 'نوع تصویر', value: imageTypes.find((t) => t.value === uploadForm.image_type)?.label || uploadForm.image_type },
-        { label: 'شماره دندان', value: uploadForm.tooth_number || '-' },
+        { label: 'شماره دندان', value: uploadForm.tooth_number ? toothLabel(uploadForm.tooth_number) : '-' },
         { label: 'تاریخ تصویربرداری', value: uploadForm.taken_at ? toJalaliDisplay(uploadForm.taken_at) : '-' },
       ],
       confirmLabel: editingImage ? 'ذخیره تغییرات' : 'ثبت تصویر',
@@ -356,7 +358,7 @@ export default function Radiology() {
                       <p className="text-sm font-medium text-slate-800 truncate">{patientName(img)}</p>
                       <div className="flex items-center justify-between mt-1">
                         <span className="text-xs text-slate-500">
-                          {img.tooth_number ? `دندان: ${toPersianDigits(img.tooth_number)}` : '-'}
+                          {img.tooth_number ? `دندان ${toothLabel(img.tooth_number)}` : '-'}
                         </span>
                         <span className="text-xs text-slate-400">
                           {img.taken_at ? toJalaliDisplay(img.taken_at) : toJalaliDisplay(img.created_at)}
@@ -460,7 +462,7 @@ export default function Radiology() {
                 </div>
                 <div className="bg-slate-50 rounded-xl p-3">
                   <p className="text-xs text-slate-400 flex items-center gap-1 mb-1"><Smile size={12} /> دندان</p>
-                  <p className="text-sm font-medium text-slate-800">{selectedImage.tooth_number ? toPersianDigits(selectedImage.tooth_number) : '-'}</p>
+                  <p className="text-sm font-medium text-slate-800">{selectedImage.tooth_number ? toothLabel(selectedImage.tooth_number) : '-'}</p>
                 </div>
                 <div className="bg-slate-50 rounded-xl p-3">
                   <p className="text-xs text-slate-400 flex items-center gap-1 mb-1"><Calendar size={12} /> تاریخ</p>
@@ -502,7 +504,7 @@ export default function Radiology() {
                   if (!cleanPhone) return null
                   const typeLabel = getTypeMeta(selectedImage.image_type).label
                   const pName = patientName(selectedImage)
-                  const waText = `سلام ${pName} عزیز،\nتصویر رادیولوژی شما در کلینیک دندانپزشکی مینادنت:\nنوع رادیولوژی: ${typeLabel}${selectedImage.tooth_number ? `\nشماره دندان: ${toPersianDigits(selectedImage.tooth_number)}` : ''}\nتاریخ: ${toJalaliStringPretty(selectedImage.taken_at || selectedImage.created_at)}${selectedImage.image_url ? `\nلینک تصویر:\n${selectedImage.image_url}` : ''}\nبا آرزوی تندرستی - کلینیک مینادنت`
+                  const waText = `سلام ${pName} عزیز،\nتصویر رادیولوژی شما در کلینیک دندانپزشکی مینادنت:\nنوع رادیولوژی: ${typeLabel}${selectedImage.tooth_number ? `\nشماره دندان: ${toothLabel(selectedImage.tooth_number)}` : ''}\nتاریخ: ${toJalaliStringPretty(selectedImage.taken_at || selectedImage.created_at)}${selectedImage.image_url ? `\nلینک تصویر:\n${selectedImage.image_url}` : ''}\nبا آرزوی تندرستی - کلینیک مینادنت`
                   return (
                     <a
                       href={`https://wa.me/${cleanPhone}?text=${encodeURIComponent(waText)}`}
@@ -551,7 +553,7 @@ export default function Radiology() {
                 <PatientSelect required value={uploadForm.patient_id} onChange={(v) => setUploadForm((p) => ({ ...p, patient_id: v }))} patients={patients} />
                 <div className="grid grid-cols-2 gap-3">
                   <Select label="نوع تصویر" value={uploadForm.image_type} onChange={(v) => setUploadForm((p) => ({ ...p, image_type: v }))} options={imageTypes.map((t) => ({ value: t.value, label: t.label }))} />
-                  <Input label="شماره دندان" value={uploadForm.tooth_number} onChange={(v) => setUploadForm((p) => ({ ...p, tooth_number: v }))} placeholder="مثال: 16" dir="ltr" />
+                  <ToothArchSelect label="دندان" value={uploadForm.tooth_number} onChange={(v) => setUploadForm((p) => ({ ...p, tooth_number: v }))} allowPrimary={false} />
                 </div>
               </>
             ),

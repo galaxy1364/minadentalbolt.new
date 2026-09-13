@@ -8,6 +8,7 @@ import { chimes } from '../lib/chimes'
 import { db } from '../lib/db'
 import { createPatient, createAppointment, fetchDoctors, fetchUnits } from '../lib/api'
 import { toPersianDigits } from '../lib/persianDate'
+import { toothLabel } from '../lib/toothLabel'
 import { CLINIC_ID } from '../lib/supabase'
 import { showToast } from './ui'
 import { rankResults, parseQuery, groupByKind, flattenGroups, KIND_LABELS } from '../lib/globalSearch'
@@ -34,6 +35,7 @@ function parseCommand(
     { keywords: ['بیمار', 'patient', 'لیست بیمار'], route: '/patients', label: 'بیماران' },
     { keywords: ['نوبت', 'appointment', 'وقت'], route: '/appointments', label: 'نوبت‌ها' },
     { keywords: ['درمان', 'treatment', 'رویه'], route: '/treatments', label: 'درمان‌ها' },
+    { keywords: ['سهم پزشک', 'سهم دکتر', 'کارانه', 'سهم پزشکان', 'محاسبه سهم'], route: '/billing', label: 'محاسبه سهم پزشکان' },
     { keywords: ['پرداخت', 'صورتحساب', 'billing', 'فاکتور', 'قسط'], route: '/billing', label: 'مالی و پرداخت' },
     { keywords: ['رادیولوژی', 'رادیو', 'x-ray', 'تصویر'], route: '/radiology', label: 'رادیولوژی' },
     { keywords: ['نسخه', 'دارو', 'prescription'], route: '/prescriptions', label: 'نسخه‌ها' },
@@ -231,15 +233,16 @@ export default function AICommandBar() {
         ...treatments.map((t) => ({
           kind: 'treatment' as const, id: t.id,
           title: t.procedure_name || 'درمان',
-          subtitle: nameOf(t.patient_id),
+          subtitle: `${nameOf(t.patient_id)}${t.tooth_number ? ` • دندان ${toothLabel(t.tooth_number)}` : ''}`,
           route: '/treatments',
-          keywords: [t.tooth_number],
+          keywords: [t.tooth_number, t.tooth_number ? toothLabel(t.tooth_number) : null],
         })),
         ...labOrders.map((l) => ({
           kind: 'labOrder' as const, id: l.id,
           title: l.work_type || 'کار لابراتوار',
-          subtitle: nameOf(l.patient_id),
+          subtitle: `${nameOf(l.patient_id)}${l.tooth_number ? ` • دندان ${toothLabel(l.tooth_number)}` : ''}`,
           route: '/laboratory',
+          keywords: [l.tooth_number, l.tooth_number ? toothLabel(l.tooth_number) : null],
         })),
       ]
       setRecords(idx)

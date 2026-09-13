@@ -161,7 +161,7 @@ export function PeriodontalChart({ patientId, patientName, doctors, exam, onSave
               const isDeep = [t.db, t.b, t.mb, t.dl, t.l, t.ml].some((s) => (s?.pd || 0) >= 4)
               return `
               <tr class="${isDeep ? 'deep' : ''}">
-                <td><b>${toPersianDigits(t.tooth_number)}</b></td>
+                <td><b>${toothLabel(t.tooth_number)}</b></td>
                 <td>${toPersianDigits(t.db.pd)} - ${toPersianDigits(t.b.pd)} - ${toPersianDigits(t.mb.pd)}</td>
                 <td>${toPersianDigits(t.dl.pd)} - ${toPersianDigits(t.l.pd)} - ${toPersianDigits(t.ml.pd)}</td>
                 <td class="${bopStr ? 'bop' : ''}">${bopStr || '—'}</td>

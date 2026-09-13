@@ -6,7 +6,7 @@ import { useNavigate, useLocation } from 'react-router-dom'
 import {
   Activity, ClipboardList, Stethoscope, Search, Eye, Smile, Plus, Edit2, Trash2, Ban, Layers,
   DollarSign, FlaskConical, CheckCircle2, X, UserPlus, ChevronRight, Bone,
-  ChevronDown, Wallet, Receipt, CalendarClock, Users, Pill, MessageSquare,
+  ChevronDown, Wallet, Receipt, CalendarClock, Users, Pill, MessageSquare, AlertCircle
 } from 'lucide-react'
 import { BarChart, Bar, XAxis, YAxis, Tooltip as RTooltip, ResponsiveContainer, Cell } from 'recharts'
 import {
@@ -15,7 +15,7 @@ import {
   fetchPayments, fetchImplantCases, fetchCheques, fetchAllInstallments,
   fetchPatientPolicies, fetchInsuranceClaims,
   updateTreatment, createLabOrder, fetchLabOrders, updateLabOrder,
-  createToothRecord, updateToothRecord,
+  createToothRecord, updateToothRecord, fetchInventoryItems
 } from '../lib/api'
 import { selectApplicablePolicy, splitCoverage } from '../lib/insurance'
 import { procedureDefaultPrice } from '../lib/selectionHints'
@@ -23,7 +23,7 @@ import { groupPatientTreatments } from '../lib/patientTreatmentGroups'
 import type { PatientPolicy } from '../lib/insurance'
 import { PatientSelect } from '../components/PatientSelect'
 import { toJalaliDisplay, toJalaliStringPretty, formatCurrency, formatNumber, toPersianDigits } from '../lib/persianDate'
-import { Encounter, EncounterWithRelations, Treatment, Procedure, Patient, Doctor, Laboratory, ToothRecord, LabOrder, InsuranceClaim, Payment, Cheque, Installment, ImplantCaseWithRelations } from '../types'
+import { Encounter, EncounterWithRelations, Treatment, Procedure, Patient, Doctor, Laboratory, ToothRecord, LabOrder, InsuranceClaim, Payment, Cheque, Installment, ImplantCaseWithRelations, InventoryItemWithRelations } from '../types'
 import { Card, Button, Badge, Spinner, EmptyState, Tabs, Input, Select, Textarea, Modal, Wizard, showToast } from '../components/ui'
 import { PersianDateInput } from '../components/PersianDateInput'
 import { ToothArchSelect } from '../components/ToothArchSelect'
@@ -39,6 +39,7 @@ import { buildChartHandoff } from '../lib/chartHandoff'
 import DentalChart from '../components/DentalChart'
 import { CurrencyInput } from '../components/CurrencyInput'
 import { logError } from '../lib/errorLog'
+import { tileThemes, getHashColor } from '../lib/colors'
 import { itemTotal, basketTotal, distinctTeeth, findDuplicate, validateBasket, makeTempId, type BasketItem } from '../lib/bulkTreatment'
 
 // ── Constants ──────────────────────────────────────────────────
@@ -131,6 +132,7 @@ export default function Treatments() {
   const [implantCases, setImplantCases] = useState<ImplantCaseWithRelations[]>([])
   const [cheques, setCheques] = useState<Cheque[]>([])
   const [installments, setInstallments] = useState<Installment[]>([])
+  const [inventoryItems, setInventoryItems] = useState<InventoryItemWithRelations[]>([])
   const [expandedPatients, setExpandedPatients] = useState<Set<string>>(new Set())
   const [loading, setLoading] = useState(true)
 
@@ -283,6 +285,7 @@ export default function Treatments() {
     tooth_number: '', tooth_surface: '', quantity: '1', unit_price: '',
     discount: '', total_price: '', status: 'planned', notes: '',
     has_lab: false, lab_id: '', lab_cost: '', lab_work_type: '', lab_material: '', lab_shade: '', go_to_billing: false,
+    materials_used: [] as { item_id: string; quantity: number }[],
   })
 
   // Encounter detail modal (shows treatments + chart)
@@ -290,16 +293,19 @@ export default function Treatments() {
 
   // Procedure category filter for treatment modal dropdown
   const [procCategoryFilter, setProcCategoryFilter] = useState('')
+  const [matInputId, setMatInputId] = useState('')
+  const [matInputQty, setMatInputQty] = useState('1')
 
   // ── Data Fetching ─────────────────────────────────────────────
 
   const loadData = useCallback(async () => {
     setLoading(true)
     try {
-      const [encs, trets, procs, pats, docs, labsList, labOrdersList, pays, impl, chqs, insts] = await Promise.all([
+      const [encs, trets, procs, pats, docs, labsList, labOrdersList, pays, impl, chqs, insts, invs] = await Promise.all([
         fetchEncounters(), fetchTreatments(), fetchProcedures(),
         fetchPatients(), fetchDoctors(), fetchLabs(), fetchLabOrders(),
         fetchPayments(), fetchImplantCases(), fetchCheques(), fetchAllInstallments(),
+        fetchInventoryItems(),
       ])
       setEncounters(encs)
       setTreatments(trets as Treatment[])
@@ -552,7 +558,10 @@ export default function Treatments() {
         procedure_code: '', procedure_name: '', procedure_category: '', tooth_number: '', tooth_surface: '',
         quantity: '1', unit_price: '', discount: '', total_price: '', status: 'planned', notes: '',
         has_lab: false, lab_id: '', lab_cost: '', lab_work_type: '', lab_material: '', lab_shade: '', go_to_billing: false,
+        materials_used: [],
       })
+      setMatInputId('')
+      setMatInputQty('1')
       setTreatModalOpen(true)
     } catch (err) {
       // Was a silent catch before — if this ever fails again, the exact
@@ -682,7 +691,10 @@ export default function Treatments() {
       tooth_number: lastSelectedTooth, tooth_surface: '', quantity: '1', unit_price: '',
       discount: '', total_price: '', status: 'planned', notes: '',
       has_lab: false, lab_id: '', lab_cost: '', lab_work_type: '', lab_material: '', lab_shade: '', go_to_billing: false,
+      materials_used: [],
     })
+    setMatInputId('')
+    setMatInputQty('1')
     setTreatModalOpen(true)
   }
 
@@ -700,7 +712,10 @@ export default function Treatments() {
       notes: t.notes || '', has_lab: !!t.lab_id, lab_id: t.lab_id || '',
       lab_cost: t.lab_cost ? String(t.lab_cost) : '', lab_work_type: '',
       lab_material: '', lab_shade: '', go_to_billing: false,
+      materials_used: t.materials_used || [],
     })
+    setMatInputId('')
+    setMatInputQty('1')
     setTreatModalOpen(true)
   }
 
@@ -784,12 +799,15 @@ export default function Treatments() {
       lab_cost: treatForm.has_lab && treatForm.lab_cost ? Number(treatForm.lab_cost) : null,
       status: treatForm.status, notes: treatForm.notes || null,
       doctor_share: null, doctor_share_calculated: false,
+      materials_used: treatForm.materials_used.length > 0 ? treatForm.materials_used : null,
+      insurance_share: insuranceSplit ? insuranceSplit.insuranceShare : null,
+      patient_share: insuranceSplit ? insuranceSplit.patientShare : null,
     } as any
     const enc = encounters.find((e) => e.id === treatEncounterId)
     const fields = [
       { label: 'بیمار', value: enc ? encounterPatientName(enc) : '-', highlight: true },
       { label: 'رویه', value: treatForm.procedure_name },
-      { label: 'دندان', value: treatForm.tooth_number ? toPersianDigits(treatForm.tooth_number) : '-' },
+      { label: 'دندان', value: treatForm.tooth_number ? toothLabel(treatForm.tooth_number) : '-' },
       { label: 'هزینه کل', value: `${formatCurrency(total)} ت` },
     ]
     // Surfaced at the point of commit: if the ceiling caps the insurer's
@@ -945,7 +963,7 @@ export default function Treatments() {
       warning: 'این درمان هیچ‌وقت پاک نمی‌شود — فقط به‌عنوان لغو‌شده علامت می‌خورد و در پرونده‌ی بیمار باقی می‌ماند.',
       fields: [
         { label: 'رویه', value: t.procedure_name || '-', highlight: true },
-        { label: 'دندان', value: t.tooth_number ? toPersianDigits(t.tooth_number) : '-' },
+        { label: 'دندان', value: t.tooth_number ? toothLabel(t.tooth_number) : '-' },
         ...(linkedOrder ? [{ label: 'سفارش لابراتوار مرتبط', value: 'همزمان لغو می‌شود تا کار روی آن ادامه پیدا نکند' }] : []),
       ],
       confirmLabel: 'تایید لغو',
@@ -1062,7 +1080,7 @@ export default function Treatments() {
           {patientGroups.length === 0 ? (
             <Card className="p-5"><EmptyState icon={<ClipboardList size={28} />} title="پرونده‌ای یافت نشد" description="با شروع درمان، پرونده‌ی بیمار خودکار ساخته می‌شود" action={<Button onClick={openQuickTreatModal} className="flex items-center gap-1.5"><Stethoscope size={16} /> شروع درمان</Button>} /></Card>
           ) : (
-            patientGroups.map((g) => {
+            patientGroups.map((g, idx) => {
               const p = patientMap.get(g.patientId)
               const name = p ? `${p.first_name} ${p.last_name}` : 'نامشخص'
               const initials = p ? `${p.first_name?.[0] ?? ''}${p.last_name?.[0] ?? ''}` : '؟'
@@ -1072,12 +1090,16 @@ export default function Treatments() {
               // A file's left edge is its money status at a glance: red owes,
               // green settled, slate untouched.
               const edge = owes ? '#dc2626' : settled ? '#0d9488' : '#cbd5e1'
+              const theme = tileThemes[getHashColor(g.patientId)]
+              const staggerDelay = Math.min(idx, 15) * 0.05
               return (
-                <Card key={g.patientId} className="p-0 overflow-hidden" style={{ borderRight: `4px solid ${edge}` }}>
+                <Card key={g.patientId} className={`p-0 overflow-hidden relative transition-all duration-300 stagger-item bg-gradient-to-br ${theme.bg} ${theme.border}`} style={{ borderRight: `4px solid ${edge}`, animationDelay: `${staggerDelay}s` }}>
+                  <div className={`absolute -right-16 -top-16 w-32 h-32 rounded-full blur-3xl opacity-20 breathe-slow pointer-events-none ${theme.text}`} />
+                  <div className="relative z-10">
                   {/* File header — tap to open the patient's visit history */}
                   <button
                     onClick={() => { h.tap(); togglePatient(g.patientId) }}
-                    className="w-full flex items-center gap-3 p-3.5 text-right hover:bg-slate-50 dark:hover:bg-slate-700/40 transition-all-smooth"
+                    className="w-full flex items-center gap-3 p-3.5 text-right hover:bg-slate-50/50 dark:hover:bg-slate-700/40 transition-all-smooth"
                     aria-expanded={open}
                   >
                     <div className="w-11 h-11 rounded-2xl bg-gradient-to-br from-violet-500 to-sky-500 text-white flex items-center justify-center font-bold text-sm shrink-0">{initials}</div>
@@ -1183,6 +1205,7 @@ export default function Treatments() {
                       </div>
                     </div>
                   )}
+                  </div>
                 </Card>
               )
             })
@@ -1334,6 +1357,25 @@ export default function Treatments() {
       <Modal open={!!detailEnc} onClose={() => { h.cancel(); setDetailEnc(null); setLastSelectedTooth('') }} title={detailEnc ? `ویزیت: ${encounterPatientName(detailEnc)}` : ''} size="full">
         {detailEnc && (
           <div className="space-y-5">
+            {/* Smart Medical Alerts */}
+            {(() => {
+              const p = patientMap.get(detailEnc.patient_id)
+              const hasAlerts = p?.allergies || p?.medical_conditions
+              if (!hasAlerts) return null
+              return (
+                <div className="flex flex-col sm:flex-row sm:items-center gap-3 p-3 rounded-xl border border-red-200/60 bg-red-50 dark:bg-red-900/20 glass glass-specular shadow-sm">
+                  <div className="flex items-center gap-2 text-red-700 dark:text-red-400 font-bold text-sm shrink-0">
+                    <AlertCircle size={18} className="animate-pulse" />
+                    هشدار پزشکی:
+                  </div>
+                  <div className="flex flex-wrap items-center gap-1.5 text-[11px] font-medium text-red-800 dark:text-red-200">
+                    {p.allergies?.split(',').map(s => s.trim()).filter(Boolean).map(a => <span key={`a-${a}`} className="px-2 py-0.5 rounded-md bg-red-100 dark:bg-red-800/40">{a}</span>)}
+                    {p.medical_conditions?.split(',').map(s => s.trim()).filter(Boolean).map(c => <span key={`c-${c}`} className="px-2 py-0.5 rounded-md bg-red-100 dark:bg-red-800/40">{c}</span>)}
+                  </div>
+                </div>
+              )
+            })()}
+
             {/* Info bar */}
             <div className="flex flex-wrap items-center gap-3 p-3 rounded-xl bg-slate-50">
               <Badge color={getEncounterStatusMeta(detailEnc.status).color}>{getEncounterStatusMeta(detailEnc.status).label}</Badge>
@@ -1384,7 +1426,7 @@ export default function Treatments() {
             {/* Dental Chart */}
             <div>
               <h4 className="text-xs font-bold text-slate-500 mb-3 uppercase tracking-wider flex items-center gap-1.5"><Smile size={14} /> چارت دندانی (پالمر)</h4>
-              <DentalChart toothRecords={toothRecords} treatments={encounterTreatments} onUpdateTooth={handleUpdateTooth} onToothSelect={(toothNum) => setLastSelectedTooth(toothNum)} onAddTreatment={(toothNum, surface) => { if (!detailEnc) return; setTreatEncounterId(detailEnc.id); setTreatPatientId(detailEnc.patient_id); setEditingTreat(null); /* MOD-FEAT-021: the tooth came from the chart, so the wizard opens past the question it already answers */ setTreatWizardStep(startingStepIndex({ toothNumber: toothNum })); setTreatForm({ procedure_code: '', procedure_name: '', procedure_category: '', tooth_number: toothNum, tooth_surface: surface || '', quantity: '1', unit_price: '', discount: '', total_price: '', status: 'planned', notes: '', has_lab: false, lab_id: '', lab_cost: '', lab_work_type: '', lab_material: '', lab_shade: '', go_to_billing: false }); setTreatModalOpen(true) }}
+              <DentalChart toothRecords={toothRecords} treatments={encounterTreatments} onUpdateTooth={handleUpdateTooth} onToothSelect={(toothNum) => setLastSelectedTooth(toothNum)} onAddTreatment={(toothNum, surface) => { if (!detailEnc) return; setTreatEncounterId(detailEnc.id); setTreatPatientId(detailEnc.patient_id); setEditingTreat(null); /* MOD-FEAT-021: the tooth came from the chart, so the wizard opens past the question it already answers */ setTreatWizardStep(startingStepIndex({ toothNumber: toothNum })); setTreatForm({ procedure_code: '', procedure_name: '', procedure_category: '', tooth_number: toothNum, tooth_surface: surface || '', quantity: '1', unit_price: '', discount: '', total_price: '', status: 'planned', notes: '', has_lab: false, lab_id: '', lab_cost: '', lab_work_type: '', lab_material: '', lab_shade: '', go_to_billing: false, materials_used: [] }); setMatInputId(''); setMatInputQty('1'); setTreatModalOpen(true) }}
                 onAddLabOrder={(toothNum, surface) => {
                   // MOD-FEAT-022: lab work now starts where the dentist is
                   // looking, instead of in a blank Palmer picker two screens
@@ -1531,7 +1573,7 @@ export default function Treatments() {
                   <div className="flex items-center justify-between gap-3 rounded-xl border border-primary-200 bg-primary-50 dark:bg-primary-900/20 px-4 py-3">
                     <span className="text-sm font-bold text-primary-800 dark:text-primary-300">
                       {seededSummary(
-                        { toothNumber: toPersianDigits(treatForm.tooth_number), toothSurface: treatForm.tooth_surface },
+                        { toothNumber: toothLabel(treatForm.tooth_number), toothSurface: treatForm.tooth_surface },
                         (v) => ({ occlusal: 'اکلوزال', mesial: 'مزیال', distal: 'دیستال', buccal: 'باکال', lingual: 'لینگوال' }[v] || v),
                       )}
                     </span>
@@ -1728,6 +1770,73 @@ export default function Treatments() {
             label: 'یادداشت',
             content: (
               <Textarea label="یادداشت" value={treatForm.notes} onChange={(v) => setTreatForm((p) => ({ ...p, notes: v }))} rows={3} />
+            ),
+          },
+          {
+            label: 'مواد مصرفی',
+            content: (
+              <div className="space-y-4">
+                <div className="p-4 bg-slate-50 dark:bg-slate-800/50 rounded-2xl border border-slate-200 dark:border-slate-700">
+                  <p className="text-sm font-medium text-slate-700 dark:text-slate-300 mb-3">
+                    پس از ثبت درمان در وضعیت «انجام شده»، این مواد به صورت خودکار از انبار کسر خواهند شد.
+                  </p>
+                  
+                  <div className="grid grid-cols-[1fr_80px_auto] gap-2 items-end mb-4">
+                    <Select 
+                      label="ماده" 
+                      value={matInputId} 
+                      onChange={setMatInputId} 
+                      options={inventoryItems.map(i => ({ value: i.id, label: `${i.name} (موجودی: ${i.quantity || 0} ${i.unit})` }))} 
+                      placeholder="انتخاب ماده مصرفی" 
+                    />
+                    <Input 
+                      label="تعداد" 
+                      type="number" 
+                      value={matInputQty} 
+                      onChange={setMatInputQty} 
+                      dir="ltr" 
+                    />
+                    <Button 
+                      variant="secondary" 
+                      className="mb-1.5"
+                      onClick={() => {
+                        if (matInputId && matInputQty) {
+                          setTreatForm(p => ({
+                            ...p,
+                            materials_used: [...p.materials_used, { item_id: matInputId, quantity: parseFloat(matInputQty) }]
+                          }))
+                          setMatInputId('')
+                          setMatInputQty('1')
+                        }
+                      }}
+                    >
+                      افزودن
+                    </Button>
+                  </div>
+                  
+                  {treatForm.materials_used.length > 0 && (
+                    <div className="space-y-2 mt-4">
+                      {treatForm.materials_used.map((mat, idx) => {
+                        const item = inventoryItems.find(i => i.id === mat.item_id)
+                        return (
+                          <div key={idx} className="flex items-center justify-between bg-white dark:bg-slate-900 p-2 rounded-lg border border-slate-200 dark:border-slate-700">
+                            <span className="text-sm font-medium text-slate-700 dark:text-slate-200">{item?.name || 'ماده نامشخص'}</span>
+                            <div className="flex items-center gap-3">
+                              <span className="text-sm text-slate-500">{mat.quantity} {item?.unit || 'واحد'}</span>
+                              <button
+                                onClick={() => setTreatForm(p => ({ ...p, materials_used: p.materials_used.filter((_, i) => i !== idx) }))}
+                                className="text-red-500 hover:bg-red-50 p-1 rounded transition-colors"
+                              >
+                                حذف
+                              </button>
+                            </div>
+                          </div>
+                        )
+                      })}
+                    </div>
+                  )}
+                </div>
+              </div>
             ),
           },
         ]}

@@ -121,13 +121,10 @@ Deno.serve(async (req: Request) => {
       const patient = appt.patient as any;
       if (!patient?.phone) continue;
 
-      const name      = `${patient.first_name} ${patient.last_name}`;
-      const doctor    = (appt.doctor as any)?.name
-        ? `دکتر ${(appt.doctor as any).name}`
-        : 'پزشک محترم';
+      const name      = `${patient.first_name || ''} ${patient.last_name || ''}`.trim() || 'بیمار';
       const time      = (appt.start_time as string || '').slice(0, 5);
       const message   =
-        `${name} عزیز،\nیادآوری نوبت فردا:\nپزشک: ${doctor}\nساعت: ${time}\n\nمطب دندانپزشکی`;
+        `${name} عزیز،\nیادآوری نوبت دندانپزشکی فردا:\nساعت: ${time}\n\nکلینیک دندانپزشکی مینا`;
 
       const result = await provider.send(patient.phone, message);
 

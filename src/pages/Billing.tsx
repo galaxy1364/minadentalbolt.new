@@ -1,5 +1,6 @@
 // Billing.tsx - Persian RTL Dental Clinic Billing & Payments Management
 import { useState, useEffect, useCallback, useMemo } from 'react'
+import { PatientDebtBar } from '../components/PatientDebtBar'
 import { PatientSelect } from '../components/PatientSelect'
 import { toothLabel, toothCode } from '../lib/toothLabel'
 import { buildPrintDocument } from '../lib/printDocument'
@@ -8,10 +9,11 @@ import { validateCheque, chequeModeHint } from '../lib/chequeValidation'
 import { findDuplicatePayments, duplicateWarning } from '../lib/duplicatePayment'
 import { PatientFinanceOverview } from '../components/PatientFinanceOverview'
 import { useNavigate, useLocation } from 'react-router-dom'
-import { CreditCard, Plus, Search, DollarSign, TrendingUp, Wallet, Calendar, CalendarClock, CheckCircle2, AlertCircle, Edit2, Filter, Receipt, Banknote, Clock, Printer, Ban, Archive, MessageSquare } from 'lucide-react'
+import { CreditCard, Plus, Search, DollarSign, TrendingUp, Wallet, Calendar, CalendarClock, CheckCircle2, AlertCircle, Edit2, Filter, Receipt, Banknote, Clock, Printer, Ban, Archive, MessageSquare, Users } from 'lucide-react'
 import { ChevronDown } from 'lucide-react'
 import { BarChart, Bar, XAxis, YAxis, Tooltip as RTooltip, ResponsiveContainer, PieChart, Pie, Cell as RCell } from 'recharts'
-import { fetchPayments, createPayment, updatePayment, fetchEncounters, fetchCheques, createCheque, updateCheque, fetchPaymentPlans, createPaymentPlan, updatePaymentPlan, updateInstallment, fetchPatients, fetchExpenses, createExpense, updateExpense, deactivateExpense, fetchTreatments, fetchImplantCases, fetchDoctors } from '../lib/api'
+import { fetchPayments, createPayment, updatePayment, fetchEncounters, fetchCheques, createCheque, updateCheque, fetchPaymentPlans, createPaymentPlan, updatePaymentPlan, updateInstallment, fetchPatients, fetchExpenses, createExpense, updateExpense, deactivateExpense, fetchTreatments, fetchImplantCases, fetchDoctors, fetchLabOrders } from '../lib/api'
+import { calculateDoctorShare } from '../lib/doctorShare'
 import { buildSchedule, splitAmount, planProgress, reconcilePlan } from '../lib/installments'
 import { checkOverpayment } from '../lib/finance'
 import { toJalaliDisplay, toJalaliStringPretty, formatCurrency, formatNumber, toPersianDigits, toEnglishDigits } from '../lib/persianDate'
@@ -26,6 +28,7 @@ import type { CashRegisterSession } from '../types'
 import { Wizard, Card, Button, Input, Select, Textarea, Badge, Spinner, EmptyState, Tabs, showToast, Modal } from '../components/ui'
 import { PersianDateInput } from '../components/PersianDateInput'
 import { CurrencyInput } from '../components/CurrencyInput'
+import { tileThemes, getHashColor } from '../lib/colors'
 import { ModuleHeader, ModuleStatCard, ReorderableStatGrid } from '../components/ModuleHeader'
 
 // ============================================================================
@@ -88,6 +91,7 @@ export default function Billing() {
   const [paymentPlans, setPaymentPlans] = useState<PaymentPlanWithRelations[]>([])
   const [expenses, setExpenses] = useState<Expense[]>([])
   const [patients, setPatients] = useState<Patient[]>([])
+  const [labOrders, setLabOrders] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
 
   // Tab state
@@ -200,7 +204,7 @@ export default function Billing() {
   const loadData = useCallback(async () => {
     setLoading(true)
     try {
-      const [pays, encs, chqs, plans, pats, exps, trts, implCases, cashSess, docs] = await Promise.all([
+      const [pays, encs, chqs, plans, pats, exps, trts, implCases, cashSess, docs, labs] = await Promise.all([
         fetchPayments(),
         fetchEncounters(),
         fetchCheques(),
@@ -211,6 +215,7 @@ export default function Billing() {
         fetchImplantCases(),
         fetchCashRegisterSessions(),
         fetchDoctors(),
+        fetchLabOrders(),
       ])
       setPayments(pays)
       setEncounters(encs)
@@ -223,6 +228,7 @@ export default function Billing() {
       setDoctors(docs as never)
       setCashSessions(cashSess)
       setOpenSession(cashSess.find((s) => s.status === 'open') || null)
+      setLabOrders(labs)
     } catch (err) {
       console.error('Error loading billing data:', err)
       showToast('error', 'خطا در بارگذاری اطلاعات مالی')
@@ -893,12 +899,16 @@ export default function Billing() {
         <Card className="p-6"><EmptyState icon={<CreditCard size={32} />} title="پرداختی یافت نشد" /></Card>
       ) : (
         <div className="space-y-2">
-          {filteredPayments.map((p) => {
+          {filteredPayments.map((p, idx) => {
             const methodMeta = paymentMethods.find((m) => m.value === p.payment_method) || paymentMethods[0]
             const statusMeta = paymentStatuses.find((s) => s.value === p.status) || paymentStatuses[0]
+            const theme = tileThemes[getHashColor(p.patient_id)]
+            const staggerDelay = Math.min(idx, 15) * 0.05
             return (
-              <Card key={p.id} className="p-4">
-                <div className="flex items-center justify-between gap-3 flex-wrap">
+              <Card key={p.id} className={`p-4 relative overflow-hidden transition-all duration-300 hover:shadow-xl hover:-translate-y-1 stagger-item bg-gradient-to-br ${theme.bg} ${theme.border}`} style={{ animationDelay: `${staggerDelay}s` }}>
+                <div className={`absolute -right-16 -top-16 w-32 h-32 rounded-full blur-3xl opacity-20 breathe-slow ${theme.text}`} />
+                <div className="relative z-10">
+                  <div className="flex items-center justify-between gap-3 flex-wrap">
                   <div className="flex items-center gap-3">
                     <div className={`w-10 h-10 rounded-xl bg-${methodMeta.color}-50 text-${methodMeta.color}-600 flex items-center justify-center`}>
                       <CreditCard size={18} />
@@ -1009,6 +1019,7 @@ export default function Billing() {
                       },
                     })
                   }} className="flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs text-slate-500 hover:text-error-600 hover:bg-error-50 transition-colors"><Ban size={12} /> لغو پرداخت</button>
+                </div>
                 </div>
               </Card>
             )
@@ -1199,15 +1210,19 @@ export default function Billing() {
         <Card className="p-6"><EmptyState icon={<Banknote size={32} />} title="چکی یافت نشد" /></Card>
       ) : (
         <div className="space-y-2">
-          {filteredCheques.map((c) => {
+          {filteredCheques.map((c, idx) => {
             const statusMeta = chequeStatuses.find((s) => s.value === c.status) || chequeStatuses[0]
             const dueDate = new Date(c.due_date)
             const now = new Date()
             const daysLeft = Math.ceil((dueDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24))
             const isOverdue = daysLeft < 0 && c.status === 'pending'
+            const theme = tileThemes[getHashColor(c.patient_id)]
+            const staggerDelay = Math.min(idx, 15) * 0.05
             return (
-              <Card key={c.id} className="p-4">
-                <div className="flex items-center justify-between gap-3 flex-wrap">
+              <Card key={c.id} className={`p-4 relative overflow-hidden transition-all duration-300 hover:shadow-xl hover:-translate-y-1 stagger-item bg-gradient-to-br ${theme.bg} ${theme.border}`} style={{ animationDelay: `${staggerDelay}s` }}>
+                <div className={`absolute -right-16 -top-16 w-32 h-32 rounded-full blur-3xl opacity-20 breathe-slow ${theme.text}`} />
+                <div className="relative z-10">
+                  <div className="flex items-center justify-between gap-3 flex-wrap">
                   <div className="flex items-center gap-3">
                     <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${isOverdue ? 'bg-error-50 text-error-600' : statusMeta.color === 'success' ? 'bg-success-50 text-success-600' : 'bg-warning-50 text-warning-600'}`}>
                       <Banknote size={18} />
@@ -1262,6 +1277,7 @@ export default function Billing() {
                   </div>
                 </div>
                 {c.notes && <p className="text-xs text-slate-400 mt-2">{c.notes}</p>}
+                </div>
               </Card>
             )
           })}
@@ -1287,7 +1303,7 @@ export default function Billing() {
         <Card className="p-6"><EmptyState icon={<Calendar size={32} />} title="طرح قسطی ثبت نشده" /></Card>
       ) : (
         <div className="space-y-3">
-          {paymentPlans.map((plan) => {
+          {paymentPlans.map((plan, idx) => {
             const statusMeta = planStatuses.find((s) => s.value === plan.status) || planStatuses[0]
             const installments = (plan as any).installments || []
             // Progress comes from the tested helper: it excludes
@@ -1301,9 +1317,13 @@ export default function Billing() {
             // the rows and the header disagree. Say so rather than
             // showing whichever number happens to be rendered.
             const check = reconcilePlan({ planTotal: plan.total_amount, installments })
+            const theme = tileThemes[getHashColor(plan.patient_id)]
+            const staggerDelay = Math.min(idx, 15) * 0.05
             return (
-              <Card key={plan.id} className="p-4">
-                <div className="flex items-center justify-between gap-3 flex-wrap mb-3">
+              <Card key={plan.id} className={`p-4 relative overflow-hidden transition-all duration-300 hover:shadow-xl hover:-translate-y-1 stagger-item bg-gradient-to-br ${theme.bg} ${theme.border}`} style={{ animationDelay: `${staggerDelay}s` }}>
+                <div className={`absolute -right-16 -top-16 w-32 h-32 rounded-full blur-3xl opacity-20 breathe-slow ${theme.text}`} />
+                <div className="relative z-10">
+                  <div className="flex items-center justify-between gap-3 flex-wrap mb-3">
                   <div>
                     <p className="text-sm font-bold text-slate-800">{getPatientName(plan.patient_id)}</p>
                     <p className="text-xs text-slate-500">مبلغ کل: {formatCurrency(plan.total_amount)} تومان - {toPersianDigits(plan.installment_count)} قسط</p>
@@ -1389,6 +1409,7 @@ export default function Billing() {
                   </div>
                 )}
                 {plan.notes && <p className="text-xs text-slate-400 mt-2">{plan.notes}</p>}
+                </div>
               </Card>
             )
           })}
@@ -1554,9 +1575,13 @@ export default function Billing() {
         <Card className="p-6"><EmptyState icon={<CheckCircle2 size={32} />} title="مطالبات معوقی وجود ندارد" description="همه حساب‌ها تسویه هستند" /></Card>
       ) : (
         <div className="space-y-2">
-          {patientBalanceList.map((b) => (
-            <Card key={b.patientId} className="p-4 cursor-pointer hover:card-shadow-lg transition-all-smooth" >
-              <div className="flex items-center justify-between gap-3" onClick={() => navigate(`/patients/${b.patientId}`)}>
+          {patientBalanceList.map((b, idx) => {
+            const theme = tileThemes[getHashColor(b.patientId)]
+            const staggerDelay = Math.min(idx, 15) * 0.05
+            return (
+            <Card key={b.patientId} className={`p-4 cursor-pointer relative overflow-hidden transition-all duration-300 hover:shadow-xl hover:-translate-y-1 stagger-item bg-gradient-to-br ${theme.bg} ${theme.border}`} style={{ animationDelay: `${staggerDelay}s` }}>
+              <div className={`absolute -right-16 -top-16 w-32 h-32 rounded-full blur-3xl opacity-20 breathe-slow ${theme.text}`} />
+              <div className="relative z-10 flex items-center justify-between gap-3" onClick={() => navigate(`/patients/${b.patientId}`)}>
                 <div className="flex items-center gap-3">
                   <div className="w-10 h-10 rounded-xl bg-error-50 text-error-600 flex items-center justify-center">
                     <Wallet size={18} />
@@ -1566,14 +1591,127 @@ export default function Billing() {
                     <p className="text-xs text-slate-400">مانده حساب</p>
                   </div>
                 </div>
-                <p className="text-sm font-bold text-error-700">{formatCurrency(b.balance)} ت</p>
+                <PatientDebtBar patientId={b.patientId} balance={{ balance: b.balance, paid: 0, totalCost: 0 }} variant="compact" />
               </div>
             </Card>
-          ))}
+            )
+          })}
         </div>
       )}
     </div>
   )
+
+  const renderDoctorShareTab = () => {
+    const shareCards = doctors.map((doc) => {
+      const isMina = (doc.name || '').includes('مینا')
+      const isMehdi = (doc.name || '').includes('مهدی')
+      const role: 'mehdi' | 'mina' | 'doctor' = isMehdi ? 'mehdi' : isMina ? 'mina' : 'doctor'
+      const breakdown = calculateDoctorShare(
+        {
+          doctorId: doc.id,
+          doctorName: doc.name || 'پزشک',
+          role,
+          commissionPercent: isMehdi ? 100 : isMina ? 50 : 50,
+        },
+        treatments,
+        labOrders,
+      )
+      return { doc, breakdown, role }
+    })
+
+    const totalPayable = shareCards.reduce((sum, item) => sum + item.breakdown.finalDoctorShare, 0)
+
+    return (
+      <div className="space-y-4">
+        <div className="p-4 rounded-2xl bg-gradient-to-r from-primary-500/10 via-accent-500/10 to-primary-500/5 border border-primary-100 dark:border-primary-900/40 flex items-center justify-between gap-4 flex-wrap">
+          <div>
+            <h3 className="text-base font-bold text-slate-800 dark:text-slate-100 flex items-center gap-2">
+              <DollarSign className="text-primary-600" size={18} />
+              <span>محاسبه کارانه و سهم پزشکان (قرارداد اجرایی مستر)</span>
+            </h3>
+            <p className="text-xs text-slate-500 mt-1">
+              فرمول قفل‌شده کلینیک: سهم مهدی (کل کارکرد − هزینه لابراتوار)، سهم دکتر مینا ((کارکرد − قطعات ایمپلنت − لابراتوار) ÷ ۲)
+            </p>
+          </div>
+          <div className="flex items-center gap-3">
+            <div className="text-left bg-white dark:bg-slate-800 px-3.5 py-2 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm">
+              <p className="text-[10px] text-slate-400">مجموع سهم قابل پرداخت به پزشکان</p>
+              <p className="text-sm font-bold text-primary-600">{formatCurrency(totalPayable)} ت</p>
+            </div>
+          </div>
+        </div>
+
+        {shareCards.length === 0 ? (
+          <Card className="p-6">
+            <EmptyState icon={<Users size={32} />} title="پزشکی تعریف نشده است" description="در بخش کاربران و پرسنل پزشکان کلینیک را ثبت نمایید." />
+          </Card>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {shareCards.map(({ doc, breakdown, role }) => (
+              <Card key={doc.id} className="p-5 space-y-4 relative overflow-hidden border border-slate-200 dark:border-slate-800 shadow-sm hover:shadow-md transition-all">
+                <div className="flex items-center justify-between gap-3">
+                  <div className="flex items-center gap-2.5">
+                    <div className="w-10 h-10 rounded-xl bg-primary-100 dark:bg-primary-900/40 text-primary-700 dark:text-primary-300 flex items-center justify-center font-bold">
+                      {(doc.name || 'د')[0]}
+                    </div>
+                    <div>
+                      <h4 className="text-sm font-bold text-slate-800 dark:text-slate-100">
+                        {doc.name || 'پزشک'}
+                      </h4>
+                      <p className="text-[11px] text-slate-500">
+                        {role === 'mehdi' ? 'مالک کلینیک (فرمول ۱۰۰٪)' : role === 'mina' ? 'دکتر مینا (فرمول ۵۰٪ منهای قطعات و لابراتوار)' : `درصد کارانه: ${toPersianDigits(breakdown.commissionPercent)}٪`}
+                      </p>
+                    </div>
+                  </div>
+                  <Badge color={role === 'mehdi' ? 'primary' : role === 'mina' ? 'accent' : 'slate'}>
+                    {toPersianDigits(breakdown.commissionPercent)}٪ سهم
+                  </Badge>
+                </div>
+
+                <div className="space-y-2 text-xs bg-slate-50 dark:bg-slate-800/60 p-3 rounded-xl">
+                  <div className="flex items-center justify-between text-slate-600 dark:text-slate-300">
+                    <span>کل کارکرد ثبت‌شده:</span>
+                    <span className="font-bold">{formatCurrency(breakdown.totalGrossWork)} ت</span>
+                  </div>
+                  {breakdown.implantPartsValue > 0 && (
+                    <div className="flex items-center justify-between text-amber-700 dark:text-amber-400">
+                      <span>کسر قطعات ایمپلنت (سهم مالک):</span>
+                      <span>− {formatCurrency(breakdown.implantPartsValue)} ت</span>
+                    </div>
+                  )}
+                  {breakdown.totalLabCost > 0 && (
+                    <div className="flex items-center justify-between text-error-600 dark:text-error-400">
+                      <span>کسر هزینه لابراتوار:</span>
+                      <span>− {formatCurrency(breakdown.totalLabCost)} ت</span>
+                    </div>
+                  )}
+                  <div className="pt-1.5 border-t border-slate-200 dark:border-slate-700 flex items-center justify-between text-slate-700 dark:text-slate-200 font-medium">
+                    <span>مبنای خالص محاسبه:</span>
+                    <span>{formatCurrency(breakdown.netBase)} ت</span>
+                  </div>
+                </div>
+
+                <div className="pt-2 flex items-center justify-between">
+                  <div>
+                    <p className="text-[10px] text-slate-400">سهم خالص قابل پرداخت</p>
+                    <p className="text-base font-bold text-emerald-600 dark:text-emerald-400">
+                      {formatCurrency(breakdown.finalDoctorShare)} تومان
+                    </p>
+                  </div>
+                  <div className="text-left">
+                    <p className="text-[10px] text-slate-400">سهم ناخالص باقیمانده برای کلینیک</p>
+                    <p className="text-xs font-bold text-slate-700 dark:text-slate-300">
+                      {formatCurrency(breakdown.clinicShare)} ت
+                    </p>
+                  </div>
+                </div>
+              </Card>
+            ))}
+          </div>
+        )}
+      </div>
+    )
+  }
 
   // ===========================================================================
   // Render: Modals
@@ -1983,6 +2121,7 @@ export default function Billing() {
     { key: 'plans', label: 'طرح‌های قسطی', icon: <Calendar size={16} /> },
     { key: 'expenses', label: 'هزینه‌ها', icon: <Receipt size={16} /> },
     { key: 'balances', label: 'مانده حساب', icon: <Wallet size={16} /> },
+    { key: 'shares', label: 'سهم پزشکان', icon: <DollarSign size={16} /> },
   ]
 
   return (
@@ -2004,6 +2143,10 @@ export default function Billing() {
       >
         {financeOverviewPatientId && (
           <PatientFinanceOverview
+            hasMedicalAlerts={(() => {
+              const p = patients.find(x => x.id === financeOverviewPatientId)
+              return !!p?.allergies || !!p?.medical_conditions
+            })()}
             patientId={financeOverviewPatientId}
             patientName={getPatientName(financeOverviewPatientId)}
             payments={payments}
@@ -2023,6 +2166,7 @@ export default function Billing() {
       {activeTab === 'plans' && renderPlansTab()}
       {activeTab === 'expenses' && renderExpensesTab()}
       {activeTab === 'balances' && renderBalancesTab()}
+      {activeTab === 'shares' && renderDoctorShareTab()}
 
       {renderPaymentModal()}
       {renderChequeModal()}

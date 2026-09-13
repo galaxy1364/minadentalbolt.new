@@ -51,8 +51,8 @@ describe('🔴 تاریخچه‌ی پرداخت با دندان و پزشک', ()
     // همان resolveAttribution که فهرست پرداخت‌ها و رسید استفاده می‌کنند،
     // پس هر سه یک چیز می‌گویند.
     show(<PatientFinanceOverview {...base} payments={[payment()]} />)
-    expect(screen.getByText(/بیلدآپ/)).toBeDefined()
-    expect(screen.getByText(/دندان ۱┘/)).toBeDefined()
+    expect(screen.getAllByText(/بیلدآپ/).length).toBeGreaterThanOrEqual(1)
+    expect(screen.getAllByText(/دندان ۱┘/).length).toBeGreaterThanOrEqual(1)
     expect(screen.getByText(/مینا مازندارنی/)).toBeDefined()
   })
 

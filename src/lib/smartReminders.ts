@@ -1,5 +1,6 @@
 import type { Patient, Encounter, Payment, Installment, AppointmentWithRelations, Treatment, Cheque, ImplantCase, LabOrder } from '../types'
 import { toPersianDigits, formatCurrency } from './persianDate'
+import { toothLabel } from './toothLabel'
 import { calcAllPatientBalances } from './finance'
 import { nextImplantAction } from './implantMilestones'
 import { daysUntilDue } from './labClinicMilestones'
@@ -405,7 +406,7 @@ export function findPendingImplantStages(
     else if (action.key === 'impression') priority = 70
     else if (action.key === 'opg') priority = 60
 
-    const detail = `ایمپلنت دندان ${im.tooth_number ? toPersianDigits(im.tooth_number) : ''}: ${action.label}`
+    const detail = `ایمپلنت دندان ${im.tooth_number ? toothLabel(im.tooth_number) : ''}: ${action.label}`
 
     result.push({
       id: `implant-${im.id}`,
@@ -415,7 +416,7 @@ export function findPendingImplantStages(
       patientName: `${p.first_name} ${p.last_name}`,
       detail,
       actionNeeded: detail,
-      smsMessage: `${p.first_name} عزیز، موعد مرحله‌ی بعدی درمان ایمپلنت شما فرارسیده است. لطفاً جهت هماهنگی نوبت با کلینیک مینادنت تماس بگیرید.`,
+      smsMessage: `${p.first_name} عزیز، موعد مرحله‌ی بعدی درمان ایمپلنت شما فرارسیده است. لطفاً جهت هماهنگی نوبت با کلینیک دندانپزشکی مینا تماس بگیرید.`,
       priority,
       urgency: 'urgent',
       actionPath: '/implants',

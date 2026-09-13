@@ -51,7 +51,7 @@ export function ToothArchSelect({
   const lower = primary ? lowerRowPrimary : lowerRow
   const selected = Number(value)
 
-  const renderRow = (row: ToothEntry[]) => (
+  const renderRow = (row: ToothEntry[], jaw: 'upper' | 'lower') => (
     /* MOD-FIX-013: dir="ltr" is the whole fix for the mirrored arch.
        A dental chart is drawn as if you are facing the patient, so the
        patient's RIGHT belongs on the viewer's LEFT. The row data is
@@ -59,13 +59,21 @@ export function ToothArchSelect({
        inherited dir="rtl" from the app shell, and an RTL flex row lays
        its first item on the right — flipping the entire mouth. Mehdi
        tapped what he read as the patient's upper right and got UL1. */
-    <div dir="ltr" className="flex items-end gap-0.5 dock-scroll overflow-x-auto pb-1">
+    <div dir="ltr" className="flex items-center gap-0.5 dock-scroll overflow-x-auto py-1">
       {row.map((t, i) => (
-        <div key={t.fdi} className="flex items-end shrink-0">
+        <div key={t.fdi} className="flex items-center shrink-0">
           {/* Same midline rule as the numeric picker — one divider, at the
               real boundary between the two sides. See MOD-FIX-006. */}
           {isMidlineStart(row, i) && (
-            <div className="w-px h-12 bg-slate-300 dark:bg-slate-500 mx-1.5 shrink-0" />
+            <div className="flex items-center gap-1 shrink-0 px-1">
+              <span className={`text-xl font-bold select-none ${primary ? 'text-amber-500' : 'text-slate-400'}`}>
+                {jaw === 'upper' ? '┘' : '┐'}
+              </span>
+              <div className="w-px h-12 bg-slate-300 dark:bg-slate-500 mx-1 shrink-0" />
+              <span className={`text-xl font-bold select-none ${primary ? 'text-amber-500' : 'text-slate-400'}`}>
+                {jaw === 'upper' ? '└' : '┌'}
+              </span>
+            </div>
           )}
           <button
             type="button"
@@ -114,20 +122,20 @@ export function ToothArchSelect({
         )}
       </div>
 
-      <div className="rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 p-2 space-y-1">
+      <div className={`rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 p-2 space-y-1 ${primary ? 'bg-amber-50/30 border-amber-100 dark:bg-amber-900/10' : ''}`}>
         {/* Spelled out, because "UR" and "UL" are exactly the pair that was
             silently swapped and neither looks wrong on its own. */}
         <div dir="ltr" className="flex items-center justify-between px-1 text-[10px] text-slate-400">
           <span>راست بیمار</span>
-          <span className="font-medium">فک بالا</span>
+          <span className="font-medium text-xs">فک بالا</span>
           <span>چپ بیمار</span>
         </div>
-        {renderRow(upper)}
+        {renderRow(upper, 'upper')}
         <div className="h-px bg-slate-200 dark:bg-slate-600 my-1" />
-        {renderRow(lower)}
+        {renderRow(lower, 'lower')}
         <div dir="ltr" className="flex items-center justify-between px-1 text-[10px] text-slate-400">
           <span>راست بیمار</span>
-          <span className="font-medium">فک پایین</span>
+          <span className="font-medium text-xs">فک پایین</span>
           <span>چپ بیمار</span>
         </div>
       </div>

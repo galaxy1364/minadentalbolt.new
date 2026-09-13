@@ -45,7 +45,7 @@ export function calcPatientBalance(
   // out explicitly or a cancelled treatment would inflate the balance
   // forever with no way to correct it.
   const billableTreatments = treatments.filter((t) => t.status !== 'cancelled')
-  const treatmentCost = billableTreatments.reduce((s, t) => s + (t.total_price || 0), 0)
+  const treatmentCost = billableTreatments.reduce((s, t) => s + (t.patient_share ?? (t.total_price || 0)), 0)
   // Implant-linked payments are excluded here because they are already
   // counted through implant_cases.paid_amount below.
   //
@@ -131,7 +131,7 @@ export interface OverpaymentCheck {
 export function calcEncounterTotal(treatments: Treatment[], encounterId: string): number {
   return treatments
     .filter((t) => t.encounter_id === encounterId && t.status !== 'cancelled')
-    .reduce((sum, t) => sum + (t.total_price || 0), 0)
+    .reduce((sum, t) => sum + (t.patient_share ?? (t.total_price || 0)), 0)
 }
 
 export function checkOverpayment(amount: number, remaining: number): OverpaymentCheck {

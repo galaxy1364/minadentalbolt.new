@@ -3,12 +3,14 @@ import { DENTAL_DRUG_PRESETS } from './drugPresets'
 
 describe('DENTAL_DRUG_PRESETS', () => {
   it('contains essential clinical prescription categories', () => {
-    expect(DENTAL_DRUG_PRESETS.length).toBeGreaterThanOrEqual(4)
+    expect(DENTAL_DRUG_PRESETS.length).toBeGreaterThanOrEqual(6)
     const ids = DENTAL_DRUG_PRESETS.map((p) => p.id)
     expect(ids).toContain('post_wisdom_surgery')
     expect(ids).toContain('acute_dental_abscess')
     expect(ids).toContain('acute_pulpitis_endo')
     expect(ids).toContain('pediatric_dental_pack')
+    expect(ids).toContain('simple_extraction_pack')
+    expect(ids).toContain('perio_maintenance_pack')
   })
 
   it('all presets have non-empty items and required fields', () => {

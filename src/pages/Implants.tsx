@@ -562,7 +562,7 @@ export default function Implants() {
       title: editingCase ? 'ویرایش مورد ایمپلنت' : 'ایجاد مورد ایمپلنت',
       fields: [
         { label: 'بیمار', value: patient ? `${patient.first_name} ${patient.last_name}` : '-', highlight: true },
-        { label: 'دندان', value: toPersianDigits(caseForm.tooth_number) },
+        { label: 'دندان', value: caseForm.tooth_number ? toothLabel(caseForm.tooth_number) : '-' },
         { label: 'برند', value: getBrandLabel(caseForm.brand) },
         { label: 'کل هزینه', value: caseForm.total_cost ? `${formatCurrency(Number(caseForm.total_cost))} ت` : '-' },
         { label: 'دستمزد جراح', value: caseForm.surgery_fee_mode === 'negotiated' ? `توافقی — ${caseForm.surgery_fee_amount ? formatCurrency(Number(caseForm.surgery_fee_amount)) : '0'} ت` : 'فرمول خودکار' },
@@ -858,7 +858,7 @@ export default function Implants() {
                     <div>
                       <h3 className="font-bold text-slate-800">{patientName(c)}</h3>
                       <p className="text-xs text-slate-500">
-                        دندان: <span className="font-medium text-slate-700">{toPersianDigits(c.tooth_number || '-')}</span>
+                        دندان: <span className="font-medium text-slate-700">{c.tooth_number ? toothLabel(c.tooth_number) : '-'}</span>
                         {c.doctor && ` | پزشک: ${doctorName(c)}`}
                       </p>
                     </div>
@@ -1057,7 +1057,7 @@ export default function Implants() {
                       confirmAction({
                         type: 'status', title: 'آرشیو مورد ایمپلنت',
                         warning: 'این مورد هیچ‌وقت پاک نمی‌شود — فقط از لیست فعال مخفی می‌شود و از بخش «بایگانی» قابل بازگردانی است.',
-                        fields: [{ label: 'بیمار', value: patientName(c), highlight: true }, { label: 'دندان', value: toPersianDigits(c.tooth_number || '-') }],
+                        fields: [{ label: 'بیمار', value: patientName(c), highlight: true }, { label: 'دندان', value: c.tooth_number ? toothLabel(c.tooth_number) : '-' }],
                         confirmLabel: 'تایید آرشیو',
                         onConfirm: async () => {
                           try {

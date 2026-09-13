@@ -154,4 +154,50 @@ export const DENTAL_DRUG_PRESETS: DrugPreset[] = [
       },
     ],
   },
+  {
+    id: 'simple_extraction_pack',
+    title: 'پک تسکین درد کشیدن ساده دندان',
+    category: 'surgery',
+    description: 'ژلوفن ۴۰۰ یا استامینوفن کدئین + دهانشویه آب‌نمک ولرم',
+    badgeColor: 'bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-950/40 dark:text-blue-300',
+    items: [
+      {
+        drug_name: 'ژلوفن (ایبوپروفن) ۴۰۰ میلی‌گرم',
+        dosage: 'کپسول ۴۰۰mg',
+        frequency: 'هر ۶ تا ۸ ساعت در صورت احساس درد',
+        instructions: 'یک عدد همراه آب کافی بعد از غذا مصرف شود',
+        quantity: 10,
+      },
+      {
+        drug_name: 'دهانشویه سرم فیزیولوژی (نرمال سالین)',
+        dosage: 'محلول شستشو',
+        frequency: 'روزانه ۳ تا ۴ بار بعد از ۲۴ ساعت اول',
+        instructions: 'به آرامی در دهان چرخانده و خارج شود؛ از تف کردن محکم خودداری فرمایید',
+        quantity: 1,
+      },
+    ],
+  },
+  {
+    id: 'perio_maintenance_pack',
+    title: 'پک بیماری‌های لثه و پریودنتال',
+    category: 'general',
+    description: 'داکسی‌سایکلین ۱۰۰ + دهانشویه کلرهگزیدین ۰.۲٪',
+    badgeColor: 'bg-teal-50 text-teal-700 border-teal-200 dark:bg-teal-950/40 dark:text-teal-300',
+    items: [
+      {
+        drug_name: 'داکسی‌سایکلین ۱۰۰ میلی‌گرم',
+        dosage: 'کپسول ۱۰۰mg',
+        frequency: 'روز اول ۲ کپسول، سپس روزی ۱ کپسول به مدت ۱۴ روز',
+        instructions: 'همراه با یک لیوان آب کامل و در حالت ایستاده میل شود؛ تا ۱ ساعت بعد دراز نکشید',
+        quantity: 15,
+      },
+      {
+        drug_name: 'دهانشویه کلرهگزیدین ۰.۲٪',
+        dosage: 'محلول دهانشویه',
+        frequency: 'روزی ۲ بار صبح و شب به مدت ۱۰ روز',
+        instructions: 'نیم ساعت بعد از مسواک، ۱۵ سی‌سی به مدت ۱ دقیقه چرخانده و تخلیه شود',
+        quantity: 1,
+      },
+    ],
+  },
 ]

@@ -15,6 +15,7 @@ import { PersianDateInput } from '../components/PersianDateInput'
 import { ModuleHeader, ModuleStatCard, ReorderableStatGrid } from '../components/ModuleHeader'
 import { supabase } from '../lib/supabase'
 import { addMinutes } from '../lib/timeSlots'
+import { tileThemes, getHashColor } from '../lib/colors'
 
 // ============================================================================
 // Constants
@@ -484,24 +485,31 @@ export default function WaitingList() {
                 const priority = e.priority ?? 2
                 const pColor = priorityColors[priority] || 'slate'
                 const pLabel = priorityLabels[priority] || 'متوسط'
+                const colorKey = getHashColor(e.patient_id || e.id)
+                const theme = tileThemes[colorKey]
+
                 return (
-                  <Card key={e.id} className="p-4 rounded-2xl bg-white/90 dark:bg-slate-900/90 backdrop-blur-md border border-slate-200/80 dark:border-slate-800 hover:shadow-lg transition-all duration-200">
-                    <div className="flex items-start justify-between gap-3">
-                      <div className="flex items-center gap-3 min-w-0 flex-1">
-                        <div className="w-11 h-11 rounded-xl bg-amber-100 dark:bg-amber-950/50 flex items-center justify-center text-amber-700 dark:text-amber-300 flex-shrink-0">
-                          <Clock size={20} />
-                        </div>
-                        <div className="min-w-0 flex-1">
-                          <div className="flex items-center gap-2 flex-wrap">
-                            <h3 className="font-bold text-slate-800 dark:text-slate-100 truncate">{patientName(e)}</h3>
-                            <Badge color={pColor}>{pLabel}</Badge>
-                            <Badge color={meta.color}>{meta.label}</Badge>
+                  <div key={e.id} className="relative group/row rounded-2xl overflow-hidden card-shadow dark:card-shadow bg-white dark:bg-slate-800 transition-all duration-300">
+                    <div className={`absolute inset-0 bg-gradient-to-br ${theme.bg} opacity-100 transition-opacity duration-500`} />
+                    <div className={`absolute -right-20 -top-20 w-64 h-64 bg-gradient-to-br ${theme.blob} rounded-full blur-3xl breathe-slow mix-blend-multiply dark:mix-blend-screen pointer-events-none opacity-40 group-hover/row:opacity-70 transition-opacity duration-700`} />
+                    
+                    <div className="relative z-10 p-4">
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="flex items-center gap-3 min-w-0 flex-1">
+                          <div className={`w-11 h-11 rounded-xl ${theme.iconBg} flex items-center justify-center text-white flex-shrink-0 shadow-inner`}>
+                            <Clock size={20} />
                           </div>
-                          <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">پزشک: {doctorName(e)}</p>
-                          {e.reason && <p className="text-sm text-slate-600 dark:text-slate-300 mt-1">{e.reason}</p>}
+                          <div className="min-w-0 flex-1">
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <h3 className="font-bold text-slate-800 dark:text-slate-100 truncate">{patientName(e)}</h3>
+                              <Badge color={pColor}>{pLabel}</Badge>
+                              <Badge color={meta.color}>{meta.label}</Badge>
+                            </div>
+                            <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">پزشک: {doctorName(e)}</p>
+                            {e.reason && <p className="text-sm text-slate-600 dark:text-slate-300 mt-1">{e.reason}</p>}
+                          </div>
                         </div>
                       </div>
-                    </div>
 
                     <div className="flex flex-wrap items-center gap-4 mt-3 pt-3 border-t border-slate-100 dark:border-slate-800/80 text-xs text-slate-500 dark:text-slate-400">
                       {e.preferred_date && (
@@ -600,7 +608,8 @@ export default function WaitingList() {
                         حذف
                       </button>
                     </div>
-                  </Card>
+                    </div>
+                  </div>
                 )
               })}
             </div>

@@ -22,6 +22,7 @@ import { CurrencyInput } from '../components/CurrencyInput'
 import { MultiChairGrid } from '../components/MultiChairGrid'
 import { buildPrintDocument } from '../lib/printDocument'
 import { detectSpecialty, CANCELLATION_REASONS } from '../lib/appointmentColorMap'
+import { tileThemes, getHashColor } from '../lib/colors'
 
 const typeMeta: Record<string, { label: string; color: string; bg: string; dot: string }> = {
   consultation:  { label: 'مشاوره',      color: 'text-primary-700',  bg: 'bg-primary-50',  dot: 'bg-primary-500' },
@@ -483,9 +484,7 @@ export default function Appointments() {
           // Fire-and-forget: SMS failure never blocks the booking itself.
           try {
             const patient = patients.find((p) => p.id === wizardData.patient_id)
-            const doctor  = doctors.find((d) => d.id === wizardData.doctor_id)
             if (patient?.phone) {
-              const doctorLabel = doctor?.name ? `دکتر ${doctor.name}` : 'پزشک'
               const dateLabel   = toJalaliStringPretty(wizardData.date)
               const timeLabel   = formatTime(wizardData.start_time)
               await supabase.functions.invoke('send-sms', {
@@ -493,7 +492,6 @@ export default function Appointments() {
                   type: 'booking_confirmation',
                   to: patient.phone,
                   patientName: `${patient.first_name} ${patient.last_name}`,
-                  doctorName: doctorLabel,
                   date: dateLabel,
                   time: timeLabel,
                 },
@@ -924,19 +922,21 @@ export default function Appointments() {
         </Card>
       ) : (
         <div className="space-y-2.5">
-          {filtered.map((appt) => {
+          {filtered.map((appt, idx) => {
             const tm = getType(appt.type)
             const sm = getStatus(appt.status)
             const spec = detectSpecialty(appt.type || appt.notes || tm.label)
             const isToday = appt.date === todayStr
+            const theme = tileThemes[getHashColor(appt.patient_id || appt.id)]
             return (
               <div
                 key={appt.id}
-                className="appt-card p-3.5 stagger-item"
-                style={{ borderRight: `4px solid ${spec.accentColor}` }}
+                className={`stagger-item relative overflow-hidden p-3.5 rounded-2xl cursor-pointer hover:shadow-md border border-slate-100 dark:border-slate-700 bg-gradient-to-br ${theme.bg} ${theme.ring} focus:outline-none focus:ring-4 transition-all duration-300 group`}
+                style={{ animationDelay: `${Math.min(idx, 15) * 30}ms` }}
                 onClick={() => openWizard(appt)}
               >
-                <div className="flex items-start gap-3">
+                <div className={`absolute -bottom-6 -right-6 w-24 h-24 rounded-full bg-gradient-to-br ${theme.blob} to-transparent blur-xl pointer-events-none breathe-slow opacity-50 group-hover:opacity-80 transition-opacity duration-700`} />
+                <div className="flex items-start gap-3 relative z-10">
                   {/* Time badge */}
                   {isToday && appt.status === 'scheduled' ? (
                     <div className="time-badge">
@@ -1021,7 +1021,7 @@ export default function Appointments() {
 
                 {/* Notes */}
                 {appt.notes && (
-                  <p className="text-[11px] text-slate-400 mt-2 pt-2 border-t border-slate-100 line-clamp-1">{appt.notes}</p>
+                  <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-2 pt-2 border-t border-slate-100/50 dark:border-slate-700/50 line-clamp-1 relative z-10">{appt.notes}</p>
                 )}
               </div>
             )

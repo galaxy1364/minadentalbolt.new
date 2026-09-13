@@ -16,6 +16,7 @@ import { Prescription, PrescriptionWithRelations, Patient, Doctor } from '../typ
 import { Wizard, Card, Button, Input, Select, Textarea, Badge, Spinner, EmptyState, showToast } from '../components/ui'
 import { ModuleHeader, ModuleStatCard, ReorderableStatGrid } from '../components/ModuleHeader'
 import { DENTAL_DRUG_PRESETS, DrugPreset } from '../lib/drugPresets'
+import { toothLabel } from '../lib/toothLabel'
 
 // ============================================================================
 // Constants
@@ -138,7 +139,7 @@ export default function Prescriptions() {
       patient_id: handoff.patientId,
       doctor_id: handoff.doctorId || '',
       medications: '',
-      notes: handoff.toothNumber && handoff.toothNumber !== 'general' ? `مربوط به دندان ${handoff.toothNumber}` : '',
+      notes: handoff.toothNumber && handoff.toothNumber !== 'general' ? `مربوط به دندان ${toothLabel(handoff.toothNumber)}` : '',
     })
     setEditingRx(null)
     setRxWizardStep(1)

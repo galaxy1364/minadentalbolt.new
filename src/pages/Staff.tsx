@@ -16,6 +16,7 @@ import { useConfirmAction } from '../components/ConfirmAction'
 import { h } from '../lib/haptics'
 import { chimes } from '../lib/chimes'
 import { CurrencyInput } from '../components/CurrencyInput'
+import { tileThemes, getHashColor } from '../lib/colors'
 
 /**
  * MOD-FIX-017: برچسب‌ها از `permissions.ts` می‌آیند، نه از یک فهرست دوم.
@@ -688,11 +689,15 @@ export default function Staff() {
             </Card>
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {filteredStaff.map((s) => {
+              {filteredStaff.map((s, idx) => {
                 const meta = getRoleMeta(s.role)
                 const isDoctor = s.is_doctor || s.role === 'doctor'
+                const theme = tileThemes[getHashColor(s.id)]
+                const staggerDelay = Math.min(idx, 15) * 0.05
                 return (
-                  <Card key={s.id} className={`p-5 hover:card-shadow-lg transition-all-smooth ${!s.is_active ? 'opacity-60' : ''}`}>
+                  <Card key={s.id} className={`p-5 relative overflow-hidden transition-all duration-300 stagger-item ${!s.is_active ? 'opacity-60' : ''} bg-gradient-to-br ${theme.bg} ${theme.border}`} style={{ animationDelay: `${staggerDelay}s` }}>
+                    <div className={`absolute -right-16 -top-16 w-32 h-32 rounded-full blur-3xl opacity-20 breathe-slow pointer-events-none ${theme.text}`} />
+                    <div className="relative z-10">
                     <div className="flex items-start gap-3 mb-3">
                       <div className={`w-12 h-12 rounded-full flex items-center justify-center text-base font-bold flex-shrink-0 ${isDoctor ? 'bg-primary-100 text-primary-700' : 'bg-slate-100 text-slate-600'}`}>
                         {isDoctor ? <Stethoscope size={20} /> : toPersianDigits(s.full_name?.charAt(0) || '؟')}
@@ -784,6 +789,7 @@ export default function Staff() {
                           </span>
                         </div>
                       )}
+                    </div>
                     </div>
                   </Card>
                 )

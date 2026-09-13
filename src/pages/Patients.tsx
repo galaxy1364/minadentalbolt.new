@@ -30,20 +30,7 @@ const genderOptions = [{ value: 'male', label: 'آقا' }, { value: 'female', la
 
 function getVipMeta(level: number | null) { return vipLevels.find((v) => v.value === (level ?? 0)) || vipLevels[0] }
 
-const avatarColors = [
-  'from-primary-400 to-primary-600',
-  'from-accent-400 to-accent-600',
-  'from-success-400 to-success-600',
-  'from-warning-400 to-warning-600',
-  'from-secondary-400 to-secondary-600',
-  'from-error-400 to-error-600',
-]
-
-function getAvatarColor(id: string): string {
-  let hash = 0
-  for (let i = 0; i < id.length; i++) hash = id.charCodeAt(i) + ((hash << 5) - hash)
-  return avatarColors[Math.abs(hash) % avatarColors.length]
-}
+import { tileThemes, getHashColor } from '../lib/colors'
 
 function getInitials(p: Patient): string {
   const f = p.first_name?.charAt(0) || ''
@@ -466,17 +453,20 @@ export default function Patients() {
             const fin = patientFinances.get(patient.id) || { balance: 0, paid: 0, totalCost: 0 }
             const hasAllergies = !isNegativeValue(patient.allergies)
             const hasConditions = !isNegativeValue(patient.medical_conditions)
+            const theme = tileThemes[getHashColor(patient.id)]
 
             return (
               <div
                 key={patient.id}
-                className="appt-card p-3.5 cursor-pointer list-stagger-item"
+                className={`stagger-item relative overflow-hidden flex flex-col gap-3 p-3.5 rounded-2xl cursor-pointer hover:shadow-md border border-slate-100 dark:border-slate-700 bg-gradient-to-br ${theme.bg} ${theme.ring} focus:outline-none focus:ring-4 transition-all duration-300 group`}
                 style={{ animationDelay: `${Math.min(idx, 10) * 30}ms` }}
                 onClick={() => { h.tap(); navigate(`/patients/${patient.id}`) }}
               >
-                <div className="flex items-center gap-3">
+                <div className={`absolute -top-6 -right-6 w-24 h-24 rounded-full bg-gradient-to-br ${theme.blob} to-transparent blur-xl pointer-events-none breathe-slow opacity-50 group-hover:opacity-80 transition-opacity duration-700`} />
+                
+                <div className="flex items-center gap-3 relative z-10">
                   {/* Avatar */}
-                  <div className={`w-11 h-11 rounded-2xl overflow-hidden bg-gradient-to-br ${getAvatarColor(patient.id)} flex items-center justify-center text-white font-bold text-sm flex-shrink-0 shadow-ios`}>
+                  <div className={`w-11 h-11 rounded-2xl overflow-hidden ${theme.iconBg} flex items-center justify-center text-white font-bold text-sm flex-shrink-0 shadow-ios`}>
                     {patient.avatar_url ? <img src={patient.avatar_url} alt="" className="w-full h-full object-cover" /> : getInitials(patient)}
                   </div>
 
@@ -580,7 +570,7 @@ export default function Patients() {
 
                 {/* Medical alerts row */}
                 {(hasAllergies || hasConditions || !patient.is_active) && (
-                  <div className="flex items-center gap-1.5 mt-2 pt-2 border-t border-slate-100 flex-wrap">
+                  <div className="flex items-center gap-1.5 pt-2 border-t border-slate-100/50 dark:border-slate-700/50 flex-wrap relative z-10">
                     {hasAllergies && (
                       <span className="status-pill bg-error-50 text-error-600 border border-error-100 flex items-center gap-1">
                         <AlertCircle size={10} className="text-error-500" />

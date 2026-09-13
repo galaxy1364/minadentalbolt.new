@@ -59,7 +59,7 @@ export function PatientAlerts({ patient, balance }: Props) {
 
   return (
     <div
-      className="fixed top-20 left-4 z-40 flex flex-col gap-2 max-w-xs w-[min(20rem,calc(100vw-2rem))]"
+      className="fixed top-20 right-4 z-50 flex flex-col gap-2 max-w-xs w-[min(22rem,calc(100vw-2rem))] animate-fade-in"
       role="alert"
       aria-live="polite"
     >

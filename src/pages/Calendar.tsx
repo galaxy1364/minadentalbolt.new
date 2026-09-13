@@ -13,6 +13,7 @@ import { Card, Spinner, EmptyState, Badge, Button } from '../components/ui'
 import { ModuleHeader } from '../components/ModuleHeader'
 import { h } from '../lib/haptics'
 import { chimes } from '../lib/chimes'
+import { detectSpecialty } from '../lib/appointmentColorMap'
 import type { AppointmentWithRelations, LabOrder, TreatmentPhase, ImplantCaseWithRelations, Patient, Doctor, DoctorSchedule } from '../types'
 
 type CalEvent = {
@@ -70,10 +71,18 @@ export default function CalendarPage() {
     const events: CalEvent[] = []
     for (const a of appointments) {
       if (a.status === 'cancelled') continue
+      const specialty = a.type ? detectSpecialty(a.type).label : ''
+      const unitText = a.unit?.name ? `یونیت ${a.unit.name}` : ''
+      const doctorText = a.doctor?.name ? `دکتر ${a.doctor.name}` : ''
+      const subtitleParts = [`ساعت ${toPersianDigits(a.start_time)}`]
+      if (doctorText) subtitleParts.push(doctorText)
+      if (unitText) subtitleParts.push(unitText)
+      if (specialty) subtitleParts.push(specialty)
+
       events.push({
         id: `appt-${a.id}`, date: a.date, type: 'appointment',
         title: a.patient ? `${a.patient.first_name} ${a.patient.last_name}` : 'نوبت',
-        subtitle: `ساعت ${toPersianDigits(a.start_time)}`, status: a.status, patientId: a.patient_id,
+        subtitle: subtitleParts.join(' — '), status: a.status, patientId: a.patient_id,
         doctorColorHex: a.doctor?.color || undefined,
       })
     }

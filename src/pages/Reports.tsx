@@ -5,12 +5,15 @@ import { TrendingUp, Users, Activity, Calendar, DollarSign, BarChart3, PieChart 
 import { AreaChart, Area, BarChart, Bar, LineChart, Line, PieChart, Pie, Cell, XAxis, YAxis, Tooltip as RTooltip, ResponsiveContainer, Legend } from 'recharts'
 import { fetchPayments, fetchPatients, fetchEncounters, fetchTreatments, fetchProcedures, fetchAppointments, fetchExpenses, fetchImplantCases } from '../lib/api'
 import { calcAllPatientBalances } from '../lib/finance'
-import { toJalaliString, toJalaliStringPretty, getJalaliMonthYear, formatCurrency, formatNumber, toPersianDigits, persianMonths, jsDateToPersianWeekday } from '../lib/persianDate'
+import { toothCode } from '../lib/toothLabel'
+import { toJalaliString, toJalaliStringPretty, getJalaliMonthYear, formatCurrency, formatNumber, toPersianDigits, persianMonths, jsDateToPersianWeekday, toJalaliDisplay } from '../lib/persianDate'
 import { h } from '../lib/haptics'
 import { chimes } from '../lib/chimes'
 import { Payment, Patient, Encounter, Treatment, Procedure, Appointment, Expense } from '../types'
 import { Card, Button, Badge, Spinner, EmptyState, Tabs, showToast } from '../components/ui'
 import { ModuleHeader, ModuleStatCard, ReorderableStatGrid } from '../components/ModuleHeader'
+import { PatientDebtBar } from '../components/PatientDebtBar'
+import { tileThemes, getHashColor } from '../lib/colors'
 
 // ============================================================================
 // Constants
@@ -421,7 +424,7 @@ export default function Reports() {
                   category: t.procedure_category ? (procedureCategoryLabels[t.procedure_category] || t.procedure_category) : 'سایر',
                   status: t.status || '',
                   price: t.total_price || 0,
-                  tooth: t.tooth_number || '',
+                  tooth: t.tooth_number ? toothCode(t.tooth_number) : '',
                 }))
                 exportToCSV(data, 'گزارش-درمان‌ها', [
                   { key: 'procedure', label: 'رویه' },
@@ -542,20 +545,25 @@ export default function Reports() {
             <EmptyState icon={<AlertTriangle size={40} />} title="بدهی معوقی نیست" description="همه‌ی بیماران تسویه‌حساب دارند" />
           ) : (
             <div className="space-y-2">
-              {agingData.rows.map((r) => (
-                <Card key={r.patientId} className="p-3.5">
-                  <div className="flex items-center justify-between gap-2 cursor-pointer" onClick={() => navigate(`/patients/${r.patientId}`)}>
+              {agingData.rows.map((r, idx) => {
+                const theme = tileThemes[getHashColor(r.patientId)]
+                const staggerDelay = Math.min(idx, 15) * 0.05
+                return (
+                <Card key={r.patientId} className={`p-3.5 relative overflow-hidden transition-all duration-300 stagger-item bg-gradient-to-br ${theme.bg} ${theme.border}`} style={{ animationDelay: `${staggerDelay}s` }}>
+                  <div className={`absolute -right-16 -top-16 w-32 h-32 rounded-full blur-3xl opacity-20 breathe-slow pointer-events-none ${theme.text}`} />
+                  <div className="relative z-10 flex items-center justify-between gap-2 cursor-pointer" onClick={() => navigate(`/patients/${r.patientId}`)}>
                   <div>
                     <p className="text-sm font-bold text-slate-800">{r.name}</p>
                     <p className="text-[11px] text-slate-400">{toPersianDigits(r.days)} روز از آخرین فعالیت</p>
                   </div>
-                  <div className="text-left">
-                    <p className="text-sm font-extrabold text-error-600">{formatCurrency(r.balance)} ت</p>
+                  <div className="text-left flex flex-col items-end gap-1">
+                    <PatientDebtBar patientId={r.patientId} balance={{ balance: r.balance, paid: 0, totalCost: 0 }} variant="compact" />
                     <Badge color={r.bucket === '90+' ? 'error' : r.bucket === '61-90' ? 'warning' : 'slate'}>{r.bucket === '0-30' ? 'جدید' : r.bucket === '90+' ? 'بحرانی' : 'پیگیری'}</Badge>
                   </div>
                   </div>
                 </Card>
-              ))}
+                )
+              })}
             </div>
           )}
         </div>

@@ -42,6 +42,7 @@ import {
   REMINDER_CATEGORY_META, type SmartReminder, type ReminderCategory,
 } from '../lib/smartReminders'
 import { calcAllPatientBalances } from '../lib/finance'
+import { readyForDelivery } from '../lib/labShelf'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../lib/auth'
 import DoctorDashboard from './DoctorDashboard'
@@ -50,6 +51,7 @@ import { h } from '../lib/haptics'
 import { chimes } from '../lib/chimes'
 import { staggerDelay } from '../lib/motion'
 import { usePullToRefresh } from '../lib/usePullToRefresh'
+import { tileThemes, getHashColor, type TileColor } from '../lib/colors'
 
 // ============================================================================
 // Types & Constants
@@ -184,21 +186,6 @@ function Sparkline({ data, color, width = 64, height = 24 }: { data: number[]; c
 // Premium Stat Tile
 // ============================================================================
 
-// Soft "white-to-color" tiles (Gemini-style wash) — light-tinted base +
-// saturated color blob in the corner + colored icon. Shared by StatTile
-// and QuickAction so the whole dashboard reads as one coherent palette:
-// violet, lime ("کله‌غازی"), sky blue, pink, amber, rose.
-type TileColor = 'violet' | 'lime' | 'sky' | 'pink' | 'amber' | 'rose'
-
-const tileThemes: Record<TileColor, { bg: string; blob: string; iconBg: string; gradient: [string, string]; solidColor: string; text: string; sparkColor: string; ring: string }> = {
-  violet: { bg: 'from-white to-violet-100 dark:from-slate-800 dark:to-violet-950/50', blob: 'from-violet-400/60 dark:from-violet-500/40', iconBg: 'bg-gradient-to-br from-violet-500 to-purple-600', gradient: ['#a78bfa', '#9333ea'], solidColor: '#8b5cf6', text: 'text-violet-700 dark:text-violet-300', sparkColor: '#8b5cf6', ring: 'focus:ring-violet-300' },
-  lime:   { bg: 'from-white to-lime-100 dark:from-slate-800 dark:to-lime-950/40',     blob: 'from-lime-400/60 dark:from-lime-500/35',     iconBg: 'bg-gradient-to-br from-lime-500 to-green-600',   gradient: ['#a3e635', '#16a34a'], solidColor: '#84cc16', text: 'text-lime-700 dark:text-lime-300',   sparkColor: '#84cc16', ring: 'focus:ring-lime-300' },
-  sky:    { bg: 'from-white to-sky-100 dark:from-slate-800 dark:to-sky-950/50',       blob: 'from-sky-400/60 dark:from-sky-500/40',       iconBg: 'bg-gradient-to-br from-sky-500 to-blue-600',     gradient: ['#38bdf8', '#2563eb'], solidColor: '#0ea5e9', text: 'text-sky-700 dark:text-sky-300',     sparkColor: '#0ea5e9', ring: 'focus:ring-sky-300' },
-  pink:   { bg: 'from-white to-pink-100 dark:from-slate-800 dark:to-pink-950/50',     blob: 'from-pink-400/60 dark:from-pink-500/40',     iconBg: 'bg-gradient-to-br from-pink-500 to-fuchsia-600', gradient: ['#f472b6', '#c026d3'], solidColor: '#ec4899', text: 'text-pink-700 dark:text-pink-300',   sparkColor: '#ec4899', ring: 'focus:ring-pink-300' },
-  amber:  { bg: 'from-white to-amber-100 dark:from-slate-800 dark:to-amber-950/50',   blob: 'from-amber-400/60 dark:from-amber-500/40',   iconBg: 'bg-gradient-to-br from-amber-500 to-orange-600', gradient: ['#fbbf24', '#ea580c'], solidColor: '#f59e0b', text: 'text-amber-700 dark:text-amber-300', sparkColor: '#f59e0b', ring: 'focus:ring-amber-300' },
-  rose:   { bg: 'from-white to-rose-100 dark:from-slate-800 dark:to-rose-950/50',     blob: 'from-rose-400/60 dark:from-rose-500/40',     iconBg: 'bg-gradient-to-br from-rose-500 to-red-600',     gradient: ['#fb7185', '#dc2626'], solidColor: '#f43f5e', text: 'text-rose-700 dark:text-rose-300',   sparkColor: '#f43f5e', ring: 'focus:ring-rose-300' },
-}
-
 function StatTile({
   icon, label, value, suffix, color, sparkData, trend, delay, onClick, ariaLabel, goal, narrative,
 }: {
@@ -309,6 +296,12 @@ function AlertWidget({ icon, label, value, color, onClick, delay }: { icon: Reac
 }
 
 // ============================================================================
+// Dynamic Color Helper
+// ============================================================================
+
+// ============================================================================
+
+// ============================================================================
 // Today Appointment Row
 // ============================================================================
 
@@ -321,9 +314,11 @@ function AppointmentRow({ apt, index, patientName, doctorName, onClick }: {
 }) {
   const statusColor = appointmentStatusColors[apt.status] || 'slate'
   const statusLabel = appointmentStatusLabels[apt.status] || apt.status
-  const isCompleted = apt.status === 'completed'
   const isCancelled = apt.status === 'cancelled' || apt.status === 'no_show'
   const isInChair = apt.status === 'in_chair'
+
+  const pName = patientName(apt)
+  const theme = tileThemes[getHashColor(pName + apt.id)]
 
   return (
     <div
@@ -331,24 +326,22 @@ function AppointmentRow({ apt, index, patientName, doctorName, onClick }: {
       role="button"
       tabIndex={0}
       onKeyDown={(e) => { if (e.key === 'Enter') { h.tap(); onClick() } }}
-      aria-label={`نوبت ${patientName(apt)} ساعت ${formatTime(apt.start_time)}`}
-      // Was `index * 60` — linear stagger meant a long appointment list
-      // took proportionally longer to finish appearing (30 items = 1.8s
-      // before the last one showed). staggerDelay() falls off
-      // sub-linearly so the list stays responsive at any length, and
-      // unlike the inline math it's unit-tested.
+      aria-label={`نوبت ${pName} ساعت ${formatTime(apt.start_time)}`}
       style={{ animationDelay: `${staggerDelay(index)}ms` }}
-      className={`stagger-item flex items-center gap-3 p-3 rounded-2xl transition-all-smooth cursor-pointer hover:shadow-md border border-slate-100 dark:border-slate-700 hover:border-primary-200 dark:hover:border-primary-700 hover:bg-primary-50/30 dark:hover:bg-slate-700/50 ${isInChair ? 'bg-warning-50 dark:bg-warning-900/20 border-warning-200 dark:border-warning-700' : isCompleted ? 'bg-success-50/50 dark:bg-success-900/10 border-success-100 dark:border-success-800' : isCancelled ? 'bg-error-50/30 dark:bg-error-900/10 border-error-100 dark:border-error-800 opacity-70' : 'bg-white dark:bg-slate-800'}`}
+      className={`stagger-item relative overflow-hidden flex items-center gap-3 p-3 rounded-2xl transition-all-smooth cursor-pointer hover:shadow-md border border-slate-100 dark:border-slate-700 bg-gradient-to-br ${theme.bg} ${theme.ring} focus:outline-none focus:ring-4 ${isCancelled ? 'opacity-50 grayscale' : ''}`}
     >
-      <div className="flex flex-col items-center justify-center w-14 h-14 rounded-xl bg-gradient-to-br from-slate-700 to-slate-900 text-white flex-shrink-0">
+      <div className={`absolute -top-6 -left-6 w-24 h-24 rounded-full bg-gradient-to-br ${theme.blob} to-transparent blur-xl pointer-events-none breathe-slow`} />
+      <div className={`flex flex-col items-center justify-center w-14 h-14 rounded-xl ${theme.iconBg} text-white flex-shrink-0 shadow-sm relative z-10`}>
         <span className="text-xs font-bold">{formatTime(apt.start_time)}</span>
-        {isInChair && <Timer size={12} className="text-warning-300 mt-0.5" />}
+        {isInChair && <Timer size={12} className="text-white mt-0.5 animate-pulse" />}
       </div>
-      <div className="min-w-0 flex-1">
-        <p className="text-sm font-bold text-slate-800 dark:text-slate-100 truncate">{patientName(apt)}</p>
+      <div className="min-w-0 flex-1 relative z-10">
+        <p className="text-sm font-bold text-slate-800 dark:text-slate-100 truncate">{pName}</p>
         <p className="text-xs text-slate-500 dark:text-slate-400 truncate">{doctorName(apt)}</p>
       </div>
-      <Badge color={statusColor}>{statusLabel}</Badge>
+      <div className="relative z-10">
+        <Badge color={statusColor}>{statusLabel}</Badge>
+      </div>
     </div>
   )
 }
@@ -359,8 +352,7 @@ function AppointmentRow({ apt, index, patientName, doctorName, onClick }: {
 
 function PatientRow({ patient, index, onClick }: { patient: Patient; index: number; onClick: () => void }) {
   const initials = toPersianDigits(patient.first_name?.charAt(0) || '؟')
-  const avatarColors = ['from-teal-400 to-cyan-500', 'from-amber-400 to-orange-500', 'from-emerald-400 to-green-500', 'from-sky-400 to-blue-500', 'from-rose-400 to-red-500']
-  const colorIdx = (patient.first_name?.charCodeAt(0) || 0) % avatarColors.length
+  const theme = tileThemes[getHashColor(patient.id)]
   return (
     <div
       onClick={() => { h.tap(); onClick() }}
@@ -369,17 +361,18 @@ function PatientRow({ patient, index, onClick }: { patient: Patient; index: numb
       onKeyDown={(e) => { if (e.key === 'Enter') { h.tap(); onClick() } }}
       aria-label={`بیمار ${patient.first_name} ${patient.last_name}`}
       style={{ animationDelay: `${index * 50}ms` }}
-      className="stagger-item flex items-center gap-3 p-2.5 rounded-xl hover:bg-slate-50 dark:hover:bg-slate-700/50 transition-all-smooth cursor-pointer"
+      className={`stagger-item relative overflow-hidden flex items-center gap-3 p-2.5 rounded-xl transition-all-smooth cursor-pointer hover:shadow-md border border-slate-100 dark:border-slate-700 bg-gradient-to-br ${theme.bg} ${theme.ring} focus:outline-none focus:ring-4`}
     >
-      <div className={`w-10 h-10 rounded-full bg-gradient-to-br ${avatarColors[colorIdx]} flex items-center justify-center text-white text-sm font-bold flex-shrink-0 shadow-sm`}>
+      <div className={`absolute -bottom-6 -right-6 w-20 h-20 rounded-full bg-gradient-to-br ${theme.blob} to-transparent blur-xl pointer-events-none breathe-slow`} />
+      <div className={`w-10 h-10 rounded-full ${theme.iconBg} flex items-center justify-center text-white text-sm font-bold flex-shrink-0 shadow-sm relative z-10`}>
         {initials}
       </div>
-      <div className="min-w-0 flex-1">
+      <div className="min-w-0 flex-1 relative z-10">
         <p className="text-sm font-medium text-slate-800 dark:text-slate-100 truncate">{patient.first_name} {patient.last_name}</p>
         <p className="text-xs text-slate-500 dark:text-slate-400">{patient.phone ? toPersianDigits(patient.phone) : 'بدون تلفن'}</p>
       </div>
       {patient.vip_level && patient.vip_level > 0 && (
-        <span className="flex items-center gap-0.5 text-xs font-bold text-amber-600 bg-amber-100 dark:bg-amber-900/30 dark:text-amber-400 rounded-full px-2 py-0.5">
+        <span className="relative z-10 flex items-center gap-0.5 text-xs font-bold text-amber-600 bg-amber-100/80 dark:bg-amber-900/40 dark:text-amber-400 rounded-full px-2 py-0.5">
           <Sparkles size={10} /> VIP
         </span>
       )}
@@ -424,8 +417,20 @@ type ActivityItem = {
   created_at: string
 }
 
+const activityThemeColor: Record<string, TileColor> = {
+  patient_created: 'sky',
+  appointment_scheduled: 'violet',
+  payment_received: 'lime',
+  treatment_completed: 'pink',
+  prescription_created: 'amber',
+  lab_order_created: 'rose',
+}
+
 function ActivityRow({ item, index, onClick }: { item: ActivityItem; index: number; onClick: () => void }) {
   const config = activityIcons[item.event_type] || activityIcons.default
+  const colorKey = activityThemeColor[item.event_type] || getHashColor(item.id)
+  const theme = tileThemes[colorKey]
+
   return (
     <div
       onClick={() => { h.tap(); onClick() }}
@@ -433,19 +438,21 @@ function ActivityRow({ item, index, onClick }: { item: ActivityItem; index: numb
       tabIndex={0}
       onKeyDown={(e) => { if (e.key === 'Enter') { h.tap(); onClick() } }}
       style={{ animationDelay: `${index * 40}ms` }}
-      className="stagger-item flex items-start gap-3 p-3 rounded-xl hover:bg-slate-50 dark:hover:bg-slate-700/40 cursor-pointer transition-all-smooth"
+      className={`stagger-item relative overflow-hidden flex items-start gap-3 p-3 rounded-xl cursor-pointer transition-all duration-300 hover:shadow-md border border-slate-100 dark:border-slate-700 bg-gradient-to-br ${theme.bg} ${theme.ring} focus:outline-none focus:ring-4 group`}
     >
-      <div className={`w-8 h-8 rounded-lg ${config.color} flex items-center justify-center flex-shrink-0`}>
+      <div className={`absolute -bottom-6 -right-6 w-20 h-20 rounded-full bg-gradient-to-br ${theme.blob} to-transparent blur-xl pointer-events-none breathe-slow opacity-40 group-hover:opacity-70 transition-opacity duration-700`} />
+      
+      <div className={`w-8 h-8 rounded-lg ${theme.iconBg} flex items-center justify-center flex-shrink-0 text-white shadow-inner relative z-10`}>
         {config.icon}
       </div>
-      <div className="min-w-0 flex-1">
-        <p className="text-sm font-medium text-slate-800 dark:text-slate-100 truncate">{item.title || item.event_type}</p>
-        <p className="text-xs text-slate-500 dark:text-slate-400 truncate">
-          {item.patient_name && <span className="font-medium">{item.patient_name} — </span>}
+      <div className="min-w-0 flex-1 relative z-10">
+        <p className="text-sm font-bold text-slate-800 dark:text-slate-100 truncate">{item.title || item.event_type}</p>
+        <p className="text-xs text-slate-600 dark:text-slate-300 truncate mt-0.5">
+          {item.patient_name && <span className="font-extrabold">{item.patient_name} — </span>}
           {item.description}
         </p>
       </div>
-      <span className="text-xs text-slate-400 dark:text-slate-500 flex-shrink-0">
+      <span className="text-[10px] font-medium text-slate-500 dark:text-slate-400 flex-shrink-0 relative z-10 mt-1">
         {toJalaliStringPretty(item.event_date || item.created_at || new Date().toISOString())}
       </span>
     </div>
@@ -513,7 +520,9 @@ export default function Dashboard() {
   const [activity, setActivity] = useState<ActivityItem[]>([])
   const [outstandingBalance, setOutstandingBalance] = useState(0)
   const [lowInventoryCount, setLowInventoryCount] = useState(0)
+  const [expiredInventoryCount, setExpiredInventoryCount] = useState(0)
   const [overdueLabCount, setOverdueLabCount] = useState(0)
+  const [readyLabCount, setReadyLabCount] = useState(0)
   const [waitingListCount, setWaitingListCount] = useState(0)
   const [loading, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
@@ -572,7 +581,9 @@ export default function Dashboard() {
       setOutstandingBalance(totalOutstanding)
       setLowInventoryCount(items.filter((i: any) => (i.quantity ?? 0) <= (i.min_quantity ?? 0) && i.is_active !== false).length)
       const today = new Date().toISOString().slice(0, 10)
+      setExpiredInventoryCount(items.filter((i: any) => i.expiry_date && i.expiry_date < today && i.is_active !== false).length)
       setOverdueLabCount(labOrders.filter((o: any) => o.status !== 'delivered' && o.status !== 'cancelled' && o.deadline && o.deadline < today).length)
+      setReadyLabCount(readyForDelivery(labOrders as LabOrder[]).length)
       setWaitingListCount(waiting.filter((w: any) => w.status === 'waiting').length)
       setLastRefresh(new Date())
     } catch (err) {
@@ -886,7 +897,9 @@ export default function Dashboard() {
     smartReminders.unfinished_treatment.length +
     smartReminders.unresolved_appointment.length +
     lowInventoryCount +
+    expiredInventoryCount +
     overdueLabCount +
+    readyLabCount +
     waitingListCount
 
   // ── Real Sparkline Data ────────────────────────────────────────
@@ -1333,7 +1346,9 @@ export default function Dashboard() {
       {/* ═══ Alert Widgets ══════════════════════════════════════════ */}
       {(outstandingBalance > 0 ||
         lowInventoryCount > 0 ||
+        expiredInventoryCount > 0 ||
         overdueLabCount > 0 ||
+        readyLabCount > 0 ||
         waitingListCount > 0 ||
         smartReminders.cheque_due.length > 0 ||
         smartReminders.installment_due.length > 0 ||
@@ -1389,6 +1404,16 @@ export default function Dashboard() {
               delay={600}
             />
           )}
+          {expiredInventoryCount > 0 && (
+            <AlertWidget
+              icon={<div className="w-full h-full rounded-xl bg-rose-100 dark:bg-rose-900/40 flex items-center justify-center text-rose-600 dark:text-rose-400"><Clock size={20} /></div>}
+              label="کالای تاریخ‌گذشته"
+              value={`${toPersianDigits(expiredInventoryCount)} مورد`}
+              color="border-rose-200 dark:border-rose-700 bg-rose-50 dark:bg-rose-900/20 text-rose-800 dark:text-rose-300"
+              onClick={() => navigate('/inventory')}
+              delay={620}
+            />
+          )}
           {overdueLabCount > 0 && (
             <AlertWidget
               icon={<div className="w-full h-full rounded-xl bg-error-100 dark:bg-error-900/40 flex items-center justify-center text-error-600 dark:text-error-400"><AlertTriangle size={20} /></div>}
@@ -1397,6 +1422,16 @@ export default function Dashboard() {
               color="border-error-200 dark:border-error-700 bg-error-50 dark:bg-error-900/20 text-error-800 dark:text-error-300"
               onClick={() => navigate('/laboratory')}
               delay={640}
+            />
+          )}
+          {readyLabCount > 0 && (
+            <AlertWidget
+              icon={<div className="w-full h-full rounded-xl bg-emerald-100 dark:bg-emerald-900/40 flex items-center justify-center text-emerald-600 dark:text-emerald-400"><FlaskConical size={20} /></div>}
+              label="لابراتوار آماده تحویل"
+              value={`${toPersianDigits(readyLabCount)} مورد`}
+              color="border-emerald-200 dark:border-emerald-700 bg-emerald-50 dark:bg-emerald-900/20 text-emerald-800 dark:text-emerald-300"
+              onClick={() => navigate('/laboratory')}
+              delay={660}
             />
           )}
           {waitingListCount > 0 && (
@@ -1415,8 +1450,9 @@ export default function Dashboard() {
       {/* ═══ Main Grid: Appointments + Side Panel ═══════════════════ */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Today's Appointments */}
-        <Card className="p-5 lg:col-span-2 tile-in">
-          <div className="flex items-center justify-between mb-4">
+        <Card className="p-5 lg:col-span-2 tile-in relative overflow-hidden bg-gradient-to-br from-white to-slate-50/50 dark:from-slate-800 dark:to-slate-800/80">
+          <div className="absolute -top-24 -left-24 w-64 h-64 rounded-full bg-gradient-to-br from-primary-400/20 to-transparent blur-3xl pointer-events-none breathe-slow" />
+          <div className="relative z-10 flex items-center justify-between mb-4">
             <h2 className="text-base font-bold text-slate-800 dark:text-slate-100 flex items-center gap-2">
               <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-primary-400 to-primary-600 flex items-center justify-center text-white">
                 <Calendar size={16} />
@@ -1471,8 +1507,10 @@ export default function Dashboard() {
 
         {/* Side Panel: Occupancy + Revenue Snapshot */}
         <div className="space-y-6">
-          <Card className="p-4 tile-in">
-            <h3 className="text-sm font-bold text-slate-800 dark:text-slate-100 flex items-center gap-2 mb-4">
+          <Card className="p-4 tile-in relative overflow-hidden bg-gradient-to-br from-white to-amber-50/30 dark:from-slate-800 dark:to-amber-950/20">
+            <div className="absolute -bottom-16 -right-16 w-48 h-48 rounded-full bg-gradient-to-br from-amber-400/20 to-transparent blur-3xl pointer-events-none breathe-slow" style={{ animationDelay: '1s' }} />
+            <div className="relative z-10">
+              <h3 className="text-sm font-bold text-slate-800 dark:text-slate-100 flex items-center gap-2 mb-4">
               <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-amber-400 to-orange-500 flex items-center justify-center text-white">
                 <Zap size={14} />
               </div>
@@ -1488,12 +1526,15 @@ export default function Dashboard() {
                 <p className="text-xs text-slate-500 dark:text-slate-400">تکمیل شده</p>
                 <p className="text-sm font-bold text-success-600 dark:text-success-400">{toPersianDigits(todayAppointments.filter((a) => a.status === 'completed').length)}</p>
               </div>
+              </div>
             </div>
           </Card>
 
           {/* Revenue Snapshot with Comparison */}
-          <Card className="p-4 tile-in">
-            <h3 className="text-sm font-bold text-slate-800 dark:text-slate-100 flex items-center gap-2 mb-3">
+          <Card className="p-4 tile-in relative overflow-hidden bg-gradient-to-br from-white to-emerald-50/30 dark:from-slate-800 dark:to-emerald-950/20">
+            <div className="absolute -top-12 -left-12 w-40 h-40 rounded-full bg-gradient-to-br from-emerald-400/20 to-transparent blur-3xl pointer-events-none breathe-slow" style={{ animationDelay: '2s' }} />
+            <div className="relative z-10">
+              <h3 className="text-sm font-bold text-slate-800 dark:text-slate-100 flex items-center gap-2 mb-3">
               <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-emerald-400 to-green-600 flex items-center justify-center text-white">
                 <DollarSign size={14} />
               </div>
@@ -1512,6 +1553,7 @@ export default function Dashboard() {
                 </span>
               </div>
             )}
+            </div>
           </Card>
         </div>
       </div>
@@ -1519,8 +1561,9 @@ export default function Dashboard() {
       {/* ═══ Charts: Revenue + Status Distribution ══════════════════ */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Revenue Chart */}
-        <Card className="p-5 tile-in lg:col-span-2">
-          <div className="flex items-center justify-between mb-4">
+        <Card className="p-5 tile-in lg:col-span-2 relative overflow-hidden bg-gradient-to-br from-white to-sky-50/30 dark:from-slate-800 dark:to-sky-950/20">
+          <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[120%] h-[120%] rounded-full bg-gradient-to-br from-emerald-400/10 via-sky-400/10 to-transparent blur-3xl pointer-events-none breathe-slow" style={{ animationDelay: '0.5s' }} />
+          <div className="relative z-10 flex items-center justify-between mb-4">
             <h2 className="text-base font-bold text-slate-800 dark:text-slate-100 flex items-center gap-2">
               <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-emerald-400 to-green-600 flex items-center justify-center text-white">
                 <TrendingUp size={16} />
@@ -1583,8 +1626,10 @@ export default function Dashboard() {
         </Card>
 
         {/* Status Distribution Bar Chart */}
-        <Card className="p-4 tile-in">
-          <h3 className="text-sm font-bold text-slate-800 dark:text-slate-100 flex items-center gap-2 mb-4">
+        <Card className="p-4 tile-in relative overflow-hidden bg-gradient-to-br from-white to-blue-50/30 dark:from-slate-800 dark:to-blue-950/20">
+          <div className="absolute -bottom-24 -left-24 w-64 h-64 rounded-full bg-gradient-to-br from-sky-400/20 to-transparent blur-3xl pointer-events-none breathe-slow" style={{ animationDelay: '1.5s' }} />
+          <div className="relative z-10">
+            <h3 className="text-sm font-bold text-slate-800 dark:text-slate-100 flex items-center gap-2 mb-4">
             <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-sky-400 to-blue-600 flex items-center justify-center text-white">
               <Activity size={14} />
             </div>
@@ -1613,6 +1658,7 @@ export default function Dashboard() {
               </BarChart>
             </ResponsiveContainer>
           )}
+          </div>
         </Card>
       </div>
 
@@ -2003,6 +2049,13 @@ export default function Dashboard() {
                 <Package size={18} className="text-orange-600 dark:text-orange-400" />
                 <span className="flex-1 text-sm font-semibold text-orange-700 dark:text-orange-300">موجودی رو به اتمام</span>
                 <Badge color="warning">{toPersianDigits(lowInventoryCount)}</Badge>
+              </button>
+            )}
+            {expiredInventoryCount > 0 && (
+              <button onClick={() => { setNotifCenterOpen(false); navigate('/inventory') }} className="w-full flex items-center gap-3 p-3 rounded-xl bg-rose-50 dark:bg-rose-900/20 text-right hover:bg-rose-100 dark:hover:bg-rose-900/40 transition-all-smooth">
+                <Clock size={18} className="text-rose-600 dark:text-rose-400" />
+                <span className="flex-1 text-sm font-semibold text-rose-700 dark:text-rose-300">کالاهای تاریخ‌گذشته</span>
+                <Badge color="error">{toPersianDigits(expiredInventoryCount)}</Badge>
               </button>
             )}
             {overdueLabCount > 0 && (

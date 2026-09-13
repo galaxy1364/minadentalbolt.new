@@ -5,7 +5,7 @@ import {
   Settings as SettingsIcon, Building2, Hash, MessageSquare, Package, Save, Smile,
   Cloud, Download, Upload, Vibrate, Volume2, Bell, Database, RefreshCw, Check,
   Smartphone, Shield, AlertTriangle, Eye, ChevronRight, Wifi, Plus, Edit2, Trash2, Archive, Delete,
-  Stethoscope, Wrench, ListOrdered, Tag, Copy, CheckCircle2, History, CloudOff, Sparkles, Megaphone, Fingerprint, Share2,
+  Stethoscope, Wrench, ListOrdered, Tag, Copy, CheckCircle2, History, CloudOff, Sparkles, Megaphone, Fingerprint, Share2, CreditCard
 } from 'lucide-react'
 import { isAppLockEnabled, setAppLockPin, disableAppLock, isBiometricAvailable, registerBiometric, hasBiometricRegistered } from '../lib/appLock'
 import { MATERIAL_LEVELS, getMaterialLevel, setMaterialLevel, prefersReducedTransparency, type MaterialLevel } from '../lib/materials'
@@ -31,6 +31,7 @@ import {
   RolePermission, CustomRole,
 } from '../types'
 import { Card, Button, Input, Select, Textarea, Badge, Spinner, EmptyState, StatCard, Tabs, Modal, showToast } from '../components/ui'
+import { tileThemes, getHashColor } from '../lib/colors'
 import { useConfirmAction } from '../components/ConfirmAction'
 import { h, setHapticsEnabled, setSoundEnabled, getHapticsEnabled, getSoundEnabled } from '../lib/haptics'
 import { chimes } from '../lib/chimes'
@@ -97,6 +98,7 @@ export default function Settings() {
 
   const [generalForm, setGeneralForm] = useState({ clinic_name: 'کلینیک دندانپزشکی مینادنت', address: '', phone: '', email: '' })
   const [fileNumberForm, setFileNumberForm] = useState({ prefix: 'MIN', next_number: '1001', format: 'PREFIX-NUMBER' })
+  const [posForm, setPosForm] = useState({ ip: '192.168.1.100', port: '8080', enabled: false })
 
   const [hapticsOn, setHapticsOn] = useState(getHapticsEnabled())
   const [soundOn, setSoundOn] = useState(getSoundEnabled())
@@ -193,6 +195,12 @@ export default function Settings() {
     try { localStorage.setItem('minadent_fileNumber', JSON.stringify(fileNumberForm)) } catch {}
     showToast('success', 'تنظیمات شماره پرونده ذخیره شد')
   }
+  const handleSavePos = () => {
+    h.confirm()
+    chimes.playSuccess()
+    try { localStorage.setItem('minadent_pos', JSON.stringify(posForm)) } catch {}
+    showToast('success', 'تنظیمات دستگاه کارتخوان ذخیره شد')
+  }
 
   useEffect(() => {
     try {
@@ -200,6 +208,8 @@ export default function Settings() {
       if (g) setGeneralForm(JSON.parse(g))
       const f = localStorage.getItem('minadent_fileNumber')
       if (f) setFileNumberForm(JSON.parse(f))
+      const p = localStorage.getItem('minadent_pos')
+      if (p) setPosForm(JSON.parse(p))
     } catch {}
   }, [])
 
@@ -462,15 +472,21 @@ export default function Settings() {
           <Card className="p-5"><EmptyState icon={emptyIcon} title={emptyTitle} action={<Button size="sm" onClick={onCreate}><Plus size={16} /> افزودن</Button>} /></Card>
         ) : (
           <div className="space-y-2">
-            {items.map((item) => (
-              <Card key={item.id} className="p-3.5 flex items-center justify-between hover:card-shadow transition-all-smooth">
-                <div className="flex-1 min-w-0">{renderItem(item)}</div>
-                <div className="flex gap-1 flex-shrink-0">
-                  <button onClick={() => onEdit(item)} className="p-1.5 rounded-lg text-slate-400 hover:text-primary-600 hover:bg-primary-50 transition-colors"><Edit2 size={15} /></button>
-                  <button onClick={() => onDelete(item)} aria-label="غیرفعال کردن" title="غیرفعال کردن" className="p-1.5 rounded-lg text-slate-400 hover:text-error-600 hover:bg-error-50 transition-colors"><Archive size={15} /></button>
+            {items.map((item, idx) => {
+              const theme = tileThemes[getHashColor(item.id)]
+              const staggerDelay = Math.min(idx, 15) * 0.05
+              return (
+              <Card key={item.id} className={`p-3.5 relative overflow-hidden transition-all duration-300 stagger-item bg-gradient-to-br ${theme.bg} ${theme.border}`} style={{ animationDelay: `${staggerDelay}s` }}>
+                <div className={`absolute -right-16 -top-16 w-32 h-32 rounded-full blur-3xl opacity-20 breathe-slow pointer-events-none ${theme.text}`} />
+                <div className="relative z-10 flex items-center justify-between w-full">
+                  <div className="flex-1 min-w-0">{renderItem(item)}</div>
+                  <div className="flex gap-1 flex-shrink-0">
+                    <button onClick={() => onEdit(item)} className="p-1.5 rounded-lg text-slate-400 hover:text-primary-600 hover:bg-primary-50 transition-colors"><Edit2 size={15} /></button>
+                    <button onClick={() => onDelete(item)} aria-label="غیرفعال کردن" title="غیرفعال کردن" className="p-1.5 rounded-lg text-slate-400 hover:text-error-600 hover:bg-error-50 transition-colors"><Archive size={15} /></button>
+                  </div>
                 </div>
               </Card>
-            ))}
+            )})}
           </div>
         )}
       </div>
@@ -515,6 +531,7 @@ export default function Settings() {
           { key: 'haptics', label: 'لرزش و صدا', icon: <Vibrate size={16} /> },
           { key: 'app_lock', label: 'قفل امنیتی', icon: <Fingerprint size={16} /> },
           { key: 'file_number', label: 'شماره پرونده', icon: <Hash size={16} /> },
+          { key: 'pos', label: 'کارتخوان (PC-POS)', icon: <CreditCard size={16} /> },
           { key: 'packages', label: 'پکیج درمان', icon: <Package size={16} /> },
           { key: 'categories', label: 'دسته‌بندی انبار', icon: <Tag size={16} /> },
           { key: 'errors', label: 'گزارش خطاها', icon: <AlertTriangle size={16} /> },
@@ -817,6 +834,28 @@ export default function Settings() {
             <div className="bg-gradient-to-br from-primary-50 to-accent-50 rounded-2xl p-8 flex flex-col items-center justify-center min-h-[160px]">
               <p className="text-xs text-slate-500 mb-2">نمونه شماره پرونده</p>
               <p className="text-3xl font-bold text-primary-700 tracking-wider">{fileNumberPreview}</p>
+            </div>
+          </Card>
+        </div>
+      )}
+
+      {/* POS Tab */}
+      {activeTab === 'pos' && canOpenSettingsSection(profile?.role, 'pos' as any) && (
+        <div className="space-y-4">
+          <Card className="p-4">
+            <h2 className="text-base font-bold text-slate-800 mb-4 flex items-center gap-2"><CreditCard size={18} className="text-primary-600" /> پیکربندی اتصال به دستگاه کارتخوان</h2>
+            <div className="space-y-3">
+              <label className="flex items-center gap-2 cursor-pointer mb-2">
+                <input type="checkbox" checked={posForm.enabled} onChange={(e) => setPosForm({ ...posForm, enabled: e.target.checked })} className="rounded border-slate-300 text-primary-600 focus:ring-primary-500" />
+                <span className="text-sm text-slate-700">فعال‌سازی اتصال PC-POS</span>
+              </label>
+              {posForm.enabled && (
+                <>
+                  <Input label="آدرس IP دستگاه کارتخوان" value={posForm.ip} onChange={(v) => setPosForm({ ...posForm, ip: v })} placeholder="192.168.1.100" />
+                  <Input label="پورت (Port)" value={posForm.port} onChange={(v) => setPosForm({ ...posForm, port: v })} placeholder="8080" />
+                </>
+              )}
+              <Button onClick={handleSavePos} variant="primary"><Save size={16} className="inline ml-1" /> ذخیره تنظیمات</Button>
             </div>
           </Card>
         </div>

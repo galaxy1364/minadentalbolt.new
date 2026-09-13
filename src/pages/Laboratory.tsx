@@ -26,6 +26,7 @@ import { readChartHandoff } from '../lib/chartHandoff'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { ModuleHeader, ModuleStatCard, ReorderableStatGrid } from '../components/ModuleHeader'
 import { CurrencyInput } from '../components/CurrencyInput'
+import { tileThemes, getHashColor } from '../lib/colors'
 
 // MOD-FEAT-034: the laboratory's internal pipeline — impression, courier,
 // CAD/CAM, firing, QC, ready — used to live here and drive the clinic's
@@ -808,16 +809,20 @@ export default function Laboratory() {
   // Render: Order Card
   // ===========================================================================
 
-  const renderOrderCard = (order: LabOrder) => {
+  const renderOrderCard = (order: LabOrder, idx: number = 0) => {
     const statusMeta = labOrderStatuses.find((s) => s.value === order.status) || labOrderStatuses[0]
     const workTypeMeta = workTypes.find((w) => w.value === order.work_type)
     const materialMeta = materials.find((m) => m.value === order.material)
     const daysLeft = getDaysLeft(order.deadline)
     const deadlineColor = getDeadlineColor(order)
     const overdue = isOverdue(order)
+    const theme = tileThemes[getHashColor(order.patient_id)]
+    const staggerDelay = Math.min(idx, 15) * 0.05
 
     return (
-      <Card key={order.id} className="p-4">
+      <Card key={order.id} className={`p-4 relative overflow-hidden transition-all duration-300 stagger-item bg-gradient-to-br ${theme.bg} ${theme.border}`} style={{ animationDelay: `${staggerDelay}s` }}>
+        <div className={`absolute -right-16 -top-16 w-32 h-32 rounded-full blur-3xl opacity-20 breathe-slow pointer-events-none ${theme.text}`} />
+        <div className="relative z-10">
         {/* Header */}
         <div className="flex items-start justify-between gap-3 mb-3">
           <div className="flex items-center gap-3 flex-1 min-w-0">
@@ -849,7 +854,7 @@ export default function Laboratory() {
           {order.tooth_number && (
             <div className="flex items-center gap-1">
               <span className="text-slate-400">دندان:</span>
-              <span className="font-medium">{toPersianDigits(order.tooth_number)}</span>
+              <span className="font-medium">{toothLabel(order.tooth_number)}</span>
             </div>
           )}
           {order.shade && (
@@ -1043,6 +1048,7 @@ export default function Laboratory() {
         {order.notes && (
           <p className="text-xs text-slate-400 mt-2 pt-2 border-t border-slate-100">{order.notes}</p>
         )}
+        </div>
       </Card>
     )
   }
@@ -1097,7 +1103,7 @@ export default function Laboratory() {
         </Card>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-          {filteredOrders.map(renderOrderCard)}
+          {filteredOrders.map((o, idx) => renderOrderCard(o, idx))}
         </div>
       )}
     </div>
@@ -1122,11 +1128,15 @@ export default function Laboratory() {
         </Card>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-          {labs.map((lab) => {
+          {labs.map((lab, idx) => {
             const labOrdersCount = labOrders.filter((o) => o.lab_id === lab.id).length
             const activeOrders = labOrders.filter((o) => o.lab_id === lab.id && (o.status === 'ordered' || o.status === 'in_progress')).length
+            const theme = tileThemes[getHashColor(lab.id)]
+            const staggerDelay = Math.min(idx, 15) * 0.05
             return (
-              <Card key={lab.id} className="p-4">
+              <Card key={lab.id} className={`p-4 relative overflow-hidden transition-all duration-300 stagger-item bg-gradient-to-br ${theme.bg} ${theme.border}`} style={{ animationDelay: `${staggerDelay}s` }}>
+                <div className={`absolute -right-16 -top-16 w-32 h-32 rounded-full blur-3xl opacity-20 breathe-slow pointer-events-none ${theme.text}`} />
+                <div className="relative z-10">
                 <div className="flex items-start gap-3 mb-3">
                   <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-primary-400 to-primary-600 flex items-center justify-center text-white flex-shrink-0">
                     <FlaskConical size={20} />
@@ -1192,6 +1202,7 @@ export default function Laboratory() {
                   >
                     {lab.is_active ? <><Archive size={12} /> غیرفعال</> : <><RotateCcw size={12} /> فعال‌سازی</>}
                   </button>
+                </div>
                 </div>
               </Card>
             )

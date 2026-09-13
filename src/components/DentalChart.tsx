@@ -8,7 +8,7 @@ import type { ToothCondition, ToothSurface, ToothSurfaceCondition } from '../lib
 import { ToothGlyph as ToothSVG } from './ToothGlyph'
 import { toothLabel } from '../lib/toothLabel'
 import { createPortal } from 'react-dom'
-import { Smile, Plus, Activity, AlertCircle, Clock, Grid3x3, Sparkles } from 'lucide-react'
+import { Smile, Plus, Activity, AlertCircle, Clock, Grid3x3, Sparkles, Image as ImageIcon } from 'lucide-react'
 import { h } from '../lib/haptics'
 import { chimes } from '../lib/chimes'
 import { ToothRecord, Treatment } from '../types'
@@ -53,8 +53,8 @@ const palmerPrimaryLowerLeft = ['A', 'B', 'C', 'D', 'E']
 const palmerPrimaryLowerRight = ['E', 'D', 'C', 'B', 'A']
 
 const palmerSymbols: Record<string, string> = {
-  upperRight: '└', upperLeft: '┘', lowerLeft: '┐', lowerRight: '┌',
-  primaryUpperRight: '└', primaryUpperLeft: '┘', primaryLowerLeft: '┐', primaryLowerRight: '┌',
+  upperRight: '┘', upperLeft: '└', lowerRight: '┐', lowerLeft: '┌',
+  primaryUpperRight: '┘', primaryUpperLeft: '└', primaryLowerRight: '┐', primaryLowerLeft: '┌',
 }
 
 // Convert FDI number to Palmer display string
@@ -118,6 +118,7 @@ function ToothDetailPanel({
   onAddTreatment,
   onAddLabOrder,
   onAddImplantCase,
+  onViewRadiology,
 }: {
   tooth: ToothData
   onClose: () => void
@@ -127,6 +128,7 @@ function ToothDetailPanel({
    *  and implants too, not only treatments. */
   onAddLabOrder?: (toothNumber: string, surface?: string | null) => void
   onAddImplantCase?: (toothNumber: string, surface?: string | null) => void
+  onViewRadiology?: (toothNumber: string) => void
 }) {
   const [condition, setCondition] = useState<ToothCondition>(tooth.condition)
   const [surfaceConditions, setSurfaceConditions] = useState<ToothSurfaceCondition[]>(tooth.surfaces)
@@ -361,7 +363,7 @@ function ToothDetailPanel({
               module and picking the same tooth again from a blank Palmer
               picker. The surface goes along too, so what was just recorded
               here isn't asked for a second time. */}
-          {(onAddTreatment || onAddLabOrder || onAddImplantCase) && (
+          {(onAddTreatment || onAddLabOrder || onAddImplantCase || onViewRadiology) && (
             <div className="space-y-2">
               <p className="text-[11px] text-slate-500 dark:text-slate-400">
                 برای دندان {toothLabel(tooth.number)}:
@@ -405,6 +407,19 @@ function ToothDetailPanel({
                   <Plus size={16} /> مورد ایمپلنت
                 </button>
               )}
+              {onViewRadiology && (
+                <button
+                  onClick={() => {
+                    h.tap()
+                    chimes.playPop()
+                    onViewRadiology(String(tooth.number))
+                    onClose()
+                  }}
+                  className="w-full py-3 rounded-xl bg-sky-50 text-sky-700 font-medium text-sm hover:bg-sky-100 transition-all-smooth flex items-center justify-center gap-1.5 border border-sky-200 press-scale"
+                >
+                  <ImageIcon size={16} /> مشاهده تصاویر و رادیولوژی دندان
+                </button>
+              )}
             </div>
           )}
         </div>
@@ -433,6 +448,7 @@ interface DentalChartProps {
    * as "selecting" it for this purpose, not just clicking the dedicated
    * per-tooth treatment button. */
   onToothSelect?: (toothNumber: string) => void
+  onViewRadiology?: (toothNumber: string) => void
 }
 
 export default function DentalChart({
@@ -443,6 +459,7 @@ export default function DentalChart({
   onAddLabOrder,
   onAddImplantCase,
   onToothSelect,
+  onViewRadiology,
 }: DentalChartProps) {
   const [selectedTooth, setSelectedTooth] = useState<ToothData | null>(null)
   const [showPrimary, setShowPrimary] = useState(false)
@@ -860,6 +877,7 @@ export default function DentalChart({
           onAddTreatment={onAddTreatment}
           onAddLabOrder={onAddLabOrder}
           onAddImplantCase={onAddImplantCase}
+          onViewRadiology={onViewRadiology}
         />
       )}
     </div>

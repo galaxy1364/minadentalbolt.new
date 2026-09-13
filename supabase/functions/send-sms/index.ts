@@ -24,11 +24,10 @@ function buildMessage(req: SMSRequest): string {
     return (
       `${req.patientName ?? 'بیمار'} عزیز،\n` +
       `نوبت شما با موفقیت ثبت شد:\n` +
-      `پزشک: ${req.doctorName ?? '—'}\n` +
       `تاریخ: ${req.date ?? '—'}\n` +
       `ساعت: ${req.time ?? '—'}\n\n` +
       `در صورت نیاز به تغییر لطفاً تماس بگیرید.\n` +
-      `مطب دندانپزشکی`
+      `کلینیک دندانپزشکی مینا`
     );
   }
   return req.message ?? '';

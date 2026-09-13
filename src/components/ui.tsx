@@ -137,14 +137,22 @@ export function Badge({ children, color = 'slate' }: { children: React.ReactNode
 
 export function EmptyState({ icon, title, description, action }: { icon: React.ReactNode; title: string; description?: string; action?: React.ReactNode }) {
   return (
-    <div className="flex flex-col items-center justify-center py-16 text-center">
-      <div
-        className="w-16 h-16 rounded-2xl flex items-center justify-center mb-4"
-        style={{ background: 'color-mix(in srgb, var(--module-color, #64748b) 14%, white)', color: 'var(--module-color, #64748b)' }}
-      >{icon}</div>
-      <p className="text-sm font-medium text-slate-600 dark:text-slate-300 mb-1">{title}</p>
-      {description && <p className="text-xs text-slate-400 dark:text-slate-500 mb-4">{description}</p>}
-      {action}
+    <div className="flex flex-col items-center justify-center py-16 text-center relative overflow-hidden rounded-3xl group">
+      {/* Dynamic Background */}
+      <div className="absolute inset-0 bg-gradient-to-br from-slate-50 to-slate-100/50 dark:from-slate-800/50 dark:to-slate-900/50 transition-colors duration-500" />
+      <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-48 h-48 bg-primary-400/10 dark:bg-primary-500/10 rounded-full blur-3xl breathe-slow mix-blend-multiply dark:mix-blend-screen pointer-events-none opacity-50 group-hover:opacity-100 transition-opacity duration-700" />
+      
+      <div className="relative z-10">
+        <div
+          className="w-16 h-16 rounded-3xl flex items-center justify-center mx-auto mb-5 shadow-sm ring-1 ring-slate-900/5 dark:ring-white/10 transition-transform duration-500 group-hover:scale-110"
+          style={{ background: 'color-mix(in srgb, var(--module-color, #64748b) 14%, white)', color: 'var(--module-color, #64748b)' }}
+        >
+          {icon}
+        </div>
+        <p className="text-base font-bold text-slate-800 dark:text-slate-100 mb-1.5">{title}</p>
+        {description && <p className="text-sm text-slate-500 dark:text-slate-400 mb-6 max-w-xs mx-auto leading-relaxed">{description}</p>}
+        {action && <div className="mt-2">{action}</div>}
+      </div>
     </div>
   )
 }
@@ -398,6 +406,94 @@ export function ToastContainer() {
           {icons[t.type]}<span className="text-sm font-medium">{t.message}</span>
         </div>
       ))}
+    </div>
+  )
+}
+
+export function MultiSelectChips({ 
+  label, 
+  options, 
+  value, 
+  onChange,
+  allowCustom = true,
+  placeholder = "افزودن مورد جدید..."
+}: { 
+  label: string; 
+  options: string[]; 
+  value: string; 
+  onChange: (val: string) => void;
+  allowCustom?: boolean;
+  placeholder?: string;
+}) {
+  const [inputValue, setInputValue] = useState('')
+  
+  // Parse comma-separated value into array, trimming whitespace and filtering empty
+  const selectedItems = (value || '').split(',').map(s => s.trim()).filter(Boolean)
+  
+  const toggleItem = (item: string) => {
+    h.light()
+    if (selectedItems.includes(item)) {
+      onChange(selectedItems.filter(i => i !== item).join(', '))
+    } else {
+      onChange([...selectedItems, item].join(', '))
+    }
+  }
+
+  const handleAddCustom = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Enter' && inputValue.trim()) {
+      e.preventDefault()
+      const newItem = inputValue.trim()
+      if (!selectedItems.includes(newItem)) {
+        h.medium()
+        onChange([...selectedItems, newItem].join(', '))
+      }
+      setInputValue('')
+    }
+  }
+
+  return (
+    <div className="space-y-2">
+      <label className="block text-xs font-medium text-slate-700 dark:text-slate-300">{label}</label>
+      <div className="flex flex-wrap gap-2 mb-2">
+        {options.map(opt => {
+          const isSelected = selectedItems.includes(opt)
+          return (
+            <button
+              key={opt}
+              type="button"
+              onClick={() => toggleItem(opt)}
+              className={`px-3 py-1.5 rounded-full text-xs font-medium transition-all-smooth border ${
+                isSelected 
+                  ? 'bg-primary-600 border-primary-600 text-white shadow-sm' 
+                  : 'bg-white/50 dark:bg-slate-800/50 border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:border-primary-300'
+              }`}
+            >
+              {opt}
+            </button>
+          )
+        })}
+        {selectedItems.filter(item => !options.includes(item)).map(customOpt => (
+          <button
+            key={customOpt}
+            type="button"
+            onClick={() => toggleItem(customOpt)}
+            className="flex items-center gap-1 px-3 py-1.5 rounded-full text-xs font-medium transition-all-smooth border bg-primary-600 border-primary-600 text-white shadow-sm"
+          >
+            {customOpt}
+            <X size={12} className="opacity-70 hover:opacity-100" />
+          </button>
+        ))}
+      </div>
+      {allowCustom && (
+        <input
+          type="text"
+          value={inputValue}
+          onChange={e => setInputValue(e.target.value)}
+          onKeyDown={handleAddCustom}
+          placeholder={placeholder}
+          className="w-full bg-slate-50 dark:bg-slate-900/50 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2 text-sm focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500 outline-none transition-all-smooth text-slate-900 dark:text-white"
+        />
+      )}
     </div>
   )
 }

@@ -1,4 +1,5 @@
 import { toPersianDigits, formatCurrency, toJalaliStringPretty } from './persianDate'
+import { toothLabel } from './toothLabel'
 
 export type ClinicAiIntentType =
   | 'create_appointment'
@@ -233,7 +234,7 @@ export function parseClinicCommand(rawInput: string): ParsedAiAction {
         { label: 'تاریخ نوبت', value: toJalaliStringPretty(date) },
         { label: 'ساعت', value: toPersianDigits(time) },
         { label: 'نوع خدمت', value: service },
-        ...(tooth ? [{ label: 'شماره دندان', value: toPersianDigits(tooth) }] : []),
+        ...(tooth ? [{ label: 'شماره دندان', value: toothLabel(tooth) }] : []),
       ],
       rawText: text,
     }
@@ -353,13 +354,13 @@ export function parseClinicCommand(rawInput: string): ParsedAiAction {
       intent: 'record_treatment',
       confidence: 0.88,
       title: `ثبت طرح درمان برای ${patientName}`,
-      description: `ثبت ${service} برای دندان شماره ${toPersianDigits(tooth)} در پرونده بیمار`,
+      description: `ثبت ${service} برای دندان ${toothLabel(tooth)} در پرونده بیمار`,
       patientName,
       toothNumber: tooth,
       service,
       details: [
         { label: 'نام بیمار', value: patientName },
-        { label: 'شماره دندان (FDI)', value: toPersianDigits(tooth) },
+        { label: 'شماره دندان', value: toothLabel(tooth) },
         { label: 'عنوان درمان', value: service },
         { label: 'وضعیت', value: 'در حال انجام / ثبت اولیه' },
       ],

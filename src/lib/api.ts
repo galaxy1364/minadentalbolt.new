@@ -290,6 +290,17 @@ export async function createTreatment(t: TreatmentInput): Promise<Treatment> {
   const { clinic_id, ...rest } = t
   const id = uid()
   const treatment: Treatment = { ...rest, id, clinic_id: CLINIC_ID, created_at: nowISO(), updated_at: nowISO(), sync_version: 1 }
+
+  // Auto-deplete inventory if treatment is completed and has materials
+  if (treatment.status === 'completed' && treatment.materials_used && treatment.materials_used.length > 0) {
+    for (const mat of treatment.materials_used) {
+      const inv = await db.inventory_items.get(mat.item_id)
+      if (inv && (inv.quantity || 0) >= mat.quantity) {
+        await updateInventoryItem(inv.id, { quantity: (inv.quantity || 0) - mat.quantity })
+      }
+    }
+  }
+
   await db.treatments.put(treatment)
   await queueOperation('treatments', 'insert', id, treatment)
   await logToTimeline(treatment.patient_id, 'treatment_created', 'درمان ثبت شد',
@@ -302,6 +313,17 @@ export async function updateTreatment(id: string, updates: Partial<TreatmentInpu
   if (!existing) throw new Error('درمان یافت نشد')
   const { clinic_id, ...rest } = updates
   const updated: Treatment = { ...existing, ...rest, updated_at: nowISO() }
+
+  // Auto-deplete inventory if changing to completed with materials (simple one-way depletion for phase 4)
+  if (existing.status !== 'completed' && updated.status === 'completed' && updated.materials_used && updated.materials_used.length > 0) {
+    for (const mat of updated.materials_used) {
+      const inv = await db.inventory_items.get(mat.item_id)
+      if (inv && (inv.quantity || 0) >= mat.quantity) {
+        await updateInventoryItem(inv.id, { quantity: (inv.quantity || 0) - mat.quantity })
+      }
+    }
+  }
+
   await db.treatments.put(updated)
   await queueOperation('treatments', 'update', id, rest)
   return updated

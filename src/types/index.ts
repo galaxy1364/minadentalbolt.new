@@ -141,12 +141,15 @@ export interface Treatment {
   lab_cost: number | null
   status: string
   notes: string | null
+  materials_used?: { item_id: string; quantity: number }[] | null
   created_at: string
   updated_at: string
   sync_version: number
   procedure_category: string | null
   doctor_share: number | null
   doctor_share_calculated: boolean | null
+  insurance_share?: number | null
+  patient_share?: number | null
 }
 
 export interface Payment {

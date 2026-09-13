@@ -25,6 +25,7 @@ export interface TreatmentRef {
   tooth_number: string | null
   doctor_id: string | null
   total_price: number | null
+  patient_share?: number | null
   status: string
 }
 
@@ -120,5 +121,5 @@ export function treatmentRemaining(
   const paid = payments
     .filter((p) => p.treatment_id === treatment.id && p.status !== 'cancelled')
     .reduce((sum, p) => sum + (p.amount || 0), 0)
-  return (treatment.total_price || 0) - paid
+  return (treatment.patient_share ?? (treatment.total_price || 0)) - paid
 }
