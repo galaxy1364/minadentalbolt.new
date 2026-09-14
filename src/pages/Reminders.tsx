@@ -6,34 +6,47 @@
 import { useState, useEffect, useMemo } from 'react'
 import { PatientSelect } from '../components/PatientSelect'
 import { useNavigate } from 'react-router-dom'
-import { CalendarClock, Banknote, CreditCard, FlaskConical, Bone, Settings2, Bell, BellOff, Plus, StickyNote, Check, X as XIcon, Send, MessageSquare } from 'lucide-react'
+import {
+  CalendarClock, Banknote, CreditCard, FlaskConical, Bone, Settings2,
+  Bell, BellOff, Plus, StickyNote, Check, X as XIcon, Send, MessageSquare,
+  HeartPulse, Scissors, Smile, Users, AlertTriangle, ChevronRight, ExternalLink, Phone
+} from 'lucide-react'
 import { ModuleHeader } from '../components/ModuleHeader'
 import { Card, Button, Badge, Spinner, EmptyState, Select, Modal, Input, Textarea, showToast } from '../components/ui'
 import { chimes } from '../lib/chimes'
 import { CurrencyInput } from '../components/CurrencyInput'
 import { PersianDateInput } from '../components/PersianDateInput'
-import { fetchCheques, fetchAllInstallments, fetchLabOrders, fetchImplantCases, fetchPatients, fetchManualReminders, createManualReminder, updateManualReminder, fetchAppointments, fetchPersonalFinanceItems } from '../lib/api'
+import {
+  fetchCheques, fetchAllInstallments, fetchLabOrders, fetchImplantCases,
+  fetchPatients, fetchManualReminders, createManualReminder, updateManualReminder,
+  fetchAppointments, fetchPersonalFinanceItems, fetchTreatments, fetchEncounters, fetchPayments
+} from '../lib/api'
+import {
+  findPostOpCheckups, findSutureRemovalReminders, findHygieneRecalls,
+  calculateClinicRetentionSummary, type ClinicRetentionSummary
+} from '../lib/patientRecallChurn'
 import { toJalaliStringPretty, toPersianDigits, formatCurrency } from '../lib/persianDate'
 import { downloadICSReminder } from '../lib/icsReminder'
 import { requestNotificationPermission, getNotificationPermission, notifyOnceForReminder } from '../lib/notifications'
 import { h } from '../lib/haptics'
 import { supabase } from '../lib/supabase'
-import type { Patient, ManualReminder } from '../types'
+import type { Patient, ManualReminder, Treatment } from '../types'
 
 const LEAD_DAYS_KEY = 'minadent-reminder-lead-days'
 
 interface ReminderItem {
   id: string
-  category: 'cheque' | 'installment' | 'lab' | 'implant' | 'manual' | 'appointment' | 'personal'
+  category: 'cheque' | 'installment' | 'lab' | 'implant' | 'manual' | 'appointment' | 'personal' | 'post_op' | 'suture' | 'hygiene'
   title: string
   patientName: string
   dueDate: string
   amount?: number
   daysLeft: number
-  /** Set only for category==='manual' — lets tapping the card open it for
-   * editing (formal records like cheques/installments are edited from
-   * their own module, not from here). */
   manualSource?: ManualReminder
+  actionPath?: string
+  actionNeeded?: string
+  smsTemplate?: string
+  priority?: number
 }
 
 export default function Reminders() {
@@ -44,9 +57,11 @@ export default function Reminders() {
   const [leadDays, setLeadDays] = useState(() => localStorage.getItem(LEAD_DAYS_KEY) || '3')
   const [filter, setFilter] = useState<'all' | ReminderItem['category']>('all')
   const [notifPermission, setNotifPermission] = useState(getNotificationPermission())
+  const [retentionSummary, setRetentionSummary] = useState<ClinicRetentionSummary | null>(null)
 
   // Manual reminder create/edit modal
   const [modalOpen, setModalOpen] = useState(false)
+  const [atRiskModalOpen, setAtRiskModalOpen] = useState(false)
   const [editingReminder, setEditingReminder] = useState<ManualReminder | null>(null)
   const [saving, setSaving] = useState(false)
   const [form, setForm] = useState({ patient_id: '', title: '', amount: '', due_date: '', notes: '' })
@@ -55,8 +70,20 @@ export default function Reminders() {
   const loadData = () => {
     setLoading(true)
     const today = new Date().toISOString().slice(0, 10)
-    return Promise.all([fetchCheques(), fetchAllInstallments(), fetchLabOrders(), fetchImplantCases(), fetchPatients(), fetchManualReminders(), fetchAppointments(today), fetchPersonalFinanceItems()])
-      .then(([cheques, installments, labOrders, implantCases, pats, manualReminders, appointments, personalItems]) => {
+    return Promise.all([
+      fetchCheques(),
+      fetchAllInstallments(),
+      fetchLabOrders(),
+      fetchImplantCases(),
+      fetchPatients(),
+      fetchManualReminders(),
+      fetchAppointments(today),
+      fetchPersonalFinanceItems(),
+      fetchTreatments(),
+      fetchEncounters(),
+      fetchPayments(),
+    ])
+      .then(([cheques, installments, labOrders, implantCases, pats, manualReminders, appointments, personalItems, treatments, encounters, payments]) => {
         setPatients(pats)
         const patientName = (id: string | null) => {
           if (!id) return 'بدون بیمار'
@@ -82,11 +109,6 @@ export default function Reminders() {
           if (im.surgery_date && im.surgery_date >= today) {
             list.push({ id: `implant-surgery-${im.id}`, category: 'implant', title: 'جراحی ایمپلنت', patientName: patientName(im.patient_id), dueDate: im.surgery_date, daysLeft: daysLeft(im.surgery_date) })
           }
-          // The other three implant milestones (هیلینگ‌آباتمنت, قالب‌گیری,
-          // تحویل روکش) were being tracked in the form but never fed into
-          // Reminders at all — only surgery_date was. A missed follow-up
-          // appointment mid-treatment is exactly the kind of thing that
-          // should never quietly fall through the cracks.
           if (im.healing_abutment_date && im.healing_abutment_date >= today) {
             list.push({ id: `implant-healing-${im.id}`, category: 'implant', title: 'نصب هیلینگ آباتمنت', patientName: patientName(im.patient_id), dueDate: im.healing_abutment_date, daysLeft: daysLeft(im.healing_abutment_date) })
           }
@@ -97,40 +119,88 @@ export default function Reminders() {
             list.push({ id: `implant-crown-${im.id}`, category: 'implant', title: 'تحویل روکش ایمپلنت', patientName: patientName(im.patient_id), dueDate: im.crown_delivery_date, daysLeft: daysLeft(im.crown_delivery_date) })
           }
         }
-        // Manual reminders — free-form, patient-optional, fully editable.
-        // Exactly for cases like "patient said they'd bring 50M on the
-        // 20th of next month" that aren't a formal cheque/installment yet.
+        // Manual reminders
         for (const mr of manualReminders) {
           if (mr.status !== 'pending') continue
           list.push({ id: `manual-${mr.id}`, category: 'manual', title: mr.title, patientName: patientName(mr.patient_id), dueDate: mr.due_date, amount: mr.amount || undefined, daysLeft: daysLeft(mr.due_date), manualSource: mr })
         }
-        // Upcoming appointments — including long-range recall/follow-up
-        // bookings (e.g. 'come back in 1/3/4 months') that were
-        // previously invisible here entirely; staff had to remember to
-        // check Appointments/Calendar separately for anything far out.
-        // Only surfaced within 14 days of their date — a follow-up
-        // booked 3 months out isn't 'urgent' yet and would otherwise
-        // flood this list with routine day-to-day bookings; it appears
-        // here (and starts sending the escalating notifications below)
-        // automatically once it enters that window, so nothing far out
-        // needs manual tracking in the meantime.
+        // Upcoming appointments (within 14 days)
         for (const a of appointments as any[]) {
           if (a.status === 'cancelled' || a.status === 'completed' || a.status === 'no_show') continue
           const dl = daysLeft(a.date)
           if (dl > 14) continue
           list.push({ id: `appt-${a.id}`, category: 'appointment', title: 'نوبت', patientName: patientName(a.patient_id), dueDate: a.date, daysLeft: dl })
         }
-        // Personal finance (owner's own loans/rent/cheques/debts) had
-        // zero connection to the notification system before — only a
-        // one-off .ics export, no escalating alerts. Same treatment as
-        // every other due-date-bearing record now.
+        // Personal finance
         for (const pf of personalItems as any[]) {
           if (pf.status !== 'active' || !pf.due_date) continue
           const typeLabel = { loan: 'وام', rent: 'اجاره', cheque: 'چک شخصی', debt: 'بدهی', other: 'مالی شخصی' }[pf.item_type as string] || 'مالی شخصی'
           list.push({ id: `personal-${pf.id}`, category: 'personal', title: `${typeLabel} — ${pf.title}`, patientName: pf.counterparty || '-', dueDate: pf.due_date, amount: pf.monthly_amount || (pf.total_amount - pf.paid_amount) || undefined, daysLeft: daysLeft(pf.due_date) })
         }
+
+        // Post-Operative Checkups (24 to 48 hours post surgery)
+        const postOps = findPostOpCheckups(treatments as Treatment[], pats, today)
+        for (const po of postOps) {
+          list.push({
+            id: po.id || `postop-${po.patient.id}`,
+            category: 'post_op',
+            title: po.detail || po.title || 'پیگیری پس از جراحی',
+            patientName: po.patientName || `${po.patient.first_name} ${po.patient.last_name}`,
+            dueDate: today,
+            daysLeft: 0,
+            actionPath: po.actionPath,
+            actionNeeded: po.actionNeeded,
+            smsTemplate: po.smsMessage,
+            priority: po.priority,
+          })
+        }
+
+        // Suture Removals (7 to 10 days post-surgery without booked appointment)
+        const sutureRemovals = findSutureRemovalReminders(treatments as Treatment[], pats, appointments as any, today)
+        for (const sr of sutureRemovals) {
+          list.push({
+            id: sr.id || `suture-${sr.patient.id}`,
+            category: 'suture',
+            title: sr.detail || sr.title || 'موعد کشیدن بخیه',
+            patientName: sr.patientName || `${sr.patient.first_name} ${sr.patient.last_name}`,
+            dueDate: today,
+            daysLeft: 0,
+            actionPath: sr.actionPath,
+            actionNeeded: sr.actionNeeded,
+            smsTemplate: sr.smsMessage,
+            priority: sr.priority,
+          })
+        }
+
+        // Preventive Hygiene & Periodontal Recalls (6-month periodic recall)
+        const hygieneRecalls = findHygieneRecalls(pats, encounters as any, appointments as any, 180, today)
+        for (const hr of hygieneRecalls) {
+          list.push({
+            id: hr.id || `recall-${hr.patient.id}`,
+            category: 'hygiene',
+            title: hr.detail || hr.title || 'چکاپ دوره‌ای ۶ ماهه',
+            patientName: hr.patientName || `${hr.patient.first_name} ${hr.patient.last_name}`,
+            dueDate: today,
+            daysLeft: 0,
+            actionPath: hr.actionPath,
+            actionNeeded: hr.actionNeeded,
+            smsTemplate: hr.smsMessage,
+            priority: hr.priority,
+          })
+        }
+
         list.sort((a, b) => a.daysLeft - b.daysLeft)
         setItems(list)
+
+        // Calculate clinic-wide retention metrics
+        const summary = calculateClinicRetentionSummary({
+          patients: pats,
+          encounters: encounters as any,
+          appointments: appointments as any,
+          treatments: treatments as any,
+          payments: payments as any,
+        })
+        setRetentionSummary(summary)
       })
       .finally(() => setLoading(false))
   }
@@ -142,18 +212,13 @@ export default function Reminders() {
   const filteredItems = useMemo(() => items.filter((it) => filter === 'all' || it.category === filter), [items, filter])
   const urgentCount = items.filter((it) => it.daysLeft <= Number(leadDays)).length
 
-  // Real OS notifications — escalating tiers per item, not a single flat
-  // threshold: 3 days before, 1 day before, the due day itself, and a
-  // distinct daily 'overdue' alert that keeps firing every day it stays
-  // unresolved (never just once) so a slipped payment can't quietly fall
-  // through the cracks. Each tier uses its own notification id (see
-  // notifyOnceForReminder's per-day dedup), so all four can fire
-  // independently as an item crosses each threshold — this is separate
-  // from the 'leadDays' setting below, which only controls the visual
-  // 'urgent' highlight in the list, not which alerts actually fire.
   useEffect(() => {
     if (notifPermission !== 'granted') return
-    const categoryLabel = { cheque: 'چک', installment: 'قسط', lab: 'لابراتوار', implant: 'ایمپلنت', manual: 'یادآوری', appointment: 'نوبت', personal: 'مالی شخصی' }
+    const categoryLabel: Record<ReminderItem['category'], string> = {
+      cheque: 'چک', installment: 'قسط', lab: 'لابراتوار', implant: 'ایمپلنت',
+      manual: 'یادآوری', appointment: 'نوبت', personal: 'مالی شخصی',
+      post_op: 'پیگیری پس از جراحی', suture: 'کشیدن بخیه', hygiene: 'چکاپ دوره‌ای',
+    }
     for (const it of items) {
       const label = categoryLabel[it.category]
       const when = it.daysLeft === 0 ? 'امروز' : it.daysLeft < 0 ? `${Math.abs(it.daysLeft)} روز پیش` : `${it.daysLeft} روز دیگر`
@@ -177,13 +242,16 @@ export default function Reminders() {
   }
 
   const categoryMeta: Record<ReminderItem['category'], { label: string; icon: JSX.Element; color: string }> = {
-    cheque: { label: 'چک', icon: <Banknote size={14} />, color: 'text-purple-600 bg-purple-50' },
-    installment: { label: 'قسط', icon: <CreditCard size={14} />, color: 'text-blue-600 bg-blue-50' },
-    lab: { label: 'لابراتوار', icon: <FlaskConical size={14} />, color: 'text-cyan-600 bg-cyan-50' },
-    implant: { label: 'ایمپلنت', icon: <Bone size={14} />, color: 'text-indigo-600 bg-indigo-50' },
-    manual: { label: 'یادآوری دستی', icon: <StickyNote size={14} />, color: 'text-amber-600 bg-amber-50' },
-    appointment: { label: 'نوبت', icon: <CalendarClock size={14} />, color: 'text-teal-600 bg-teal-50' },
-    personal: { label: 'مالی شخصی', icon: <Banknote size={14} />, color: 'text-rose-600 bg-rose-50' },
+    cheque: { label: 'چک', icon: <Banknote size={14} />, color: 'text-purple-600 bg-purple-50 dark:bg-purple-900/30' },
+    installment: { label: 'قسط', icon: <CreditCard size={14} />, color: 'text-blue-600 bg-blue-50 dark:bg-blue-900/30' },
+    lab: { label: 'لابراتوار', icon: <FlaskConical size={14} />, color: 'text-cyan-600 bg-cyan-50 dark:bg-cyan-900/30' },
+    implant: { label: 'ایمپلنت', icon: <Bone size={14} />, color: 'text-indigo-600 bg-indigo-50 dark:bg-indigo-900/30' },
+    manual: { label: 'یادآوری دستی', icon: <StickyNote size={14} />, color: 'text-amber-600 bg-amber-50 dark:bg-amber-900/30' },
+    appointment: { label: 'نوبت', icon: <CalendarClock size={14} />, color: 'text-teal-600 bg-teal-50 dark:bg-teal-900/30' },
+    personal: { label: 'مالی شخصی', icon: <Banknote size={14} />, color: 'text-rose-600 bg-rose-50 dark:bg-rose-900/30' },
+    post_op: { label: 'پیگیری جراحی (۲۴-۴۸h)', icon: <HeartPulse size={14} />, color: 'text-rose-600 bg-rose-50 dark:bg-rose-900/30' },
+    suture: { label: 'کشیدن بخیه', icon: <Scissors size={14} />, color: 'text-amber-600 bg-amber-50 dark:bg-amber-900/30' },
+    hygiene: { label: 'چکاپ دوره‌ای ۶ ماهه', icon: <Smile size={14} />, color: 'text-emerald-600 bg-emerald-50 dark:bg-emerald-900/30' },
   }
 
   const openCreateModal = () => {
@@ -254,9 +322,10 @@ export default function Reminders() {
     const categoryLabel: Record<ReminderItem['category'], string> = {
       cheque: 'چک', installment: 'قسط', lab: 'سفارش لابراتوار',
       implant: 'مرحله ایمپلنت', manual: 'یادآوری', appointment: 'نوبت', personal: 'مالی',
+      post_op: 'پیگیری جراحی', suture: 'کشیدن بخیه', hygiene: 'چکاپ دوره‌ای',
     }
     const when = it.daysLeft === 0 ? 'امروز' : it.daysLeft < 0 ? `${toPersianDigits(Math.abs(it.daysLeft))} روز پیش` : `${toPersianDigits(it.daysLeft)} روز دیگر`
-    const message = `${it.patientName} عزیز، یادآوری ${categoryLabel[it.category]}: ${it.title} — سررسید ${when}${it.amount ? ' — مبلغ ' + formatCurrency(it.amount) + ' تومان' : ''}. کلینیک دندانپزشکی مینا`
+    const message = it.smsTemplate || `${it.patientName} عزیز، یادآوری ${categoryLabel[it.category]}: ${it.title} — سررسید ${when}${it.amount ? ' — مبلغ ' + formatCurrency(it.amount) + ' تومان' : ''}. کلینیک دندانپزشکی مینا`
     try {
       const { error } = await supabase.functions.invoke('send-sms', { body: { to: phone, message, type: 'reminder' } })
       if (error) throw error
@@ -323,9 +392,67 @@ export default function Reminders() {
         </Card>
       </div>
 
+      {retentionSummary && (
+        <Card className="p-4 bg-gradient-to-br from-indigo-50/70 via-white to-sky-50/70 dark:from-slate-900 dark:via-slate-850 dark:to-slate-900 border border-indigo-100 dark:border-indigo-900/40 shadow-sm">
+          <div className="flex items-center justify-between gap-2 mb-3 flex-wrap">
+            <div className="flex items-center gap-2">
+              <div className="w-8 h-8 rounded-xl bg-indigo-100 dark:bg-indigo-900/50 text-indigo-600 flex items-center justify-center">
+                <Users size={16} />
+              </div>
+              <div>
+                <h3 className="text-sm font-bold text-slate-800 dark:text-slate-100">شاخص وفاداری و ماندگاری بیماران (CRM Retention)</h3>
+                <p className="text-[11px] text-slate-500">پایش هوشمند مراجعات، نرخ ریزش و یادآوری‌های کلینیکی</p>
+              </div>
+            </div>
+            <Badge color={retentionSummary.retentionRatePercent >= 80 ? 'success' : retentionSummary.retentionRatePercent >= 60 ? 'warning' : 'error'}>
+              نرخ ماندگاری کلینیک: {toPersianDigits(retentionSummary.retentionRatePercent)}٪
+            </Badge>
+          </div>
+
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+            <div className="p-2.5 rounded-xl bg-white/80 dark:bg-slate-800/80 border border-slate-200/60 dark:border-slate-700/60">
+              <span className="text-[11px] text-slate-500">بیماران وفادار</span>
+              <p className="text-base font-extrabold text-emerald-600 mt-0.5">{toPersianDigits(retentionSummary.loyalCount)}</p>
+            </div>
+            <div className="p-2.5 rounded-xl bg-white/80 dark:bg-slate-800/80 border border-slate-200/60 dark:border-slate-700/60">
+              <span className="text-[11px] text-slate-500">پایدار و عادی</span>
+              <p className="text-base font-extrabold text-primary-600 mt-0.5">{toPersianDigits(retentionSummary.stableCount)}</p>
+            </div>
+            <div className="p-2.5 rounded-xl bg-white/80 dark:bg-slate-800/80 border border-amber-200/60 dark:border-amber-900/40">
+              <span className="text-[11px] text-amber-600">در معرض ریزش</span>
+              <p className="text-base font-extrabold text-amber-600 mt-0.5">{toPersianDigits(retentionSummary.atRiskCount)}</p>
+            </div>
+            <div className="p-2.5 rounded-xl bg-white/80 dark:bg-slate-800/80 border border-rose-200/60 dark:border-rose-900/40">
+              <span className="text-[11px] text-rose-600">ریزش‌کرده (بازگشت)</span>
+              <p className="text-base font-extrabold text-rose-600 mt-0.5">{toPersianDigits(retentionSummary.churnedCount)}</p>
+            </div>
+          </div>
+
+          {retentionSummary.atRiskPatients.length > 0 && (
+            <div className="mt-3 pt-3 border-t border-indigo-100/60 dark:border-slate-700/60 flex items-center justify-between text-xs">
+              <span className="text-amber-700 dark:text-amber-400 font-medium flex items-center gap-1">
+                <AlertTriangle size={13} className="shrink-0" />
+                {toPersianDigits(retentionSummary.atRiskPatients.length)} بیمار نیازمند ارتباط و پیگیری ویژه جهت پیشگیری از ریزش
+              </span>
+              <Button
+                size="sm"
+                variant="secondary"
+                onClick={() => {
+                  h.tap()
+                  chimes.playPop()
+                  setAtRiskModalOpen(true)
+                }}
+              >
+                مشاهده لیست بیماران ({toPersianDigits(retentionSummary.atRiskPatients.length)}) <ChevronRight size={14} className="mr-0.5 inline" />
+              </Button>
+            </div>
+          )}
+        </Card>
+      )}
+
       <div className="flex items-center gap-1.5 flex-wrap">
-        {(['all', 'cheque', 'installment', 'lab', 'implant', 'manual', 'appointment', 'personal'] as const).map((f) => (
-          <button key={f} onClick={() => { h.select(); setFilter(f) }} className={`px-3 py-1.5 rounded-xl text-xs font-bold ${filter === f ? 'bg-primary-600 text-white' : 'bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300'}`}>
+        {(['all', 'cheque', 'installment', 'lab', 'implant', 'manual', 'appointment', 'personal', 'post_op', 'suture', 'hygiene'] as const).map((f) => (
+          <button key={f} onClick={() => { h.select(); setFilter(f) }} className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${filter === f ? 'bg-primary-600 text-white shadow-sm' : 'bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-650'}`}>
             {f === 'all' ? 'همه' : categoryMeta[f].label}
           </button>
         ))}
@@ -365,6 +492,15 @@ export default function Reminders() {
                     </div>
                   ) : (
                     <div className="flex items-center gap-1 shrink-0">
+                      {it.actionPath && (
+                        <button
+                          onClick={() => { h.tap(); navigate(it.actionPath!) }}
+                          className="p-2 rounded-lg bg-indigo-50 dark:bg-indigo-900/30 text-indigo-600 hover:bg-indigo-100 dark:hover:bg-indigo-900/50 transition-colors"
+                          title={it.actionNeeded || 'انتقال به بخش مربوطه'}
+                        >
+                          <ExternalLink size={16} />
+                        </button>
+                      )}
                       {(() => {
                         const pat = patients.find((p) => `${p.first_name} ${p.last_name}` === it.patientName)
                         if (!pat?.phone) return null
@@ -373,8 +509,9 @@ export default function Reminders() {
                         const categoryLabel: Record<ReminderItem['category'], string> = {
                           cheque: 'چک', installment: 'قسط', lab: 'سفارش لابراتوار',
                           implant: 'مرحله ایمپلنت', manual: 'یادآوری', appointment: 'نوبت', personal: 'مالی',
+                          post_op: 'پیگیری جراحی', suture: 'کشیدن بخیه', hygiene: 'چکاپ دوره‌ای',
                         }
-                        const waText = `${it.patientName} عزیز، یادآوری کلینیک دندانپزشکی مینا (${categoryLabel[it.category]}): ${it.title} — سررسید ${when}${it.amount ? ' — مبلغ ' + formatCurrency(it.amount) + ' تومان' : ''}.`
+                        const waText = it.smsTemplate || `${it.patientName} عزیز، یادآوری کلینیک دندانپزشکی مینا (${categoryLabel[it.category]}): ${it.title} — سررسید ${when}${it.amount ? ' — مبلغ ' + formatCurrency(it.amount) + ' تومان' : ''}.`
                         return (
                           <a
                             href={`https://wa.me/${cleanPhone}?text=${encodeURIComponent(waText)}`}
@@ -422,6 +559,114 @@ export default function Reminders() {
           <Button onClick={handleSave} disabled={saving} className="w-full">
             {saving ? <Spinner size={16} /> : editingReminder ? 'ذخیره‌ی تغییرات' : 'ثبت یادآوری'}
           </Button>
+        </div>
+      </Modal>
+
+      {/* At-Risk Patients CRM Outreach Modal */}
+      <Modal
+        open={atRiskModalOpen}
+        onClose={() => setAtRiskModalOpen(false)}
+        title="مرکز پیشگیری از ریزش و فراخوان مراجعین (CRM Outreach)"
+      >
+        <div className="space-y-3 p-1 max-h-[70vh] overflow-y-auto">
+          <p className="text-xs text-slate-500 dark:text-slate-400">
+            بیمارانی که درمان نیمه‌کاره رها شده دارند، نوبت‌های متوالی لغو کرده‌اند یا فاصله طولانی از آخرین حضورشان سپری شده است:
+          </p>
+
+          {retentionSummary?.atRiskPatients && retentionSummary.atRiskPatients.length > 0 ? (
+            <div className="space-y-2.5">
+              {retentionSummary.atRiskPatients.map((profile) => {
+                const pat = patients.find((p) => p.id === profile.patientId)
+                if (!pat) return null
+                const fullName = `${pat.first_name} ${pat.last_name}`
+                const isChurned = profile.tier === 'churned'
+                const cleanPhone = pat.phone ? pat.phone.replace(/\D/g, '').replace(/^0/, '98') : ''
+                const waMessage = `${pat.first_name} عزیز، از کلینیک دندانپزشکی مینا با شما در تماس هستیم. پیرو روند درمانی قبلی و جهت بررسی وضعیت سلامت دندان‌ها، مایل به تنظیم نوبت جدید برای شما هستیم.`
+
+                return (
+                  <Card
+                    key={profile.patientId}
+                    className={`p-3.5 rounded-2xl border ${
+                      isChurned
+                        ? 'border-rose-300 dark:border-rose-900/60 bg-rose-50/30 dark:bg-rose-950/20'
+                        : 'border-amber-300 dark:border-amber-900/60 bg-amber-50/30 dark:bg-amber-950/20'
+                    }`}
+                  >
+                    <div className="flex items-start justify-between gap-2 flex-wrap mb-2">
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <span className="text-sm font-bold text-slate-800 dark:text-slate-100">{fullName}</span>
+                          <Badge color={profile.tierColor}>
+                            {profile.tierLabel} (امتیاز: {toPersianDigits(profile.score)}٪)
+                          </Badge>
+                        </div>
+                        <p className="text-[11px] text-slate-500 mt-0.5">
+                          آخرین حضور: {toPersianDigits(profile.daysSinceLastVisit)} روز پیش
+                          {profile.outstandingBalance > 0 && ` — مانده بدهی: ${formatCurrency(profile.outstandingBalance)} تومان`}
+                        </p>
+                      </div>
+
+                      <div className="flex items-center gap-1">
+                        {pat.phone && (
+                          <>
+                            <a
+                              href={`tel:${pat.phone}`}
+                              className="p-2 rounded-xl bg-emerald-100 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 hover:bg-emerald-200 transition-colors"
+                              title={`تماس تلفنی با ${fullName}`}
+                            >
+                              <Phone size={15} />
+                            </a>
+                            {cleanPhone && (
+                              <a
+                                href={`https://wa.me/${cleanPhone}?text=${encodeURIComponent(waMessage)}`}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="p-2 rounded-xl bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600 hover:bg-emerald-100 transition-colors"
+                                title="پیامک / پیام در واتساپ"
+                              >
+                                <MessageSquare size={15} />
+                              </a>
+                            )}
+                          </>
+                        )}
+                        <button
+                          onClick={() => {
+                            h.tap()
+                            setAtRiskModalOpen(false)
+                            navigate(`/patients/${profile.patientId}`)
+                          }}
+                          className="p-2 rounded-xl bg-primary-100 dark:bg-primary-950/60 text-primary-700 dark:text-primary-300 hover:bg-primary-200 transition-colors"
+                          title="مشاهده پرونده کامل بیمار"
+                        >
+                          <ExternalLink size={15} />
+                        </button>
+                      </div>
+                    </div>
+
+                    {profile.riskFactors && profile.riskFactors.length > 0 && (
+                      <div className="mt-2 pt-2 border-t border-slate-200/60 dark:border-slate-800/60 space-y-1">
+                        <p className="text-[11px] font-bold text-slate-600 dark:text-slate-300">عوامل ریسک شناسایی‌شده:</p>
+                        <div className="flex flex-wrap gap-1">
+                          {profile.riskFactors.map((rf, rIdx) => (
+                            <span key={rIdx} className="text-[10px] bg-white dark:bg-slate-850 px-2 py-0.5 rounded-md text-amber-700 dark:text-amber-300 border border-amber-200/70 dark:border-amber-900/40">
+                              • {rf}
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    <div className="mt-2 text-[11px] text-slate-500 dark:text-slate-400 flex items-center gap-1 bg-white/60 dark:bg-slate-850/60 p-2 rounded-xl">
+                      <span className="font-bold text-primary-600 dark:text-primary-400 shrink-0">اقدام پیشنهادی هوش بالینی:</span>
+                      <span className="truncate">{profile.recommendedAction}</span>
+                    </div>
+                  </Card>
+                )
+              })}
+            </div>
+          ) : (
+            <p className="text-xs text-slate-400 text-center py-6">هیچ بیماری در وضعیت پرخطر یا ریزش قرار ندارد.</p>
+          )}
         </div>
       </Modal>
     </div>

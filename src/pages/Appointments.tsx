@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useMemo } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
-import { Calendar, Clock, CheckCircle2, User, ChevronRight, ChevronLeft, Plus, Search, AlertCircle, Edit2, Stethoscope, DollarSign, FileText, Activity, List, Grid, X, UserPlus, Globe, Ban, Printer, MessageSquare } from 'lucide-react'
-import { fetchTreatments, fetchPayments, fetchImplantCases, fetchAppointments, createAppointment, updateAppointment, checkConflict, fetchPatients, updatePatient, fetchDoctors, fetchUnits, peekNextFileNumber, createPatient, createEncounter, fetchDoctorSchedules, fetchOnlineBookingRequests, rejectBookingRequest, updateLabOrder, updateImplantCase } from '../lib/api'
+import { Calendar, Clock, CheckCircle2, User, ChevronRight, ChevronLeft, Plus, Search, AlertCircle, Edit2, Stethoscope, DollarSign, FileText, Activity, List, Grid, X, UserPlus, Globe, Ban, Printer, MessageSquare, UserCheck, Volume2, Armchair, Sparkles, Tv } from 'lucide-react'
+import { fetchTreatments, fetchPayments, fetchImplantCases, fetchAppointments, createAppointment, updateAppointment, checkConflict, fetchPatients, updatePatient, fetchDoctors, fetchUnits, peekNextFileNumber, createPatient, createEncounter, fetchDoctorSchedules, fetchOnlineBookingRequests, rejectBookingRequest, updateLabOrder, updateImplantCase, fetchWaitingList, updateWaitingEntry } from '../lib/api'
 import { supabase } from '../lib/supabase'
 import { toJalaliString, toJalaliStringPretty, getJalaliDateInfo, formatTime, timeParts, formatCurrency, toPersianDigits, persianWeekdaysShort, getHoliday, jsDateToPersianWeekday } from '../lib/persianDate'
 import { doctorColor } from '../lib/doctorColors'
@@ -11,7 +11,7 @@ import { doctorsForDay, unitAvailability, patientPickerHint } from '../lib/selec
 import { calcAllPatientBalances } from '../lib/finance'
 import { buildPatientAlerts, alertChips } from '../lib/patientAlerts'
 import { Appointment, AppointmentWithRelations, Patient, Doctor, Unit, DoctorSchedule } from '../types'
-import { Modal, Card, Button, Input, Select, Textarea, EmptyState, showToast, Badge } from '../components/ui'
+import { Modal, Card, Button, Input, Select, Textarea, EmptyState, showToast, Badge, Spinner } from '../components/ui'
 import { ModuleHeader } from '../components/ModuleHeader'
 import { useConfirmAction, ConfirmActionConfig } from '../components/ConfirmAction'
 import { h } from '../lib/haptics'
@@ -23,6 +23,8 @@ import { MultiChairGrid } from '../components/MultiChairGrid'
 import { buildPrintDocument } from '../lib/printDocument'
 import { detectSpecialty, CANCELLATION_REASONS } from '../lib/appointmentColorMap'
 import { tileThemes, getHashColor } from '../lib/colors'
+import { computeWaitingTimeMinutes, formatWaitingTime, announcePatientCall, broadcastPatientCall, computeAverageWaitingTime } from '../lib/operatoryWorkflow'
+import { matchWaitingListForCancelledSlot, MatchCandidate, SlotInfo } from '../lib/waitingListMatcher'
 
 const typeMeta: Record<string, { label: string; color: string; bg: string; dot: string }> = {
   consultation:  { label: 'مشاوره',      color: 'text-primary-700',  bg: 'bg-primary-50',  dot: 'bg-primary-500' },
@@ -42,6 +44,7 @@ const typeMeta: Record<string, { label: string; color: string; bg: string; dot: 
 const statusMeta: Record<string, { label: string; bg: string; color: string }> = {
   scheduled:  { label: 'در انتظار',    bg: 'bg-slate-100',  color: 'text-slate-600' },
   confirmed:  { label: 'تایید شده',    bg: 'bg-primary-100',color: 'text-primary-700' },
+  arrived:    { label: 'در سالن انتظار', bg: 'bg-teal-100 dark:bg-teal-950/40', color: 'text-teal-800 dark:text-teal-300' },
   in_chair:   { label: 'روی صندلی',    bg: 'bg-warning-100',color: 'text-warning-700' },
   completed:  { label: 'تکمیل شد',     bg: 'bg-success-100',color: 'text-success-700' },
   cancelled:  { label: 'لغو شد',        bg: 'bg-error-100',  color: 'text-error-700' },
@@ -86,6 +89,10 @@ export default function Appointments() {
   const [cancelModalAppt, setCancelModalAppt] = useState<AppointmentWithRelations | null>(null)
   const [cancelReason, setCancelReason] = useState<string>(CANCELLATION_REASONS[0].label)
   const [cancelNote, setCancelNote] = useState<string>('')
+  const [waitingCandidates, setWaitingCandidates] = useState<MatchCandidate[]>([])
+  const [backfillModalOpen, setBackfillModalOpen] = useState(false)
+  const [freedSlotInfo, setFreedSlotInfo] = useState<SlotInfo | null>(null)
+  const [assigningBackfill, setAssigningBackfill] = useState(false)
 
   // Wizard state
   const [wizardOpen, setWizardOpen] = useState(false)
@@ -536,7 +543,17 @@ export default function Appointments() {
         ...(offerEncounter ? [{ label: 'ثبت ویزیت', value: 'همزمان یک ویزیت جدید برای ثبت درمان باز می‌شود' }] : []),
       ],
       onConfirm: async () => {
-        await updateAppointment(appt.id, { status: newStatus })
+        const patch: Record<string, any> = { status: newStatus }
+        const nowIso = new Date().toISOString()
+        if (newStatus === 'arrived' && !appt.check_in_time) {
+          patch.check_in_time = nowIso
+        } else if (newStatus === 'in_chair') {
+          if (!appt.chair_entry_time) patch.chair_entry_time = nowIso
+          if (!appt.check_in_time) patch.check_in_time = nowIso
+        } else if (newStatus === 'completed') {
+          if (!appt.chair_exit_time) patch.chair_exit_time = nowIso
+        }
+        await updateAppointment(appt.id, patch as any)
         chimes.playSuccess()
         if (offerEncounter) {
           const enc = await createEncounter({
@@ -557,6 +574,32 @@ export default function Appointments() {
     })
   }
 
+  const handleCallPatient = async (appt: AppointmentWithRelations) => {
+    h.tap()
+    const pName = patientName(appt)
+    const uName = unitName(appt)
+    const dName = doctorName(appt)
+
+    // Calculate today's turn sequence
+    const todayAppts = appointments
+      .filter((a) => a.date === appt.date)
+      .sort((a, b) => (a.start_time || '').localeCompare(b.start_time || ''))
+    const turnIndex = todayAppts.findIndex((a) => a.id === appt.id)
+    const turnNumber = turnIndex >= 0 ? turnIndex + 1 : undefined
+
+    const options = {
+      patientName: pName,
+      unitName: uName,
+      doctorName: dName,
+      turnNumber,
+      fileNumber: appt.patient?.file_number,
+    }
+
+    broadcastPatientCall(options)
+    await announcePatientCall(options)
+    showToast('info', `فراخوان ${turnNumber ? `نوبت ${toPersianDigits(turnNumber)}` : 'بیمار'}: ${pName} (مانیتور سالن انتظار)`)
+  }
+
   // ── Smart Clinical Cancellation with Reason ──
   const handleDelete = (appt: AppointmentWithRelations) => {
     setCancelReason(CANCELLATION_REASONS[0].label)
@@ -568,6 +611,14 @@ export default function Appointments() {
     if (!cancelModalAppt) return
     const noteSuffix = ` [علت لغو: ${cancelReason}${cancelNote.trim() ? ` - ${cancelNote.trim()}` : ''}]`
     const updatedNotes = ((cancelModalAppt.notes || '') + noteSuffix).trim()
+    
+    const freedSlot: SlotInfo = {
+      date: cancelModalAppt.date,
+      start_time: cancelModalAppt.start_time,
+      doctor_id: cancelModalAppt.doctor_id,
+      unit_id: cancelModalAppt.unit_id,
+    }
+
     await updateAppointment(cancelModalAppt.id, {
       status: 'cancelled',
       notes: updatedNotes,
@@ -576,6 +627,55 @@ export default function Appointments() {
     setCancelModalAppt(null)
     showToast('info', 'نوبت لغو و علت در تاریخچه ثبت شد')
     await loadData()
+
+    // Smart Waiting List Backfill Detection
+    try {
+      const wl = await fetchWaitingList()
+      const candidates = matchWaitingListForCancelledSlot(freedSlot, wl)
+      if (candidates.length > 0) {
+        setFreedSlotInfo(freedSlot)
+        setWaitingCandidates(candidates.slice(0, 5))
+        setBackfillModalOpen(true)
+      }
+    } catch (err) {
+      console.error('Error matching waiting list:', err)
+    }
+  }
+
+  const handleAssignBackfill = async (candidate: MatchCandidate) => {
+    if (!freedSlotInfo) return
+    setAssigningBackfill(true)
+    try {
+      const pat = candidate.entry.patient
+      await createAppointment({
+        patient_id: candidate.entry.patient_id,
+        doctor_id: freedSlotInfo.doctor_id || null,
+        unit_id: freedSlotInfo.unit_id || null,
+        date: freedSlotInfo.date,
+        start_time: freedSlotInfo.start_time,
+        end_time: addMinutes(freedSlotInfo.start_time, 30),
+        type: 'treatment',
+        status: 'scheduled',
+        notes: `تخصیص‌یافته از صف انتظار (علت: ${candidate.entry.reason || '—'})`,
+      } as any)
+
+      await updateWaitingEntry(candidate.entry.id, {
+        status: 'scheduled',
+      })
+
+      chimes.playSuccess()
+      showToast('success', `نوبت جدید با موفقیت به ${pat ? `${pat.first_name} ${pat.last_name}` : 'بیمار لیست انتظار'} اختصاص داده شد`)
+      setBackfillModalOpen(false)
+      setWaitingCandidates([])
+      setFreedSlotInfo(null)
+      await loadData()
+    } catch (err) {
+      console.error('Error assigning backfill appointment:', err)
+      chimes.playWarning()
+      showToast('error', 'خطا در تخصیص نوبت از لیست انتظار')
+    } finally {
+      setAssigningBackfill(false)
+    }
   }
 
   const ptr = usePullToRefresh(async () => { await loadData() })
@@ -827,6 +927,20 @@ export default function Appointments() {
             <Grid size={16} />
           </button>
         </div>
+
+        {/* ── Waiting Room TV Display Launcher Button ── */}
+        <button
+          type="button"
+          onClick={() => {
+            h.tap()
+            window.open('#/waiting-room', '_blank')
+          }}
+          className="px-2.5 py-1.5 rounded-xl bg-teal-50 dark:bg-teal-950/40 border border-teal-200 dark:border-teal-800 text-teal-700 dark:text-teal-300 hover:bg-teal-100 dark:hover:bg-teal-900/60 transition-all-smooth press-scale flex items-center gap-1.5 text-xs font-bold shrink-0"
+          title="باز کردن مانیتور سالن انتظار (مخصوص تلویزیون و نمایشگر عمومی)"
+        >
+          <Tv size={15} />
+          <span className="hidden sm:inline">تلویزیون سالن انتظار</span>
+        </button>
       </div>
 
       {showSearch && (
@@ -898,6 +1012,8 @@ export default function Appointments() {
           doctors={doctors}
           appointments={appointments}
           onSelectAppointment={(appt) => openWizard(appt)}
+          onCallPatient={handleCallPatient}
+          onQuickStatus={quickStatus}
           onNewAppointmentAtSlot={(date, startTime, unitId, doctorId) => {
             openWizard(null, {
               date,
@@ -964,6 +1080,11 @@ export default function Appointments() {
                         {spec.label}
                       </span>
                       <span className={`status-pill ${sm.bg} ${sm.color}`}>{sm.label}</span>
+                      {appt.status === 'arrived' && appt.check_in_time && (
+                        <span className="text-[10px] px-2 py-0.5 rounded-lg font-bold bg-teal-50 dark:bg-teal-950/40 text-teal-700 dark:text-teal-300 border border-teal-200 dark:border-teal-800 animate-pulse">
+                          ⏳ {formatWaitingTime(computeWaitingTimeMinutes(appt.check_in_time))}
+                        </span>
+                      )}
                     </div>
                     <div className="flex items-center gap-3 text-[11px] text-slate-500">
                       <span className="flex items-center gap-1"><User size={11} /> {doctorName(appt)}</span>
@@ -993,10 +1114,25 @@ export default function Appointments() {
                         </a>
                       )
                     })()}
+                    {(appt.status === 'scheduled' || appt.status === 'confirmed') && (
+                      <button onClick={() => quickStatus(appt, 'arrived')} aria-label="اعلام حضور در مطب" className="p-1.5 rounded-lg bg-teal-50 text-teal-700 hover:bg-teal-100 transition-all-smooth press-scale" title="اعلام حضور بیمار در کلینیک (پذیرش سالن انتظار)">
+                        <UserCheck size={16} />
+                      </button>
+                    )}
                     {appt.status === 'scheduled' && (
                       <button onClick={() => quickStatus(appt, 'confirmed')} aria-label="تایید نوبت" className="p-1.5 rounded-lg bg-primary-50 text-primary-600 hover:bg-primary-100 transition-all-smooth press-scale" title="تایید نوبت">
                         <CheckCircle2 size={16} />
                       </button>
+                    )}
+                    {appt.status === 'arrived' && (
+                      <>
+                        <button onClick={() => handleCallPatient(appt)} aria-label="فراخوان صوتی بیمار" className="p-1.5 rounded-lg bg-indigo-50 text-indigo-700 hover:bg-indigo-100 transition-all-smooth press-scale animate-bounce" title="فراخوان صوتی بیمار به یونیت">
+                          <Volume2 size={16} />
+                        </button>
+                        <button onClick={() => quickStatus(appt, 'in_chair')} aria-label="ورود به یونیت" className="p-1.5 rounded-lg bg-warning-50 text-warning-700 hover:bg-warning-100 transition-all-smooth press-scale" title="نشاندن بیمار روی صندلی یونیت">
+                          <Armchair size={16} />
+                        </button>
+                      </>
                     )}
                     {appt.status === 'confirmed' && (
                       <>
@@ -1562,6 +1698,86 @@ export default function Appointments() {
               </Button>
               <Button variant="danger" onClick={confirmCancelWithReason}>
                 <Ban size={15} /> تایید لغو نوبت
+              </Button>
+            </div>
+          </div>
+        </Modal>
+      )}
+
+      {/* ── مدال پیشنهاد جایگزینی هوشمند از لیست انتظار ── */}
+      {backfillModalOpen && freedSlotInfo && (
+        <Modal
+          open={backfillModalOpen}
+          onClose={() => setBackfillModalOpen(false)}
+          title="⚡ پیشنهاد جایگزینی هوشمند از لیست انتظار"
+          size="md"
+        >
+          <div className="space-y-4">
+            <div className="p-3.5 rounded-2xl bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 text-xs text-amber-900 dark:text-amber-200 space-y-1">
+              <p className="font-bold flex items-center gap-1.5 text-amber-800 dark:text-amber-300">
+                <Sparkles size={16} className="text-amber-600 shrink-0" />
+                وقت نوبت زیر با لغو آزاد شد:
+              </p>
+              <div className="flex items-center gap-3 font-medium text-[11px] pt-1 text-slate-600 dark:text-slate-300 flex-wrap">
+                <span>📅 {toJalaliStringPretty(freedSlotInfo.date)}</span>
+                <span>⏰ ساعت {toPersianDigits(freedSlotInfo.start_time)}</span>
+                {freedSlotInfo.doctor_id && (
+                  <span>👨‍⚕️ {doctors.find((d) => d.id === freedSlotInfo.doctor_id)?.name || 'پزشک'}</span>
+                )}
+              </div>
+            </div>
+
+            <p className="text-xs text-slate-600 dark:text-slate-300 font-medium">
+              بیماران زیر در لیست انتظار ثبت شده‌اند و بر اساس اولویت و تطابق، بهترین کاندیداها هستند:
+            </p>
+
+            <div className="space-y-2 max-h-60 overflow-y-auto dock-scroll p-1">
+              {waitingCandidates.map((cand) => {
+                const pat = cand.entry.patient
+                return (
+                  <div
+                    key={cand.entry.id}
+                    className="p-3 rounded-xl bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 flex items-center justify-between gap-2.5 hover:border-primary-400 transition-all-smooth"
+                  >
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs font-bold text-slate-800 dark:text-slate-100 truncate">
+                          {pat ? `${pat.first_name} ${pat.last_name}` : 'بیمار'}
+                        </span>
+                        <Badge color={cand.entry.priority === 4 ? 'error' : cand.entry.priority === 3 ? 'warning' : 'primary'}>
+                          {cand.entry.priority === 4 ? 'فوری' : cand.entry.priority === 3 ? 'بالا' : 'عادی'}
+                        </Badge>
+                      </div>
+                      <p className="text-[11px] text-teal-600 dark:text-teal-400 mt-1 font-medium truncate">
+                        {cand.matchReason}
+                      </p>
+                      {cand.entry.reason && (
+                        <p className="text-[11px] text-slate-400 truncate mt-0.5">
+                          علت: {cand.entry.reason}
+                        </p>
+                      )}
+                    </div>
+                    <Button
+                      size="sm"
+                      variant="primary"
+                      onClick={() => handleAssignBackfill(cand)}
+                      disabled={assigningBackfill}
+                      className="shrink-0 text-xs flex items-center gap-1 bg-gradient-to-r from-teal-600 to-emerald-600 text-white"
+                    >
+                      {assigningBackfill ? <Spinner size={14} /> : (
+                        <>
+                          <CheckCircle2 size={14} /> تخصیص وقت
+                        </>
+                      )}
+                    </Button>
+                  </div>
+                )
+              })}
+            </div>
+
+            <div className="flex justify-end pt-2 border-t border-slate-100 dark:border-slate-700">
+              <Button variant="secondary" onClick={() => setBackfillModalOpen(false)}>
+                صرف‌نظر (خالی ماندن وقت)
               </Button>
             </div>
           </div>

@@ -11,6 +11,8 @@ import {
   ChevronDown,
   Lock,
   AlertCircle,
+  Users,
+  Printer,
 } from 'lucide-react'
 import { formatCurrency, toJalaliStringPretty, toPersianDigits } from '../lib/persianDate'
 import { calcPatientBalance } from '../lib/finance'
@@ -18,11 +20,13 @@ import { resolveAttribution } from '../lib/paymentAttribution'
 import { toothLabelWithWord } from '../lib/toothLabel'
 import { summariseCheques, type ChequeLike } from '../lib/chequeSummary'
 import { PatientDebtBar } from './PatientDebtBar'
+import { calculateHouseholdBalance, generateHouseholdStatementHtml } from '../lib/familyBilling'
+import { showToast } from './ui'
 import { h } from '../lib/haptics'
 import { chimes } from '../lib/chimes'
 import { useOptionalAuth } from '../lib/auth'
 import { canEditFinancialPrice } from '../lib/permissions'
-import type { Payment, Treatment, Doctor, ImplantCase, PaymentPlan, Installment } from '../types'
+import type { Payment, Treatment, Doctor, ImplantCase, PaymentPlan, Installment, Patient } from '../types'
 
 export interface PatientFinanceOverviewProps {
   patientId: string
@@ -42,6 +46,10 @@ export interface PatientFinanceOverviewProps {
   onClearCheque?: (cheque: ChequeLike) => void
   onBounceCheque?: (cheque: ChequeLike) => void
   hasMedicalAlerts?: boolean
+  currentPatient?: Patient
+  allPatients?: Patient[]
+  allPayments?: Payment[]
+  allTreatments?: Treatment[]
 }
 
 export function PatientFinanceOverview({
@@ -62,8 +70,38 @@ export function PatientFinanceOverview({
   onClearCheque,
   onBounceCheque,
   hasMedicalAlerts = false,
+  currentPatient,
+  allPatients = [],
+  allPayments,
+  allTreatments,
 }: PatientFinanceOverviewProps) {
   const todayStr = useMemo(() => new Date().toISOString().slice(0, 10), [])
+
+  const householdProfile = useMemo(() => {
+    if (!allPatients || allPatients.length === 0) return null
+    return calculateHouseholdBalance(
+      currentPatient || patientId,
+      allPatients,
+      allPayments || payments,
+      allTreatments || treatments,
+      implantCases,
+    )
+  }, [currentPatient, patientId, allPatients, allPayments, payments, allTreatments, treatments, implantCases])
+
+  const handlePrintHouseholdStatement = () => {
+    if (!householdProfile) return
+    h.tap()
+    chimes.playPop()
+    const html = generateHouseholdStatementHtml(householdProfile)
+    const win = window.open('', '_blank')
+    if (!win) {
+      showToast('error', 'اجازه‌ی باز کردن پنجره چاپ داده نشد')
+      return
+    }
+    win.document.write(html)
+    win.document.close()
+    win.focus()
+  }
 
   const mine = useMemo(
     () =>
@@ -178,6 +216,84 @@ export function PatientFinanceOverview({
           )}
         </div>
       </div>
+
+      {/* ── Household Master Account (حساب مالی خانوادگی) ──────────── */}
+      {householdProfile && (
+        <div className="p-3.5 rounded-2xl bg-gradient-to-br from-teal-50/80 via-emerald-50/50 to-slate-50 dark:from-teal-950/30 dark:via-emerald-950/20 dark:to-slate-900/40 border border-teal-200/80 dark:border-teal-800/60 shadow-xs">
+          <div className="flex items-center justify-between flex-wrap gap-2 mb-2.5">
+            <div className="flex items-center gap-2">
+              <span className="p-1.5 rounded-xl bg-teal-600 text-white shadow-xs">
+                <Users size={16} />
+              </span>
+              <div>
+                <div className="flex items-center gap-2">
+                  <span className="text-xs font-bold text-slate-800 dark:text-slate-100">
+                    حساب مالی خانوادگی (سرپرست: {householdProfile.head.first_name} {householdProfile.head.last_name})
+                  </span>
+                  <span className="text-[10px] px-2 py-0.5 rounded-full bg-teal-100 dark:bg-teal-900/50 text-teal-800 dark:text-teal-300 font-bold">
+                    {toPersianDigits(householdProfile.members.length)} عضو
+                  </span>
+                </div>
+                <p className="text-[11px] text-slate-500 dark:text-slate-400">
+                  مانده تجمیعی کل اعضای خانواده:{' '}
+                  <b className={householdProfile.netRemaining > 0 ? 'text-error-600' : 'text-emerald-600'}>
+                    {householdProfile.netRemaining > 0
+                      ? `${formatCurrency(householdProfile.netRemaining)} تومان بدهکار`
+                      : householdProfile.netRemaining < 0
+                        ? `${formatCurrency(Math.abs(householdProfile.netRemaining))} تومان بستانکار`
+                        : 'تسویه کامل'}
+                  </b>
+                </p>
+              </div>
+            </div>
+
+            <button
+              type="button"
+              onClick={handlePrintHouseholdStatement}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700 text-teal-700 dark:text-teal-300 text-xs font-bold border border-teal-200 dark:border-teal-800 transition-all shadow-xs press-scale"
+              title="چاپ صورت‌حساب رسمی تجمیعی خانوار"
+            >
+              <Printer size={13} />
+              <span>صورت‌حساب خانوار</span>
+            </button>
+          </div>
+
+          {/* Quick Member Badges */}
+          <div className="flex items-center gap-1.5 flex-wrap pt-2 border-t border-teal-100 dark:border-teal-900/40">
+            {householdProfile.members.map((m) => {
+              const isCurrent = m.patient.id === patientId
+              return (
+                <div
+                  key={m.patient.id}
+                  className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs ${
+                    isCurrent
+                      ? 'bg-teal-600 text-white font-bold'
+                      : 'bg-white/80 dark:bg-slate-800/80 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700'
+                  }`}
+                >
+                  <span>
+                    {m.patient.first_name} {m.patient.last_name}
+                  </span>
+                  <span className={`text-[10px] ${isCurrent ? 'text-teal-100' : 'text-slate-400'}`}>
+                    ({m.relationshipLabel})
+                  </span>
+                  <span
+                    className={`font-mono text-[11px] ${
+                      isCurrent
+                        ? 'text-white'
+                        : m.balance.balance > 0
+                          ? 'text-error-600 dark:text-error-400 font-bold'
+                          : 'text-emerald-600 dark:text-emerald-400 font-bold'
+                    }`}
+                  >
+                    {m.balance.balance > 0 ? `${formatCurrency(m.balance.balance)} بدهکار` : 'تسویه'}
+                  </span>
+                </div>
+              )
+            })}
+          </div>
+        </div>
+      )}
 
       {/* ── Balance / Debt Bar ──────────────────────────────────── */}
       <PatientDebtBar patientId={patientId} balance={balance} />

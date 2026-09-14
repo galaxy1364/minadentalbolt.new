@@ -7,6 +7,7 @@ import { toJalaliStringPretty, formatCurrency, toPersianDigits } from '../lib/pe
 import { Patient, Doctor, Payment, Treatment, ImplantCase } from '../types'
 import { Modal, Card, Button, Input, Select, Textarea, Spinner, EmptyState, showToast, HighlightText, SkeletonList } from '../components/ui'
 import { PatientPhotoUpload } from '../components/PatientPhotoUpload'
+import { PatientSelect } from '../components/PatientSelect'
 import { PersianDateInput } from '../components/PersianDateInput'
 import { ModuleHeader } from '../components/ModuleHeader'
 import { useConfirmAction, ConfirmActionConfig } from '../components/ConfirmAction'
@@ -49,6 +50,9 @@ const emptyForm = {
   insurance_info: '', insurance_number: '', notes: '', vip_level: '0',
   file_number: '', file_number_manual: false, is_active: 'true', primary_doctor_id: '', tags: '',
   avatar_url: '', referral_source: '',
+  anticoagulant_use: false, inr_value: '', bisphosphonate_use: false,
+  bp_systolic: '', bp_diastolic: '', diabetes_hba1c: '', endocarditis_prophylaxis: false,
+  pregnancy_trimester: '', family_head_id: '',
 }
 
 export default function Patients() {
@@ -175,6 +179,15 @@ export default function Patients() {
       file_number_manual: patient.file_number_manual ?? false, is_active: String(patient.is_active),
       primary_doctor_id: patient.primary_doctor_id || '', tags: (patient.tags || []).join(', '),
       avatar_url: patient.avatar_url || '', referral_source: patient.referral_source || '',
+      anticoagulant_use: Boolean(patient.anticoagulant_use),
+      inr_value: patient.inr_value != null ? String(patient.inr_value) : '',
+      bisphosphonate_use: Boolean(patient.bisphosphonate_use),
+      bp_systolic: patient.bp_systolic != null ? String(patient.bp_systolic) : '',
+      bp_diastolic: patient.bp_diastolic != null ? String(patient.bp_diastolic) : '',
+      diabetes_hba1c: patient.diabetes_hba1c != null ? String(patient.diabetes_hba1c) : '',
+      endocarditis_prophylaxis: Boolean(patient.endocarditis_prophylaxis),
+      pregnancy_trimester: patient.pregnancy_trimester != null ? String(patient.pregnancy_trimester) : '',
+      family_head_id: patient.family_head_id || '',
     })
     setModalOpen(true)
     h.pop()
@@ -257,6 +270,15 @@ export default function Patients() {
           primary_doctor_id: formData.primary_doctor_id || null,
           tags: formData.tags ? formData.tags.split(',').map((t) => t.trim()).filter(Boolean) : [],
           avatar_url: formData.avatar_url || null, credit_limit: null, referral_source: formData.referral_source || null,
+          anticoagulant_use: formData.anticoagulant_use || false,
+          inr_value: formData.inr_value ? Number(formData.inr_value) : null,
+          bisphosphonate_use: formData.bisphosphonate_use || false,
+          bp_systolic: formData.bp_systolic ? Number(formData.bp_systolic) : null,
+          bp_diastolic: formData.bp_diastolic ? Number(formData.bp_diastolic) : null,
+          diabetes_hba1c: formData.diabetes_hba1c ? Number(formData.diabetes_hba1c) : null,
+          endocarditis_prophylaxis: formData.endocarditis_prophylaxis || false,
+          pregnancy_trimester: formData.pregnancy_trimester ? Number(formData.pregnancy_trimester) : null,
+          family_head_id: formData.family_head_id || null,
         } as any
         try {
           if (editingPatient) {
@@ -648,6 +670,101 @@ export default function Patients() {
                 <Textarea label="بیماری‌های زمینه‌ای" value={formData.medical_conditions} onChange={(v) => setFormData((p) => ({ ...p, medical_conditions: v }))} placeholder="بیماری‌های زمینه‌ای..." rows={2} />
               </div>
             </div>
+            <div className="p-3.5 rounded-2xl bg-rose-50/50 dark:bg-rose-950/20 border border-rose-200/70 dark:border-rose-900/50 space-y-3">
+              <h4 className="text-xs font-bold text-rose-800 dark:text-rose-300 flex items-center gap-1.5">
+                <AlertCircle size={14} className="text-rose-600" />
+                غربالگری بالینی و عوامل پرخطر دندانپزشکی (استاندارد ADA / نظام پزشکی)
+              </h4>
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                <div className="space-y-1.5 p-2.5 rounded-xl bg-white/80 dark:bg-slate-800/80 border border-rose-100 dark:border-rose-900/40">
+                  <label className="flex items-center gap-2 cursor-pointer text-xs font-bold text-slate-700 dark:text-slate-200">
+                    <input
+                      type="checkbox"
+                      checked={Boolean(formData.anticoagulant_use)}
+                      onChange={(e) => setFormData((p) => ({ ...p, anticoagulant_use: e.target.checked }))}
+                      className="w-4 h-4 rounded text-rose-600 focus:ring-rose-400"
+                    />
+                    مصرف داروی ضد انعقاد
+                  </label>
+                  <Input
+                    label="آخرین مقدار INR"
+                    value={formData.inr_value}
+                    onChange={(v) => setFormData((p) => ({ ...p, inr_value: v }))}
+                    placeholder="مثال: ۲.۵"
+                    dir="ltr"
+                  />
+                </div>
+
+                <div className="space-y-1.5 p-2.5 rounded-xl bg-white/80 dark:bg-slate-800/80 border border-rose-100 dark:border-rose-900/40">
+                  <label className="flex items-center gap-2 cursor-pointer text-xs font-bold text-slate-700 dark:text-slate-200">
+                    <input
+                      type="checkbox"
+                      checked={Boolean(formData.bisphosphonate_use)}
+                      onChange={(e) => setFormData((p) => ({ ...p, bisphosphonate_use: e.target.checked }))}
+                      className="w-4 h-4 rounded text-rose-600 focus:ring-rose-400"
+                    />
+                    مصرف بیس‌فسفونات‌ها
+                  </label>
+                  <p className="text-[11px] text-slate-500">ریسک استئونکروز فک در جراحی و ایمپلنت</p>
+                </div>
+
+                <div className="space-y-1.5 p-2.5 rounded-xl bg-white/80 dark:bg-slate-800/80 border border-rose-100 dark:border-rose-900/40">
+                  <label className="flex items-center gap-2 cursor-pointer text-xs font-bold text-slate-700 dark:text-slate-200">
+                    <input
+                      type="checkbox"
+                      checked={Boolean(formData.endocarditis_prophylaxis)}
+                      onChange={(e) => setFormData((p) => ({ ...p, endocarditis_prophylaxis: e.target.checked }))}
+                      className="w-4 h-4 rounded text-rose-600 focus:ring-rose-400"
+                    />
+                    ریسک اندوکاردیت
+                  </label>
+                  <p className="text-[11px] text-slate-500">ضرورت پروفیلاکسی آنتی‌بیوتیک پیش از ویزیت</p>
+                </div>
+
+                <div className="space-y-1.5 p-2.5 rounded-xl bg-white/80 dark:bg-slate-800/80 border border-rose-100 dark:border-rose-900/40">
+                  <div className="grid grid-cols-2 gap-2">
+                    <Input
+                      label="فشار سیستول"
+                      value={formData.bp_systolic}
+                      onChange={(v) => setFormData((p) => ({ ...p, bp_systolic: v }))}
+                      placeholder="۱۲۰"
+                      dir="ltr"
+                    />
+                    <Input
+                      label="فشار دیاستول"
+                      value={formData.bp_diastolic}
+                      onChange={(v) => setFormData((p) => ({ ...p, bp_diastolic: v }))}
+                      placeholder="۸۰"
+                      dir="ltr"
+                    />
+                  </div>
+                </div>
+
+                <div className="space-y-1.5 p-2.5 rounded-xl bg-white/80 dark:bg-slate-800/80 border border-rose-100 dark:border-rose-900/40">
+                  <Input
+                    label="دیابت: شاخص HbA1c (%)"
+                    value={formData.diabetes_hba1c}
+                    onChange={(v) => setFormData((p) => ({ ...p, diabetes_hba1c: v }))}
+                    placeholder="مثال: ۷.۲"
+                    dir="ltr"
+                  />
+                </div>
+
+                <div className="space-y-1.5 p-2.5 rounded-xl bg-white/80 dark:bg-slate-800/80 border border-rose-100 dark:border-rose-900/40">
+                  <Select
+                    label="وضعیت بارداری"
+                    value={formData.pregnancy_trimester}
+                    onChange={(v) => setFormData((p) => ({ ...p, pregnancy_trimester: v }))}
+                    options={[
+                      { value: '', label: 'عدم بارداری / نامشخص' },
+                      { value: '1', label: 'سه‌ماهه اول (ترایمستر ۱)' },
+                      { value: '2', label: 'سه‌ماهه دوم (ترایمستر ۲)' },
+                      { value: '3', label: 'سه‌ماهه سوم (ترایمستر ۳)' },
+                    ]}
+                  />
+                </div>
+              </div>
+            </div>
             <div>
               <h4 className="text-xs font-bold text-slate-500 mb-3 uppercase tracking-wider">بیمه و دسته‌بندی</h4>
               <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
@@ -668,6 +785,16 @@ export default function Patients() {
                   ]}
                   placeholder="انتخاب..."
                 />
+              </div>
+              <div className="mt-3">
+                <PatientSelect
+                  label="سرپرست خانواده (جهت تجمیع حساب)"
+                  value={formData.family_head_id || ''}
+                  onChange={(v) => setFormData((p) => ({ ...p, family_head_id: v }))}
+                  patients={patients.filter(p => p.id !== editingPatient?.id)} // Cannot be their own head
+                  placeholder="بدون سرپرست (حساب مستقل)"
+                />
+                <p className="text-[11px] text-slate-500 mt-1">با انتخاب سرپرست خانواده، مانده حساب این بیمار با سرپرست او تجمیع می‌شود.</p>
               </div>
             </div>
             <Textarea label="یادداشت" value={formData.notes} onChange={(v) => setFormData((p) => ({ ...p, notes: v }))} placeholder="یادداشت‌های بیمار..." />

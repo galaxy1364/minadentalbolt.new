@@ -1,7 +1,8 @@
 // Insurance.tsx - Persian RTL Dental Clinic Insurance Management
 import { useState, useEffect, useCallback, useMemo } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
-import { Shield, FileText, Search, Building2, Percent, Eye, Plus, Edit2, Phone, MapPin, Wallet, CheckCircle2, Ban, Archive, MessageSquare } from 'lucide-react'
+import { Shield, FileText, Search, Building2, Percent, Eye, Plus, Edit2, Phone, MapPin, Wallet, CheckCircle2, Ban, Archive, MessageSquare, Printer } from 'lucide-react'
+import { generateInsuranceClaimPrintData } from '../lib/insurance'
 import { PieChart, Pie, Cell, XAxis, YAxis, Tooltip as RTooltip, ResponsiveContainer, Legend } from 'recharts'
 import {
   fetchInsuranceCompanies, fetchInsuranceClaims,
@@ -57,7 +58,7 @@ export default function Insurance() {
   const [companyModalOpen, setCompanyModalOpen] = useState(false)
   const [companyWizardStep, setCompanyWizardStep] = useState(0)
   const [editingCompany, setEditingCompany] = useState<InsuranceCompany | null>(null)
-  const [companyForm, setCompanyForm] = useState({ name: '', code: '', phone: '', address: '', coverage_percentage: '', discount_percentage: '', is_active: 'true' })
+  const [companyForm, setCompanyForm] = useState({ name: '', code: '', phone: '', address: '', coverage_percentage: '', discount_percentage: '', tier: 'supplementary', is_active: 'true' })
   const [savingCompany, setSavingCompany] = useState(false)
 
   // Claim modal
@@ -112,24 +113,26 @@ export default function Insurance() {
   }, [companies, searchQuery])
 
   const filteredClaims = useMemo(() => {
-    return claims.filter((c) => {
-      if (searchQuery) {
-        const name = c.patient ? `${c.patient.first_name} ${c.patient.last_name}` : ''
-        const comp = c.company?.name || ''
-        if (!name.toLowerCase().includes(searchQuery.toLowerCase()) && !comp.toLowerCase().includes(searchQuery.toLowerCase())) return false
-      }
-      if (filterStatus && c.status !== filterStatus) return false
-      return true
-    })
-  }, [claims, searchQuery, filterStatus])
+    let result = claims
+    if (filterStatus) {
+      result = result.filter((c) => c.status === filterStatus)
+    }
+    if (searchQuery) {
+      const q = searchQuery.toLowerCase()
+      result = result.filter((c) =>
+        (c.patient ? `${c.patient.first_name} ${c.patient.last_name}`.toLowerCase() : '').includes(q) ||
+        (c.company?.name || '').toLowerCase().includes(q)
+      )
+    }
+    return result
+  }, [claims, filterStatus, searchQuery])
 
-  const stats = useMemo(() => {
+  const claimStats = useMemo(() => {
     const totalClaims = claims.length
-    const approvedCount = claims.filter((c) => c.status === 'approved' || c.status === 'partially_approved').length
+    const totalAmount = claims.reduce((s, c) => s + (c.amount || 0), 0)
+    const totalApproved = claims.reduce((s, c) => s + (c.approved_amount || 0), 0)
     const pendingCount = claims.filter((c) => c.status === 'submitted' || c.status === 'under_review').length
-    const totalAmount = claims.reduce((sum, c) => sum + (c.amount || 0), 0)
-    const approvedAmount = claims.reduce((sum, c) => sum + (c.approved_amount || 0), 0)
-    return { totalClaims, approvedCount, pendingCount, totalAmount, approvedAmount }
+    return { totalClaims, totalAmount, totalApproved, pendingCount }
   }, [claims])
 
   const claimsByStatusChart = useMemo(() => {
@@ -149,7 +152,7 @@ export default function Insurance() {
   const openCreateCompany = () => {
     setEditingCompany(null)
     setCompanyWizardStep(0)
-    setCompanyForm({ name: '', code: '', phone: '', address: '', coverage_percentage: '', discount_percentage: '', is_active: 'true' })
+    setCompanyForm({ name: '', code: '', phone: '', address: '', coverage_percentage: '', discount_percentage: '', tier: 'supplementary', is_active: 'true' })
     setCompanyModalOpen(true)
   }
 
@@ -162,10 +165,43 @@ export default function Insurance() {
       address: c.address || '',
       coverage_percentage: c.coverage_percentage != null ? String(c.coverage_percentage) : '',
       discount_percentage: c.discount_percentage != null ? String(c.discount_percentage) : '',
+      tier: c.tier || 'supplementary',
       is_active: c.is_active ? 'true' : 'false',
     })
     setCompanyWizardStep(0)
     setCompanyModalOpen(true)
+  }
+
+  const handlePrintClaimCertificate = (c: InsuranceClaimWithRelations) => {
+    const patient = patients.find((p) => p.id === c.patient_id)
+    const patientName = patient ? `${patient.first_name || ''} ${patient.last_name || ''}`.trim() : 'بیمار گرامی'
+    const printDoc = generateInsuranceClaimPrintData({
+      claimNumber: c.claim_number || c.id.slice(0, 8),
+      patientName,
+      nationalId: patient?.national_id,
+      insuranceCompany: c.company?.name || 'بیمه‌گر طرف قرارداد',
+      policyNumber: patient?.insurance_number,
+      claimDate: c.submitted_at || c.created_at,
+      tierLabel: c.company?.tier === 'primary' ? 'بیمه پایه درمان' : 'بیمه تکمیلی درمان',
+      items: [
+        {
+          procedureName: c.notes || 'خدمات درمانی و تشخیصی دندانپزشکی',
+          totalFee: c.amount || 0,
+          supplementaryClaimed: c.approved_amount ?? c.amount ?? 0,
+          patientPaid: Math.max(0, (c.amount || 0) - (c.approved_amount ?? c.amount ?? 0)),
+        },
+      ],
+      notes: c.notes || undefined,
+    })
+
+    const win = window.open('', '_blank')
+    if (win) {
+      win.document.write(printDoc)
+      win.document.close()
+      win.focus()
+    } else {
+      showToast('error', 'امکان باز کردن پنجره چاپ وجود ندارد')
+    }
   }
 
   const handleSaveCompany = () => {
@@ -182,6 +218,7 @@ export default function Insurance() {
       address: companyForm.address || null,
       coverage_percentage: companyForm.coverage_percentage ? Number(companyForm.coverage_percentage) : null,
       discount_percentage: companyForm.discount_percentage ? Number(companyForm.discount_percentage) : null,
+      tier: (companyForm.tier as 'primary' | 'supplementary') || 'supplementary',
       is_active: companyForm.is_active === 'true',
     }
     confirmAction({
@@ -189,6 +226,7 @@ export default function Insurance() {
       title: editingCompany ? 'ویرایش شرکت بیمه' : 'شرکت بیمه جدید',
       fields: [
         { label: 'نام شرکت', value: companyForm.name.trim(), highlight: true },
+        { label: 'نوع بیمه', value: companyForm.tier === 'primary' ? 'بیمه پایه' : 'بیمه تکمیلی' },
         { label: 'کد', value: companyForm.code || '-' },
         { label: 'تلفن', value: companyForm.phone || '-' },
         { label: 'درصد پوشش', value: companyForm.coverage_percentage ? `${toPersianDigits(companyForm.coverage_percentage)}٪` : '-' },
@@ -447,9 +485,9 @@ export default function Insurance() {
         storageKey="insurance"
         items={[
           { key: 'companies', node: <ModuleStatCard moduleKey="insurance" icon={<Building2 size={20} />} label="شرکت‌های بیمه" value={formatNumber(companies.length)} /> },
-          { key: 'claims', node: <ModuleStatCard moduleKey="insurance" icon={<FileText size={20} />} label="کل ادعاها" value={formatNumber(stats.totalClaims)} /> },
-          { key: 'pending', node: <ModuleStatCard moduleKey="insurance" icon={<Shield size={20} />} label="در انتظار بررسی" value={formatNumber(stats.pendingCount)} /> },
-          { key: 'approved', node: <ModuleStatCard moduleKey="insurance" icon={<Percent size={20} />} label="مبلغ تایید شده" value={`${formatCurrency(stats.approvedAmount)} ت`} /> },
+          { key: 'claims', node: <ModuleStatCard moduleKey="insurance" icon={<FileText size={20} />} label="کل ادعاها" value={formatNumber(claimStats.totalClaims)} /> },
+          { key: 'pending', node: <ModuleStatCard moduleKey="insurance" icon={<Shield size={20} />} label="در انتظار بررسی" value={formatNumber(claimStats.pendingCount)} /> },
+          { key: 'approved', node: <ModuleStatCard moduleKey="insurance" icon={<Percent size={20} />} label="مبلغ تایید شده" value={`${formatCurrency(claimStats.totalApproved)} ت`} /> },
         ]}
       />
 
@@ -509,6 +547,9 @@ export default function Insurance() {
                       </div>
                     </div>
                     <div className="flex items-center gap-1">
+                      <Badge color={c.tier === 'primary' ? 'accent' : 'primary'}>
+                        {c.tier === 'primary' ? 'پایه' : 'تکمیلی'}
+                      </Badge>
                       <Badge color={c.is_active ? 'success' : 'slate'}>{c.is_active ? 'فعال' : 'غیرفعال'}</Badge>
                       <button onClick={() => openEditCompany(c)} className="p-1.5 rounded-lg text-slate-400 hover:text-primary-600 hover:bg-primary-50 transition-colors"><Edit2 size={14} /></button>
                       <button onClick={() => handleDeleteCompany(c)} aria-label="غیرفعال کردن شرکت بیمه" title="غیرفعال کردن" className="p-1.5 rounded-lg text-slate-400 hover:text-error-600 hover:bg-error-50 transition-colors"><Archive size={14} /></button>
@@ -575,6 +616,7 @@ export default function Insurance() {
                                   <button onClick={() => handleRecordClaimAsPayment(c)} title="ثبت به‌عنوان پرداخت (کاهش مانده‌حساب بیمار)" className="text-success-500 hover:text-success-700 hover:bg-success-50 p-1 rounded-lg transition-colors"><Wallet size={15} /></button>
                                 )
                               )}
+                              <button onClick={() => handlePrintClaimCertificate(c)} aria-label="چاپ گواهی ادعای بیمه" title="چاپ گواهی تأیید خدمات و ادعای بیمه" className="text-slate-400 hover:text-blue-600 hover:bg-blue-50 p-1 rounded-lg transition-colors"><Printer size={15} /></button>
                               <button onClick={() => handleSendWhatsAppClaim(c)} aria-label="ارسال وضعیت به واتساپ بیمار" title="ارسال وضعیت ادعای بیمه به واتساپ بیمار" className="text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 p-1 rounded-lg transition-colors"><MessageSquare size={15} /></button>
                               <button onClick={() => openEditClaim(c)} className="text-slate-400 hover:text-primary-600 hover:bg-primary-50 p-1 rounded-lg transition-colors"><Edit2 size={15} /></button>
                               <button onClick={() => handleDeleteClaim(c)} aria-label="لغو ادعای بیمه" title="لغو" className="text-slate-400 hover:text-error-600 hover:bg-error-50 p-1 rounded-lg transition-colors"><Ban size={15} /></button>
@@ -641,6 +683,15 @@ export default function Insurance() {
                   <Input label="درصد پوشش" value={companyForm.coverage_percentage} onChange={(v) => setCompanyForm((p) => ({ ...p, coverage_percentage: v }))} placeholder="مثال: 70" dir="ltr" />
                   <Input label="درصد تخفیف" value={companyForm.discount_percentage} onChange={(v) => setCompanyForm((p) => ({ ...p, discount_percentage: v }))} placeholder="مثال: 20" dir="ltr" />
                 </div>
+                <Select
+                  label="سطح و نوع بیمه"
+                  value={companyForm.tier}
+                  onChange={(v) => setCompanyForm((p) => ({ ...p, tier: v }))}
+                  options={[
+                    { value: 'supplementary', label: 'بیمه تکمیلی (ایران، دانا، البرز و...)' },
+                    { value: 'primary', label: 'بیمه پایه (تامین اجتماعی، سلامت، نیروهای مسلح)' },
+                  ]}
+                />
                 <Select label="وضعیت" value={companyForm.is_active} onChange={(v) => setCompanyForm((p) => ({ ...p, is_active: v }))} options={[{ value: 'true', label: 'فعال' }, { value: 'false', label: 'غیرفعال' }]} />
               </>
             ),

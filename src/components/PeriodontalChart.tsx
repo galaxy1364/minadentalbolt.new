@@ -1,6 +1,6 @@
 // PeriodontalChart.tsx — Professional 6-Point Periodontal Examination Chart
 import React, { useState, useMemo } from 'react'
-import { PerioExam, PerioToothData, Doctor } from '../types'
+import { PerioExam, PerioToothData, Doctor, Patient } from '../types'
 import {
   UPPER_PERIO_TEETH,
   LOWER_PERIO_TEETH,
@@ -21,10 +21,11 @@ interface PeriodontalChartProps {
   patientName: string
   doctors: Doctor[]
   exam?: PerioExam | null
+  patient?: Patient | null
   onSave: (examData: Record<number, PerioToothData>, notes: string, doctorId: string | null) => Promise<void>
 }
 
-export function PeriodontalChart({ patientId, patientName, doctors, exam, onSave }: PeriodontalChartProps) {
+export function PeriodontalChart({ patientId, patientName, doctors, exam, patient, onSave }: PeriodontalChartProps) {
   const [selectedTooth, setSelectedTooth] = useState<number>(16)
   const [teethData, setTeethData] = useState<Record<number, PerioToothData>>(() => {
     if (exam?.teeth_data && Object.keys(exam.teeth_data).length > 0) {
@@ -41,7 +42,7 @@ export function PeriodontalChart({ patientId, patientName, doctors, exam, onSave
   const [doctorId, setDoctorId] = useState<string>(exam?.doctor_id || (doctors[0]?.id || ''))
   const [saving, setSaving] = useState(false)
 
-  const stats = useMemo(() => calculatePerioStatistics(teethData), [teethData])
+  const stats = useMemo(() => calculatePerioStatistics(teethData, patient), [teethData, patient])
 
   const currentToothData: PerioToothData = teethData[selectedTooth] || createEmptyPerioToothData(selectedTooth)
 
@@ -129,8 +130,10 @@ export function PeriodontalChart({ patientId, patientName, doctors, exam, onSave
       </div>
 
       <div class="diag">
-        <b>تشخیص پریودنتال: ${stats.diagnosisGrade.title}</b>
-        <p style="margin: 4px 0 0; color: #475569;">${stats.diagnosisGrade.description}</p>
+        <b>طبقه‌بندی استاندارد بین‌المللی AAP/EFP 2018: ${stats.aapClassification.stageLabel} | ${stats.aapClassification.gradeLabel} (${stats.aapClassification.extentLabel})</b>
+        <p style="margin: 4px 0 0; color: #475569;">${stats.aapClassification.stageDescription}</p>
+        ${stats.aapClassification.riskModifiers.length > 0 ? `<p style="margin: 6px 0 0; color: #b45309; font-size: 11px;"><b>عوامل خطر سیستمیک:</b> ${stats.aapClassification.riskModifiers.join(' | ')}</p>` : ''}
+        ${stats.aapClassification.treatmentProtocols.length > 0 ? `<p style="margin: 6px 0 0; color: #0f766e; font-size: 11px;"><b>پروتکل‌های بالینی پیشنهادی:</b> ${stats.aapClassification.treatmentProtocols.join(' — ')}</p>` : ''}
       </div>
 
       <h3>یافته‌های پروبینگ دندان‌ها (DB, B, MB | DL, L, ML)</h3>
@@ -254,6 +257,56 @@ export function PeriodontalChart({ patientId, patientName, doctors, exam, onSave
               {toPersianDigits(stats.severePocketsCount)} سطح
             </span>
           </div>
+        </div>
+
+        {/* ── AAP/EFP 2018 World Workshop Classification Banner ── */}
+        <div className="p-3 bg-indigo-50/70 dark:bg-indigo-950/30 border border-indigo-200/60 dark:border-indigo-800/40 rounded-xl space-y-2 mt-3">
+          <div className="flex items-center justify-between flex-wrap gap-2">
+            <div className="flex items-center gap-2 flex-wrap">
+              <span className="text-xs font-black text-indigo-900 dark:text-indigo-200">
+                طبقه‌بندی استاندارد جهانی AAP / EFP 2018:
+              </span>
+              <span className="px-2 py-0.5 rounded-md text-xs font-bold bg-indigo-600 text-white shadow-sm">
+                {stats.aapClassification.stageLabel}
+              </span>
+              <span className="px-2 py-0.5 rounded-md text-xs font-bold bg-purple-100 dark:bg-purple-900/40 text-purple-800 dark:text-purple-300 border border-purple-200 dark:border-purple-800">
+                {stats.aapClassification.gradeLabel}
+              </span>
+              <span className="px-2 py-0.5 rounded-md text-xs font-bold bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300">
+                {stats.aapClassification.extentLabel}
+              </span>
+            </div>
+          </div>
+
+          <p className="text-[11px] text-indigo-800 dark:text-indigo-300 leading-relaxed">
+            {stats.aapClassification.stageDescription}
+          </p>
+
+          {stats.aapClassification.riskModifiers.length > 0 && (
+            <div className="flex items-center gap-1.5 flex-wrap pt-1 border-t border-indigo-200/50 dark:border-indigo-800/50">
+              <span className="text-[10px] font-bold text-amber-700 dark:text-amber-400">عوامل خطر سیستمیک (Risk Modifiers):</span>
+              {stats.aapClassification.riskModifiers.map((mod, idx) => (
+                <span key={idx} className="text-[10px] px-2 py-0.5 rounded-md bg-amber-100 dark:bg-amber-900/30 text-amber-900 dark:text-amber-300 font-medium">
+                  ⚠️ {mod}
+                </span>
+              ))}
+            </div>
+          )}
+
+          {stats.aapClassification.treatmentProtocols.length > 0 && (
+            <div className="pt-1.5 border-t border-indigo-200/50 dark:border-indigo-800/50">
+              <span className="text-[11px] font-bold text-slate-700 dark:text-slate-200 block mb-1">
+                پروتکل بالینی پیشنهادی (Clinical Protocol):
+              </span>
+              <div className="flex flex-wrap gap-1.5">
+                {stats.aapClassification.treatmentProtocols.map((proto, idx) => (
+                  <span key={idx} className="text-[10px] px-2 py-0.5 rounded-md bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700 font-medium">
+                    ✓ {proto}
+                  </span>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
       </Card>
 

@@ -47,9 +47,12 @@ export function ToothArchSelect({
   conditions,
 }: ToothArchSelectProps) {
   const [primary, setPrimary] = useState(false)
+  const [jawView, setJawView] = useState<'all' | 'upper' | 'lower'>('all')
   const upper = primary ? upperRowPrimary : upperRow
   const lower = primary ? lowerRowPrimary : lowerRow
   const selected = Number(value)
+
+  const glyphSize = jawView === 'all' ? 40 : 46
 
   const renderRow = (row: ToothEntry[], jaw: 'upper' | 'lower') => (
     /* MOD-FIX-013: dir="ltr" is the whole fix for the mirrored arch.
@@ -91,7 +94,7 @@ export function ToothArchSelect({
               number={t.fdi}
               condition={conditions?.[t.fdi]?.condition ?? 'healthy'}
               surfaces={conditions?.[t.fdi]?.surfaces ?? []}
-              size={40}
+              size={glyphSize}
               selected={selected === t.fdi}
             />
           </button>
@@ -102,42 +105,109 @@ export function ToothArchSelect({
 
   return (
     <div>
-      <div className="flex items-center justify-between mb-1.5">
+      <div className="flex items-center justify-between mb-1.5 flex-wrap gap-1.5">
         <label className="block text-xs font-medium text-slate-600 dark:text-slate-300">{label}</label>
-        {allowPrimary && (
-          <button
-            type="button"
-            onClick={() => {
-              chimes.playPop()
-              h.toggle()
-              setPrimary((p) => !p)
-              onChange('')
-            }}
-            className={`text-xs font-semibold px-2 py-1 rounded-lg transition-all-smooth press-scale ${
-              primary ? 'bg-primary-600 text-white' : 'text-primary-700 dark:text-primary-400'
-            }`}
-          >
-            دندان شیری
-          </button>
-        )}
+        <div className="flex items-center gap-1.5">
+          <div className="inline-flex p-0.5 rounded-lg bg-slate-100 dark:bg-slate-700/60 text-[11px] font-medium text-slate-600 dark:text-slate-300 border border-slate-200/50 dark:border-slate-600/50">
+            <button
+              type="button"
+              aria-label="نمایش هر دو فک"
+              onClick={() => {
+                chimes.playPop()
+                h.select()
+                setJawView('all')
+              }}
+              className={`px-2 py-0.5 rounded-md transition-all-smooth ${
+                jawView === 'all'
+                  ? 'bg-white dark:bg-slate-800 text-primary-600 dark:text-primary-400 font-semibold shadow-xs'
+                  : 'hover:text-slate-900 dark:hover:text-slate-100'
+              }`}
+            >
+              هر دو
+            </button>
+            <button
+              type="button"
+              aria-label="نمایش فقط فک بالا"
+              onClick={() => {
+                chimes.playPop()
+                h.select()
+                setJawView('upper')
+              }}
+              className={`px-2 py-0.5 rounded-md transition-all-smooth ${
+                jawView === 'upper'
+                  ? 'bg-white dark:bg-slate-800 text-primary-600 dark:text-primary-400 font-semibold shadow-xs'
+                  : 'hover:text-slate-900 dark:hover:text-slate-100'
+              }`}
+            >
+              بالا
+            </button>
+            <button
+              type="button"
+              aria-label="نمایش فقط فک پایین"
+              onClick={() => {
+                chimes.playPop()
+                h.select()
+                setJawView('lower')
+              }}
+              className={`px-2 py-0.5 rounded-md transition-all-smooth ${
+                jawView === 'lower'
+                  ? 'bg-white dark:bg-slate-800 text-primary-600 dark:text-primary-400 font-semibold shadow-xs'
+                  : 'hover:text-slate-900 dark:hover:text-slate-100'
+              }`}
+            >
+              پایین
+            </button>
+          </div>
+          {allowPrimary && (
+            <button
+              type="button"
+              onClick={() => {
+                chimes.playPop()
+                h.toggle()
+                setPrimary((p) => !p)
+                onChange('')
+              }}
+              className={`text-xs font-semibold px-2 py-1 rounded-lg transition-all-smooth press-scale ${
+                primary ? 'bg-primary-600 text-white' : 'text-primary-700 dark:text-primary-400'
+              }`}
+            >
+              دندان شیری
+            </button>
+          )}
+        </div>
       </div>
 
       <div className={`rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 p-2 space-y-1 ${primary ? 'bg-amber-50/30 border-amber-100 dark:bg-amber-900/10' : ''}`}>
-        {/* Spelled out, because "UR" and "UL" are exactly the pair that was
-            silently swapped and neither looks wrong on its own. */}
-        <div dir="ltr" className="flex items-center justify-between px-1 text-[10px] text-slate-400">
-          <span>راست بیمار</span>
-          <span className="font-medium text-xs">فک بالا</span>
-          <span>چپ بیمار</span>
-        </div>
-        {renderRow(upper, 'upper')}
-        <div className="h-px bg-slate-200 dark:bg-slate-600 my-1" />
-        {renderRow(lower, 'lower')}
-        <div dir="ltr" className="flex items-center justify-between px-1 text-[10px] text-slate-400">
-          <span>راست بیمار</span>
-          <span className="font-medium text-xs">فک پایین</span>
-          <span>چپ بیمار</span>
-        </div>
+        {(jawView === 'all' || jawView === 'upper') && (
+          <>
+            <div dir="ltr" className="flex items-center justify-between px-1 text-[10px] text-slate-400">
+              <span>راست بیمار</span>
+              <span className="font-medium text-xs">فک بالا</span>
+              <span>چپ بیمار</span>
+            </div>
+            {renderRow(upper, 'upper')}
+          </>
+        )}
+        {jawView === 'all' && <div className="h-px bg-slate-200 dark:bg-slate-600 my-1" />}
+        {(jawView === 'all' || jawView === 'lower') && (
+          <>
+            {jawView === 'lower' && (
+              <div dir="ltr" className="flex items-center justify-between px-1 text-[10px] text-slate-400">
+                <span>راست بیمار</span>
+                <span className="font-medium text-xs">فک پایین</span>
+                <span>چپ بیمار</span>
+              </div>
+            )}
+            {renderRow(lower, 'lower')}
+            {jawView === 'all' && (
+              <div dir="ltr" className="flex items-center justify-between px-1 text-[10px] text-slate-400">
+                <span>راست بیمار</span>
+                <span className="font-medium text-xs">فک پایین</span>
+                <span>چپ بیمار</span>
+              </div>
+            )}
+          </>
+        )}
       </div>
 
       {/* The chosen tooth is stated in words as well as highlighted. On a

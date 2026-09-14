@@ -84,6 +84,14 @@ export interface AlertPatientFields {
   medical_history?: string | null
   medications?: string | null
   credit_limit?: number | null
+  anticoagulant_use?: boolean | null
+  inr_value?: number | null
+  bisphosphonate_use?: boolean | null
+  bp_systolic?: number | null
+  bp_diastolic?: number | null
+  diabetes_hba1c?: number | null
+  endocarditis_prophylaxis?: boolean | null
+  pregnancy_trimester?: number | null
 }
 
 export interface AlertBalance {
@@ -154,10 +162,38 @@ export function buildPatientAlerts(
 
   push('allergy', splitClinicalField(patient.allergies))
 
+  // Structured clinical flags
+  const structuredConditions: string[] = []
+  const structuredMedications: string[] = []
+
+  if (patient.anticoagulant_use) {
+    const inrText = patient.inr_value ? ` (INR: ${patient.inr_value})` : ''
+    structuredMedications.push(`داروی ضد انعقاد${inrText}`)
+  }
+  if (patient.bisphosphonate_use) {
+    structuredConditions.push('مصرف بیس‌فسفونات (خطر استئونکروز فک/ONJ)')
+  }
+  if (patient.endocarditis_prophylaxis) {
+    structuredConditions.push('ریسک اندوکاردیت (نیاز به آنتی‌بیوتیک پروفیلاکسی)')
+  }
+  if (
+    (patient.bp_systolic != null && patient.bp_systolic >= 140) ||
+    (patient.bp_diastolic != null && patient.bp_diastolic >= 90)
+  ) {
+    structuredConditions.push(`فشار خون بالا (${patient.bp_systolic ?? '—'}/${patient.bp_diastolic ?? '—'} mmHg)`)
+  }
+  if (patient.diabetes_hba1c != null && patient.diabetes_hba1c > 0) {
+    structuredConditions.push(`دیابت (HbA1c: ${patient.diabetes_hba1c}%)`)
+  }
+  if (patient.pregnancy_trimester != null && patient.pregnancy_trimester > 0) {
+    structuredConditions.push(`بارداری (سه‌ماهه ${patient.pregnancy_trimester})`)
+  }
+
   // medical_conditions and medical_history are merged: they are the same
   // idea recorded in two places, and duplicates are removed so a fact
   // written in both does not appear twice on screen.
   const conditions = [
+    ...structuredConditions,
     ...splitClinicalField(patient.medical_conditions),
     ...splitClinicalField(patient.medical_history),
   ]
@@ -170,7 +206,18 @@ export function buildPatientAlerts(
   })
   push('condition', uniqueConditions)
 
-  push('medication', splitClinicalField(patient.medications))
+  const medications = [
+    ...structuredMedications,
+    ...splitClinicalField(patient.medications),
+  ]
+  const seenMeds = new Set<string>()
+  const uniqueMedications = medications.filter((m) => {
+    const key = normalizeClinicalText(m)
+    if (seenMeds.has(key)) return false
+    seenMeds.add(key)
+    return true
+  })
+  push('medication', uniqueMedications)
 
   // Only a real debt raises the card. A zero or credit balance is not a
   // warning, and a negative balance means the clinic owes the patient.

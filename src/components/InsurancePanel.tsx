@@ -11,11 +11,11 @@ import {
 } from '../lib/api'
 import {
   usedCeiling, remainingCeiling, ceilingUsagePercent, isPolicyValidOn,
-  validatePolicy, splitCoverage, selectApplicablePolicy,
+  validatePolicy, splitMultiTierCoverage,
 } from '../lib/insurance'
 import type { PatientPolicy } from '../lib/insurance'
 import type { InsuranceClaim, InsuranceCompany } from '../types'
-import { formatNumber, toPersianDigits } from '../lib/persianDate'
+import { formatNumber, toPersianDigits, formatCurrency } from '../lib/persianDate'
 import { chimes } from '../lib/chimes'
 import { h } from '../lib/haptics'
 
@@ -34,6 +34,8 @@ const emptyForm = {
   end_date: '',
   coverage_percentage: '60',
   ceiling_amount: '',
+  tier: 'supplementary',
+  deductible_percentage: '',
 }
 
 export function InsurancePanel({ patientId, previewCost }: Props) {
@@ -67,14 +69,15 @@ export function InsurancePanel({ patientId, previewCost }: Props) {
     ceiling_amount: form.ceiling_amount === '' ? null : Number(form.ceiling_amount),
     start_date: form.start_date || null,
     end_date: form.end_date || null,
+    tier: (form.tier as 'primary' | 'supplementary') || null,
+    deductible_percentage: form.deductible_percentage === '' ? null : Number(form.deductible_percentage),
   }
   const errors = validatePolicy(draft)
 
   const preview = useMemo(() => {
-    if (previewCost === undefined) return null
-    const best = selectApplicablePolicy(active, claims, today)
-    return splitCoverage(previewCost, best, claims, today)
-  }, [previewCost, active, claims, today])
+    if (previewCost === undefined || active.length === 0) return null
+    return splitMultiTierCoverage(previewCost, active, claims, today, companies)
+  }, [previewCost, active, claims, today, companies])
 
   const save = async () => {
     if (errors.length) {
@@ -90,6 +93,8 @@ export function InsurancePanel({ patientId, previewCost }: Props) {
       end_date: form.end_date || null,
       coverage_percentage: Number(form.coverage_percentage),
       ceiling_amount: form.ceiling_amount === '' ? null : Number(form.ceiling_amount),
+      tier: (form.tier as 'primary' | 'supplementary') || null,
+      deductible_percentage: form.deductible_percentage === '' ? null : Number(form.deductible_percentage),
       is_active: true,
       notes: null,
     })
@@ -125,11 +130,20 @@ export function InsurancePanel({ patientId, previewCost }: Props) {
         </div>
 
         {preview && (
-          <div className={`mt-3 rounded-lg p-3 text-sm ${preview.cappedByCeiling ? 'bg-amber-50 border border-amber-200' : 'bg-slate-50'}`}>
-            <div className="flex flex-wrap gap-x-6 gap-y-1">
-              <span>هزینه: <b>{formatNumber(previewCost!)}</b></span>
-              <span>سهم بیمه: <b className="text-emerald-700">{formatNumber(preview.insuranceShare)}</b></span>
-              <span>سهم بیمار: <b className="text-slate-800">{formatNumber(preview.patientShare)}</b></span>
+          <div className={`mt-3 rounded-lg p-3 text-sm ${(preview.primaryCapped || preview.supplementaryCapped) ? 'bg-amber-50 border border-amber-200' : 'bg-slate-50'}`}>
+            <div className="font-semibold text-xs text-slate-500 mb-2">پیش‌نمایش تفکیک هزینه دو لایه بیمه:</div>
+            <div className="flex flex-wrap gap-x-6 gap-y-1.5">
+              <span>هزینه کل: <b>{formatNumber(previewCost!)}</b></span>
+              {preview.primaryShare > 0 && (
+                <span>سهم بیمه پایه: <b className="text-blue-700">{formatNumber(preview.primaryShare)}</b></span>
+              )}
+              {preview.supplementaryShare > 0 && (
+                <span>سهم بیمه تکمیلی: <b className="text-emerald-700">{formatNumber(preview.supplementaryShare)}</b></span>
+              )}
+              {preview.franchiseAmount > 0 && (
+                <span>فرانشیز: <b className="text-amber-700">{formatNumber(preview.franchiseAmount)}</b></span>
+              )}
+              <span>سهم نهایی بیمار: <b className="text-slate-900 font-extrabold">{formatNumber(preview.patientShare)}</b></span>
             </div>
             {preview.warning && (
               <p className="mt-2 flex items-start gap-1.5 text-amber-800">
@@ -146,13 +160,30 @@ export function InsurancePanel({ patientId, previewCost }: Props) {
             <Select
               label="بیمه‌گر"
               value={form.company_id}
-              onChange={(v) => setForm((f) => ({ ...f, company_id: v }))}
+              onChange={(v) => {
+                const selectedCo = companies.find((c) => c.id === v)
+                setForm((f) => ({
+                  ...f,
+                  company_id: v,
+                  tier: selectedCo?.tier || f.tier,
+                }))
+              }}
               options={[{ value: '', label: 'انتخاب کنید' }, ...companies.map((c) => ({ value: c.id, label: c.name }))]}
+            />
+            <Select
+              label="نوع بیمه"
+              value={form.tier}
+              onChange={(v) => setForm((f) => ({ ...f, tier: v }))}
+              options={[
+                { value: 'supplementary', label: 'بیمه تکمیلی (ایران، دانا، البرز و...)' },
+                { value: 'primary', label: 'بیمه پایه (تامین اجتماعی، سلامت، نیروهای مسلح)' },
+              ]}
             />
             <Input label="شماره بیمه‌نامه" value={form.policy_number} onChange={(v) => setForm((f) => ({ ...f, policy_number: v }))} dir="ltr" />
             <PersianDateInput label="تاریخ شروع" value={form.start_date} onChange={(v) => setForm((f) => ({ ...f, start_date: v }))} />
             <PersianDateInput label="تاریخ پایان" value={form.end_date} onChange={(v) => setForm((f) => ({ ...f, end_date: v }))} />
             <Input label="درصد پوشش" value={form.coverage_percentage} onChange={(v) => setForm((f) => ({ ...f, coverage_percentage: v }))} dir="ltr" />
+            <Input label="درصد فرانشیز (خالی = صفر)" value={form.deductible_percentage} onChange={(v) => setForm((f) => ({ ...f, deductible_percentage: v }))} dir="ltr" placeholder="مثلاً ۱۰ یا ۲۰" />
             <Input label="سقف تعهد (خالی = نامحدود)" value={form.ceiling_amount} onChange={(v) => setForm((f) => ({ ...f, ceiling_amount: v }))} dir="ltr" />
           </div>
           {errors.length > 0 && (
@@ -160,8 +191,6 @@ export function InsurancePanel({ patientId, previewCost }: Props) {
               {errors.map((e) => <li key={e}>{e}</li>)}
             </ul>
           )}
-          {/* Disabled purely on the shared validator — a required field
-              must block, never merely warn. */}
           <Button className="mt-3 press-scale" onClick={save} disabled={errors.length > 0}>ثبت بیمه</Button>
         </Card>
       )}
@@ -182,8 +211,14 @@ export function InsurancePanel({ patientId, previewCost }: Props) {
                 <div>
                   <div className="flex items-center gap-2 flex-wrap">
                     <span className="font-bold text-slate-800">{companyName(p.company_id)}</span>
+                    <Badge color={p.tier === 'primary' ? 'accent' : 'primary'}>
+                      {p.tier === 'primary' ? 'بیمه پایه' : 'بیمه تکمیلی'}
+                    </Badge>
                     <Badge color={valid ? 'success' : 'error'}>{valid ? 'معتبر' : 'منقضی'}</Badge>
-                    <Badge color="primary">پوشش {toPersianDigits(p.coverage_percentage)}٪</Badge>
+                    <Badge color="slate">پوشش {toPersianDigits(p.coverage_percentage)}٪</Badge>
+                    {p.deductible_percentage ? (
+                      <Badge color="warning">فرانشیز {toPersianDigits(p.deductible_percentage)}٪</Badge>
+                    ) : null}
                   </div>
                   {p.policy_number && <p className="text-xs text-slate-500 mt-0.5" dir="ltr">{p.policy_number}</p>}
                 </div>

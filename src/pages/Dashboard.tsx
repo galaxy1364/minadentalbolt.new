@@ -41,6 +41,7 @@ import {
   findDueCheques, findPendingImplantStages, findOverdueLabOrders,
   REMINDER_CATEGORY_META, type SmartReminder, type ReminderCategory,
 } from '../lib/smartReminders'
+import { findPostOpCheckups, findSutureRemovalReminders, findHygieneRecalls } from '../lib/patientRecallChurn'
 import { calcAllPatientBalances } from '../lib/finance'
 import { readyForDelivery } from '../lib/labShelf'
 import { supabase } from '../lib/supabase'
@@ -696,8 +697,11 @@ export default function Dashboard() {
       no_show: findNoShows(appointments, patients),
       unresolved_appointment: findUnresolvedPastAppointments(appointments, patients),
       unfinished_treatment: findUnfinishedTreatmentFollowups(treatments, appointments, patients),
+      post_op_checkup: findPostOpCheckups(treatments as any, patients, todayStr),
+      suture_removal: findSutureRemovalReminders(treatments as any, patients, appointments as any, todayStr),
+      hygiene_recall: findHygieneRecalls(patients, encounters, appointments as any, 180, todayStr),
     }
-  }, [patients, encounters, installments, treatments, appointments, implantCases, chequesState, labOrdersState])
+  }, [patients, encounters, installments, treatments, appointments, implantCases, chequesState, labOrdersState, todayStr])
 
   // ── Clinical follow-ups ──────────────────────────────────────
   // smartReminders covers the patient-facing side. Nothing covered the
@@ -896,6 +900,9 @@ export default function Dashboard() {
     smartReminders.no_show.length +
     smartReminders.unfinished_treatment.length +
     smartReminders.unresolved_appointment.length +
+    smartReminders.post_op_checkup.length +
+    smartReminders.suture_removal.length +
+    smartReminders.hygiene_recall.length +
     lowInventoryCount +
     expiredInventoryCount +
     overdueLabCount +

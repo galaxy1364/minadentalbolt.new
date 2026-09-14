@@ -8,8 +8,9 @@ import { implantMilestones, nextImplantAction, implantDeadline, IMPLANT_MILESTON
 import { PatientSelect } from '../components/PatientSelect'
 import { toothLabel, toothLabelWithWord } from '../lib/toothLabel'
 import { useNavigate, useLocation } from 'react-router-dom'
-import { Smile, Plus, Search, Edit2, Eye, Filter, Package, Calendar, DollarSign, ShieldCheck, AlertTriangle, CheckCircle2, Clock, Activity, Layers, CalendarClock, ScanLine, Archive, Ban, X, ChevronLeft, MessageSquare } from 'lucide-react'
+import { Smile, Plus, Search, Edit2, Eye, Filter, Package, Calendar, DollarSign, ShieldCheck, AlertTriangle, CheckCircle2, Clock, Activity, Layers, CalendarClock, ScanLine, Archive, Ban, X, ChevronLeft, MessageSquare, Award } from 'lucide-react'
 import { downloadICSReminder } from '../lib/icsReminder'
+import { printImplantPassport } from '../lib/implantPassport'
 import { fetchImplantCases, createImplantCase, updateImplantCase, createImplantComponent, deactivateImplantComponent, fetchPatients, fetchDoctors, createExpense, fetchInventoryItems, fetchImplantCostItems, createImplantCostItem, updateImplantCostItem, fetchLabOrders } from '../lib/api'
 import { calcSurgeryShare, validateImplantCase, caseFinancials } from '../lib/implants'
 import { BarcodeScanner } from '../components/BarcodeScanner'
@@ -131,6 +132,7 @@ export default function Implants() {
   // Component modal
   const [componentModalOpen, setComponentModalOpen] = useState(false)
   const [componentScannerOpen, setComponentScannerOpen] = useState(false)
+  const [fixtureScannerOpen, setFixtureScannerOpen] = useState(false)
   const [componentWizardStep, setComponentWizardStep] = useState(0)
   const [componentCaseId, setComponentCaseId] = useState<string | null>(null)
   const [savingComponent, setSavingComponent] = useState(false)
@@ -154,6 +156,13 @@ export default function Implants() {
     total_cost: '',
     paid_amount: '',
     warranty_years: '',
+    torque_ncm: '',
+    isq_value: '',
+    lot_number: '',
+    serial_number: '',
+    bone_density: '',
+    abutment_type: '',
+    crown_material: '',
     notes: '',
     surgery_fee_mode: 'formula' as 'formula' | 'negotiated',
     surgery_fee_amount: '',
@@ -231,6 +240,7 @@ export default function Implants() {
       patient_id: state.quickStartPatientId, doctor_id: state.quickStartDoctorId || '', tooth_number: handoff?.toothNumber || '', brand: '', custom_brand: '', model: '', diameter: '', length: '',
       surgery_date: '', healing_months: '', opg_reminder_date: '',
       total_cost: '', paid_amount: '', warranty_years: '', notes: '',
+      torque_ncm: '', isq_value: '', lot_number: '', serial_number: '', bone_density: '', abutment_type: '', crown_material: '',
       surgery_fee_mode: 'formula', surgery_fee_amount: '', prosthesis_doctor_id: '', prosthesis_fee_amount: '',
     })
     setCaseModalOpen(true)
@@ -300,6 +310,7 @@ export default function Implants() {
       patient_id: '', doctor_id: '', tooth_number: '', brand: '', custom_brand: '', model: '', diameter: '', length: '',
       surgery_date: '', healing_months: '', opg_reminder_date: '',
       total_cost: '', paid_amount: '', warranty_years: '', notes: '',
+      torque_ncm: '', isq_value: '', lot_number: '', serial_number: '', bone_density: '', abutment_type: '', crown_material: '',
       surgery_fee_mode: 'formula', surgery_fee_amount: '', prosthesis_doctor_id: '', prosthesis_fee_amount: '',
     })
     setCaseModalOpen(true)
@@ -399,6 +410,13 @@ export default function Implants() {
       total_cost: c.total_cost != null ? String(c.total_cost) : '',
       paid_amount: c.paid_amount != null ? String(c.paid_amount) : '',
       warranty_years: c.warranty_years != null ? String(c.warranty_years) : '',
+      torque_ncm: c.torque_ncm != null ? String(c.torque_ncm) : '',
+      isq_value: c.isq_value != null ? String(c.isq_value) : '',
+      lot_number: c.lot_number || '',
+      serial_number: c.serial_number || '',
+      bone_density: c.bone_density || '',
+      abutment_type: c.abutment_type || '',
+      crown_material: c.crown_material || '',
       notes: c.notes || '',
       surgery_fee_mode: (c.surgery_fee_mode as 'formula' | 'negotiated') || 'formula',
       surgery_fee_amount: c.surgery_fee_amount != null ? String(c.surgery_fee_amount) : '',
@@ -538,6 +556,13 @@ export default function Implants() {
       total_cost: caseForm.total_cost ? Number(caseForm.total_cost) : null,
       paid_amount: caseForm.paid_amount ? Number(caseForm.paid_amount) : null,
       warranty_years: caseForm.warranty_years ? Number(caseForm.warranty_years) : null,
+      torque_ncm: caseForm.torque_ncm ? Number(caseForm.torque_ncm) : null,
+      isq_value: caseForm.isq_value ? Number(caseForm.isq_value) : null,
+      lot_number: caseForm.lot_number.trim() || null,
+      serial_number: caseForm.serial_number.trim() || null,
+      bone_density: caseForm.bone_density || null,
+      abutment_type: caseForm.abutment_type.trim() || null,
+      crown_material: caseForm.crown_material.trim() || null,
       notes: caseForm.notes || null,
       surgery_fee_mode: caseForm.surgery_fee_mode,
       surgery_fee_amount: caseForm.surgery_fee_mode === 'negotiated' && caseForm.surgery_fee_amount ? Number(caseForm.surgery_fee_amount) : null,
@@ -891,6 +916,18 @@ export default function Implants() {
                       <span className="text-slate-700 font-medium">{toPersianDigits(c.length)} mm</span>
                     </div>
                   )}
+                  {c.torque_ncm != null && (
+                    <div className="bg-teal-50/70 rounded-lg p-2 border border-teal-100/60">
+                      <span className="text-teal-600 text-[11px]">تورک: </span>
+                      <span className="text-teal-800 font-bold">{toPersianDigits(c.torque_ncm)} N.cm</span>
+                    </div>
+                  )}
+                  {c.isq_value != null && (
+                    <div className="bg-teal-50/70 rounded-lg p-2 border border-teal-100/60">
+                      <span className="text-teal-600 text-[11px]">ISQ: </span>
+                      <span className="text-teal-800 font-bold">{toPersianDigits(c.isq_value)}</span>
+                    </div>
+                  )}
                 </div>
 
                 {/* Surgery date & flags */}
@@ -1039,6 +1076,31 @@ export default function Implants() {
                       </a>
                     )
                   })()}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      chimes.playSuccess()
+                      h.select()
+                      const patient = patients.find((p) => p.id === c.patient_id)
+                      if (!patient) {
+                        showToast('error', 'اطلاعات بیمار یافت نشد')
+                        return
+                      }
+                      const surgeonDoctor = doctors.find((d) => d.id === c.doctor_id)
+                      const prosDoctor = doctors.find((d) => d.id === c.prosthesis_doctor_id)
+                      printImplantPassport({
+                        implantCase: c,
+                        patient,
+                        doctor: surgeonDoctor,
+                        prosthesisDoctor: prosDoctor,
+                      })
+                    }}
+                    className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-teal-50 text-teal-700 hover:bg-teal-100 text-xs font-bold transition-all-smooth press-scale border border-teal-200"
+                    title="صدور و چاپ شناسنامه رسمی ایمپلنت (پروتکل ITI)"
+                  >
+                    <Award size={12} className="text-teal-600" />
+                    شناسنامه
+                  </button>
                   <button
                     onClick={() => openEditCaseModal(c)}
                     className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-primary-50 text-primary-700 text-xs hover:bg-primary-100 transition-all-smooth"
@@ -1204,6 +1266,112 @@ export default function Implants() {
                       <option key={m} value={m} />
                     ))}
                   </datalist>
+                </div>
+              </>
+            ),
+          },
+          {
+            label: 'بیومکانیک و ردیابی (ITI)',
+            content: (
+              <>
+                <div className="p-3 bg-teal-50/50 dark:bg-teal-950/20 border border-teal-200/60 dark:border-teal-800/40 rounded-xl space-y-1 text-xs text-teal-800 dark:text-teal-300 mb-2">
+                  <p className="font-bold flex items-center gap-1.5">
+                    <Award size={14} className="text-teal-600" />
+                    استاندارد بین‌المللی ITI Consensus & EAO
+                  </p>
+                  <p className="text-[11px] text-teal-700 dark:text-teal-400">
+                    ثبت پارامترهای بیومکانیکی ثبات اولیه و بارکد ردیابی قطعه جهت صدور شناسنامه رسمی ایمپلنت (Passport) و گارانتی بیمار.
+                  </p>
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <Input
+                    label="گشتاور جایگذاری (Torque - N.cm)"
+                    type="number"
+                    value={caseForm.torque_ncm}
+                    onChange={(v) => setCaseForm({ ...caseForm, torque_ncm: v })}
+                    placeholder="مثلاً: 35"
+                    dir="ltr"
+                  />
+                  <Input
+                    label="ثبات اولیه (ISQ - Ostell)"
+                    type="number"
+                    value={caseForm.isq_value}
+                    onChange={(v) => setCaseForm({ ...caseForm, isq_value: v })}
+                    placeholder="مثلاً: 70"
+                    dir="ltr"
+                  />
+                </div>
+                <div className="flex items-center justify-between pb-1 mt-1">
+                  <span className="text-xs font-bold text-slate-700 dark:text-slate-300">ردیابی کارخانه و بارکد بسته فیکسچر</span>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      chimes.playPop()
+                      h.tap()
+                      setFixtureScannerOpen(true)
+                    }}
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-teal-50 dark:bg-teal-950/40 text-teal-700 dark:text-teal-300 hover:bg-teal-100 text-xs font-bold border border-teal-200 dark:border-teal-800 transition-all-smooth press-scale"
+                  >
+                    <ScanLine size={14} className="text-teal-600" />
+                    اسکن بارکد بسته فیکسچر
+                  </button>
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <Input
+                    label="شماره لات / بهر (LOT)"
+                    value={caseForm.lot_number}
+                    onChange={(v) => setCaseForm({ ...caseForm, lot_number: v })}
+                    placeholder="مثلاً: LOT-2024-X9"
+                    dir="ltr"
+                  />
+                  <Input
+                    label="شماره سریال (Serial No)"
+                    value={caseForm.serial_number}
+                    onChange={(v) => setCaseForm({ ...caseForm, serial_number: v })}
+                    placeholder="مثلاً: SN-998241"
+                    dir="ltr"
+                  />
+                </div>
+                <Select
+                  label="تراکم استخوان (Misch Bone Density)"
+                  value={caseForm.bone_density}
+                  onChange={(v) => setCaseForm({ ...caseForm, bone_density: v })}
+                  options={[
+                    { value: '', label: 'تعیین نشده' },
+                    { value: 'D1', label: 'D1 (استخوان کورتیکال متراکم - فک پایین قدامی)' },
+                    { value: 'D2', label: 'D2 (کورتیکال ضخیم با اسفنجی متراکم)' },
+                    { value: 'D3', label: 'D3 (کورتیکال نازک با اسفنجی متخلخل)' },
+                    { value: 'D4', label: 'D4 (استخوان بسیار نرم / اسفنجی - فک بالا خلفی)' },
+                  ]}
+                />
+                <div className="grid grid-cols-2 gap-3">
+                  <Select
+                    label="نوع اباتمنت"
+                    value={caseForm.abutment_type}
+                    onChange={(v) => setCaseForm({ ...caseForm, abutment_type: v })}
+                    options={[
+                      { value: '', label: 'انتخاب یا نامشخص' },
+                      { value: 'Custom Ti', label: 'تراش اختصاصی تیتانیوم (Custom Ti)' },
+                      { value: 'Custom Zirconia', label: 'تراش اختصاصی زیرکونیا' },
+                      { value: 'Straight Prefab', label: 'پیش‌ساخته مستقیم (Straight)' },
+                      { value: 'Angled Prefab', label: 'پیش‌ساخته زاویه‌دار (Angled)' },
+                      { value: 'Multi-Unit', label: 'مولتی‌یونیت (Multi-Unit)' },
+                      { value: 'Locator/Ball', label: 'لوکیتور / بال اباتمنت' },
+                    ]}
+                  />
+                  <Select
+                    label="جنس روکش پروتز"
+                    value={caseForm.crown_material}
+                    onChange={(v) => setCaseForm({ ...caseForm, crown_material: v })}
+                    options={[
+                      { value: '', label: 'انتخاب یا نامشخص' },
+                      { value: 'Zirconia Monolithic', label: 'زیرکونیا مونولیتیک (Monolithic)' },
+                      { value: 'Zirconia Layered', label: 'زیرکونیا لیرینگ (Layered)' },
+                      { value: 'PFM', label: 'فلز پرسلن (PFM)' },
+                      { value: 'E-max', label: 'سرامیک شیشه‌ای (IPS E-max)' },
+                      { value: 'PMMA / Temporary', label: 'موقت یا PMMA' },
+                    ]}
+                  />
                 </div>
               </>
             ),
@@ -1424,6 +1592,35 @@ export default function Implants() {
             } else {
               setComponentForm((p) => ({ ...p, serial_number: code }))
               showToast('success', 'بارکد به‌عنوان شماره سریال ثبت شد — در انبار پیدا نشد')
+            }
+          }}
+        />
+      )}
+
+      {fixtureScannerOpen && (
+        <BarcodeScanner
+          onClose={() => setFixtureScannerOpen(false)}
+          onScan={(code) => {
+            setFixtureScannerOpen(false)
+            chimes.playSuccess()
+            h.confirm()
+            const match = inventoryItems.find((i) => i.barcode === code)
+            if (match) {
+              setCaseForm((p) => ({
+                ...p,
+                brand: p.brand || match.brand || '',
+                model: p.model || match.name || '',
+                lot_number: p.lot_number || code,
+                serial_number: p.serial_number || code,
+              }))
+              showToast('success', `فیکسچر «${match.name}» از انبار تطبیق داده و ثبت شد`)
+            } else {
+              setCaseForm((p) => ({
+                ...p,
+                lot_number: p.lot_number || code,
+                serial_number: p.serial_number ? p.serial_number : (p.lot_number ? code : p.serial_number),
+              }))
+              showToast('success', `بارکد بسته فیکسچر «${code}» در مشخصات ردیابی ثبت شد`)
             }
           }}
         />

@@ -84,3 +84,97 @@ export function seededSummary(
   const surface = surfaceAlreadyKnown(seed) ? ` — ${surfaceLabel(seed.toothSurface as string)}` : ''
   return `دندان ${seed.toothNumber}${surface}`
 }
+
+/**
+ * زنجیره‌های هوشمند رویه‌های بالینی دندانپزشکی
+ *
+ * وقتی دندانپزشک عصب‌کشی را انتخاب می‌کند، نیازی به ثبت و پر کردن دوباره
+ * دندان یا جستجوی مجدد رویه نیست؛ مراحل بعدی (پست، بیلداپ، روکش) به صورت
+ * زنجیره منطقی پیشنهاد داده می‌شوند.
+ */
+export interface ProcedureChainStep {
+  name: string
+  category: 'endo' | 'restorative' | 'prostho' | 'surgery' | 'perio'
+  defaultDaysLater?: number
+  needsLab?: boolean
+  description: string
+}
+
+export interface ProcedureChain {
+  id: string
+  name: string
+  triggerKeywords: string[]
+  steps: ProcedureChainStep[]
+}
+
+export const DENTAL_PROCEDURE_CHAINS: readonly ProcedureChain[] = [
+  {
+    id: 'endo-crown',
+    name: 'زنجیره درمان ریشه و روکش (عصب‌کشی → پست و کور → روکش)',
+    triggerKeywords: ['عصب‌کشی', 'درمان ریشه', 'اندو', 'endo', 'pulpectomy', 'عصب کشی'],
+    steps: [
+      {
+        name: 'عصب‌کشی / پاکسازی و پر کردن کانال‌ها',
+        category: 'endo',
+        description: 'پالپکتومی، پاکسازی و شکل‌دهی کانال ریشه و آبچوریشن',
+      },
+      {
+        name: 'پست و کور / بیلداپ تاج',
+        category: 'restorative',
+        defaultDaysLater: 7,
+        description: 'بازسازی تاج دندان عصب‌کشی‌شده با فایبرپست و کامپوزیت بیلداپ',
+      },
+      {
+        name: 'تراش، قالب‌گیری و روکش دندان (Crown)',
+        category: 'prostho',
+        defaultDaysLater: 14,
+        needsLab: true,
+        description: 'تراش، قالب‌گیری دیجیتال/آنالوگ، ارسال به لابراتوار و تحویل روکش',
+      },
+    ],
+  },
+  {
+    id: 'implant-prostho',
+    name: 'زنجیره پروتز ایمپلنت (کاشت فیکسچر → هیلینگ → اباتمنت و روکش)',
+    triggerKeywords: ['ایمپلنت', 'کاشت دندان', 'implant', 'fixture', 'فیکسچر'],
+    steps: [
+      {
+        name: 'جراحی کاشت فیکسچر ایمپلنت',
+        category: 'surgery',
+        description: 'قراردهی فیکسچر در استخوان فک با رعایت تورک جراحی',
+      },
+      {
+        name: 'بستن هیلینگ اباتمنت (Healing Cap)',
+        category: 'surgery',
+        defaultDaysLater: 60,
+        description: 'فرم‌دهی بافت لثه پس از استئواینتگریشن',
+      },
+      {
+        name: 'قالب‌گیری و بستن اباتمنت نهایی',
+        category: 'prostho',
+        defaultDaysLater: 75,
+        needsLab: true,
+        description: 'انتخاب اباتمنت و ارسال قالب به لابراتوار جهت ساخت روکش',
+      },
+      {
+        name: 'تحویل و سمان روکش نهایی ایمپلنت',
+        category: 'prostho',
+        defaultDaysLater: 90,
+        description: 'امتحان بایت و تحویل روکش زیرکونیا/پیچ‌شونده به بیمار',
+      },
+    ],
+  },
+]
+
+/** Finds a matching procedure chain if the procedure matches clinical keywords. */
+export function findProcedureChain(procedureNameOrCode: string | null | undefined): ProcedureChain | null {
+  if (!procedureNameOrCode || !String(procedureNameOrCode).trim()) return null
+  const query = String(procedureNameOrCode).toLowerCase()
+  for (const chain of DENTAL_PROCEDURE_CHAINS) {
+    if (chain.triggerKeywords.some((kw) => query.includes(kw.toLowerCase()))) {
+      return chain
+    }
+  }
+  return null
+}
+

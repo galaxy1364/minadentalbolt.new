@@ -14,6 +14,7 @@ import {
   Sparkles,
   Eye,
   Crosshair,
+  Search,
 } from 'lucide-react'
 import { h } from '../lib/haptics'
 import { chimes } from '../lib/chimes'
@@ -47,6 +48,10 @@ export function DentalRadiologyViewer({
   const [caliperPoints, setCaliperPoints] = useState<{ x: number; y: number }[]>([])
   const containerRef = useRef<HTMLDivElement | null>(null)
 
+  // Diagnostic Loupe tool (DEF-CL-08)
+  const [isLoupeActive, setIsLoupeActive] = useState(false)
+  const [loupePos, setLoupePos] = useState<{ x: number; y: number } | null>(null)
+
   const handleReset = () => {
     h.tap()
     chimes.playPop()
@@ -58,6 +63,8 @@ export function DentalRadiologyViewer({
     setPan({ x: 0, y: 0 })
     setCaliperPoints([])
     setIsCaliperActive(false)
+    setIsLoupeActive(false)
+    setLoupePos(null)
   }
 
   // Presets
@@ -102,6 +109,7 @@ export function DentalRadiologyViewer({
 
   // Pan controls
   const handleMouseDown = (e: React.MouseEvent) => {
+    if (isLoupeActive) return
     if (isCaliperActive) {
       // Handle caliper point placement
       if (!containerRef.current) return
@@ -125,7 +133,14 @@ export function DentalRadiologyViewer({
   }
 
   const handleMouseMove = (e: React.MouseEvent) => {
-    if (!isDragging || isCaliperActive) return
+    if (isLoupeActive && containerRef.current) {
+      const rect = containerRef.current.getBoundingClientRect()
+      setLoupePos({
+        x: Math.max(0, Math.min(rect.width, e.clientX - rect.left)),
+        y: Math.max(0, Math.min(rect.height, e.clientY - rect.top)),
+      })
+    }
+    if (!isDragging || isCaliperActive || isLoupeActive) return
     setPan({
       x: e.clientX - dragStartRef.current.x,
       y: e.clientY - dragStartRef.current.y,
@@ -234,11 +249,12 @@ export function DentalRadiologyViewer({
         ref={containerRef}
         className={`relative w-full overflow-hidden bg-black flex items-center justify-center select-none ${
           isFullscreen ? 'flex-1' : 'h-[440px]'
-        } ${isCaliperActive ? 'cursor-crosshair' : 'cursor-grab active:cursor-grabbing'}`}
+        } ${isCaliperActive ? 'cursor-crosshair' : isLoupeActive ? 'cursor-none' : 'cursor-grab active:cursor-grabbing'}`}
         onWheel={handleWheel}
         onMouseDown={handleMouseDown}
         onMouseMove={handleMouseMove}
         onMouseUp={handleMouseUp}
+        onMouseLeave={() => setLoupePos(null)}
       >
         {/* The X-Ray Image */}
         <div
@@ -299,6 +315,46 @@ export function DentalRadiologyViewer({
           </svg>
         )}
 
+        {/* Diagnostic Loupe Lens Overlay (DEF-CL-08) */}
+        {isLoupeActive && loupePos && containerRef.current && (
+          <div
+            className="absolute pointer-events-none rounded-full overflow-hidden border-2 border-sky-400 shadow-[0_0_25px_rgba(56,189,248,0.55)] z-30 bg-black"
+            style={{
+              width: 140,
+              height: 140,
+              left: loupePos.x - 70,
+              top: loupePos.y - 70,
+            }}
+          >
+            <div
+              className="absolute pointer-events-none origin-top-left flex items-center justify-center"
+              style={{
+                width: containerRef.current.clientWidth,
+                height: containerRef.current.clientHeight,
+                left: -(loupePos.x * 2.5 - 70),
+                top: -(loupePos.y * 2.5 - 70),
+                transform: `translate(${pan.x * 2.5}px, ${pan.y * 2.5}px) scale(${scale * 2.5})`,
+                filter: filterStyle,
+              }}
+            >
+              <img
+                src={imageUrl}
+                alt=""
+                className="max-h-[85vh] max-w-full object-contain pointer-events-none"
+                draggable={false}
+              />
+            </div>
+            {/* Loupe Crosshair and badge */}
+            <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+              <div className="w-5 h-px bg-sky-400/80" />
+              <div className="w-px h-5 bg-sky-400/80 absolute" />
+              <span className="absolute bottom-1.5 text-[9px] font-bold text-sky-200 bg-black/75 px-1.5 py-0.5 rounded-full border border-sky-400/50">
+                2.5×
+              </span>
+            </div>
+          </div>
+        )}
+
         {/* Measurement HUD */}
         {isCaliperActive && (
           <div className="absolute top-3 left-3 px-3 py-1.5 rounded-xl bg-slate-900/90 border border-sky-500/50 backdrop-blur-md text-sky-300 text-xs font-mono flex items-center gap-2">
@@ -354,7 +410,10 @@ export function DentalRadiologyViewer({
               h.select()
               chimes.playPop()
               setIsCaliperActive(!isCaliperActive)
-              if (!isCaliperActive) setCaliperPoints([])
+              if (!isCaliperActive) {
+                setCaliperPoints([])
+                setIsLoupeActive(false)
+              }
             }}
             className={`p-1.5 rounded-lg transition-all flex items-center gap-1 text-[11px] press-scale ${
               isCaliperActive
@@ -365,6 +424,34 @@ export function DentalRadiologyViewer({
           >
             <Ruler size={15} />
             <span>خط‌کش</span>
+          </button>
+
+          <div className="h-4 w-px bg-slate-700 mx-0.5" />
+
+          {/* Diagnostic Loupe Toggle */}
+          <button
+            type="button"
+            onClick={() => {
+              h.select()
+              chimes.playPop()
+              const next = !isLoupeActive
+              setIsLoupeActive(next)
+              if (next) {
+                setIsCaliperActive(false)
+                setCaliperPoints([])
+              } else {
+                setLoupePos(null)
+              }
+            }}
+            className={`p-1.5 rounded-lg transition-all flex items-center gap-1 text-[11px] press-scale ${
+              isLoupeActive
+                ? 'bg-sky-500 text-white font-bold ring-2 ring-sky-300 shadow-sm'
+                : 'hover:bg-slate-800 text-slate-300'
+            }`}
+            title="ذره‌بین تشخیصی ۲.۵ برابر برای آپکس ریشه و مارجین"
+          >
+            <Search size={15} />
+            <span>ذره‌بین ۲.۵×</span>
           </button>
 
           <div className="h-4 w-px bg-slate-700 mx-0.5" />

@@ -184,3 +184,57 @@ describe('🔴 یک تاریخچه‌ی پرداخت، نه دو', () => {
     expect(patientDetail).not.toContain('<p className="text-xs text-slate-500 mb-1">کل هزینه درمان</p>')
   })
 })
+
+describe('🔴 MOD-FEAT-035: حساب مشترک و تجمیعی خانوار (Household Master Account)', () => {
+  const headPatient = {
+    id: 'p1', first_name: 'رضا', last_name: 'حسینی', national_id: '0011223344',
+    family_head_id: null, family_relationship: 'head', is_active: true,
+  } as never
+
+  const childPatient = {
+    id: 'p2', first_name: 'علی', last_name: 'حسینی', national_id: '0055667788',
+    family_head_id: 'p1', family_relationship: 'child', is_active: true,
+  } as never
+
+  const tr1 = { id: 'tr1', patient_id: 'p1', total_price: 10_000_000, status: 'completed' } as never
+  const tr2 = { id: 'tr2', patient_id: 'p2', total_price: 5_000_000, status: 'completed' } as never
+  const pay1 = { id: 'pay1', patient_id: 'p1', amount: 4_000_000, status: 'completed' } as never
+  const pay2 = { id: 'pay2', patient_id: 'p2', amount: 2_000_000, status: 'completed' } as never
+
+  it('بنر حساب مشترک خانوار را برای پرونده دارای عضو وابسته نشان می‌دهد', () => {
+    show(
+      <PatientFinanceOverview
+        {...base}
+        currentPatient={headPatient}
+        allPatients={[headPatient, childPatient]}
+        allTreatments={[tr1, tr2]}
+        allPayments={[pay1, pay2]}
+        payments={[pay1]}
+        treatments={[tr1]}
+      />
+    )
+
+    expect(screen.getByText(/حساب مالی خانوادگی/)).toBeDefined()
+    expect(screen.getByText(/علی حسینی/)).toBeDefined()
+    expect(screen.getByText(/صورت‌حساب خانوار/)).toBeDefined()
+  })
+
+  it('مانده حساب تجمیعی کل خانوار را محاسبه و نمایش می‌دهد', () => {
+    // Total cost = 15m, total paid = 6m, net remaining = 9m
+    show(
+      <PatientFinanceOverview
+        {...base}
+        currentPatient={headPatient}
+        allPatients={[headPatient, childPatient]}
+        allTreatments={[tr1, tr2]}
+        allPayments={[pay1, pay2]}
+        payments={[pay1]}
+        treatments={[tr1]}
+      />
+    )
+
+    expect(screen.getByText(/مانده تجمیعی کل اعضای خانواده/)).toBeDefined()
+    expect(screen.getByText(/۹,۰۰۰,۰۰۰ تومان بدهکار/)).toBeDefined()
+  })
+})
+

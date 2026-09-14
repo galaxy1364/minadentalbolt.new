@@ -4,9 +4,9 @@ import { SurfaceSelect } from '../components/SurfaceSelect'
 import { toothLabel, toothLabelWithWord } from '../lib/toothLabel'
 import { useNavigate, useLocation } from 'react-router-dom'
 import {
-  Activity, ClipboardList, Stethoscope, Search, Eye, Smile, Plus, Edit2, Trash2, Ban, Layers,
+  Activity, ClipboardList, Stethoscope, Search, Eye, Smile, Plus, Edit2, Ban, Layers,
   DollarSign, FlaskConical, CheckCircle2, X, UserPlus, ChevronRight, Bone,
-  ChevronDown, Wallet, Receipt, CalendarClock, Users, Pill, MessageSquare, AlertCircle
+  ChevronDown, Wallet, Receipt, CalendarClock, Users, Pill, MessageSquare, AlertCircle, Sparkles, Trash2, AlertTriangle
 } from 'lucide-react'
 import { BarChart, Bar, XAxis, YAxis, Tooltip as RTooltip, ResponsiveContainer, Cell } from 'recharts'
 import {
@@ -17,7 +17,7 @@ import {
   updateTreatment, createLabOrder, fetchLabOrders, updateLabOrder,
   createToothRecord, updateToothRecord, fetchInventoryItems
 } from '../lib/api'
-import { selectApplicablePolicy, splitCoverage } from '../lib/insurance'
+import { selectApplicablePolicy, splitCoverage, splitMultiTierCoverage } from '../lib/insurance'
 import { procedureDefaultPrice } from '../lib/selectionHints'
 import { groupPatientTreatments } from '../lib/patientTreatmentGroups'
 import type { PatientPolicy } from '../lib/insurance'
@@ -34,13 +34,16 @@ import { h } from '../lib/haptics'
 import { chimes } from '../lib/chimes'
 import { findLinkedLabOrder, decideLabHandoff } from '../lib/labHandoff'
 import { calcEncounterTotal } from '../lib/finance'
-import { startingStepIndex, toothStepMode, seededSummary } from '../lib/treatmentWizardFlow'
+import { startingStepIndex, toothStepMode, seededSummary, findProcedureChain } from '../lib/treatmentWizardFlow'
+import { evaluateClinicalPrerequisites } from '../lib/clinicalPrerequisites'
 import { buildChartHandoff } from '../lib/chartHandoff'
 import DentalChart from '../components/DentalChart'
 import { CurrencyInput } from '../components/CurrencyInput'
 import { logError } from '../lib/errorLog'
 import { tileThemes, getHashColor } from '../lib/colors'
 import { itemTotal, basketTotal, distinctTeeth, findDuplicate, validateBasket, makeTempId, type BasketItem } from '../lib/bulkTreatment'
+import { getChainedNextSteps, ClinicalNextStepRecommendation } from '../lib/clinicalChains'
+import { matchSuppliesToInventory, buildMaterialsUsedPayload, getTemplateForProcedure } from '../lib/clinicalSupplies'
 
 // ── Constants ──────────────────────────────────────────────────
 
@@ -296,6 +299,39 @@ export default function Treatments() {
   const [matInputId, setMatInputId] = useState('')
   const [matInputQty, setMatInputQty] = useState('1')
 
+  // Smart Clinical Consumables & Inventory Matching
+  const suggestedSupplies = useMemo(() => {
+    if (!treatForm.procedure_name && !treatForm.procedure_category) return []
+    return matchSuppliesToInventory(treatForm.procedure_name, inventoryItems as any, treatForm.procedure_category)
+  }, [treatForm.procedure_name, treatForm.procedure_category, inventoryItems])
+
+  const handleAutoPopulateSupplies = () => {
+    h.confirm()
+    chimes.playSuccess()
+    const matched = suggestedSupplies.filter((s) => s.matchedInventoryItem)
+    if (matched.length === 0) {
+      showToast('info', 'کالای منطبق در انبار کلینیک برای این رویه یافت نشد')
+      return
+    }
+    const payload = buildMaterialsUsedPayload(suggestedSupplies)
+    setTreatForm((p) => {
+      const existingIds = new Set(p.materials_used.map((m) => m.item_id))
+      const toAdd = payload.filter((m) => !existingIds.has(m.item_id))
+      return { ...p, materials_used: [...p.materials_used, ...toAdd] }
+    })
+    showToast('success', `${toPersianDigits(matched.length)} قلم متریال مصرفی استاندارد به درمان اضافه شد`)
+  }
+
+  // MOD-FEAT-036: ADA CDT Procedure Chains Next-Step Advisor
+  const [chainedModalOpen, setChainedModalOpen] = useState(false)
+  const [chainedRecommendations, setChainedRecommendations] = useState<ClinicalNextStepRecommendation[]>([])
+  const [chainedContext, setChainedContext] = useState<{
+    patientId: string
+    encounterId: string
+    toothNumber: string | null
+    completedProcName: string
+  } | null>(null)
+
   // ── Data Fetching ─────────────────────────────────────────────
 
   const loadData = useCallback(async () => {
@@ -318,6 +354,7 @@ export default function Treatments() {
       setImplantCases(impl)
       setCheques(chqs)
       setInstallments(insts)
+      setInventoryItems(invs)
     } catch (err) {
       console.error('Error loading treatments:', err)
       showToast('error', 'خطا در بارگذاری درمان‌ها')
@@ -770,9 +807,8 @@ export default function Treatments() {
     if (total <= 0) return null
     const enc = encounters.find((e) => e.id === treatEncounterId)
     const onDate = (enc?.encounter_date || new Date().toISOString()).slice(0, 10)
-    const policy = selectApplicablePolicy(treatPolicies, treatClaims, onDate)
-    if (!policy) return null
-    return splitCoverage(total, policy, treatClaims, onDate)
+    if (treatPolicies.length === 0) return null
+    return splitMultiTierCoverage(total, treatPolicies, treatClaims, onDate)
   }, [treatForm.quantity, treatForm.unit_price, treatForm.discount, treatPolicies, treatClaims, treatEncounterId, encounters])
 
   const calcTotal = () => {
@@ -800,7 +836,10 @@ export default function Treatments() {
       status: treatForm.status, notes: treatForm.notes || null,
       doctor_share: null, doctor_share_calculated: false,
       materials_used: treatForm.materials_used.length > 0 ? treatForm.materials_used : null,
-      insurance_share: insuranceSplit ? insuranceSplit.insuranceShare : null,
+      insurance_share: insuranceSplit ? insuranceSplit.totalInsuranceShare : null,
+      primary_insurance_share: insuranceSplit ? insuranceSplit.primaryShare : null,
+      supplementary_insurance_share: insuranceSplit ? insuranceSplit.supplementaryShare : null,
+      franchise_amount: insuranceSplit ? insuranceSplit.franchiseAmount : null,
       patient_share: insuranceSplit ? insuranceSplit.patientShare : null,
     } as any
     const enc = encounters.find((e) => e.id === treatEncounterId)
@@ -814,8 +853,20 @@ export default function Treatments() {
     // share, the doctor must see the real patient share before agreeing
     // to the price, not after the claim comes back short.
     if (insuranceSplit) {
-      fields.push({ label: 'سهم بیمه', value: `${formatCurrency(insuranceSplit.insuranceShare)} ت` })
-      fields.push({ label: 'سهم بیمار', value: `${formatCurrency(insuranceSplit.patientShare)} ت`, highlight: insuranceSplit.cappedByCeiling })
+      if (insuranceSplit.primaryShare > 0) {
+        fields.push({ label: 'سهم بیمه پایه', value: `${formatCurrency(insuranceSplit.primaryShare)} ت` })
+      }
+      if (insuranceSplit.supplementaryShare > 0) {
+        fields.push({ label: 'سهم بیمه تکمیلی', value: `${formatCurrency(insuranceSplit.supplementaryShare)} ت` })
+      }
+      if (insuranceSplit.franchiseAmount > 0) {
+        fields.push({ label: 'فرانشیز', value: `${formatCurrency(insuranceSplit.franchiseAmount)} ت` })
+      }
+      fields.push({
+        label: 'سهم بیمار',
+        value: `${formatCurrency(insuranceSplit.patientShare)} ت`,
+        highlight: insuranceSplit.primaryCapped || insuranceSplit.supplementaryCapped,
+      })
     }
     if (treatForm.has_lab && treatForm.lab_id) {
       const lab = labs.find((l) => l.id === treatForm.lab_id)
@@ -923,6 +974,22 @@ export default function Treatments() {
             const found = updated.find((e) => e.id === detailEnc.id)
             if (found) setDetailEnc(found)
           }
+
+          // MOD-FEAT-036: ADA CDT Procedure Chains Next-Step Advisor
+          if (payload.status === 'completed' && treatPatientId) {
+            const currentPatientTreatments = treatments.filter((t) => t.patient_id === treatPatientId)
+            const chainSteps = getChainedNextSteps(payload, currentPatientTreatments, procedures)
+            if (chainSteps.length > 0) {
+              setChainedContext({
+                patientId: treatPatientId,
+                encounterId: treatEncounterId,
+                toothNumber: payload.tooth_number,
+                completedProcName: payload.procedure_name || 'درمان',
+              })
+              setChainedRecommendations(chainSteps)
+              setChainedModalOpen(true)
+            }
+          }
         } catch {
           chimes.playWarning()
           showToast('error', 'خطا در ذخیره')
@@ -930,6 +997,40 @@ export default function Treatments() {
         finally { setSavingTreat(false) }
       },
     })
+  }
+
+  const handleSelectChainedStep = (rec: ClinicalNextStepRecommendation) => {
+    h.tap()
+    if (!chainedContext) return
+    setChainedModalOpen(false)
+    setTreatEncounterId(chainedContext.encounterId)
+    setTreatPatientId(chainedContext.patientId)
+    setEditingTreat(null)
+    setTreatWizardStep(0)
+    setTreatForm({
+      procedure_code: rec.procedureCode || '',
+      procedure_name: rec.procedureName,
+      procedure_category: rec.procedureCategory || '',
+      tooth_number: rec.toothNumber || chainedContext.toothNumber || '',
+      tooth_surface: '',
+      quantity: '1',
+      unit_price: rec.estimatedPrice ? String(rec.estimatedPrice) : '',
+      discount: '',
+      total_price: rec.estimatedPrice ? String(rec.estimatedPrice) : '',
+      status: 'planned',
+      notes: rec.rationale,
+      has_lab: false,
+      lab_id: '',
+      lab_cost: '',
+      lab_work_type: '',
+      lab_material: '',
+      lab_shade: '',
+      go_to_billing: false,
+      materials_used: [],
+    })
+    setTreatModalOpen(true)
+    chimes.playPop()
+    showToast('info', `گام پیشنهادی «${rec.title}» در ویزارد بارگذاری شد`)
   }
 
   /**
@@ -1426,7 +1527,63 @@ export default function Treatments() {
             {/* Dental Chart */}
             <div>
               <h4 className="text-xs font-bold text-slate-500 mb-3 uppercase tracking-wider flex items-center gap-1.5"><Smile size={14} /> چارت دندانی (پالمر)</h4>
-              <DentalChart toothRecords={toothRecords} treatments={encounterTreatments} onUpdateTooth={handleUpdateTooth} onToothSelect={(toothNum) => setLastSelectedTooth(toothNum)} onAddTreatment={(toothNum, surface) => { if (!detailEnc) return; setTreatEncounterId(detailEnc.id); setTreatPatientId(detailEnc.patient_id); setEditingTreat(null); /* MOD-FEAT-021: the tooth came from the chart, so the wizard opens past the question it already answers */ setTreatWizardStep(startingStepIndex({ toothNumber: toothNum })); setTreatForm({ procedure_code: '', procedure_name: '', procedure_category: '', tooth_number: toothNum, tooth_surface: surface || '', quantity: '1', unit_price: '', discount: '', total_price: '', status: 'planned', notes: '', has_lab: false, lab_id: '', lab_cost: '', lab_work_type: '', lab_material: '', lab_shade: '', go_to_billing: false, materials_used: [] }); setMatInputId(''); setMatInputQty('1'); setTreatModalOpen(true) }}
+              <DentalChart toothRecords={toothRecords} treatments={encounterTreatments} onUpdateTooth={handleUpdateTooth} onToothSelect={(toothNum) => setLastSelectedTooth(toothNum)} 
+                onAddTreatment={(toothNum, surface, condition) => { 
+                  if (!detailEnc) return; 
+                  setTreatEncounterId(detailEnc.id); 
+                  setTreatPatientId(detailEnc.patient_id); 
+                  setEditingTreat(null); 
+                  
+                  // Map condition to a likely procedure
+                  let mappedName = '';
+                  let mappedCategory = '';
+                  let mappedCode = '';
+                  let mappedPrice = '';
+
+                  if (condition) {
+                    const conditionToSearch: Record<string, string> = {
+                      caries: 'ترمیم',
+                      rct: 'عصب کشی',
+                      crown: 'روکش',
+                      implant: 'ایمپلنت',
+                      extraction: 'کشیدن',
+                      post: 'پست',
+                      pin: 'پین',
+                      bridge: 'بریج',
+                      veneer: 'ونیر',
+                      sealant: 'سیلنت'
+                    };
+                    const searchTerm = conditionToSearch[condition as string];
+                    if (searchTerm) {
+                      const proc = procedures.find(p => p.name.includes(searchTerm) || (p.category && p.category.includes(searchTerm)));
+                      if (proc) {
+                        mappedName = proc.name;
+                        mappedCategory = proc.category || '';
+                        mappedCode = proc.code;
+                        mappedPrice = proc.default_price?.toString() || '';
+                      }
+                    }
+                  }
+
+                  setTreatWizardStep(startingStepIndex({ toothNumber: toothNum })); 
+                  setTreatForm({ 
+                    procedure_code: mappedCode, 
+                    procedure_name: mappedName, 
+                    procedure_category: mappedCategory, 
+                    tooth_number: toothNum, 
+                    tooth_surface: surface || '', 
+                    quantity: '1', 
+                    unit_price: mappedPrice, 
+                    discount: '', 
+                    total_price: mappedPrice, 
+                    status: 'planned', 
+                    notes: '', 
+                    has_lab: false, lab_id: '', lab_cost: '', lab_work_type: '', lab_material: '', lab_shade: '', go_to_billing: false, materials_used: [] 
+                  }); 
+                  setMatInputId(''); 
+                  setMatInputQty('1'); 
+                  setTreatModalOpen(true); 
+                }}
                 onAddLabOrder={(toothNum, surface) => {
                   // MOD-FEAT-022: lab work now starts where the dentist is
                   // looking, instead of in a blank Palmer picker two screens
@@ -1672,6 +1829,68 @@ export default function Treatments() {
                   </select>
                 </div>
                 <Input label="نام رویه (دستی)" value={treatForm.procedure_name} onChange={(v) => setTreatForm((p) => ({ ...p, procedure_name: v }))} placeholder="نام رویه درمانی" />
+                {(() => {
+                  if (!treatForm.procedure_name || !treatForm.tooth_number) return null
+                  const patientTreats = treatments.filter((t) => t.patient_id === treatPatientId)
+                  const evalRes = evaluateClinicalPrerequisites(
+                    {
+                      procedure_name: treatForm.procedure_name,
+                      tooth_number: treatForm.tooth_number,
+                      id: editingTreat?.id,
+                    },
+                    patientTreats,
+                  )
+                  if (evalRes.allowed && evalRes.severity === 'none') return null
+                  return (
+                    <div
+                      className={`p-3 rounded-xl border text-xs space-y-1 ${
+                        evalRes.severity === 'error'
+                          ? 'border-error-300 bg-error-50 dark:bg-error-950/40 dark:border-error-800'
+                          : 'border-amber-300 bg-amber-50 dark:bg-amber-950/40 dark:border-amber-800'
+                      }`}
+                    >
+                      <div className="flex items-center gap-1.5 font-bold text-slate-800 dark:text-slate-200">
+                        <AlertTriangle
+                          size={14}
+                          className={evalRes.severity === 'error' ? 'text-error-600' : 'text-amber-600'}
+                        />
+                        <span>هشدار پیش‌نیاز بالینی: {evalRes.ruleTitle}</span>
+                      </div>
+                      <p className="text-[11px] text-slate-600 dark:text-slate-400 leading-relaxed">{evalRes.message}</p>
+                      {evalRes.missingStep && (
+                        <p className="text-[10px] font-semibold text-primary-700 dark:text-primary-300">
+                          اقدام بالینی لازم: {evalRes.missingStep}
+                        </p>
+                      )}
+                    </div>
+                  )
+                })()}
+                {(() => {
+                  const chain = findProcedureChain(treatForm.procedure_name)
+                  if (!chain) return null
+                  return (
+                    <div className="p-3 rounded-xl border border-sky-200 bg-sky-50/70 dark:bg-sky-950/30 dark:border-sky-800/60 space-y-2">
+                      <div className="flex items-center gap-1.5 text-xs font-bold text-sky-800 dark:text-sky-300">
+                        <Sparkles size={14} className="text-sky-600 animate-pulse" />
+                        <span>مسیر بالینی هوشمند: {chain.name}</span>
+                      </div>
+                      <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
+                        {chain.steps.map((st, idx) => (
+                          <div key={idx} className="p-2 rounded-lg bg-white/80 dark:bg-slate-800/80 border border-sky-100 dark:border-sky-900 text-xs space-y-1">
+                            <div className="flex items-center justify-between">
+                              <span className="font-bold text-slate-800 dark:text-slate-200">گام {toPersianDigits(idx + 1)}: {st.name}</span>
+                              {st.needsLab && <span className="text-[10px] px-1.5 py-0.5 rounded bg-amber-100 text-amber-800 font-medium">لابراتوار</span>}
+                            </div>
+                            <p className="text-[11px] text-slate-500 leading-tight">{st.description}</p>
+                            {st.defaultDaysLater && (
+                              <span className="text-[10px] text-sky-600 font-medium block">فاصله پیشنهادی: {toPersianDigits(st.defaultDaysLater)} روز بعد</span>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )
+                })()}
                 <div className="grid grid-cols-3 gap-3">
                   <Input label="تعداد" value={treatForm.quantity} onChange={(v) => setTreatForm((p) => ({ ...p, quantity: v }))} type="number" dir="ltr" />
                   <div>
@@ -1695,13 +1914,18 @@ export default function Treatments() {
                     while quoting, instead of discovering the ceiling
                     only at the moment of commit. */}
                 {insuranceSplit && (
-                  <div className={`rounded-xl p-3 border ${insuranceSplit.cappedByCeiling ? 'bg-amber-50 border-amber-200' : 'bg-slate-50 border-slate-200'}`}>
-                    <div className="flex flex-wrap gap-x-5 gap-y-1 text-sm">
-                      <span>سهم بیمه: <b className="text-emerald-700">{formatCurrency(insuranceSplit.insuranceShare)} ت</b></span>
-                      <span>سهم بیمار: <b className="text-slate-800">{formatCurrency(insuranceSplit.patientShare)} ت</b></span>
-                      {insuranceSplit.remainingAfter !== null && (
-                        <span className="text-slate-500">مانده سقف پس از این درمان: {formatCurrency(insuranceSplit.remainingAfter)} ت</span>
+                  <div className={`rounded-xl p-3 border ${(insuranceSplit.primaryCapped || insuranceSplit.supplementaryCapped) ? 'bg-amber-50 border-amber-200' : 'bg-slate-50 border-slate-200'}`}>
+                    <div className="flex flex-wrap gap-x-5 gap-y-1.5 text-sm">
+                      {insuranceSplit.primaryShare > 0 && (
+                        <span>بیمه پایه: <b className="text-blue-700">{formatCurrency(insuranceSplit.primaryShare)} ت</b></span>
                       )}
+                      {insuranceSplit.supplementaryShare > 0 && (
+                        <span>بیمه تکمیلی: <b className="text-emerald-700">{formatCurrency(insuranceSplit.supplementaryShare)} ت</b></span>
+                      )}
+                      {insuranceSplit.franchiseAmount > 0 && (
+                        <span>فرانشیز: <b className="text-amber-700">{formatCurrency(insuranceSplit.franchiseAmount)} ت</b></span>
+                      )}
+                      <span>سهم بیمار: <b className="text-slate-900 font-bold">{formatCurrency(insuranceSplit.patientShare)} ت</b></span>
                     </div>
                     {insuranceSplit.warning && (
                       <p className="mt-2 text-xs text-amber-800">⚠ {insuranceSplit.warning}</p>
@@ -1773,21 +1997,88 @@ export default function Treatments() {
             ),
           },
           {
-            label: 'مواد مصرفی',
+            label: 'مواد مصرفی و انبار',
             content: (
               <div className="space-y-4">
+                {/* Smart Clinical Presets Suggestion Banner */}
+                {suggestedSupplies.length > 0 && (
+                  <div className="p-4 bg-primary-50/80 dark:bg-primary-950/40 rounded-2xl border border-primary-200/80 dark:border-primary-800/60 space-y-3">
+                    <div className="flex items-center justify-between flex-wrap gap-2">
+                      <div className="flex items-center gap-2">
+                        <Sparkles size={16} className="text-primary-600 dark:text-primary-400 animate-pulse" />
+                        <span className="text-xs font-bold text-primary-900 dark:text-primary-200">
+                          بسته مواد مصرفی پیشنهادی برای «{treatForm.procedure_name || 'این درمان'}»:
+                        </span>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={handleAutoPopulateSupplies}
+                        className="min-h-[44px] px-3.5 py-1.5 rounded-xl bg-primary-600 hover:bg-primary-700 text-white text-xs font-bold transition-all shadow-xs press-scale flex items-center gap-1.5"
+                      >
+                        <Sparkles size={13} />
+                        تزریق خودکار مواد استاندارد
+                      </button>
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
+                      {suggestedSupplies.map((s, idx) => {
+                        const matched = s.matchedInventoryItem
+                        return (
+                          <div
+                            key={idx}
+                            className={`p-2.5 rounded-xl border flex items-center justify-between ${
+                              matched
+                                ? s.inStock
+                                  ? 'bg-white/80 dark:bg-slate-900/60 border-emerald-200 dark:border-emerald-800/40'
+                                  : 'bg-amber-50/60 dark:bg-amber-950/30 border-amber-200 dark:border-amber-800/40'
+                                : 'bg-slate-50 dark:bg-slate-900/40 border-slate-200 dark:border-slate-800 opacity-60'
+                            }`}
+                          >
+                            <div className="min-w-0 flex-1">
+                              <p className="font-bold text-slate-800 dark:text-slate-100 truncate">{s.templateSupplyName}</p>
+                              <p className="text-[11px] text-slate-400">
+                                مقدار پیش‌فرض: {toPersianDigits(s.defaultQuantity)} {s.unit}
+                                {matched && (
+                                  <span className={s.inStock ? ' text-emerald-600 dark:text-emerald-400 mr-1' : ' text-amber-600 dark:text-amber-400 mr-1'}>
+                                    (موجودی انبار: {toPersianDigits(s.availableQuantity)} {matched.unit})
+                                  </span>
+                                )}
+                              </p>
+                            </div>
+                            <span className="shrink-0 text-xs">
+                              {matched ? (
+                                s.inStock ? (
+                                  <span className="text-emerald-600 dark:text-emerald-400 font-bold flex items-center gap-0.5">
+                                    <CheckCircle2 size={14} /> آماده
+                                  </span>
+                                ) : (
+                                  <span className="text-amber-600 dark:text-amber-400 font-bold flex items-center gap-0.5">
+                                    <AlertTriangle size={14} /> کمبود
+                                  </span>
+                                )
+                              ) : (
+                                <span className="text-slate-400 text-[10px]">تعریف‌نشده</span>
+                              )}
+                            </span>
+                          </div>
+                        )
+                      })}
+                    </div>
+                  </div>
+                )}
+
                 <div className="p-4 bg-slate-50 dark:bg-slate-800/50 rounded-2xl border border-slate-200 dark:border-slate-700">
-                  <p className="text-sm font-medium text-slate-700 dark:text-slate-300 mb-3">
-                    پس از ثبت درمان در وضعیت «انجام شده»، این مواد به صورت خودکار از انبار کسر خواهند شد.
+                  <p className="text-xs text-slate-500 dark:text-slate-400 mb-3">
+                    پس از ثبت درمان در وضعیت «انجام شده»، این مواد به صورت خودکار از موجودی انبار کسر خواهند شد.
                   </p>
                   
                   <div className="grid grid-cols-[1fr_80px_auto] gap-2 items-end mb-4">
                     <Select 
-                      label="ماده" 
+                      label="ماده مصرفی" 
                       value={matInputId} 
                       onChange={setMatInputId} 
-                      options={inventoryItems.map(i => ({ value: i.id, label: `${i.name} (موجودی: ${i.quantity || 0} ${i.unit})` }))} 
-                      placeholder="انتخاب ماده مصرفی" 
+                      options={inventoryItems.map(i => ({ value: i.id, label: `${i.name} (موجودی: ${toPersianDigits(i.quantity || 0)} ${i.unit})` }))} 
+                      placeholder="انتخاب ماده مصرفی..." 
                     />
                     <Input 
                       label="تعداد" 
@@ -1798,7 +2089,7 @@ export default function Treatments() {
                     />
                     <Button 
                       variant="secondary" 
-                      className="mb-1.5"
+                      className="mb-1.5 min-h-[44px]"
                       onClick={() => {
                         if (matInputId && matInputQty) {
                           setTreatForm(p => ({
@@ -1814,26 +2105,34 @@ export default function Treatments() {
                     </Button>
                   </div>
                   
-                  {treatForm.materials_used.length > 0 && (
+                  {treatForm.materials_used.length > 0 ? (
                     <div className="space-y-2 mt-4">
+                      <p className="text-xs font-bold text-slate-700 dark:text-slate-300">
+                        اقلام ثبت‌شده برای کسر از انبار ({toPersianDigits(treatForm.materials_used.length)} قلم):
+                      </p>
                       {treatForm.materials_used.map((mat, idx) => {
                         const item = inventoryItems.find(i => i.id === mat.item_id)
                         return (
-                          <div key={idx} className="flex items-center justify-between bg-white dark:bg-slate-900 p-2 rounded-lg border border-slate-200 dark:border-slate-700">
+                          <div key={idx} className="flex items-center justify-between bg-white dark:bg-slate-900 p-2.5 rounded-xl border border-slate-200 dark:border-slate-700 shadow-xs">
                             <span className="text-sm font-medium text-slate-700 dark:text-slate-200">{item?.name || 'ماده نامشخص'}</span>
                             <div className="flex items-center gap-3">
-                              <span className="text-sm text-slate-500">{mat.quantity} {item?.unit || 'واحد'}</span>
+                              <span className="text-xs font-bold text-slate-500 dark:text-slate-400 bg-slate-100 dark:bg-slate-800 px-2 py-1 rounded-lg">
+                                {toPersianDigits(mat.quantity)} {item?.unit || 'واحد'}
+                              </span>
                               <button
                                 onClick={() => setTreatForm(p => ({ ...p, materials_used: p.materials_used.filter((_, i) => i !== idx) }))}
-                                className="text-red-500 hover:bg-red-50 p-1 rounded transition-colors"
+                                className="text-red-500 hover:bg-red-50 dark:hover:bg-red-950/40 p-1.5 rounded-lg transition-colors"
+                                title="حذف"
                               >
-                                حذف
+                                <Trash2 size={15} />
                               </button>
                             </div>
                           </div>
                         )
                       })}
                     </div>
+                  ) : (
+                    <p className="text-xs text-slate-400 text-center py-3">هنوز هیچ ماده‌ای برای این درمان ثبت نشده است.</p>
                   )}
                 </div>
               </div>
@@ -2006,6 +2305,75 @@ export default function Treatments() {
               </Card>
             </>
           )}
+        </div>
+      </Modal>
+
+      {/* MOD-FEAT-036: ADA CDT Procedure Chains Next-Step Advisor Modal */}
+      <Modal
+        open={chainedModalOpen}
+        onClose={() => setChainedModalOpen(false)}
+        title="زنجیره بالینی: پیشنهاد گام بعدی درمان"
+      >
+        <div className="space-y-4">
+          <div className="p-3.5 rounded-2xl bg-teal-50 dark:bg-teal-950/40 border border-teal-200 dark:border-teal-800 flex items-center gap-3">
+            <div className="p-2 rounded-xl bg-teal-600 text-white shadow-xs shrink-0">
+              <Sparkles size={20} />
+            </div>
+            <div>
+              <p className="text-xs text-slate-500 dark:text-slate-400">
+                درمان تکمیل‌شده: <b className="text-teal-800 dark:text-teal-200">{chainedContext?.completedProcName}</b>
+                {chainedContext?.toothNumber && ` (دندان ${toothLabel(chainedContext.toothNumber)})`}
+              </p>
+              <p className="text-sm font-bold text-slate-800 dark:text-slate-100">
+                گام‌های بالینی پیشنهادی بر اساس استاندارد ADA CDT:
+              </p>
+            </div>
+          </div>
+
+          <div className="space-y-2 max-h-[380px] overflow-y-auto">
+            {chainedRecommendations.map((rec) => (
+              <Card
+                key={rec.id}
+                className="p-3.5 hover:border-teal-400 hover:shadow-md transition-all cursor-pointer border border-slate-200 dark:border-slate-700"
+                onClick={() => handleSelectChainedStep(rec)}
+              >
+                <div className="flex items-center justify-between gap-2 mb-1.5 flex-wrap">
+                  <div className="flex items-center gap-2">
+                    <Badge color={rec.urgency === 'critical' ? 'error' : rec.urgency === 'recommended' ? 'warning' : 'primary'}>
+                      {rec.urgency === 'critical' ? '⚡ گام ضروری بعدی' : rec.urgency === 'recommended' ? 'توصیه بالینی' : 'برنامه تکمیلی'}
+                    </Badge>
+                    <span className="text-sm font-bold text-slate-800 dark:text-slate-100">{rec.title}</span>
+                  </div>
+                  {rec.estimatedPrice && (
+                    <span className="text-xs font-bold text-primary-600 dark:text-primary-400">
+                      {formatCurrency(rec.estimatedPrice)} ت
+                    </span>
+                  )}
+                </div>
+                <p className="text-xs font-medium text-slate-700 dark:text-slate-300 mb-1">
+                  رویه: {rec.procedureName}
+                </p>
+                <p className="text-[11px] text-slate-500 dark:text-slate-400 leading-relaxed mb-2.5">
+                  علت پزشکی: {rec.rationale}
+                </p>
+                <Button
+                  size="sm"
+                  variant="primary"
+                  className="w-full justify-center flex items-center gap-1.5"
+                  onClick={() => handleSelectChainedStep(rec)}
+                >
+                  <Plus size={14} />
+                  <span>ثبت این گام در پرونده بیمار</span>
+                </Button>
+              </Card>
+            ))}
+          </div>
+
+          <div className="flex justify-end pt-2 border-t border-slate-100 dark:border-slate-800">
+            <Button variant="secondary" size="sm" onClick={() => setChainedModalOpen(false)}>
+              فعلاً لازم نیست
+            </Button>
+          </div>
         </div>
       </Modal>
 

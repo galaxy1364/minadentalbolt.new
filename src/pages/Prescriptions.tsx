@@ -4,8 +4,17 @@ import { PatientSelect } from '../components/PatientSelect'
 import { buildPrintDocument } from '../lib/printDocument'
 import { useNavigate, useLocation } from 'react-router-dom'
 import { readChartHandoff } from '../lib/chartHandoff'
-import { Pill, FileText, Search, Plus, Eye, Edit2, TrendingUp, Smile, Printer, Ban, AlertTriangle, Calculator, ShieldAlert, MessageSquare } from 'lucide-react'
+import { Pill, FileText, Search, Plus, Eye, Edit2, TrendingUp, Smile, Printer, Ban, AlertTriangle, Calculator, ShieldAlert, MessageSquare, FileHeart, Copy } from 'lucide-react'
 import { checkDrugInteractions, calculatePediatricDosage } from '../lib/drugSafety'
+import { buildPatientMedicationGuideDocument } from '../lib/patientMedicationGuide'
+import {
+  formatPrescriptionForInsurancePortal,
+  renderElectronicTrackingBadgeHtml,
+  validateElectronicTrackingCode,
+  INSURANCE_SYSTEMS,
+  INSURANCE_SYSTEM_OPTIONS,
+  InsuranceSystemType,
+} from '../lib/electronicPrescription'
 import { AreaChart, Area, XAxis, YAxis, Tooltip as RTooltip, ResponsiveContainer } from 'recharts'
 import { fetchPrescriptions, createPrescription, updatePrescription, fetchPatients, fetchDoctors } from '../lib/api'
 import { toJalaliString, toJalaliStringPretty, getJalaliMonthYear, formatCurrency, formatNumber, toPersianDigits, persianMonths } from '../lib/persianDate'
@@ -74,6 +83,8 @@ export default function Prescriptions() {
     doctor_id: '',
     medications: '',
     notes: '',
+    electronic_tracking_code: '',
+    insurance_system: 'tamin' as InsuranceSystemType,
   })
 
   // Pediatric calculator state
@@ -120,8 +131,8 @@ export default function Prescriptions() {
       setPatients(pats)
       setDoctors(docs)
     } catch (err) {
-      console.error('Error loading prescriptions:', err)
-      showToast('error', 'خطا در بارگذاری نسخه‌ها')
+      console.error('Failed to load prescriptions:', err)
+      showToast('error', 'خطا در بارگذاری اطلاعات')
     } finally {
       setLoading(false)
     }
@@ -140,6 +151,8 @@ export default function Prescriptions() {
       doctor_id: handoff.doctorId || '',
       medications: '',
       notes: handoff.toothNumber && handoff.toothNumber !== 'general' ? `مربوط به دندان ${toothLabel(handoff.toothNumber)}` : '',
+      electronic_tracking_code: '',
+      insurance_system: 'tamin',
     })
     setEditingRx(null)
     setRxWizardStep(1)
@@ -157,8 +170,9 @@ export default function Prescriptions() {
     return prescriptions.filter((p) => {
       const pat = patients.find((pt) => pt.id === p.patient_id)
       const name = pat ? `${pat.first_name} ${pat.last_name}` : ''
+      const code = p.electronic_tracking_code || ''
       const medsText = p.medications ? JSON.stringify(p.medications).toLowerCase() : ''
-      return name.toLowerCase().includes(q) || medsText.includes(q)
+      return name.toLowerCase().includes(q) || code.toLowerCase().includes(q) || medsText.includes(q)
     })
   }, [prescriptions, searchQuery])
 
@@ -192,7 +206,10 @@ export default function Prescriptions() {
   }, [prescriptions])
 
   const doctorOptions = useMemo(() => {
-    return doctors.map((d) => ({ value: d.id, label: d.name || d.specialty || 'پزشک' }))
+    return doctors.map((d) => ({
+      value: d.id,
+      label: d.name ? `دکتر ${d.name}` : (d.specialty || 'پزشک'),
+    }))
   }, [doctors])
 
   // ===========================================================================
@@ -232,12 +249,13 @@ export default function Prescriptions() {
     const items = medicationsList(p)
     const win = window.open('', '_blank', 'width=650,height=800')
     if (!win) { showToast('error', 'اجازه‌ی باز کردن پنجره‌ی چاپ داده نشد'); return }
+    const trackingBadge = renderElectronicTrackingBadgeHtml(p)
     const rxStyles = `
         body { font-family: Tahoma, Arial, sans-serif; padding: 32px; color: #1e293b; }
         .header { text-align: center; border-bottom: 2px solid #0d9488; padding-bottom: 16px; margin-bottom: 24px; }
         .header h1 { color: #0d9488; margin: 0 0 4px; font-size: 22px; }
         .header p { margin: 0; color: #64748b; font-size: 13px; }
-        .meta { display: flex; justify-content: space-between; margin-bottom: 20px; font-size: 14px; }
+        .meta { display: flex; justify-content: space-between; margin-bottom: 16px; font-size: 14px; }
         table { width: 100%; border-collapse: collapse; margin-bottom: 20px; }
         th, td { border: 1px solid #e2e8f0; padding: 10px; text-align: right; font-size: 13px; }
         th { background: #f0fdfa; color: #0d9488; }
@@ -252,6 +270,7 @@ export default function Prescriptions() {
           <span><b>پزشک:</b> ${doctorName(p)}</span>
           <span><b>تاریخ:</b> ${toJalaliStringPretty(p.created_at)}</span>
         </div>
+        ${trackingBadge ? `<div style="margin-bottom: 16px;">${trackingBadge}</div>` : ''}
         <table>
           <thead><tr><th>#</th><th>نام دارو</th><th>دوز</th><th>بسامد مصرف</th></tr></thead>
           <tbody>
@@ -266,6 +285,34 @@ export default function Prescriptions() {
     win.focus()
   }
 
+  const handleCopyElectronicRx = (p: PrescriptionWithRelations) => {
+    const pat = patients.find((pt) => pt.id === p.patient_id)
+    if (!pat) return
+    const text = formatPrescriptionForInsurancePortal(p, pat, p.doctor)
+    navigator.clipboard.writeText(text)
+    chimes.playPop()
+    h.confirm()
+    showToast('success', 'مشخصات نسخه الکترونیک در حافظه کپی شد (آماده الصاق در سامانه)')
+  }
+
+  const handlePrintGuide = (p: PrescriptionWithRelations) => {
+    chimes.playPop()
+    h.tap()
+    const items = medicationsList(p)
+    const win = window.open('', '_blank', 'width=700,height=850')
+    if (!win) { showToast('error', 'اجازه‌ی باز کردن پنجره‌ی چاپ داده نشد'); return }
+    const docHtml = buildPatientMedicationGuideDocument({
+      patientName: patientName(p),
+      doctorName: doctorName(p),
+      createdDate: p.created_at,
+      medications: items,
+      notes: p.notes || undefined,
+    })
+    win.document.write(docHtml)
+    win.document.close()
+    win.focus()
+  }
+
   // ===========================================================================
   // Modal Handlers
   // ===========================================================================
@@ -274,7 +321,14 @@ export default function Prescriptions() {
     h.tap()
     setEditingRx(null)
     setRxWizardStep(0)
-    setFormData({ patient_id: '', doctor_id: '', medications: '', notes: '' })
+    setFormData({
+      patient_id: '',
+      doctor_id: '',
+      medications: '',
+      notes: '',
+      electronic_tracking_code: '',
+      insurance_system: 'tamin',
+    })
     setModalOpen(true)
   }
 
@@ -287,7 +341,14 @@ export default function Prescriptions() {
     } else if (Array.isArray(p.medications)) {
       medsText = p.medications.map((m: any) => `${m.name || m.medication || ''} | ${m.dose || ''} | ${m.frequency || ''}`).join('\n')
     }
-    setFormData({ patient_id: p.patient_id, doctor_id: p.doctor_id || '', medications: medsText, notes: p.notes || '' })
+    setFormData({
+      patient_id: p.patient_id,
+      doctor_id: p.doctor_id || '',
+      medications: medsText,
+      notes: p.notes || '',
+      electronic_tracking_code: p.electronic_tracking_code || '',
+      insurance_system: (p.insurance_system as InsuranceSystemType) || 'tamin',
+    })
     setRxWizardStep(0)
     setModalOpen(true)
   }
@@ -295,6 +356,16 @@ export default function Prescriptions() {
   const handleSave = () => {
     if (!formData.patient_id) { chimes.playWarning(); showToast('error', 'انتخاب بیمار الزامی است'); return }
     if (!formData.medications.trim()) { chimes.playWarning(); showToast('error', 'ورود حداقل یک دارو الزامی است'); return }
+
+    if (formData.electronic_tracking_code.trim()) {
+      const val = validateElectronicTrackingCode(formData.electronic_tracking_code)
+      if (!val.isValid) {
+        chimes.playWarning()
+        showToast('error', val.error || 'کد رهگیری نسخه الکترونیک معتبر نیست')
+        return
+      }
+    }
+
     const meds = formData.medications.split('\n').map((l) => l.trim()).filter(Boolean).map((line) => {
       const parts = line.split('|').map((s) => s.trim())
       return { name: parts[0] || '', dose: parts[1] || '', frequency: parts[2] || '' }
@@ -303,16 +374,22 @@ export default function Prescriptions() {
     const payload = {
       patient_id: formData.patient_id,
       doctor_id: formData.doctor_id || null,
-      medications: { items: meds },
+      medications: { items: meds, text: formData.medications },
       notes: formData.notes || null,
+      electronic_tracking_code: formData.electronic_tracking_code.trim() || null,
+      insurance_system: formData.insurance_system || 'tamin',
+    }
+    const fields = [
+      { label: 'بیمار', value: patient ? `${patient.first_name} ${patient.last_name}` : '-', highlight: true },
+      { label: 'تعداد داروها', value: toPersianDigits(meds.length) },
+    ]
+    if (formData.electronic_tracking_code.trim()) {
+      fields.push({ label: 'کد رهگیری نسخه الکترونیک', value: formData.electronic_tracking_code.trim(), highlight: true })
     }
     confirmAction({
       type: editingRx ? 'edit' : 'create',
-      title: editingRx ? 'ویرایش نسخه' : 'نسخه جدید',
-      fields: [
-        { label: 'بیمار', value: patient ? `${patient.first_name} ${patient.last_name}` : '-', highlight: true },
-        { label: 'تعداد داروها', value: toPersianDigits(meds.length) },
-      ],
+      title: editingRx ? 'ویرایش نسخه' : 'ایجاد نسخه جدید',
+      fields,
       confirmLabel: editingRx ? 'ذخیره' : 'ایجاد نسخه',
       onConfirm: async () => {
         setSaving(true)
@@ -470,6 +547,17 @@ export default function Prescriptions() {
                   <p className="text-sm text-slate-700 line-clamp-2">{medicationsSummary(p)}</p>
                 </div>
 
+                {p.electronic_tracking_code && (
+                  <div className="flex items-center justify-between bg-emerald-50/80 dark:bg-emerald-950/30 border border-emerald-200 dark:border-emerald-800 rounded-xl px-3 py-2 mb-3 text-xs">
+                    <div className="flex items-center gap-1.5 text-emerald-800 dark:text-emerald-300 font-medium">
+                      <span>نسخه الکترونیک ({INSURANCE_SYSTEMS[(p.insurance_system as InsuranceSystemType) || 'tamin']?.label || 'تأمین اجتماعی'}):</span>
+                    </div>
+                    <span className="font-mono font-bold text-emerald-700 dark:text-emerald-300 tracking-wider">
+                      {p.electronic_tracking_code}
+                    </span>
+                  </div>
+                )}
+
                 <div className="flex items-center justify-between pt-3 border-t border-slate-100">
                   <span className="text-xs text-slate-500">{toJalaliStringPretty(p.created_at)}</span>
                   <div className="flex items-center gap-2">
@@ -493,8 +581,10 @@ export default function Prescriptions() {
                         </a>
                       )
                     })()}
+                    <button onClick={() => handleCopyElectronicRx(p)} className="text-emerald-600 hover:text-emerald-700 text-xs flex items-center gap-1" title="کپی مشخصات نسخه جهت ورود در سامانه بیمه"><Copy size={14} /> کپی پرتال</button>
                     <button onClick={() => openEditModal(p)} className="text-slate-500 hover:text-slate-700 text-xs flex items-center gap-1"><Edit2 size={14} /> ویرایش</button>
                     <button onClick={() => handlePrint(p)} className="text-primary-600 hover:text-primary-700 text-xs flex items-center gap-1"><Printer size={14} /> چاپ</button>
+                    <button onClick={() => handlePrintGuide(p)} className="text-teal-600 hover:text-teal-700 text-xs flex items-center gap-1" title="چاپ برگه راهنمای مصرف دارو و مراقبت‌های پس از درمان بیمار"><FileHeart size={14} /> راهنمای بیمار</button>
                     <button onClick={() => handleDelete(p)} className="text-error-500 hover:text-error-700 text-xs flex items-center gap-1"><Ban size={14} /> لغو</button>
                     <button onClick={() => navigate(`/patients/${p.patient_id}`)} className="text-primary-600 hover:text-primary-700 text-xs flex items-center gap-1"><Eye size={14} /> پرونده</button>
                   </div>
@@ -725,9 +815,50 @@ export default function Prescriptions() {
             ),
           },
           {
-            label: 'یادداشت',
+            label: 'نسخه الکترونیک و یادداشت',
+            validate: () => {
+              if (formData.electronic_tracking_code.trim()) {
+                const res = validateElectronicTrackingCode(formData.electronic_tracking_code)
+                if (!res.isValid) return res.error || 'کد رهگیری نسخه الکترونیک نامعتبر است'
+              }
+              return null
+            },
             content: (
-              <Textarea label="یادداشت" value={formData.notes} onChange={(v) => setFormData({ ...formData, notes: v })} placeholder="توضیحات اختیاری" rows={3} />
+              <div className="space-y-4">
+                <div className="p-3.5 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-bold text-slate-700 dark:text-slate-200">
+                      مشخصات نسخه الکترونیک (سامانه سپاس / تأمین / سلامت)
+                    </span>
+                    <span className="text-[11px] text-slate-400">اختیاری</span>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <Select
+                      label="سامانه بیمه‌گر الکترونیک"
+                      value={formData.insurance_system}
+                      onChange={(v) => setFormData({ ...formData, insurance_system: v as InsuranceSystemType })}
+                      options={INSURANCE_SYSTEM_OPTIONS}
+                    />
+
+                    <Input
+                      label="کد رهگیری نسخه الکترونیک"
+                      value={formData.electronic_tracking_code}
+                      onChange={(v) => setFormData({ ...formData, electronic_tracking_code: v })}
+                      placeholder="مثال: ۱۲۳۴۵۶ یا ۷ رقمی"
+                      hint="کد ثبت شده در پرتال بیمه (جهت تحویل در داروخانه)"
+                    />
+                  </div>
+                </div>
+
+                <Textarea
+                  label="یادداشت و توصیه‌های پزشک به بیمار"
+                  value={formData.notes}
+                  onChange={(v) => setFormData({ ...formData, notes: v })}
+                  placeholder="توضیحات اختیاری (نحوه مصرف خاص، پرهیز غذایی و ...)"
+                  rows={3}
+                />
+              </div>
             ),
           },
         ]}

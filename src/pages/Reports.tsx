@@ -1,12 +1,13 @@
 // Reports.tsx - Persian RTL Dental Clinic Reports & Analytics
 import { useState, useEffect, useCallback, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { TrendingUp, Users, Activity, Calendar, DollarSign, BarChart3, PieChart as PieIcon, Smile, ArrowUp, ArrowDown, Download, FileSpreadsheet, AlertTriangle } from 'lucide-react'
+import { TrendingUp, Users, Activity, Calendar, DollarSign, BarChart3, PieChart as PieIcon, Smile, ArrowUp, ArrowDown, Download, FileSpreadsheet, AlertTriangle, Printer } from 'lucide-react'
 import { AreaChart, Area, BarChart, Bar, LineChart, Line, PieChart, Pie, Cell, XAxis, YAxis, Tooltip as RTooltip, ResponsiveContainer, Legend } from 'recharts'
 import { fetchPayments, fetchPatients, fetchEncounters, fetchTreatments, fetchProcedures, fetchAppointments, fetchExpenses, fetchImplantCases } from '../lib/api'
 import { calcAllPatientBalances } from '../lib/finance'
 import { toothCode } from '../lib/toothLabel'
-import { toJalaliString, toJalaliStringPretty, getJalaliMonthYear, formatCurrency, formatNumber, toPersianDigits, persianMonths, jsDateToPersianWeekday, toJalaliDisplay } from '../lib/persianDate'
+import { toJalaliString, toJalaliStringPretty, getJalaliMonthYear, formatCurrency, formatNumber, toPersianDigits, persianMonths, jsDateToPersianWeekday, toJalaliDisplay, formatTime } from '../lib/persianDate'
+import { buildPrintDocument } from '../lib/printDocument'
 import { h } from '../lib/haptics'
 import { chimes } from '../lib/chimes'
 import { Payment, Patient, Encounter, Treatment, Procedure, Appointment, Expense } from '../types'
@@ -396,6 +397,316 @@ export default function Reports() {
     return { rows, totals, grandTotal: rows.reduce((s, r) => s + r.balance, 0) }
   }, [payments, treatments, implantCases, patients, encounters])
 
+  // ── Official Executive Print Report ─────────────────────────────
+  const handlePrintOfficialReport = useCallback(() => {
+    h.tap()
+    chimes.playPop()
+    const win = window.open('', '_blank', 'width=900,height=1000')
+    if (!win) return
+
+    const todayStr = new Date().toISOString().slice(0, 10)
+    const nowTime = new Date().toTimeString().slice(0, 5)
+
+    const reportStyles = `
+      * { box-sizing: border-box; }
+      body {
+        font-family: Tahoma, 'IRANSans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+        direction: rtl;
+        margin: 0;
+        padding: 24px;
+        background: #fff;
+        color: #1e293b;
+        font-size: 13px;
+        line-height: 1.6;
+      }
+      .report-header {
+        border-bottom: 2px solid #0284c7;
+        padding-bottom: 16px;
+        margin-bottom: 20px;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+      }
+      .clinic-brand {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+      }
+      .clinic-logo {
+        width: 44px;
+        height: 44px;
+        border-radius: 12px;
+        background: linear-gradient(135deg, #0284c7, #0369a1);
+        color: #fff;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 20px;
+        font-weight: bold;
+      }
+      .clinic-title {
+        font-size: 17px;
+        font-weight: 800;
+        color: #0f172a;
+        margin: 0 0 4px 0;
+      }
+      .clinic-sub {
+        font-size: 11px;
+        color: #64748b;
+        margin: 0;
+      }
+      .meta-box {
+        text-align: left;
+        font-size: 11px;
+        color: #475569;
+        background: #f8fafc;
+        padding: 8px 14px;
+        border-radius: 10px;
+        border: 1px solid #e2e8f0;
+        line-height: 1.8;
+      }
+      .kpi-grid {
+        display: grid;
+        grid-template-columns: repeat(4, 1fr);
+        gap: 10px;
+        margin-bottom: 20px;
+      }
+      .kpi-card {
+        background: #f8fafc;
+        border: 1px solid #e2e8f0;
+        border-radius: 10px;
+        padding: 10px 12px;
+      }
+      .kpi-title {
+        font-size: 11px;
+        color: #64748b;
+        margin-bottom: 4px;
+        font-weight: 600;
+      }
+      .kpi-val {
+        font-size: 14px;
+        font-weight: 800;
+        color: #0f172a;
+      }
+      .kpi-card.green { border-top: 3px solid #10b981; }
+      .kpi-card.blue { border-top: 3px solid #0284c7; }
+      .kpi-card.purple { border-top: 3px solid #8b5cf6; }
+      .kpi-card.rose { border-top: 3px solid #f43f5e; }
+
+      .section-box {
+        margin-bottom: 18px;
+        background: #fff;
+        border: 1px solid #e2e8f0;
+        border-radius: 10px;
+        overflow: hidden;
+      }
+      .section-header {
+        background: #f1f5f9;
+        padding: 8px 14px;
+        font-size: 12px;
+        font-weight: 700;
+        color: #334155;
+        border-bottom: 1px solid #e2e8f0;
+        display: flex;
+        justify-content: space-between;
+      }
+      table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 11px;
+      }
+      th {
+        background: #f8fafc;
+        color: #475569;
+        padding: 8px 10px;
+        text-align: right;
+        font-weight: 600;
+        border-bottom: 1px solid #e2e8f0;
+      }
+      td {
+        padding: 7px 10px;
+        border-bottom: 1px solid #f1f5f9;
+        color: #1e293b;
+      }
+      tr:last-child td { border-bottom: none; }
+      .sign-section {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 30px;
+        margin-top: 24px;
+        padding-top: 16px;
+        border-top: 1px dashed #cbd5e1;
+      }
+      .sign-box {
+        text-align: center;
+        padding: 12px;
+        background: #f8fafc;
+        border-radius: 8px;
+        border: 1px solid #e2e8f0;
+      }
+      .sign-title { font-weight: bold; margin-bottom: 35px; color: #334155; font-size: 11px; }
+      .sign-line { border-top: 1px dotted #94a3b8; width: 65%; margin: 0 auto 4px; }
+      @media print {
+        body { padding: 0; }
+        @page { size: A4 portrait; margin: 12mm; }
+      }
+    `
+
+    const reportHtml = `
+      <div class="report-header">
+        <div class="clinic-brand">
+          <div class="clinic-logo">M</div>
+          <div>
+            <h1 class="clinic-title">کلینیک تخصصی دندانپزشکی مینادنت</h1>
+            <p class="clinic-sub">کارنامه رسمی عملکرد و تحلیل مدیریتی کلینیک (Executive Management Report)</p>
+          </div>
+        </div>
+        <div class="meta-box">
+          <div><strong>تاریخ صدور:</strong> ${toJalaliStringPretty(todayStr)}</div>
+          <div><strong>زمان صدور:</strong> ${toPersianDigits(formatTime(nowTime))}</div>
+          <div><strong>نوع گزارش:</strong> کارنامه جامع مالی و بالینی</div>
+        </div>
+      </div>
+
+      <!-- Financial KPIs -->
+      <div class="kpi-grid">
+        <div class="kpi-card green">
+          <div class="kpi-title">درآمد وصول‌شده کل</div>
+          <div class="kpi-val">${toPersianDigits(formatCurrency(revenueStats.totalRevenue))} ت</div>
+        </div>
+        <div class="kpi-card rose">
+          <div class="kpi-title">مجموع هزینه‌های کلینیک</div>
+          <div class="kpi-val">${toPersianDigits(formatCurrency(revenueStats.totalExpenses))} ت</div>
+        </div>
+        <div class="kpi-card blue">
+          <div class="kpi-title">سود خالص عملیاتی</div>
+          <div class="kpi-val">${toPersianDigits(formatCurrency(revenueStats.profit))} ت</div>
+        </div>
+        <div class="kpi-card purple">
+          <div class="kpi-title">مانده مطالبات معوق بیماران</div>
+          <div class="kpi-val">${toPersianDigits(formatCurrency(agingData.grandTotal))} ت</div>
+        </div>
+      </div>
+
+      <!-- Operational KPIs -->
+      <div class="kpi-grid">
+        <div class="kpi-card blue">
+          <div class="kpi-title">کل نوبت‌های ثبت‌شده</div>
+          <div class="kpi-val">${toPersianDigits(appointmentStats.total)} نوبت</div>
+        </div>
+        <div class="kpi-card green">
+          <div class="kpi-title">نوبت‌های موفق انجام‌شده</div>
+          <div class="kpi-val">${toPersianDigits(appointmentStats.completed)} نوبت</div>
+        </div>
+        <div class="kpi-card rose">
+          <div class="kpi-title">کنسلی و عدم حضور</div>
+          <div class="kpi-val">${toPersianDigits(appointmentStats.cancelled + appointmentStats.noShow)} نوبت</div>
+        </div>
+        <div class="kpi-card purple">
+          <div class="kpi-title">نرخ حضور و بهره‌وری</div>
+          <div class="kpi-val">${toPersianDigits(appointmentStats.completionRate.toFixed(1))}٪</div>
+        </div>
+      </div>
+
+      <!-- Treatment Distribution Table -->
+      <div class="section-box">
+        <div class="section-header">
+          <span>توزیع خدمات بالینی و درمان‌های انجام‌شده</span>
+          <span>مجموع رویه‌ها: ${toPersianDigits(treatmentStats.total)} مورد</span>
+        </div>
+        <table>
+          <thead>
+            <tr>
+              <th>دسته خدمت دندانپزشکی</th>
+              <th>تعداد پرونده / انجام‌شده</th>
+              <th>سهم درصدی از کل</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${treatmentDistributionData.map((td) => {
+              const pct = treatmentStats.total > 0 ? ((td.value / treatmentStats.total) * 100).toFixed(1) : '0'
+              return `
+                <tr>
+                  <td><strong>${td.name}</strong></td>
+                  <td>${toPersianDigits(td.value)} مورد</td>
+                  <td>${toPersianDigits(pct)}٪</td>
+                </tr>
+              `
+            }).join('')}
+          </tbody>
+        </table>
+      </div>
+
+      <!-- Outstanding Debt Aging -->
+      <div class="section-box">
+        <div class="section-header">
+          <span>تحلیل سن مطالبات معوق (Aging Debt Analysis)</span>
+          <span>مجموع بدهی: ${toPersianDigits(formatCurrency(agingData.grandTotal))} تومان</span>
+        </div>
+        <table>
+          <thead>
+            <tr>
+              <th>بازه سن بدهی</th>
+              <th>تعداد بیماران</th>
+              <th>مبلغ مطالبات معوق (تومان)</th>
+              <th>وضعیت ریسک</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>۰ تا ۳۰ روز (جاری)</td>
+              <td>${toPersianDigits(agingData.rows.filter(r => r.bucket === '0-30').length)} بیمار</td>
+              <td>${toPersianDigits(formatCurrency(agingData.totals['0-30']))}</td>
+              <td style="color: #10b981;">طبیعی / در جریان</td>
+            </tr>
+            <tr>
+              <td>۳۱ تا ۶۰ روز</td>
+              <td>${toPersianDigits(agingData.rows.filter(r => r.bucket === '31-60').length)} بیمار</td>
+              <td>${toPersianDigits(formatCurrency(agingData.totals['31-60']))}</td>
+              <td style="color: #f59e0b;">پیگیری ملایم</td>
+            </tr>
+            <tr>
+              <td>۶۱ تا ۹۰ روز</td>
+              <td>${toPersianDigits(agingData.rows.filter(r => r.bucket === '61-90').length)} بیمار</td>
+              <td>${toPersianDigits(formatCurrency(agingData.totals['61-90']))}</td>
+              <td style="color: #f97316;">هشدار و اخطار مالی</td>
+            </tr>
+            <tr>
+              <td>بیش از ۹۰ روز (معوقه سوخت‌شده)</td>
+              <td>${toPersianDigits(agingData.rows.filter(r => r.bucket === '90+').length)} بیمار</td>
+              <td>${toPersianDigits(formatCurrency(agingData.totals['90+']))}</td>
+              <td style="color: #ef4444; font-weight: bold;">ریسک بالا / انسداد نوبت</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <!-- Signatures -->
+      <div class="sign-section">
+        <div class="sign-box">
+          <div class="sign-title">مسئول فنی و امور بالینی کلینیک</div>
+          <div class="sign-line"></div>
+          <div style="font-size: 11px; color: #64748b;">مهر، تاریخ و امضا</div>
+        </div>
+        <div class="sign-box">
+          <div class="sign-title">مدیریت اداری و امور مالی کلینیک</div>
+          <div class="sign-line"></div>
+          <div style="font-size: 11px; color: #64748b;">مهر، تاریخ و امضا</div>
+        </div>
+      </div>
+    `
+
+    win.document.write(
+      buildPrintDocument({
+        title: `کارنامه عملکرد کلینیک مینادنت - ${toJalaliString(todayStr)}`,
+        styles: reportStyles,
+        bodyHtml: reportHtml,
+      })
+    )
+    win.document.close()
+    chimes.playSuccess()
+  }, [revenueStats, agingData, appointmentStats, treatmentDistributionData, treatmentStats])
+
   if (loading) {
     return (
       <div className="flex items-center justify-center py-20">
@@ -413,32 +724,41 @@ export default function Reports() {
         title="گزارش‌ها"
         subtitle="تحلیل و گزارش‌گیری عملکرد کلینیک"
         action={
-          <button
-            onClick={() => {
-              if (activeTab === 'revenue') handleExportRevenue()
-              else if (activeTab === 'patients') handleExportPatients()
-              else if (activeTab === 'appointments') handleExportAppointments()
-              else if (activeTab === 'treatments') {
-                const data = treatments.map((t) => ({
-                  procedure: t.procedure_name || '',
-                  category: t.procedure_category ? (procedureCategoryLabels[t.procedure_category] || t.procedure_category) : 'سایر',
-                  status: t.status || '',
-                  price: t.total_price || 0,
-                  tooth: t.tooth_number ? toothCode(t.tooth_number) : '',
-                }))
-                exportToCSV(data, 'گزارش-درمان‌ها', [
-                  { key: 'procedure', label: 'رویه' },
-                  { key: 'category', label: 'دسته' },
-                  { key: 'status', label: 'وضعیت' },
-                  { key: 'price', label: 'قیمت' },
-                  { key: 'tooth', label: 'دندان' },
-                ])
-              }
-            }}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white/20 text-white text-xs font-bold backdrop-blur-sm hover:bg-white/30 transition-all-smooth press-scale"
-          >
-            <Download size={14} /> خروجی CSV
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={handlePrintOfficialReport}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-primary-500/90 text-white text-xs font-bold shadow-sm hover:bg-primary-600 transition-all-smooth press-scale"
+              title="چاپ کارنامه رسمی و مدیریت کلینیک در فرمت استاندارد A4"
+            >
+              <Printer size={14} /> چاپ کارنامه رسمی
+            </button>
+            <button
+              onClick={() => {
+                if (activeTab === 'revenue') handleExportRevenue()
+                else if (activeTab === 'patients') handleExportPatients()
+                else if (activeTab === 'appointments') handleExportAppointments()
+                else if (activeTab === 'treatments') {
+                  const data = treatments.map((t) => ({
+                    procedure: t.procedure_name || '',
+                    category: t.procedure_category ? (procedureCategoryLabels[t.procedure_category] || t.procedure_category) : 'سایر',
+                    status: t.status || '',
+                    price: t.total_price || 0,
+                    tooth: t.tooth_number ? toothCode(t.tooth_number) : '',
+                  }))
+                  exportToCSV(data, 'گزارش-درمان‌ها', [
+                    { key: 'procedure', label: 'رویه' },
+                    { key: 'category', label: 'دسته' },
+                    { key: 'status', label: 'وضعیت' },
+                    { key: 'price', label: 'قیمت' },
+                    { key: 'tooth', label: 'دندان' },
+                  ])
+                }
+              }}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white/20 text-white text-xs font-bold backdrop-blur-sm hover:bg-white/30 transition-all-smooth press-scale"
+            >
+              <Download size={14} /> خروجی CSV
+            </button>
+          </div>
         }
       />
 

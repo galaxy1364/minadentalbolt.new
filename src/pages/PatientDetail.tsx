@@ -9,17 +9,19 @@ import { PatientAlerts } from '../components/PatientAlerts'
 import { buildPatientAlerts, alertChips } from '../lib/patientAlerts'
 import { buildDoctorLedger } from '../lib/doctorLedger'
 import { phasePlanProgress, phaseSchedule, validatePhase, nextPhaseNumber, comparePhaseCostToTreatments } from '../lib/phases'
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useMemo } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { ArrowRight, Edit2, Phone, Mail, MapPin, Calendar, CreditCard, Activity, FileText, Image as ImageIcon, Shield, Pill, Smile, Award, AlertCircle, Clock, CheckCircle2, Layers, Plus, Trash2, FileSignature, Printer, Bone, FlaskConical, Stethoscope, Archive as ArchiveIcon, RotateCcw, Sparkles } from 'lucide-react'
-import { fetchPatient, updatePatient, fetchTimeline, fetchTreatments, fetchAppointments, fetchPayments, createPayment, fetchToothRecords, createToothRecord, updateToothRecord, fetchPrescriptions, fetchRadiologyImages, fetchEncounters, fetchDoctors, fetchImplantCases, fetchTreatmentPhases, createTreatmentPhase, updateTreatmentPhase, fetchConsentForms, createConsentForm, updateConsentForm, fetchLabOrders, updateTreatment, fetchCheques, createCheque, updateCheque, fetchPaymentPlans, createPaymentPlan, updatePaymentPlan, fetchAllInstallments, updateInstallment, fetchPerioExams, createPerioExam, updatePerioExam } from '../lib/api'
+import { ArrowRight, Edit2, Phone, Mail, MapPin, Calendar, CreditCard, Activity, FileText, Image as ImageIcon, Shield, Pill, Smile, Award, AlertCircle, Clock, CheckCircle2, Layers, Plus, Trash2, FileSignature, Printer, Bone, FlaskConical, Stethoscope, Archive as ArchiveIcon, RotateCcw, Sparkles, AlertTriangle, HeartPulse, Users, UserPlus, Link2, Download, CheckSquare, Square, Tags, FileHeart } from 'lucide-react'
+import { fetchPatient, updatePatient, fetchTimeline, fetchTreatments, fetchAppointments, fetchPayments, createPayment, fetchToothRecords, createToothRecord, updateToothRecord, fetchPrescriptions, fetchRadiologyImages, updateRadiologyImage, fetchEncounters, fetchDoctors, fetchImplantCases, fetchTreatmentPhases, createTreatmentPhase, updateTreatmentPhase, fetchConsentForms, createConsentForm, updateConsentForm, fetchLabOrders, updateTreatment, fetchCheques, createCheque, updateCheque, fetchPaymentPlans, createPaymentPlan, updatePaymentPlan, fetchAllInstallments, updateInstallment, fetchPerioExams, createPerioExam, updatePerioExam, fetchOrthoExams, createOrthoExam, updateOrthoExam, fetchPatients } from '../lib/api'
 import { toJalaliString, toJalaliStringPretty, formatCurrency, toPersianDigits, formatTime, toEnglishDigits } from '../lib/persianDate'
-import { calcPatientBalance } from '../lib/finance'
+import { calcPatientBalance, calcFamilyBalance } from '../lib/finance'
 import { buildSchedule } from '../lib/installments'
-import { Patient, Doctor, PatientTimeline, Treatment, Appointment, Payment, ToothRecord, Prescription, RadiologyImage, Encounter, ImplantCase, TreatmentPhase, ConsentForm, LabOrder, Cheque, PerioExam, PaymentPlan, Installment } from '../types'
+import { Patient, Doctor, PatientTimeline, Treatment, Appointment, Payment, ToothRecord, Prescription, RadiologyImage, Encounter, ImplantCase, TreatmentPhase, ConsentForm, LabOrder, Cheque, PerioExam, OrthoExam, OrthoExamInput, PaymentPlan, Installment } from '../types'
 import { Modal, Card, Button, Input, Select, Textarea, Badge, Spinner, EmptyState, Tabs, showToast, Wizard, MultiSelectChips } from '../components/ui'
 import { PersianDateInput } from '../components/PersianDateInput'
 import { calcPlanProgress, groupByTooth, nextStatus } from '../lib/treatmentPlan'
+import { evaluateClinicalPrerequisites, PrerequisiteEvaluation } from '../lib/clinicalPrerequisites'
+import { groupPhasesByPlan, comparePlanOptions, generateComparativePlanPrintData, PlanOptionSummary } from '../lib/alternativePlans'
 import { useConfirmAction } from '../components/ConfirmAction'
 import { h } from '../lib/haptics'
 import { chimes } from '../lib/chimes'
@@ -31,8 +33,14 @@ import { CurrencyInput } from '../components/CurrencyInput'
 import { SignatureCanvas } from '../components/SignatureCanvas'
 import { CONSENT_TEMPLATES } from '../lib/consentTemplates'
 import { PeriodontalChart } from '../components/PeriodontalChart'
+import { OrthodonticChart } from '../components/OrthodonticChart'
 import { DentalRadiologyViewer } from '../components/DentalRadiologyViewer'
 import { BeforeAfterViewer } from '../components/BeforeAfterViewer'
+import { resolveFamilyHousehold, FAMILY_RELATIONSHIPS, validateFamilyLinkage } from '../lib/familyLinkage'
+import { computePatientRetentionProfile } from '../lib/patientRecallChurn'
+import { parseRadiologyTeeth, matchesRadiologyTooth, generateRadiologyPortfolioHtml, generateDicomMetadataJson } from '../lib/radiologyExport'
+import { createPatientRadiologyZip, downloadBlob } from '../lib/zipArchive'
+import { buildPatientMedicationGuideDocument } from '../lib/patientMedicationGuide'
 
 // ============================================================================
 // Constants
@@ -157,6 +165,15 @@ export default function PatientDetail() {
   const [recordHistory, setRecordHistory] = useState<AuditLogEntry[]>([])
   const [showAllHistory, setShowAllHistory] = useState(false)
   const [doctors, setDoctors] = useState<Doctor[]>([])
+  const [allPatients, setAllPatients] = useState<Patient[]>([])
+  const [allPayments, setAllPayments] = useState<Payment[]>([])
+  const [allTreatments, setAllTreatments] = useState<Treatment[]>([])
+  const [allImplantCases, setAllImplantCases] = useState<ImplantCase[]>([])
+  const [familyModalOpen, setFamilyModalOpen] = useState(false)
+  const [familyHeadId, setFamilyHeadId] = useState('')
+  const [familyRelationship, setFamilyRelationship] = useState('')
+  const [isHeadToggle, setIsHeadToggle] = useState(false)
+  const [savingFamily, setSavingFamily] = useState(false)
   const [loading, setLoading] = useState(true)
 
   // Tab state
@@ -170,6 +187,7 @@ export default function PatientDetail() {
   const [phases, setPhases] = useState<TreatmentPhase[]>([])
   const [consentForms, setConsentForms] = useState<ConsentForm[]>([])
   const [perioExams, setPerioExams] = useState<PerioExam[]>([])
+  const [orthoExams, setOrthoExams] = useState<OrthoExam[]>([])
   const [appointments, setAppointments] = useState<Appointment[]>([])
   const [payments, setPayments] = useState<Payment[]>([])
   const [toothRecords, setToothRecords] = useState<ToothRecord[]>([])
@@ -177,6 +195,13 @@ export default function PatientDetail() {
   const [radiologyImages, setRadiologyImages] = useState<RadiologyImage[]>([])
   const [selectedRadImage, setSelectedRadImage] = useState<RadiologyImage | null>(null)
   const [radToothFilter, setRadToothFilter] = useState<string>('all')
+  const [selectedRadIds, setSelectedRadIds] = useState<Set<string>>(new Set())
+  const [batchTagModalOpen, setBatchTagModalOpen] = useState(false)
+  const [batchToothInput, setBatchToothInput] = useState('')
+  const [batchTypeInput, setBatchTypeInput] = useState('')
+  const [zippingArchive, setZippingArchive] = useState(false)
+  const [zipProgressText, setZipProgressText] = useState('')
+  const [savingBatchRad, setSavingBatchRad] = useState(false)
   const [compareModalOpen, setCompareModalOpen] = useState(false)
   const [compareBeforeUrl, setCompareBeforeUrl] = useState<string>('')
   const [compareAfterUrl, setCompareAfterUrl] = useState<string>('')
@@ -253,6 +278,16 @@ export default function PatientDetail() {
     is_active: true,
     primary_doctor_id: '',
     tags: '',
+    anticoagulant_use: false,
+    inr_value: '',
+    bisphosphonate_use: false,
+    bp_systolic: '',
+    bp_diastolic: '',
+    diabetes_hba1c: '',
+    endocarditis_prophylaxis: false,
+    pregnancy_trimester: '',
+    family_head_id: '',
+    family_relationship: '',
   })
 
   // ===========================================================================
@@ -263,9 +298,10 @@ export default function PatientDetail() {
     if (!id) return
     setLoading(true)
     try {
-      const [p, docs] = await Promise.all([
+      const [p, docs, all] = await Promise.all([
         fetchPatient(id),
         fetchDoctors(),
+        fetchPatients(),
       ])
       if (!p) {
         showToast('error', 'بیمار یافت نشد')
@@ -274,6 +310,10 @@ export default function PatientDetail() {
       }
       setPatient(p)
       setDoctors(docs)
+      setAllPatients(all)
+      setFamilyHeadId(p.family_head_id || '')
+      setFamilyRelationship(p.family_relationship || '')
+      setIsHeadToggle(p.family_relationship === 'head')
       setFormData({
         first_name: p.first_name || '',
         last_name: p.last_name || '',
@@ -299,6 +339,16 @@ export default function PatientDetail() {
         is_active: p.is_active,
         primary_doctor_id: p.primary_doctor_id || '',
         tags: (p.tags || []).join(', '),
+        anticoagulant_use: Boolean(p.anticoagulant_use),
+        inr_value: p.inr_value != null ? String(p.inr_value) : '',
+        bisphosphonate_use: Boolean(p.bisphosphonate_use),
+        bp_systolic: p.bp_systolic != null ? String(p.bp_systolic) : '',
+        bp_diastolic: p.bp_diastolic != null ? String(p.bp_diastolic) : '',
+        diabetes_hba1c: p.diabetes_hba1c != null ? String(p.diabetes_hba1c) : '',
+        endocarditis_prophylaxis: Boolean(p.endocarditis_prophylaxis),
+        pregnancy_trimester: p.pregnancy_trimester != null ? String(p.pregnancy_trimester) : '',
+        family_head_id: p.family_head_id || '',
+        family_relationship: p.family_relationship || '',
       })
     } catch (err) {
       console.error('Error loading patient:', err)
@@ -311,7 +361,7 @@ export default function PatientDetail() {
   const loadTabData = useCallback(async () => {
     if (!id) return
     try {
-      const [tl, tr, ap, pm, tr_records, pres, radio, enc, implAll, ph, cf, labAll, chq, px, plans, instAll] = await Promise.all([
+      const [tl, tr, ap, pm, tr_records, pres, radio, enc, implAll, ph, cf, labAll, chq, px, ox, plans, instAll, allPm, allTr] = await Promise.all([
         fetchTimeline(id),
         fetchTreatments(undefined, id),
         fetchAppointments(),
@@ -328,14 +378,20 @@ export default function PatientDetail() {
         // has to be able to say one is in flight and when it is due.
         fetchCheques(),
         fetchPerioExams(id),
+        fetchOrthoExams(id),
         fetchPaymentPlans(id),
         fetchAllInstallments(),
+        fetchPayments(),
+        fetchTreatments(),
       ])
       setTimeline(tl)
       setCheques(chq.filter((c) => c.patient_id === id))
       setTreatments(tr)
       setAppointments(ap.filter((a) => a.patient_id === id))
       setPayments(pm)
+      setAllPayments(allPm)
+      setAllTreatments(allTr)
+      setAllImplantCases(implAll)
       setToothRecords(tr_records)
       setPrescriptions(pres as unknown as Prescription[])
       setRadiologyImages(radio)
@@ -347,6 +403,7 @@ export default function PatientDetail() {
       // preserved, restorable, same pattern as radiology/implants/labs.
       setConsentForms(cf.filter((c) => c.is_active !== false))
       setPerioExams(px || [])
+      setOrthoExams(ox || [])
       setPaymentPlans(plans)
       setInstallments(instAll.filter((i) => i.patient_id === id || plans.some((p) => p.id === i.payment_plan_id)))
     } catch (err) {
@@ -421,9 +478,21 @@ export default function PatientDetail() {
         is_active: formData.is_active,
         primary_doctor_id: formData.primary_doctor_id || null,
         tags: formData.tags ? formData.tags.split(',').map((t) => t.trim()).filter(Boolean) : [],
+        anticoagulant_use: formData.anticoagulant_use || false,
+        inr_value: formData.inr_value ? Number(formData.inr_value) : null,
+        bisphosphonate_use: formData.bisphosphonate_use || false,
+        bp_systolic: formData.bp_systolic ? Number(formData.bp_systolic) : null,
+        bp_diastolic: formData.bp_diastolic ? Number(formData.bp_diastolic) : null,
+        diabetes_hba1c: formData.diabetes_hba1c ? Number(formData.diabetes_hba1c) : null,
+        endocarditis_prophylaxis: formData.endocarditis_prophylaxis || false,
+        pregnancy_trimester: formData.pregnancy_trimester ? Number(formData.pregnancy_trimester) : null,
+        family_head_id: formData.family_head_id || null,
+        family_relationship: formData.family_relationship || null,
       } as any
       const updated = await updatePatient(patient.id, payload)
       setPatient(updated)
+      const refreshedAll = await fetchPatients()
+      setAllPatients(refreshedAll)
       setEditModalOpen(false)
       chimes.playSuccess()
       showToast('success', 'اطلاعات بیمار ویرایش شد')
@@ -433,6 +502,40 @@ export default function PatientDetail() {
       showToast('error', 'خطا در ذخیره اطلاعات')
     } finally {
       setSaving(false)
+    }
+  }
+
+  const handleSaveFamilyLinkage = async () => {
+    if (!patient) return
+    setSavingFamily(true)
+    try {
+      const newRel = isHeadToggle ? 'head' : (familyRelationship || null)
+      const newHeadId = isHeadToggle ? null : (familyHeadId || null)
+
+      const validation = validateFamilyLinkage(patient.id, newHeadId, newRel)
+      if (!validation.valid) {
+        showToast('error', validation.error || 'اطلاعات پیوند خانوادگی نامعتبر است')
+        setSavingFamily(false)
+        return
+      }
+
+      const updated = await updatePatient(patient.id, {
+        family_head_id: newHeadId,
+        family_relationship: newRel,
+      } as any)
+
+      setPatient(updated)
+      const refreshedAll = await fetchPatients()
+      setAllPatients(refreshedAll)
+      setFamilyModalOpen(false)
+      chimes.playSuccess()
+      showToast('success', 'پیوند خانوادگی بیمار با موفقیت به‌روزرسانی شد')
+    } catch (err) {
+      console.error('Error saving family linkage:', err)
+      chimes.playWarning()
+      showToast('error', 'خطا در ذخیره پیوند خانوادگی')
+    } finally {
+      setSavingFamily(false)
     }
   }
 
@@ -467,18 +570,32 @@ export default function PatientDetail() {
 
   // Shared with Dashboard/Billing/Patients (src/lib/finance.ts) so this
   // number can never silently diverge between pages again.
-  const { paid: totalPaid, totalCost: totalTreatmentCost, balance: patientBalance } = calcPatientBalance(payments, treatments, implantCases)
+  const patientBalance = calcPatientBalance(payments, treatments, implantCases)
+  const familyBalance = calcFamilyBalance(id || '', allPatients, allPayments, allTreatments, allImplantCases)
+  const { paid: totalPaid, totalCost: totalTreatmentCost, balance: patientOwed } = patientBalance
 
   // COMP-78: the same clinical facts as the floating cards, compressed to
   // chips beside the name. The cards can be dismissed; these cannot, so a
   // fact stays visible for the whole visit.
-  const patientAlerts = patient ? buildPatientAlerts(patient, { balance: patientBalance }) : []
+  const patientAlerts = patient ? buildPatientAlerts(patient, { balance: patientBalance.balance }) : []
 
   // COMP-127 — which doctor inside this file is owed what. The single
   // patient balance answers "does this person owe us"; a multi-doctor
   // clinic settles on "who is owed", which is a different question.
   const doctorLedger = buildDoctorLedger(treatments, payments, encounters, implantCases)
   const headerChips = alertChips(patientAlerts)
+
+  // Patient Retention & Churn Risk Profile (CRM)
+  const retentionProfile = useMemo(() => {
+    if (!patient) return null
+    return computePatientRetentionProfile({
+      patient,
+      encounters,
+      appointments: appointments as any,
+      treatments,
+      payments,
+    })
+  }, [patient, encounters, appointments, treatments, payments])
 
   // ── Staged treatment plan (phases) ──────────────────────────────
   const [phaseModalOpen, setPhaseModalOpen] = useState(false)
@@ -492,13 +609,21 @@ export default function PatientDetail() {
     { value: 'on_hold', label: 'متوقف شده', color: 'error' },
     { value: 'cancelled', label: 'لغو شده', color: 'error' },
   ]
+  const [selectedPlanOption, setSelectedPlanOption] = useState<string>('all')
+  const [prereqAlert, setPrereqAlert] = useState<{
+    open: boolean
+    treatment: Treatment | null
+    evalResult: PrerequisiteEvaluation | null
+  }>({ open: false, treatment: null, evalResult: null })
+
   const [phaseForm, setPhaseForm] = useState({
     doctor_id: '', title: '', description: '', procedures: '',
     estimated_cost: '', actual_cost: '', estimated_duration_days: '',
     status: 'planned', start_date: '', end_date: '',
+    plan_option: 'A', plan_name: '', is_accepted: false,
   })
 
-  const openCreatePhase = (prefillToothNumber?: string) => {
+  const openCreatePhase = (prefillToothNumber?: string, defaultOption: string = 'A') => {
     h.tap()
     setEditingPhase(null)
     setPhaseWizardStep(0)
@@ -506,6 +631,7 @@ export default function PatientDetail() {
       doctor_id: '', title: prefillToothNumber ? `درمان دندان ${toothCode(prefillToothNumber)}` : '', description: '',
       procedures: prefillToothNumber ? `دندان ${toothCode(prefillToothNumber)}` : '',
       estimated_cost: '', actual_cost: '', estimated_duration_days: '', status: 'planned', start_date: '', end_date: '',
+      plan_option: defaultOption || 'A', plan_name: '', is_accepted: false,
     })
     setPhaseModalOpen(true)
   }
@@ -519,29 +645,66 @@ export default function PatientDetail() {
       actual_cost: p.actual_cost != null ? String(p.actual_cost) : '',
       estimated_duration_days: p.estimated_duration_days != null ? String(p.estimated_duration_days) : '',
       status: p.status, start_date: p.start_date || '', end_date: p.end_date || '',
+      plan_option: p.plan_option || 'A', plan_name: p.plan_name || '', is_accepted: !!p.is_accepted,
     })
     setPhaseModalOpen(true)
+  }
+
+  const handleAcceptPlanOption = async (optionKey: string) => {
+    h.impact()
+    try {
+      for (const p of phases) {
+        const isThis = (p.plan_option || 'A').toUpperCase() === optionKey.toUpperCase()
+        if (p.is_accepted !== isThis) {
+          await updateTreatmentPhase(p.id, { is_accepted: isThis } as any)
+        }
+      }
+      chimes.playSuccess()
+      showToast('success', `طرح ${optionKey === 'A' ? 'الف' : optionKey === 'B' ? 'ب' : optionKey} به‌عنوان طرح مصوب بیمار انتخاب شد`)
+      if (id) {
+        const updated = await fetchTreatmentPhases(id)
+        setPhases(updated.sort((a, b) => a.phase_number - b.phase_number))
+      }
+    } catch {
+      showToast('error', 'خطا در انتخاب طرح درمان')
+    }
+  }
+
+  const handlePrintComparativePlans = () => {
+    if (!patient || phases.length === 0) return
+    const win = window.open('', '_blank', 'width=850,height=900')
+    if (!win) { showToast('error', 'اجازه‌ی باز کردن پنجره‌ی چاپ داده نشد'); return }
+    const groups = groupPhasesByPlan(phases)
+    const printData = generateComparativePlanPrintData(patient, groups)
+    win.document.write(buildPrintDocument(printData))
+    win.document.close()
+    win.focus()
+  }
+
+  const handlePrereqOverride = async () => {
+    if (!prereqAlert.treatment) return
+    const t = prereqAlert.treatment
+    const next = nextStatus(t.status)
+    h.impact()
+    try {
+      await updateTreatment(t.id, {
+        status: next,
+        prerequisite_override: true,
+        prerequisite_override_reason: 'تأیید بالینی توسط پزشک معالج (Clinical Override)',
+      } as never)
+      chimes.playSuccess()
+      showToast('success', 'تأیید بالینی ثبت و درمان به‌روزرسانی شد')
+      setPrereqAlert({ open: false, treatment: null, evalResult: null })
+      await loadTabData()
+    } catch {
+      showToast('error', 'خطا در ثبت استثناء بالینی')
+    }
   }
 
   const handleSavePhase = () => {
     if (!phaseForm.title.trim()) { showToast('error', 'عنوان فاز الزامی است'); return }
     if (!id) return
-    // Defense in depth: a malformed date string (e.g. the historical
-    // "N-0a-0N" corruption this exact form once produced, before the
-    // Jalali conversion bug was fixed) would silently fail to sync
-    // forever once saved, since Postgres's `date` column type rejects
-    // it — but the local save "succeeds" with no visible error. Catch
-    // it here, before it ever reaches that state again.
-    //
-    // The previous version of this check (regex format + `new
-    // Date(s).getTime()`) wasn't actually reliable — JS's Date parser
-    // can silently accept an out-of-range month like "00" and still
-    // return a valid (non-NaN) timestamp by rolling over to the prior
-    // year, while the STRING itself (what actually gets sent to
-    // Postgres) still literally says month "00" and gets rejected
-    // there regardless of what JS thought. Validating the numeric
-    // month/day ranges directly from the string is the only check
-    // that can't be fooled by that leniency.
+
     const isValidDate = (s: string) => {
       const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(s)
       if (!m) return false
@@ -551,11 +714,8 @@ export default function PatientDetail() {
     }
     if (phaseForm.start_date && !isValidDate(phaseForm.start_date)) { showToast('error', 'تاریخ شروع نامعتبر است — دوباره از تقویم انتخاب کنید'); return }
     if (phaseForm.end_date && !isValidDate(phaseForm.end_date)) { showToast('error', 'تاریخ پایان نامعتبر است — دوباره از تقویم انتخاب کنید'); return }
-    const nextNumber = editingPhase ? editingPhase.phase_number : nextPhaseNumber(phases)
+    const nextNumber = editingPhase ? editingPhase.phase_number : nextPhaseNumber(phases, phaseForm.plan_option || 'A')
 
-    // A required rule must block, never merely warn. Duplicate numbers
-    // and an end date before the start were previously accepted, and
-    // both make every duration and overdue count downstream meaningless.
     const phaseErrors = validatePhase(
       {
         phase_number: nextNumber,
@@ -566,8 +726,8 @@ export default function PatientDetail() {
         estimated_duration_days: phaseForm.estimated_duration_days ? Number(phaseForm.estimated_duration_days) : null,
         start_date: phaseForm.start_date || null,
         end_date: phaseForm.end_date || null,
+        plan_option: phaseForm.plan_option || 'A',
       },
-      // The row being edited is not its own duplicate.
       phases.filter((p) => p.id !== editingPhase?.id),
     )
     if (phaseErrors.length) { showToast('error', phaseErrors[0]); return }
@@ -580,11 +740,15 @@ export default function PatientDetail() {
       actual_cost: phaseForm.actual_cost ? Number(phaseForm.actual_cost) : null,
       estimated_duration_days: phaseForm.estimated_duration_days ? Number(phaseForm.estimated_duration_days) : null,
       status: phaseForm.status, start_date: phaseForm.start_date || null, end_date: phaseForm.end_date || null,
+      plan_option: phaseForm.plan_option || 'A',
+      plan_name: phaseForm.plan_name?.trim() || null,
+      is_accepted: phaseForm.is_accepted,
     } as any
     confirmAction({
       type: editingPhase ? 'edit' : 'create',
       title: editingPhase ? 'ویرایش فاز درمان' : 'افزودن فاز درمان',
       fields: [
+        { label: 'گزینه طرح', value: phaseForm.plan_option === 'B' ? 'طرح ب (جایگزین)' : phaseForm.plan_option === 'C' ? 'طرح ج' : 'طرح الف (اصلی)' },
         { label: 'فاز', value: `${toPersianDigits(nextNumber)} — ${phaseForm.title}`, highlight: true },
         { label: 'هزینه‌ی تخمینی', value: phaseForm.estimated_cost ? `${formatCurrency(Number(phaseForm.estimated_cost))} ت` : '-' },
         { label: 'وضعیت', value: phaseStatuses.find((s) => s.value === phaseForm.status)?.label || phaseForm.status },
@@ -1186,7 +1350,7 @@ export default function PatientDetail() {
           <div class="balance-box">
             <span>مجموع هزینه‌ی درمان و ایمپلنت: <b>${formatCurrency(totalTreatmentCost)} ت</b></span>
             <span>مجموع پرداختی: <b>${formatCurrency(totalPaid)} ت</b></span>
-            <span>مانده‌حساب: <b>${formatCurrency(patientBalance)} ت</b></span>
+            <span>مانده‌حساب: <b>${formatCurrency(patientOwed)} ت</b></span>
           </div>
         </div>
 
@@ -1200,7 +1364,7 @@ export default function PatientDetail() {
       `بیمار: ${patient.first_name} ${patient.last_name}`,
       `پرونده: ${patient.file_number || '—'}`,
       `تعداد درمان: ${toPersianDigits(sortedTreatments.length)}`,
-      `مانده‌حساب: ${formatCurrency(patientBalance)} ت`,
+      `مانده‌حساب: ${formatCurrency(patientOwed)} ت`,
     ].join('\n')
 
     win.document.write(buildPrintDocument({ title: chartTitle, styles: chartStyles, bodyHtml: chartBody, shareText }))
@@ -1385,6 +1549,11 @@ export default function PatientDetail() {
                 {patient.first_name} {patient.last_name}
               </h1>
               <Badge color={vipMeta.color}>{vipMeta.label}</Badge>
+              {retentionProfile && (
+                <span title={`شاخص وفاداری و تعامل: ${toPersianDigits(retentionProfile.score)} از ۱۰۰ — اقدام پیشنهادی: ${retentionProfile.recommendedAction}`}>
+                  <Badge color={retentionProfile.tierColor}>{retentionProfile.tierLabel}</Badge>
+                </span>
+              )}
               {!patient.is_active && <Badge color="error">غیرفعال</Badge>}
               {headerChips.map((chip) => (
                 <Badge key={chip} color="error">{chip}</Badge>
@@ -1430,21 +1599,57 @@ export default function PatientDetail() {
               )}
             </div>
             {/* Medical alerts */}
-            {(hasAllergies || hasConditions || hasMedications) && (
+            {(hasAllergies || hasConditions || hasMedications || patient.anticoagulant_use || patient.bisphosphonate_use || patient.endocarditis_prophylaxis || (patient.bp_systolic != null && patient.bp_systolic >= 140) || (patient.diabetes_hba1c != null && patient.diabetes_hba1c >= 7) || (patient.pregnancy_trimester != null && patient.pregnancy_trimester > 0)) && (
               <div className="flex items-center gap-2 flex-wrap mt-2">
                 {hasAllergies && (
-                  <div className="flex items-center gap-1 px-2 py-1 rounded-lg bg-error-50 text-error-600 text-xs">
-                    <AlertCircle size={12} /> حساسیت: {patient.allergies}
+                  <div className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-error-50 text-error-700 border border-error-200 text-xs font-medium">
+                    <AlertCircle size={12} className="shrink-0" /> حساسیت: {patient.allergies}
                   </div>
                 )}
                 {hasConditions && (
-                  <div className="flex items-center gap-1 px-2 py-1 rounded-lg bg-warning-50 text-warning-600 text-xs">
-                    <AlertCircle size={12} /> بیماری: {patient.medical_conditions}
+                  <div className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-warning-50 text-warning-700 border border-warning-200 text-xs font-medium">
+                    <AlertCircle size={12} className="shrink-0" /> بیماری: {patient.medical_conditions}
                   </div>
                 )}
                 {hasMedications && (
-                  <div className="flex items-center gap-1 px-2 py-1 rounded-lg bg-primary-50 text-primary-600 text-xs">
-                    <Pill size={12} /> دارو: {patient.medications}
+                  <div className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-primary-50 text-primary-700 border border-primary-200 text-xs font-medium">
+                    <Pill size={12} className="shrink-0" /> دارو: {patient.medications}
+                  </div>
+                )}
+                {patient.anticoagulant_use && (
+                  <div className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-error-100/80 text-error-800 border border-error-300 text-xs font-semibold">
+                    <AlertTriangle size={12} className="shrink-0 text-error-600" />
+                    ضد انعقاد {patient.inr_value ? `(INR: ${toPersianDigits(patient.inr_value)})` : ''}
+                  </div>
+                )}
+                {patient.bisphosphonate_use && (
+                  <div className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-error-100/80 text-error-800 border border-error-300 text-xs font-semibold">
+                    <AlertTriangle size={12} className="shrink-0 text-error-600" />
+                    مصرف بیس‌فسفونات (خطر ONJ)
+                  </div>
+                )}
+                {patient.endocarditis_prophylaxis && (
+                  <div className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-warning-100/80 text-warning-800 border border-warning-300 text-xs font-semibold">
+                    <HeartPulse size={12} className="shrink-0 text-warning-600" />
+                    ریسک اندوکاردیت (پروفیلاکسی)
+                  </div>
+                )}
+                {patient.bp_systolic != null && patient.bp_systolic >= 140 && (
+                  <div className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-amber-100/80 text-amber-800 border border-amber-300 text-xs font-semibold">
+                    <Activity size={12} className="shrink-0 text-amber-600" />
+                    فشار خون: {toPersianDigits(patient.bp_systolic)}/{toPersianDigits(patient.bp_diastolic || 90)}
+                  </div>
+                )}
+                {patient.diabetes_hba1c != null && patient.diabetes_hba1c >= 7 && (
+                  <div className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-amber-100/80 text-amber-800 border border-amber-300 text-xs font-semibold">
+                    <Activity size={12} className="shrink-0 text-amber-600" />
+                    دیابت (HbA1c: {toPersianDigits(patient.diabetes_hba1c)}٪)
+                  </div>
+                )}
+                {patient.pregnancy_trimester != null && patient.pregnancy_trimester > 0 && (
+                  <div className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-pink-100/80 text-pink-800 border border-pink-300 text-xs font-semibold">
+                    <AlertCircle size={12} className="shrink-0 text-pink-600" />
+                    بارداری (سه‌ماهه {toPersianDigits(patient.pregnancy_trimester)})
                   </div>
                 )}
               </div>
@@ -1471,8 +1676,53 @@ export default function PatientDetail() {
             <Button variant="secondary" onClick={handlePrintFullChart}>
               <Printer size={16} /> چاپ پرونده
             </Button>
-            <Button variant="secondary" onClick={() => setEditModalOpen(true)}>
-              <Edit2 size={16} /> ویرایش
+            <Button
+              variant="secondary"
+              onClick={() => {
+                h.tap()
+                chimes.playPop()
+                if (patient) {
+                  setFormData({
+                    first_name: patient.first_name || '',
+                    last_name: patient.last_name || '',
+                    national_id: patient.national_id || '',
+                    phone: patient.phone || '',
+                    phone2: patient.phone2 || '',
+                    email: patient.email || '',
+                    birth_date: patient.birth_date || '',
+                    gender: patient.gender || '',
+                    blood_type: patient.blood_type || '',
+                    address: patient.address || '',
+                    city: patient.city || '',
+                    province: patient.province || '',
+                    postal_code: patient.postal_code || '',
+                    medical_history: patient.medical_history || '',
+                    allergies: patient.allergies || '',
+                    medications: patient.medications || '',
+                    medical_conditions: patient.medical_conditions || '',
+                    insurance_info: patient.insurance_info || '',
+                    insurance_number: patient.insurance_number || '',
+                    notes: patient.notes || '',
+                    vip_level: String(patient.vip_level ?? 0),
+                    is_active: patient.is_active !== false,
+                    primary_doctor_id: patient.primary_doctor_id || '',
+                    tags: (patient.tags || []).join(', '),
+                    anticoagulant_use: Boolean(patient.anticoagulant_use),
+                    inr_value: patient.inr_value ? String(patient.inr_value) : '',
+                    bisphosphonate_use: Boolean(patient.bisphosphonate_use),
+                    bp_systolic: patient.bp_systolic ? String(patient.bp_systolic) : '',
+                    bp_diastolic: patient.bp_diastolic ? String(patient.bp_diastolic) : '',
+                    diabetes_hba1c: patient.diabetes_hba1c ? String(patient.diabetes_hba1c) : '',
+                    endocarditis_prophylaxis: Boolean(patient.endocarditis_prophylaxis),
+                    pregnancy_trimester: patient.pregnancy_trimester ? String(patient.pregnancy_trimester) : '',
+                    family_head_id: patient.family_head_id || '',
+                    family_relationship: patient.family_relationship || '',
+                  })
+                }
+                setEditModalOpen(true)
+              }}
+            >
+              <Edit2 size={16} /> ویرایش پرونده
             </Button>
           </div>
           {/* MOD-FEAT-027: the balance was already computed on this page and
@@ -1482,7 +1732,8 @@ export default function PatientDetail() {
           <div className="mt-3">
             <PatientDebtBar
               patientId={patient.id}
-              balance={{ balance: patientBalance, paid: totalPaid, totalCost: totalTreatmentCost }}
+              balance={patientBalance}
+              familyBalance={familyBalance}
             />
             <PatientChequeRows patientId={patient.id} cheques={cheques as never} />
           </div>
@@ -1507,6 +1758,7 @@ export default function PatientDetail() {
     { key: 'payments', label: 'پرداخت‌ها', icon: <CreditCard size={16} /> },
     { key: 'teeth', label: 'نمودار دندان‌ها', icon: <Smile size={16} /> },
     { key: 'perio', label: 'چارت پریودنتال', icon: <Activity size={16} /> },
+    { key: 'ortho', label: 'آنالیز ارتودنسی', icon: <Sparkles size={16} /> },
     { key: 'prescriptions', label: 'نسخه‌ها', icon: <Pill size={16} /> },
     { key: 'radiology', label: 'رادیولوژی', icon: <ImageIcon size={16} /> },
     { key: 'insurance', label: 'بیمه', icon: <Shield size={16} /> },
@@ -1522,6 +1774,37 @@ export default function PatientDetail() {
     const age = calculateAge(patient.birth_date)
     return (
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
+        {/* Retention & CRM Loyalty Profile */}
+        {retentionProfile && (
+          <Card className="p-4 lg:col-span-2 bg-gradient-to-r from-slate-50 via-white to-slate-50 dark:from-slate-800/80 dark:via-slate-850 dark:to-slate-800/80 border border-slate-200 dark:border-slate-700">
+            <div className="flex items-center justify-between gap-2 mb-2 flex-wrap">
+              <div className="flex items-center gap-2">
+                <Smile size={16} className="text-primary-600" />
+                <h3 className="text-sm font-bold text-slate-800 dark:text-slate-100">وضعیت وفاداری و تعامل بالینی بیمار (CRM Retention)</h3>
+              </div>
+              <div className="flex items-center gap-2">
+                <Badge color={retentionProfile.tierColor}>{retentionProfile.tierLabel}</Badge>
+                <span className="text-xs font-extrabold text-slate-700 dark:text-slate-200">
+                  امتیاز: {toPersianDigits(retentionProfile.score)} / ۱۰۰
+                </span>
+              </div>
+            </div>
+            <p className="text-xs text-slate-600 dark:text-slate-300 mb-2">
+              <strong>اقدام پیشنهادی کلینیک:</strong> {retentionProfile.recommendedAction}
+            </p>
+            {retentionProfile.riskFactors.length > 0 && (
+              <div className="flex items-center gap-1.5 flex-wrap pt-2 border-t border-slate-100 dark:border-slate-700/60">
+                <span className="text-[11px] font-bold text-amber-600 dark:text-amber-400">عوامل ریسک:</span>
+                {retentionProfile.riskFactors.map((rf) => (
+                  <span key={rf} className="text-[11px] px-2 py-0.5 rounded bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-300 border border-amber-200 dark:border-amber-800/60">
+                    {rf}
+                  </span>
+                ))}
+              </div>
+            )}
+          </Card>
+        )}
+
         {/* Personal Info */}
         <Card className="p-4">
           <h3 className="text-sm font-bold text-slate-700 mb-3 flex items-center gap-2">
@@ -1556,13 +1839,55 @@ export default function PatientDetail() {
         {/* Medical History */}
         <Card className="p-4">
           <h3 className="text-sm font-bold text-slate-700 mb-3 flex items-center gap-2">
-            <Activity size={16} /> سوابق پزشکی
+            <Activity size={16} /> سوابق پزشکی و غربالگری سلامت
           </h3>
           <div className="space-y-2">
             <InfoRow label="تاریخچه پزشکی" value={patient.medical_history || '-'} />
             <InfoRow label="حساسیت‌ها" value={patient.allergies || '-'} />
             <InfoRow label="داروهای مصرفی" value={patient.medications || '-'} />
             <InfoRow label="بیماری‌های زمینه‌ای" value={patient.medical_conditions || '-'} />
+            {patient.anticoagulant_use && (
+              <InfoRow
+                label="داروی ضد انعقاد"
+                value={`بله ${patient.inr_value ? `(شاخص INR: ${toPersianDigits(patient.inr_value)})` : ''}`}
+                icon={<AlertTriangle size={12} className="text-error-500" />}
+              />
+            )}
+            {patient.bisphosphonate_use && (
+              <InfoRow
+                label="مصرف بیس‌فسفونات"
+                value="بله (خطر استئونکروز فک / ONJ)"
+                icon={<AlertTriangle size={12} className="text-error-500" />}
+              />
+            )}
+            {patient.endocarditis_prophylaxis && (
+              <InfoRow
+                label="پروفیلاکسی اندوکاردیت"
+                value="نیاز به آنتی‌بیوتیک پیشگیرانه قبل از پروسیجر"
+                icon={<HeartPulse size={12} className="text-warning-500" />}
+              />
+            )}
+            {patient.bp_systolic != null && (
+              <InfoRow
+                label="فشار خون ثبت‌شده"
+                value={`${toPersianDigits(patient.bp_systolic)} / ${toPersianDigits(patient.bp_diastolic || 0)} mmHg`}
+                icon={<Activity size={12} className="text-primary-500" />}
+              />
+            )}
+            {patient.diabetes_hba1c != null && (
+              <InfoRow
+                label="شاخص قند خون HbA1c"
+                value={`${toPersianDigits(patient.diabetes_hba1c)} درصد`}
+                icon={<Activity size={12} className="text-primary-500" />}
+              />
+            )}
+            {patient.pregnancy_trimester != null && patient.pregnancy_trimester > 0 && (
+              <InfoRow
+                label="وضعیت بارداری"
+                value={`سه‌ماهه ${toPersianDigits(patient.pregnancy_trimester)}`}
+                icon={<AlertCircle size={12} className="text-pink-500" />}
+              />
+            )}
           </div>
         </Card>
 
@@ -1591,6 +1916,119 @@ export default function PatientDetail() {
             </div>
           </div>
         </Card>
+
+        {/* Family & Household Linkage Card */}
+        {(() => {
+          const fam = resolveFamilyHousehold(patient, allPatients)
+          return (
+            <Card className="p-4 lg:col-span-2">
+              <div className="flex items-center justify-between gap-2 mb-3">
+                <div className="flex items-center gap-2">
+                  <div className="p-1.5 rounded-lg bg-teal-50 dark:bg-teal-900/30 text-teal-600 dark:text-teal-400">
+                    <Users size={18} />
+                  </div>
+                  <div>
+                    <h3 className="text-sm font-bold text-slate-700 dark:text-slate-200 flex items-center gap-2">
+                      اعضای خانواده و پرونده‌های متصل
+                      {fam.members.length > 0 && (
+                        <Badge color={fam.isHead ? 'accent' : 'primary'}>
+                          {fam.isHead ? '👑 سرپرست خانواده' : `وابسته (${toPersianDigits(fam.members.length)} عضو مرتبط)`}
+                        </Badge>
+                      )}
+                    </h3>
+                    <p className="text-xs text-slate-400">
+                      پیوند بین اعضای خانواده جهت دسترسی سریع به پرونده‌ها و یکپارچگی سوابق درمان
+                    </p>
+                  </div>
+                </div>
+                <Button
+                  size="sm"
+                  variant="secondary"
+                  onClick={() => {
+                    h.tap()
+                    setFamilyHeadId(patient.family_head_id || '')
+                    setFamilyRelationship(patient.family_relationship || '')
+                    setIsHeadToggle(patient.family_relationship === 'head')
+                    setFamilyModalOpen(true)
+                  }}
+                  className="text-xs flex items-center gap-1.5"
+                >
+                  <Link2 size={14} /> مدیریت پیوند خانوادگی
+                </Button>
+              </div>
+
+              {fam.members.length === 0 ? (
+                <div className="p-4 rounded-xl bg-slate-50 dark:bg-slate-800/50 border border-dashed border-slate-200 dark:border-slate-700 flex flex-col sm:flex-row items-center justify-between gap-3 text-center sm:text-right">
+                  <div className="text-xs text-slate-500 space-y-0.5">
+                    <p className="font-semibold text-slate-700 dark:text-slate-300">
+                      این پرونده هنوز به خانواده یا سرپرستی متصل نشده است.
+                    </p>
+                    <p>
+                      با تعیین سرپرست یا افزودن اعضای خانواده (همسر، فرزندان، والدین)، دسترسی یک‌کلیکی به سوابق سلامت بستگان فعال می‌شود.
+                    </p>
+                  </div>
+                  <Button
+                    size="sm"
+                    variant="primary"
+                    onClick={() => {
+                      h.tap()
+                      setFamilyHeadId(patient.family_head_id || '')
+                      setFamilyRelationship(patient.family_relationship || '')
+                      setIsHeadToggle(patient.family_relationship === 'head')
+                      setFamilyModalOpen(true)
+                    }}
+                    className="text-xs shrink-0 flex items-center gap-1"
+                  >
+                    <UserPlus size={14} /> اتصال به خانواده / تعیین سرپرست
+                  </Button>
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
+                  {fam.members.map(({ patient: m, relationshipLabel }) => (
+                    <div
+                      key={m.id}
+                      className="p-3 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 flex items-center justify-between gap-2.5 hover:border-primary-400 dark:hover:border-primary-600 transition-all-smooth"
+                    >
+                      <div className="flex items-center gap-2.5 min-w-0">
+                        <div
+                          className={`w-10 h-10 rounded-xl bg-gradient-to-br ${getAvatarColor(m.id)} flex items-center justify-center text-white font-bold text-xs shrink-0`}
+                        >
+                          {getInitials(m)}
+                        </div>
+                        <div className="min-w-0">
+                          <div className="flex items-center gap-1.5">
+                            <span className="text-xs font-bold text-slate-800 dark:text-slate-100 truncate">
+                              {m.first_name} {m.last_name}
+                            </span>
+                            <Badge color={m.id === fam.headPatient?.id ? 'accent' : 'secondary'}>
+                              {relationshipLabel}
+                            </Badge>
+                          </div>
+                          <div className="flex items-center gap-2 text-[11px] text-slate-400 mt-0.5">
+                            <span>پرونده: {m.file_number || '—'}</span>
+                            {m.phone && <span>• {toPersianDigits(m.phone)}</span>}
+                          </div>
+                        </div>
+                      </div>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        onClick={() => {
+                          h.tap()
+                          navigate(`/patients/${m.id}`)
+                        }}
+                        className="shrink-0 p-1.5 text-primary-600 hover:bg-primary-50 dark:hover:bg-primary-950/40"
+                        title="مشاهده پرونده"
+                      >
+                        <ArrowRight size={16} />
+                      </Button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </Card>
+          )
+        })()}
 
         {/* Notes */}
         {patient.notes && (
@@ -1708,6 +2146,17 @@ export default function PatientDetail() {
     const advanceStatus = async (t: Treatment) => {
       const next = nextStatus(t.status)
       if (next === t.status) return
+
+      // Validate clinical prerequisites before advancing
+      if (!t.prerequisite_override && (next === 'completed' || next === 'in_progress')) {
+        const evalRes = evaluateClinicalPrerequisites(t, treatments)
+        if (!evalRes.allowed) {
+          chimes.playWarning()
+          setPrereqAlert({ open: true, treatment: t, evalResult: evalRes })
+          return
+        }
+      }
+
       h.tap()
       try {
         await updateTreatment(t.id, { status: next } as never)
@@ -1920,38 +2369,211 @@ export default function PatientDetail() {
   // ===========================================================================
 
   const renderPhases = () => {
-    // Figures come from the tested helper. The inline versions counted
-    // cancelled phases as live, so a plan whose only remaining phase had
-    // been cancelled could never reach 100%.
     const todayStr = new Date().toISOString().slice(0, 10)
-    const prog = phasePlanProgress(phases)
+    const planGroups = groupPhasesByPlan(phases)
+    const hasMultiplePlans = planGroups.length > 1
+
+    const activeGroup =
+      selectedPlanOption !== 'all' && selectedPlanOption !== 'compare'
+        ? planGroups.find((g) => g.optionKey.toUpperCase() === selectedPlanOption.toUpperCase()) || planGroups[0]
+        : null
+
+    const displayedPhases = activeGroup ? activeGroup.phases : phases
+
+    const prog = phasePlanProgress(displayedPhases)
     const totalEstimated = prog.estimatedCost
     const totalActual = prog.actualCost
     const completedCount = prog.completed
-    const costCheck = comparePhaseCostToTreatments(phases, treatments)
+    const costCheck = comparePhaseCostToTreatments(displayedPhases, treatments)
+
+    const comparison = hasMultiplePlans ? comparePlanOptions(planGroups[0], planGroups[1] || null) : null
 
     return (
       <div className="space-y-4">
-        <div className="flex items-center justify-between">
+        {/* Header and Actions */}
+        <div className="flex items-center justify-between flex-wrap gap-2">
           <div>
-            <p className="text-sm font-bold text-slate-800 dark:text-slate-100">طرح درمان مرحله‌ای</p>
+            <div className="flex items-center gap-2">
+              <p className="text-sm font-bold text-slate-800 dark:text-slate-100">
+                طرح درمان مرحله‌ای و گزینه‌های جایگزین
+              </p>
+              {hasMultiplePlans && (
+                <Badge color="primary">
+                  {toPersianDigits(planGroups.length)} گزینه درمانی
+                </Badge>
+              )}
+            </div>
             <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
-              {prog.total > 0 ? `${toPersianDigits(completedCount)} از ${toPersianDigits(prog.total)} فاز تکمیل شده — ${toPersianDigits(prog.percent)}٪` : 'هنوز فازی تعریف نشده'}
+              {prog.total > 0
+                ? `${toPersianDigits(completedCount)} از ${toPersianDigits(prog.total)} فاز تکمیل شده — ${toPersianDigits(prog.percent)}٪`
+                : 'هنوز فازی تعریف نشده'}
             </p>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-wrap">
+            {hasMultiplePlans && (
+              <Button variant="secondary" size="sm" onClick={handlePrintComparativePlans}>
+                <Printer size={14} className="inline ml-1" /> چاپ مقایسه گزینه‌ها
+              </Button>
+            )}
             {phases.length > 0 && (
               <Button variant="secondary" size="sm" onClick={handlePrintPhases}>
                 <Printer size={14} className="inline ml-1" /> چاپ پیش‌فاکتور
               </Button>
             )}
-            <Button variant="primary" size="sm" onClick={openCreatePhase}>
+            <Button
+              variant="primary"
+              size="sm"
+              onClick={() =>
+                openCreatePhase(
+                  undefined,
+                  selectedPlanOption !== 'all' && selectedPlanOption !== 'compare' ? selectedPlanOption : 'A',
+                )
+              }
+            >
               <Plus size={14} className="inline ml-1" /> افزودن فاز
             </Button>
           </div>
         </div>
 
-        {phases.length > 0 && (
+        {/* Alternative Plan Selector Tabs */}
+        {hasMultiplePlans && (
+          <div className="flex items-center gap-1.5 p-1.5 rounded-xl bg-slate-100 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 flex-wrap">
+            <button
+              onClick={() => setSelectedPlanOption('all')}
+              className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all-smooth ${
+                selectedPlanOption === 'all'
+                  ? 'bg-white dark:bg-slate-700 text-primary-700 dark:text-primary-300 shadow-sm'
+                  : 'text-slate-600 dark:text-slate-400 hover:text-slate-900'
+              }`}
+            >
+              همه فازها ({toPersianDigits(phases.length)})
+            </button>
+            {planGroups.map((grp) => (
+              <button
+                key={grp.optionKey}
+                onClick={() => setSelectedPlanOption(grp.optionKey)}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all-smooth ${
+                  selectedPlanOption === grp.optionKey
+                    ? 'bg-white dark:bg-slate-700 text-primary-700 dark:text-primary-300 shadow-sm'
+                    : 'text-slate-600 dark:text-slate-400 hover:text-slate-900'
+                }`}
+              >
+                <span>{grp.title}</span>
+                {grp.isAccepted && (
+                  <span className="w-2 h-2 rounded-full bg-success-500 inline-block" title="طرح مصوب بیمار" />
+                )}
+              </button>
+            ))}
+            <button
+              onClick={() => setSelectedPlanOption('compare')}
+              className={`flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-bold transition-all-smooth ${
+                selectedPlanOption === 'compare'
+                  ? 'bg-primary-600 text-white shadow-sm'
+                  : 'text-primary-700 dark:text-primary-400 hover:bg-primary-50 dark:hover:bg-primary-950/40'
+              }`}
+            >
+              <Sparkles size={12} />
+              <span>مقایسه هوشمند طرح‌ها (A vs B)</span>
+            </button>
+          </div>
+        )}
+
+        {/* Plan Acceptance Banner if single option active */}
+        {activeGroup && (
+          <div className="flex items-center justify-between p-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/60 flex-wrap gap-2">
+            <div className="flex items-center gap-2">
+              <span className="font-bold text-xs text-slate-800 dark:text-slate-200">{activeGroup.title}:</span>
+              {activeGroup.isAccepted ? (
+                <Badge color="success">✓ طرح مورد تأیید و انتخاب‌شده بیمار</Badge>
+              ) : (
+                <Badge color="secondary">گزینه پیشنهادی (منتظر تصمیم بیمار)</Badge>
+              )}
+            </div>
+            {!activeGroup.isAccepted && (
+              <Button
+                variant="primary"
+                size="sm"
+                onClick={() => handleAcceptPlanOption(activeGroup.optionKey)}
+              >
+                <CheckCircle2 size={14} className="inline ml-1" />
+                تأیید و انتخاب به عنوان طرح رسمی بیمار
+              </Button>
+            )}
+          </div>
+        )}
+
+        {/* Comparative Side-by-Side View */}
+        {selectedPlanOption === 'compare' && comparison && (
+          <div className="space-y-3">
+            {comparison.savingsMessage && (
+              <div className="p-3 rounded-xl bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-200 dark:border-emerald-800 text-xs text-emerald-800 dark:text-emerald-300 font-bold flex items-center gap-2">
+                <Sparkles size={16} className="text-emerald-600" />
+                <span>تحلیل اقتصادی: {comparison.savingsMessage}</span>
+              </div>
+            )}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {planGroups.map((grp) => (
+                <Card
+                  key={grp.optionKey}
+                  className={`p-4 space-y-3 ${
+                    grp.isAccepted ? 'border-2 border-success-500 shadow-md' : 'border border-slate-200 dark:border-slate-700'
+                  }`}
+                >
+                  <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 pb-2">
+                    <div>
+                      <h4 className="font-extrabold text-sm text-slate-800 dark:text-slate-100">{grp.title}</h4>
+                      <p className="text-xs text-slate-500 mt-0.5">{toPersianDigits(grp.phases.length)} فاز اجرایی</p>
+                    </div>
+                    {grp.isAccepted ? (
+                      <Badge color="success">✓ مصوب بیمار</Badge>
+                    ) : (
+                      <Button
+                        variant="secondary"
+                        size="sm"
+                        onClick={() => handleAcceptPlanOption(grp.optionKey)}
+                      >
+                        انتخاب این طرح
+                      </Button>
+                    )}
+                  </div>
+
+                  <div className="space-y-1.5">
+                    {grp.phases.map((ph) => (
+                      <div
+                        key={ph.id}
+                        className="p-2 rounded-lg bg-slate-50 dark:bg-slate-800/80 text-xs flex items-center justify-between"
+                      >
+                        <div>
+                          <span className="font-bold text-slate-700 dark:text-slate-300">
+                            فاز {toPersianDigits(ph.phase_number)}: {ph.title}
+                          </span>
+                          {ph.estimated_duration_days && (
+                            <span className="text-[10px] text-slate-400 block">
+                              طول دوره: {toPersianDigits(ph.estimated_duration_days)} روز
+                            </span>
+                          )}
+                        </div>
+                        <span className="font-extrabold text-slate-800 dark:text-slate-100">
+                          {ph.estimated_cost ? `${formatCurrency(ph.estimated_cost)} ت` : '-'}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+
+                  <div className="pt-2 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between font-extrabold text-xs">
+                    <span>مجموع برآورد هزینه:</span>
+                    <span className="text-sm font-black text-primary-700 dark:text-primary-400">
+                      {formatCurrency(grp.progress.estimatedCost)} ت
+                    </span>
+                  </div>
+                </Card>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Cost summary */}
+        {selectedPlanOption !== 'compare' && displayedPhases.length > 0 && (
           <div className="grid grid-cols-2 gap-2.5">
             <Card className="p-3">
               <p className="text-[11px] text-slate-400">هزینه‌ی تخمینی کل</p>
@@ -1964,29 +2586,42 @@ export default function PatientDetail() {
           </div>
         )}
 
-        {/* Reported, never corrected: a plan part-executed legitimately
-            sits below its estimate, so this is information rather than
-            an error. */}
-        {phases.length > 0 && !costCheck.ok && (
+        {selectedPlanOption !== 'compare' && displayedPhases.length > 0 && !costCheck.ok && (
           <p className="text-xs text-amber-700">
             ⚠ {costCheck.message} ({formatCurrency(Math.abs(costCheck.difference))} ت اختلاف)
           </p>
         )}
 
-        {phases.length === 0 ? (
-          <EmptyState icon={<Layers size={40} />} title="فاز درمانی ثبت نشده" description="برای طرح‌های درمانی چندمرحله‌ای (مثلاً فاز۱: کشیدن، فاز۲: ایمپلنت، فاز۳: روکش) فازها را اینجا تعریف کنید" />
-        ) : (
+        {/* Phase Cards */}
+        {selectedPlanOption !== 'compare' && displayedPhases.length === 0 ? (
+          <EmptyState
+            icon={<Layers size={40} />}
+            title="فاز درمانی ثبت نشده"
+            description="برای طرح‌های درمانی چندمرحله‌ای فازها را اینجا تعریف کنید"
+          />
+        ) : selectedPlanOption !== 'compare' ? (
           <div className="relative space-y-3">
-            {phases.map((p, i) => {
+            {displayedPhases.map((p, i) => {
               const meta = phaseStatuses.find((s) => s.value === p.status) || phaseStatuses[0]
               const doc = doctors.find((d) => d.id === p.doctor_id)
+              const planLabel = p.plan_option === 'B' ? 'طرح ب (جایگزین)' : p.plan_option === 'C' ? 'طرح ج' : 'طرح الف'
               return (
                 <div key={p.id} className="relative flex gap-3">
                   <div className="flex flex-col items-center">
-                    <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-extrabold shrink-0 ${p.status === 'completed' ? 'bg-success-500 text-white' : p.status === 'in_progress' ? 'bg-warning-400 text-white' : 'bg-slate-200 text-slate-500'}`}>
+                    <div
+                      className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-extrabold shrink-0 ${
+                        p.status === 'completed'
+                          ? 'bg-success-500 text-white'
+                          : p.status === 'in_progress'
+                            ? 'bg-warning-400 text-white'
+                            : 'bg-slate-200 text-slate-500'
+                      }`}
+                    >
                       {p.status === 'completed' ? <CheckCircle2 size={16} /> : toPersianDigits(p.phase_number)}
                     </div>
-                    {i < phases.length - 1 && <div className="w-0.5 flex-1 bg-slate-200 dark:bg-slate-700 my-1" />}
+                    {i < displayedPhases.length - 1 && (
+                      <div className="w-0.5 flex-1 bg-slate-200 dark:bg-slate-700 my-1" />
+                    )}
                   </div>
                   {(() => {
                     const sched = phaseSchedule(p, todayStr)
@@ -1999,26 +2634,40 @@ export default function PatientDetail() {
                   <Card className="flex-1 p-3.5 mb-1">
                     <div className="flex items-start justify-between gap-2">
                       <div className="min-w-0">
-                        <p className="text-sm font-bold text-slate-800 dark:text-slate-100 truncate">فاز {toPersianDigits(p.phase_number)}: {p.title}</p>
-                        {p.description && <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">{p.description}</p>}
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <p className="text-sm font-bold text-slate-800 dark:text-slate-100 truncate">
+                            فاز {toPersianDigits(p.phase_number)}: {p.title}
+                          </p>
+                          <Badge color="secondary">{planLabel}</Badge>
+                          {p.is_accepted && <Badge color="success">مصوب بیمار</Badge>}
+                        </div>
+                        {p.description && (
+                          <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">{p.description}</p>
+                        )}
                         {doc && <p className="text-[11px] text-slate-400 mt-1">دکتر {doc.name}</p>}
                       </div>
                       <Badge color={meta.color}>{meta.label}</Badge>
                     </div>
                     <div className="flex items-center gap-3 mt-2 flex-wrap text-[11px] text-slate-500 dark:text-slate-400">
                       {p.estimated_cost != null && <span>هزینه تخمینی: {formatCurrency(p.estimated_cost)} ت</span>}
-                      {p.estimated_duration_days != null && <span>مدت: {toPersianDigits(p.estimated_duration_days)} روز</span>}
+                      {p.estimated_duration_days != null && (
+                        <span>مدت: {toPersianDigits(p.estimated_duration_days)} روز</span>
+                      )}
                     </div>
                     <div className="flex gap-2 mt-2.5 pt-2.5 border-t border-slate-100 dark:border-slate-700">
-                      <button onClick={() => openEditPhase(p)} className="text-xs text-primary-600 hover:underline">ویرایش</button>
-                      <button onClick={() => handleDeletePhase(p)} className="text-xs text-error-500 hover:underline">لغو</button>
+                      <button onClick={() => openEditPhase(p)} className="text-xs text-primary-600 hover:underline">
+                        ویرایش
+                      </button>
+                      <button onClick={() => handleDeletePhase(p)} className="text-xs text-error-500 hover:underline">
+                        لغو
+                      </button>
                     </div>
                   </Card>
                 </div>
               )
             })}
           </div>
-        )}
+        ) : null}
       </div>
     )
   }
@@ -2307,6 +2956,10 @@ export default function PatientDetail() {
             patientName={`${patient!.first_name} ${patient!.last_name}`}
             payments={payments}
             treatments={treatments}
+            currentPatient={patient ?? undefined}
+            allPatients={allPatients}
+            allPayments={allPayments}
+            allTreatments={allTreatments}
             doctors={doctors as never}
             implantCases={implantCases}
             cheques={cheques as never}
@@ -2332,6 +2985,7 @@ export default function PatientDetail() {
     <DentalChart
       toothRecords={toothRecords}
       treatments={treatments}
+      radiologyImages={radiologyImages}
       onUpdateTooth={handleUpdateTooth}
       onAddTreatment={(toothNumber) => {
         // Links the tooth chart directly into the treatment-phases
@@ -2431,6 +3085,36 @@ export default function PatientDetail() {
       win.focus()
     }
 
+    const handlePrintPatientGuide = (pres: any) => {
+      if (!patient) return
+      h.tap()
+      chimes.playPop()
+      const doc = doctors.find((d) => d.id === pres.doctor_id)
+      const meds = pres.medications
+      let medList: { name: string; dose?: string; frequency?: string }[] = []
+      if (Array.isArray(meds)) {
+        medList = meds.map((m: any) => typeof m === 'string' ? { name: m } : { name: m.name || '', dose: m.dose, frequency: m.frequency })
+      } else if (meds && typeof meds === 'object') {
+        medList = ((meds as any).items || Object.values(meds)).map((m: any) => typeof m === 'string' ? { name: m } : { name: m?.name || '', dose: m?.dose, frequency: m?.frequency })
+      }
+
+      const win = window.open('', '_blank', 'width=750,height=900')
+      if (!win) {
+        showToast('error', 'اجازه‌ی باز کردن پنجره‌ی چاپ داده نشد — لطفاً مسدودکننده پاپ‌آپ را غیرفعال کنید')
+        return
+      }
+      const guideDoc = buildPatientMedicationGuideDocument({
+        patientName: `${patient.first_name} ${patient.last_name}`,
+        doctorName: doc ? `دکتر ${doc.name || doc.specialty || 'پزشک'}` : 'پزشک کلینیک',
+        createdDate: pres.created_at,
+        medications: medList,
+        notes: pres.notes || undefined,
+      })
+      win.document.write(guideDoc)
+      win.document.close()
+      win.focus()
+    }
+
     if (prescriptions.length === 0) {
       return (
         <Card className="p-6 text-center">
@@ -2493,6 +3177,15 @@ export default function PatientDetail() {
                     >
                       <Printer size={13} /> چاپ نسخه
                     </Button>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      onClick={() => handlePrintPatientGuide(pres)}
+                      className="text-xs text-teal-600 hover:text-teal-700 flex items-center gap-1"
+                      title="چاپ برگه راهنمای دارویی و مراقبت‌های پس از درمان بیمار"
+                    >
+                      <FileHeart size={13} /> راهنمای بیمار
+                    </Button>
                     <Badge color={pres.status === 'active' ? 'success' : 'slate'}>{pres.status === 'active' ? 'فعال' : pres.status}</Badge>
                   </div>
                 </div>
@@ -2525,12 +3218,128 @@ export default function PatientDetail() {
       )
     }
 
-    const distinctTeeth = Array.from(new Set(radiologyImages.map((img) => img.tooth_number).filter(Boolean))) as string[]
+    const distinctTeeth = Array.from(
+      new Set(radiologyImages.flatMap((img) => parseRadiologyTeeth(img.tooth_number)))
+    ).sort()
     const filteredImages = radToothFilter === 'all'
       ? radiologyImages
-      : radiologyImages.filter((img) => String(img.tooth_number) === String(radToothFilter))
+      : radiologyImages.filter((img) => matchesRadiologyTooth(img.tooth_number, radToothFilter))
 
     const validImagesWithUrl = radiologyImages.filter((img) => Boolean(img.image_url))
+
+    const handlePrintRadiologyPortfolio = () => {
+      if (!patient || radiologyImages.length === 0) return
+      h.tap()
+      chimes.playPop()
+      const html = generateRadiologyPortfolioHtml({ patient, images: radiologyImages })
+      const win = window.open('', '_blank', 'width=900,height=1000')
+      if (!win) {
+        showToast('error', 'پنجره چاپ مسدود شد — لطفاً پاپ‌آپ مرورگر را مجاز کنید')
+        return
+      }
+      win.document.write(html)
+      win.document.close()
+      win.focus()
+    }
+
+    const handleDownloadDicomMetadata = () => {
+      if (!patient || radiologyImages.length === 0) return
+      h.tap()
+      chimes.playSuccess()
+      const dicomData = generateDicomMetadataJson({ patient, images: radiologyImages })
+      const blob = new Blob([JSON.stringify(dicomData, null, 2)], { type: 'application/json' })
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `DICOM-Metadata-${patient.file_number || patient.id}.json`
+      document.body.appendChild(a)
+      a.click()
+      document.body.removeChild(a)
+      URL.revokeObjectURL(url)
+      showToast('success', 'فایل متادیتای DICOM صادر و دانلود شد')
+    }
+
+    const handleToggleRadSelect = (imgId: string) => {
+      h.tap()
+      setSelectedRadIds((prev) => {
+        const next = new Set(prev)
+        if (next.has(imgId)) next.delete(imgId)
+        else next.add(imgId)
+        return next
+      })
+    }
+
+    const handleSelectAllRad = () => {
+      h.tap()
+      if (selectedRadIds.size === filteredImages.length) {
+        setSelectedRadIds(new Set())
+      } else {
+        setSelectedRadIds(new Set(filteredImages.map((i) => i.id)))
+      }
+    }
+
+    const handleDownloadZip = async (onlySelected = false) => {
+      if (!patient) return
+      const targetImages = onlySelected
+        ? radiologyImages.filter((img) => selectedRadIds.has(img.id))
+        : radiologyImages
+      if (targetImages.length === 0) {
+        showToast('error', 'تصویری برای خروجی انتخاب نشده است')
+        return
+      }
+      h.tap()
+      chimes.playPop()
+      setZippingArchive(true)
+      setZipProgressText('در حال آماده‌سازی بسته فشرده ZIP...')
+      try {
+        const blob = await createPatientRadiologyZip({
+          patient,
+          images: targetImages,
+          includeDicomJson: true,
+          includeHtmlPortfolio: true,
+          onProgress: (_curr, _tot, msg) => setZipProgressText(msg),
+        })
+        const filename = `Radiology_${patient.file_number || patient.id}_${patient.last_name || 'Patient'}.zip`
+        downloadBlob(blob, filename)
+        chimes.playSuccess()
+        showToast('success', `آرشیو ZIP با موفقیت تولید و دانلود شد (${toPersianDigits(targetImages.length)} تصویر)`)
+      } catch (err) {
+        console.error('Error generating radiology zip:', err)
+        showToast('error', 'خطا در فشرده‌سازی و دانلود آرشیو ZIP')
+      } finally {
+        setZippingArchive(false)
+        setZipProgressText('')
+      }
+    }
+
+    const handleApplyBatchTag = async () => {
+      if (selectedRadIds.size === 0) return
+      if (!batchToothInput.trim() && !batchTypeInput.trim()) {
+        showToast('error', 'حداقل یکی از موارد شماره دندان یا نوع تصویر را وارد فرمایید')
+        return
+      }
+      setSavingBatchRad(true)
+      try {
+        const promises: Promise<any>[] = []
+        for (const radId of Array.from(selectedRadIds)) {
+          const patch: Partial<RadiologyImage> = {}
+          if (batchToothInput.trim()) patch.tooth_number = batchToothInput.trim()
+          if (batchTypeInput.trim()) patch.image_type = batchTypeInput.trim()
+          promises.push(updateRadiologyImage(radId, patch as any))
+        }
+        await Promise.all(promises)
+        chimes.playSuccess()
+        showToast('success', `برچسب‌های ${toPersianDigits(selectedRadIds.size)} تصویر با موفقیت به‌روزرسانی شد`)
+        setBatchTagModalOpen(false)
+        setSelectedRadIds(new Set())
+        await loadTabData()
+      } catch (err) {
+        console.error('Error updating batch radiology:', err)
+        showToast('error', 'خطا در به‌روزرسانی دسته‌ای تصاویر')
+      } finally {
+        setSavingBatchRad(false)
+      }
+    }
 
     return (
       <div className="space-y-4">
@@ -2567,29 +3376,123 @@ export default function PatientDetail() {
                 دندان {toothLabel(t)}
               </button>
             ))}
+
+            {filteredImages.length > 0 && (
+              <button
+                onClick={handleSelectAllRad}
+                className="px-2.5 py-1.5 rounded-xl text-xs font-medium bg-slate-50 dark:bg-slate-800/60 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-700 hover:bg-slate-100 flex items-center gap-1 mr-2"
+                title={selectedRadIds.size === filteredImages.length ? 'لغو انتخاب همه' : 'انتخاب همه تصاویر جاری'}
+              >
+                {selectedRadIds.size === filteredImages.length ? <CheckSquare size={13} className="text-primary-600" /> : <Square size={13} />}
+                <span>{selectedRadIds.size === filteredImages.length ? 'لغو انتخاب همه' : 'انتخاب همه'}</span>
+              </button>
+            )}
           </div>
 
-          {validImagesWithUrl.length >= 2 && (
+          <div className="flex items-center gap-2 flex-wrap">
             <Button
               size="sm"
               variant="secondary"
-              onClick={() => {
-                h.tap()
-                chimes.playPop()
-                if (!compareBeforeUrl && validImagesWithUrl[0]?.image_url) {
-                  setCompareBeforeUrl(validImagesWithUrl[0].image_url)
-                }
-                if (!compareAfterUrl && validImagesWithUrl[1]?.image_url) {
-                  setCompareAfterUrl(validImagesWithUrl[1].image_url)
-                }
-                setCompareModalOpen(true)
-              }}
+              onClick={handlePrintRadiologyPortfolio}
               className="flex items-center gap-1.5 text-xs font-medium"
+              title="چاپ و خروجی کامل شناسنامه گرافی‌های بیمار"
             >
-              <Sparkles size={14} className="text-amber-500" /> مقایسه قبل و بعد درمان
+              <Printer size={14} /> شناسنامه رادیولوژی
             </Button>
-          )}
+            <Button
+              size="sm"
+              variant="secondary"
+              onClick={handleDownloadDicomMetadata}
+              className="flex items-center gap-1.5 text-xs font-medium"
+              title="صادرات داده‌های ساخت‌یافته استاندارد DICOM"
+            >
+              <Download size={14} /> متادیتا DICOM
+            </Button>
+            <Button
+              size="sm"
+              variant="secondary"
+              disabled={zippingArchive}
+              onClick={() => handleDownloadZip(false)}
+              className="flex items-center gap-1.5 text-xs font-medium text-emerald-700 dark:text-emerald-400 border-emerald-200 dark:border-emerald-800/60 bg-emerald-50 dark:bg-emerald-950/40 hover:bg-emerald-100"
+              title="دانلود کامل تمام گرافی‌ها، متادیتا و گزارش در قالب یک فایل فشرده ZIP"
+            >
+              {zippingArchive ? <Spinner size={14} /> : <ArchiveIcon size={14} />}
+              دانلود کامل ZIP
+            </Button>
+            {validImagesWithUrl.length >= 2 && (
+              <Button
+                size="sm"
+                variant="primary"
+                onClick={() => {
+                  h.tap()
+                  chimes.playPop()
+                  if (!compareBeforeUrl && validImagesWithUrl[0]?.image_url) {
+                    setCompareBeforeUrl(validImagesWithUrl[0].image_url)
+                  }
+                  if (!compareAfterUrl && validImagesWithUrl[1]?.image_url) {
+                    setCompareAfterUrl(validImagesWithUrl[1].image_url)
+                  }
+                  setCompareModalOpen(true)
+                }}
+                className="flex items-center gap-1.5 text-xs font-medium"
+              >
+                <Sparkles size={14} className="text-amber-300" /> مقایسه قبل و بعد درمان
+              </Button>
+            )}
+          </div>
         </div>
+
+        {/* Progress Alert for ZIP Archive */}
+        {zippingArchive && (
+          <div className="flex items-center gap-2 p-3 bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800 rounded-xl text-xs text-emerald-800 dark:text-emerald-200 animate-pulse">
+            <Spinner size={16} />
+            <span className="font-medium">{zipProgressText || 'در حال بسته‌بندی فایل ZIP...'}</span>
+          </div>
+        )}
+
+        {/* Sticky Batch Actions Bar */}
+        {selectedRadIds.size > 0 && (
+          <div className="sticky top-20 z-20 flex items-center justify-between gap-3 p-3.5 rounded-2xl bg-slate-900/95 text-white shadow-xl backdrop-blur-md border border-slate-700/60 flex-wrap">
+            <div className="flex items-center gap-2">
+              <span className="w-2.5 h-2.5 rounded-full bg-primary-400 animate-pulse" />
+              <span className="text-xs font-bold">
+                {toPersianDigits(selectedRadIds.size)} تصویر انتخاب شده
+              </span>
+            </div>
+            <div className="flex items-center gap-2 flex-wrap">
+              <Button
+                size="sm"
+                variant="secondary"
+                className="text-xs !bg-slate-800 !text-slate-100 hover:!bg-slate-700 border-slate-600 flex items-center gap-1.5"
+                onClick={() => {
+                  setBatchToothInput('')
+                  setBatchTypeInput('')
+                  setBatchTagModalOpen(true)
+                }}
+              >
+                <Tags size={14} /> برچسب‌گذاری دسته‌ای
+              </Button>
+              <Button
+                size="sm"
+                variant="primary"
+                disabled={zippingArchive}
+                onClick={() => handleDownloadZip(true)}
+                className="text-xs flex items-center gap-1.5"
+              >
+                {zippingArchive ? <Spinner size={14} /> : <Download size={14} />}
+                دانلود ZIP انتخابی
+              </Button>
+              <Button
+                size="sm"
+                variant="ghost"
+                className="text-xs !text-slate-300 hover:!text-white hover:!bg-slate-800"
+                onClick={() => setSelectedRadIds(new Set())}
+              >
+                لغو انتخاب
+              </Button>
+            </div>
+          </div>
+        )}
 
         {/* Images Grid */}
         {filteredImages.length === 0 ? (
@@ -2607,31 +3510,127 @@ export default function PatientDetail() {
           </Card>
         ) : (
           <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
-            {filteredImages.map((img) => (
-              <Card
-                key={img.id}
-                className="p-3 cursor-pointer hover:border-primary-400 dark:hover:border-primary-600 transition-all-smooth press-scale group"
-                onClick={() => setSelectedRadImage(img)}
-              >
-                <div className="aspect-square rounded-xl bg-slate-100 dark:bg-slate-800 flex items-center justify-center mb-2 overflow-hidden relative group">
-                  {img.image_url ? (
-                    <img src={img.image_url} alt={img.description || 'رادیولوژی'} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" />
-                  ) : (
-                    <ImageIcon size={32} className="text-slate-300" />
-                  )}
-                  <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center text-white text-xs font-medium">
-                    بررسی تشخیصی 🔍
+            {filteredImages.map((img) => {
+              const isSelected = selectedRadIds.has(img.id)
+              return (
+                <Card
+                  key={img.id}
+                  className={`p-3 cursor-pointer transition-all-smooth press-scale group relative ${
+                    isSelected ? 'ring-2 ring-primary-500 border-primary-500 bg-primary-50/10' : 'hover:border-primary-400 dark:hover:border-primary-600'
+                  }`}
+                  onClick={() => setSelectedRadImage(img)}
+                >
+                  <div className="aspect-square rounded-xl bg-slate-100 dark:bg-slate-800 flex items-center justify-center mb-2 overflow-hidden relative group">
+                    {/* Selection Checkbox */}
+                    <div
+                      className="absolute top-2 right-2 z-10"
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        handleToggleRadSelect(img.id)
+                      }}
+                    >
+                      <button
+                        type="button"
+                        className={`w-6 h-6 rounded-lg flex items-center justify-center transition-all ${
+                          isSelected
+                            ? 'bg-primary-600 text-white shadow-sm'
+                            : 'bg-black/50 text-white/90 hover:bg-black/70'
+                        }`}
+                        title={isSelected ? 'لغو انتخاب' : 'انتخاب تصویر جهت عملیات دسته‌ای'}
+                      >
+                        {isSelected ? <CheckSquare size={14} /> : <Square size={14} />}
+                      </button>
+                    </div>
+
+                    {img.image_url ? (
+                      <img src={img.image_url} alt={img.description || 'رادیولوژی'} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" />
+                    ) : (
+                      <ImageIcon size={32} className="text-slate-300" />
+                    )}
+                    <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center text-white text-xs font-medium">
+                      بررسی تشخیصی 🔍
+                    </div>
                   </div>
-                </div>
-                <div className="space-y-1">
-                  {img.image_type && <Badge color="primary">{img.image_type}</Badge>}
-                  {img.tooth_number && <p className="text-xs text-slate-700 dark:text-slate-300 font-medium">دندان {toothLabel(img.tooth_number)}</p>}
-                  {img.taken_at && <p className="text-xs text-slate-400">{toJalaliStringPretty(img.taken_at)}</p>}
-                  {img.description && <p className="text-xs text-slate-500 truncate">{img.description}</p>}
-                </div>
-              </Card>
-            ))}
+                  <div className="space-y-1">
+                    {img.image_type && <Badge color="primary">{img.image_type}</Badge>}
+                    {img.tooth_number && (
+                      <p className="text-xs text-slate-700 dark:text-slate-300 font-medium">
+                        دندان {parseRadiologyTeeth(img.tooth_number).map((t) => toothLabel(t)).join('، ')}
+                      </p>
+                    )}
+                    {img.taken_at && <p className="text-xs text-slate-400">{toJalaliStringPretty(img.taken_at)}</p>}
+                    {img.description && <p className="text-xs text-slate-500 truncate">{img.description}</p>}
+                  </div>
+                </Card>
+              )
+            })}
           </div>
+        )}
+
+        {/* Batch Tag Modal */}
+        {batchTagModalOpen && (
+          <Modal
+            open={batchTagModalOpen}
+            onClose={() => setBatchTagModalOpen(false)}
+            title={`برچسب‌گذاری دسته‌ای (${toPersianDigits(selectedRadIds.size)} تصویر)`}
+            size="md"
+          >
+            <div className="p-4 space-y-4">
+              <p className="text-xs text-slate-500">
+                مشخصات زیر بر روی تمامی {toPersianDigits(selectedRadIds.size)} تصویر انتخاب‌شده اعمال خواهد شد:
+              </p>
+
+              <div>
+                <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">
+                  شماره دندان یا دندان‌ها (اختیاری):
+                </label>
+                <Input
+                  value={batchToothInput}
+                  onChange={(v) => setBatchToothInput(v)}
+                  placeholder="مثال: 16 یا 14, 15, 16"
+                  dir="ltr"
+                />
+                <span className="text-[11px] text-slate-400 mt-1 block">
+                  می‌توانید چند شماره دندان را با کاما جدا نمایید.
+                </span>
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">
+                  نوع تصویر (اختیاری):
+                </label>
+                <Select
+                  value={batchTypeInput}
+                  onChange={(v) => setBatchTypeInput(v)}
+                  options={[
+                    { value: '', label: 'بدون تغییر' },
+                    { value: 'periapical', label: 'پری‌اپیکال' },
+                    { value: 'bitewing', label: 'بایت‌وینگ' },
+                    { value: 'panoramic', label: 'پانورامیک' },
+                    { value: 'cephalometric', label: 'سفالومتریک' },
+                    { value: 'cbct', label: 'CBCT' },
+                    { value: 'intraoral', label: 'اینتراورال (عکس داخل دهانی)' },
+                  ]}
+                />
+              </div>
+
+              <div className="flex items-center justify-end gap-2 pt-3 border-t border-slate-100 dark:border-slate-800">
+                <Button variant="ghost" size="sm" onClick={() => setBatchTagModalOpen(false)}>
+                  انصراف
+                </Button>
+                <Button
+                  variant="primary"
+                  size="sm"
+                  disabled={savingBatchRad}
+                  onClick={handleApplyBatchTag}
+                  className="flex items-center gap-1.5"
+                >
+                  {savingBatchRad ? <Spinner size={14} /> : <Tags size={14} />}
+                  اعمال برچسب‌ها بر روی تصاویر
+                </Button>
+              </div>
+            </div>
+          </Modal>
         )}
 
         {/* Diagnostic Viewer Modal */}
@@ -2639,7 +3638,7 @@ export default function PatientDetail() {
           <Modal
             open={Boolean(selectedRadImage)}
             onClose={() => setSelectedRadImage(null)}
-            title={`نمایشگر تشخیصی — دندان ${selectedRadImage.tooth_number ? toothLabel(selectedRadImage.tooth_number) : '-'}`}
+            title={`نمایشگر تشخیصی — دندان ${selectedRadImage.tooth_number ? parseRadiologyTeeth(selectedRadImage.tooth_number).map((t) => toothLabel(t)).join('، ') : '-'}`}
             size="lg"
           >
             <div className="p-1">
@@ -2890,6 +3889,101 @@ export default function PatientDetail() {
                 onChange={(v) => setFormData((p) => ({ ...p, medical_conditions: v }))} 
               />
             </div>
+            <div className="mt-3 p-3.5 rounded-2xl bg-rose-50/60 dark:bg-rose-950/20 border border-rose-200/70 dark:border-rose-900/50 space-y-3">
+              <h4 className="text-xs font-bold text-rose-800 dark:text-rose-300 flex items-center gap-1.5">
+                <AlertCircle size={14} className="text-rose-600" />
+                غربالگری بالینی و عوامل پرخطر دندانپزشکی (استاندارد ADA / نظام پزشکی)
+              </h4>
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                <div className="space-y-1.5 p-2.5 rounded-xl bg-white/80 dark:bg-slate-800/80 border border-rose-100 dark:border-rose-900/40">
+                  <label className="flex items-center gap-2 cursor-pointer text-xs font-bold text-slate-700 dark:text-slate-200">
+                    <input
+                      type="checkbox"
+                      checked={Boolean(formData.anticoagulant_use)}
+                      onChange={(e) => setFormData((p) => ({ ...p, anticoagulant_use: e.target.checked }))}
+                      className="w-4 h-4 rounded text-rose-600 focus:ring-rose-400"
+                    />
+                    مصرف داروی ضد انعقاد
+                  </label>
+                  <Input
+                    label="آخرین مقدار INR"
+                    value={formData.inr_value}
+                    onChange={(v) => setFormData((p) => ({ ...p, inr_value: v }))}
+                    placeholder="مثال: ۲.۵"
+                    dir="ltr"
+                  />
+                </div>
+
+                <div className="space-y-1.5 p-2.5 rounded-xl bg-white/80 dark:bg-slate-800/80 border border-rose-100 dark:border-rose-900/40">
+                  <label className="flex items-center gap-2 cursor-pointer text-xs font-bold text-slate-700 dark:text-slate-200">
+                    <input
+                      type="checkbox"
+                      checked={Boolean(formData.bisphosphonate_use)}
+                      onChange={(e) => setFormData((p) => ({ ...p, bisphosphonate_use: e.target.checked }))}
+                      className="w-4 h-4 rounded text-rose-600 focus:ring-rose-400"
+                    />
+                    مصرف بیس‌فسفونات‌ها
+                  </label>
+                  <p className="text-[11px] text-slate-500">خطر استئونکروز فک (ONJ) در جراحی</p>
+                </div>
+
+                <div className="space-y-1.5 p-2.5 rounded-xl bg-white/80 dark:bg-slate-800/80 border border-rose-100 dark:border-rose-900/40">
+                  <label className="flex items-center gap-2 cursor-pointer text-xs font-bold text-slate-700 dark:text-slate-200">
+                    <input
+                      type="checkbox"
+                      checked={Boolean(formData.endocarditis_prophylaxis)}
+                      onChange={(e) => setFormData((p) => ({ ...p, endocarditis_prophylaxis: e.target.checked }))}
+                      className="w-4 h-4 rounded text-rose-600 focus:ring-rose-400"
+                    />
+                    ریسک اندوکاردیت
+                  </label>
+                  <p className="text-[11px] text-slate-500">نیاز به پروفیلاکسی آنتی‌بیوتیک</p>
+                </div>
+
+                <div className="space-y-1.5 p-2.5 rounded-xl bg-white/80 dark:bg-slate-800/80 border border-rose-100 dark:border-rose-900/40">
+                  <div className="grid grid-cols-2 gap-2">
+                    <Input
+                      label="فشار سیستول"
+                      value={formData.bp_systolic}
+                      onChange={(v) => setFormData((p) => ({ ...p, bp_systolic: v }))}
+                      placeholder="۱۲۰"
+                      dir="ltr"
+                    />
+                    <Input
+                      label="فشار دیاستول"
+                      value={formData.bp_diastolic}
+                      onChange={(v) => setFormData((p) => ({ ...p, bp_diastolic: v }))}
+                      placeholder="۸۰"
+                      dir="ltr"
+                    />
+                  </div>
+                </div>
+
+                <div className="space-y-1.5 p-2.5 rounded-xl bg-white/80 dark:bg-slate-800/80 border border-rose-100 dark:border-rose-900/40">
+                  <Input
+                    label="دیابت: شاخص HbA1c (%)"
+                    value={formData.diabetes_hba1c}
+                    onChange={(v) => setFormData((p) => ({ ...p, diabetes_hba1c: v }))}
+                    placeholder="مثال: ۷.۲"
+                    dir="ltr"
+                  />
+                </div>
+
+                <div className="space-y-1.5 p-2.5 rounded-xl bg-white/80 dark:bg-slate-800/80 border border-rose-100 dark:border-rose-900/40">
+                  <Select
+                    label="وضعیت بارداری"
+                    value={formData.pregnancy_trimester}
+                    onChange={(v) => setFormData((p) => ({ ...p, pregnancy_trimester: v }))}
+                    options={[
+                      { value: '', label: 'عدم بارداری / نامشخص' },
+                      { value: '1', label: 'سه‌ماهه اول (ترایمستر ۱)' },
+                      { value: '2', label: 'سه‌ماهه دوم (ترایمستر ۲)' },
+                      { value: '3', label: 'سه‌ماهه سوم (ترایمستر ۳)' },
+                    ]}
+                  />
+                </div>
+              </div>
+            </div>
           </div>
 
           <div>
@@ -2906,6 +4000,35 @@ export default function PatientDetail() {
                   بیمار فعال
                 </label>
               </div>
+            </div>
+          </div>
+
+          <div>
+            <h4 className="text-xs font-bold text-slate-500 mb-3 uppercase tracking-wider">سرپرست و پیوند خانوادگی</h4>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              <Select
+                label="سرپرست خانواده"
+                value={formData.family_head_id}
+                onChange={(v) => setFormData((p) => ({ ...p, family_head_id: v }))}
+                options={[
+                  { value: '', label: 'بدون سرپرست (یا خود بیمار سرپرست است)' },
+                  ...allPatients.filter((p) => p.id !== patient?.id).map((p) => ({
+                    value: p.id,
+                    label: `${p.first_name} ${p.last_name} (${p.file_number ? `پرونده: ${p.file_number}` : 'بدون پرونده'})`,
+                  })),
+                ]}
+                placeholder="انتخاب سرپرست..."
+              />
+              <Select
+                label="نسبت با سرپرست / نقش خانوادگی"
+                value={formData.family_relationship}
+                onChange={(v) => setFormData((p) => ({ ...p, family_relationship: v }))}
+                options={[
+                  { value: '', label: 'تعیین نشده' },
+                  ...FAMILY_RELATIONSHIPS.map((r) => ({ value: r.value, label: r.label })),
+                ]}
+                placeholder="انتخاب نسبت..."
+              />
             </div>
           </div>
 
@@ -2964,7 +4087,7 @@ export default function PatientDetail() {
       {/* Floating clinical and financial alerts. Rendered above the header
           rather than inside it: the whole point is that they interrupt
           regardless of how far down the file has been scrolled. */}
-      <PatientAlerts patient={patient} balance={{ balance: patientBalance }} />
+      <PatientAlerts patient={patient} balance={{ balance: patientBalance.balance }} />
 
       {/* Header */}
       {renderHeader()}
@@ -2989,6 +4112,7 @@ export default function PatientDetail() {
           patientName={`${patient.first_name} ${patient.last_name}`}
           doctors={doctors}
           exam={perioExams[0] || null}
+          patient={patient}
           onSave={async (teethData, notes, docId) => {
             const payload = {
               patient_id: patient.id,
@@ -3004,6 +4128,24 @@ export default function PatientDetail() {
             }
             const updated = await fetchPerioExams(patient.id)
             setPerioExams(updated)
+          }}
+        />
+      )}
+      {activeTab === 'ortho' && (
+        <OrthodonticChart
+          patientId={patient.id}
+          patientName={`${patient.first_name} ${patient.last_name}`}
+          doctors={doctors}
+          exam={orthoExams[0] || null}
+          patient={patient}
+          onSave={async (examInput) => {
+            if (orthoExams[0]) {
+              await updateOrthoExam(orthoExams[0].id, examInput)
+            } else {
+              await createOrthoExam(examInput)
+            }
+            const updated = await fetchOrthoExams(patient.id)
+            setOrthoExams(updated)
           }}
         />
       )}
@@ -3031,13 +4173,43 @@ export default function PatientDetail() {
         saving={savingPhase}
         steps={[
           {
-            label: 'عنوان و پزشک',
+            label: 'عنوان، طرح و پزشک',
             validate: () => (!phaseForm.title.trim() ? 'عنوان فاز الزامی است' : null),
             content: (
               <>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  <Select
+                    label="گزینه طرح درمان *"
+                    value={phaseForm.plan_option}
+                    onChange={(v) => setPhaseForm({ ...phaseForm, plan_option: v })}
+                    options={[
+                      { value: 'A', label: 'طرح الف (پیشنهاد اصلی / استاندارد)' },
+                      { value: 'B', label: 'طرح ب (جایگزین / محافظه‌کارانه)' },
+                      { value: 'C', label: 'طرح ج (اقتصادی / موقت)' },
+                    ]}
+                  />
+                  <Input
+                    label="عنوان اختصاصی طرح (اختیاری)"
+                    value={phaseForm.plan_name}
+                    onChange={(v) => setPhaseForm({ ...phaseForm, plan_name: v })}
+                    placeholder="مثلاً: ایمپلنت و پروتز ثابت"
+                  />
+                </div>
                 <Input label="عنوان فاز *" value={phaseForm.title} onChange={(v) => setPhaseForm({ ...phaseForm, title: v })} placeholder="مثلاً: کشیدن دندان‌های آسیب‌دیده" />
                 <Select label="پزشک مسئول" value={phaseForm.doctor_id} onChange={(v) => setPhaseForm({ ...phaseForm, doctor_id: v })} options={doctors.filter((d) => d.is_active).map((d) => ({ value: d.id, label: `دکتر ${d.name || d.specialty || 'پزشک'}` }))} placeholder="انتخاب پزشک..." />
                 <Textarea label="توضیحات" value={phaseForm.description} onChange={(v) => setPhaseForm({ ...phaseForm, description: v })} placeholder="جزئیات این فاز" rows={2} />
+                <div className="flex items-center gap-2 pt-1">
+                  <input
+                    type="checkbox"
+                    id="phase_is_accepted"
+                    checked={phaseForm.is_accepted}
+                    onChange={(e) => setPhaseForm({ ...phaseForm, is_accepted: e.target.checked })}
+                    className="rounded border-slate-300 text-primary-600 focus:ring-primary-500"
+                  />
+                  <label htmlFor="phase_is_accepted" className="text-xs text-slate-700 dark:text-slate-300 select-none cursor-pointer">
+                    این طرح مورد تأیید و انتخاب بیمار است (طرح مصوب)
+                  </label>
+                </div>
               </>
             ),
           },
@@ -3069,6 +4241,67 @@ export default function PatientDetail() {
           },
         ]}
       />
+
+      {/* Clinical Prerequisite Validation Alert Modal */}
+      {prereqAlert.open && prereqAlert.treatment && prereqAlert.evalResult && (
+        <Modal
+          open={prereqAlert.open}
+          onClose={() => setPrereqAlert({ open: false, treatment: null, evalResult: null })}
+          title="هشدار ایمنی پیش‌نیاز بالینی (Clinical Safety Prerequisite)"
+          size="md"
+        >
+          <div className="space-y-4 text-right">
+            <div className="p-4 rounded-xl border border-amber-300 bg-amber-50 dark:bg-amber-950/30 dark:border-amber-800/60 flex items-start gap-3">
+              <div className="p-2 rounded-lg bg-amber-100 dark:bg-amber-900/50 text-amber-700 dark:text-amber-300 shrink-0">
+                <AlertTriangle size={20} />
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-bold text-amber-900 dark:text-amber-200">
+                  {prereqAlert.evalResult.ruleTitle || 'پیش‌نیاز بالینی رعایت نشده است'}
+                </p>
+                <p className="text-xs text-amber-800 dark:text-amber-300 mt-1 leading-relaxed">
+                  {prereqAlert.evalResult.message}
+                </p>
+                {prereqAlert.evalResult.missingStep && (
+                  <div className="mt-2 text-xs font-bold text-amber-950 dark:text-amber-100 flex items-center gap-1">
+                    <span>گام مفقوده یا ناتمام:</span>
+                    <Badge color="warning">{prereqAlert.evalResult.missingStep}</Badge>
+                  </div>
+                )}
+                {prereqAlert.evalResult.recommendation && (
+                  <p className="text-[11px] text-amber-700 dark:text-amber-400 mt-2 italic">
+                    توصیه بالینی: {prereqAlert.evalResult.recommendation}
+                  </p>
+                )}
+              </div>
+            </div>
+
+            <p className="text-xs text-slate-500 leading-relaxed">
+              جهت رعایت پروتکل‌های ADA CDT و راهنماهای بالینی، پیش از تکمیل این رویه باید مراحل پیش‌نیاز انجام و تأیید شوند. در صورت صلاحدید علمی دندانپزشک، امکان اعمال استثناء بالینی وجود دارد.
+            </p>
+
+            <div className="flex items-center justify-end gap-2 pt-3 border-t border-slate-100 dark:border-slate-800">
+              <Button
+                variant="secondary"
+                size="sm"
+                onClick={() => setPrereqAlert({ open: false, treatment: null, evalResult: null })}
+              >
+                انصراف و اصلاح توالی درمان
+              </Button>
+              {prereqAlert.evalResult.canOverride && (
+                <Button
+                  variant="primary"
+                  size="sm"
+                  onClick={handlePrereqOverride}
+                >
+                  <Shield size={14} className="inline ml-1" />
+                  تأیید پزشک معالج (Clinical Override)
+                </Button>
+              )}
+            </div>
+          </div>
+        </Modal>
+      )}
 
       {ConfirmActionModal}
 
@@ -3384,6 +4617,295 @@ export default function PatientDetail() {
               disabled={savingPlan}
             >
               {savingPlan ? <Spinner size={16} /> : 'ثبت و فعال‌سازی طرح اقساط'}
+            </Button>
+          </div>
+        </div>
+      </Modal>
+
+      {/* Family Linkage Modal */}
+      <Modal
+        open={familyModalOpen}
+        onClose={() => setFamilyModalOpen(false)}
+        title="مدیریت پیوند خانوادگی و سرپرست"
+        size="md"
+      >
+        <div className="space-y-4">
+          <div className="p-3 rounded-xl bg-teal-50 dark:bg-teal-950/30 border border-teal-200 dark:border-teal-800 text-xs text-teal-800 dark:text-teal-200">
+            با اتصال پرونده‌های اعضای یک خانواده، امکان مشاهده پرونده‌ها با یک کلیک و ارجاع سریع فراهم می‌گردد.
+          </div>
+
+          <div className="space-y-3">
+            <label className="flex items-center gap-2.5 p-3 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={isHeadToggle}
+                onChange={(e) => {
+                  setIsHeadToggle(e.target.checked)
+                  if (e.target.checked) {
+                    setFamilyHeadId('')
+                    setFamilyRelationship('head')
+                  } else {
+                    setFamilyRelationship('')
+                  }
+                }}
+                className="w-4 h-4 rounded text-primary-600 focus:ring-primary-400"
+              />
+              <div>
+                <span className="text-xs font-bold text-slate-800 dark:text-slate-100">
+                  این بیمار سرپرست خانواده است (Head of Household)
+                </span>
+                <p className="text-[11px] text-slate-400 mt-0.5">
+                  سایر اعضای خانواده می‌توانند به عنوان وابسته به این پرونده متصل شوند.
+                </p>
+              </div>
+            </label>
+
+            {!isHeadToggle && (
+              <>
+                <Select
+                  label="انتخاب سرپرست خانواده از بین بیماران"
+                  value={familyHeadId}
+                  onChange={(v) => setFamilyHeadId(v)}
+                  options={[
+                    { value: '', label: 'بدون سرپرست (مستقل)' },
+                    ...allPatients
+                      .filter((p) => p.id !== patient.id)
+                      .map((p) => ({
+                        value: p.id,
+                        label: `${p.first_name} ${p.last_name} (${p.file_number ? `پرونده: ${p.file_number}` : 'بدون پرونده'}${p.phone ? ` - ${p.phone}` : ''})`,
+                      })),
+                  ]}
+                  placeholder="سرپرست خانواده را انتخاب کنید..."
+                />
+
+                <Select
+                  label="نسبت بیمار با سرپرست"
+                  value={familyRelationship}
+                  onChange={(v) => setFamilyRelationship(v)}
+                  options={FAMILY_RELATIONSHIPS.filter((r) => r.value !== 'head').map((r) => ({
+                    value: r.value,
+                    label: r.label,
+                  }))}
+                  placeholder="انتخاب نسبت خانوادگی..."
+                />
+              </>
+            )}
+          </div>
+
+          <div className="flex justify-end gap-2 pt-3 border-t border-slate-100 dark:border-slate-700">
+            <Button variant="secondary" onClick={() => setFamilyModalOpen(false)}>
+              انصراف
+            </Button>
+            <Button
+              variant="primary"
+              onClick={handleSaveFamilyLinkage}
+              disabled={savingFamily}
+            >
+              {savingFamily ? <Spinner size={16} /> : 'ذخیره پیوند خانوادگی'}
+            </Button>
+          </div>
+        </div>
+      </Modal>
+
+      {/* Edit Patient Modal with Full Clinical Triage Screening */}
+      <Modal
+        open={editModalOpen}
+        onClose={() => setEditModalOpen(false)}
+        title="ویرایش پرونده و اطلاعات بیمار"
+        size="full"
+      >
+        <div className="space-y-4 max-h-[80vh] overflow-y-auto p-1">
+          {/* File number badge */}
+          <div className="flex items-center gap-3 p-3.5 rounded-2xl bg-teal-50/70 dark:bg-teal-950/30 border border-teal-200 dark:border-teal-800">
+            <div className="w-10 h-10 rounded-xl bg-teal-600 text-white flex items-center justify-center font-bold">
+              <FileText size={20} />
+            </div>
+            <div>
+              <span className="text-[11px] font-bold text-teal-800 dark:text-teal-300">شماره پرونده بالینی بیمار:</span>
+              <p className="text-base font-extrabold text-teal-900 dark:text-teal-100 font-mono">
+                {patient?.file_number || 'بدون شماره پرونده'}
+              </p>
+            </div>
+          </div>
+
+          <div>
+            <h4 className="text-xs font-bold text-slate-500 mb-3 uppercase tracking-wider">اطلاعات هویتی و تماس</h4>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+              <Input label="نام *" value={formData.first_name} onChange={(v) => setFormData((p) => ({ ...p, first_name: v }))} placeholder="نام" />
+              <Input label="نام خانوادگی *" value={formData.last_name} onChange={(v) => setFormData((p) => ({ ...p, last_name: v }))} placeholder="نام خانوادگی" />
+              <Input label="کد ملی" value={formData.national_id} onChange={(v) => setFormData((p) => ({ ...p, national_id: v }))} placeholder="کد ملی ده‌رقمی" dir="ltr" />
+              <Input label="تلفن همراه *" value={formData.phone} onChange={(v) => setFormData((p) => ({ ...p, phone: v }))} placeholder="09xxxxxxxxx" dir="ltr" />
+              <Input label="تلفن ثابت یا منزل" value={formData.phone2} onChange={(v) => setFormData((p) => ({ ...p, phone2: v }))} placeholder="شماره تماس دوم" dir="ltr" />
+              <Input label="پست الکترونیکی (ایمیل)" type="email" value={formData.email} onChange={(v) => setFormData((p) => ({ ...p, email: v }))} placeholder="name@domain.com" dir="ltr" />
+              <PersianDateInput label="تاریخ تولد" value={formData.birth_date} onChange={(v) => setFormData((p) => ({ ...p, birth_date: v }))} />
+              <Select label="جنسیت" value={formData.gender} onChange={(v) => setFormData((p) => ({ ...p, gender: v }))} options={[{ value: 'male', label: 'آقا' }, { value: 'female', label: 'خانم' }]} placeholder="انتخاب جنسیت" />
+              <Select label="گروه خونی" value={formData.blood_type} onChange={(v) => setFormData((p) => ({ ...p, blood_type: v }))} options={['O-', 'O+', 'A-', 'A+', 'B-', 'B+', 'AB-', 'AB+'].map((bt) => ({ value: bt, label: bt }))} placeholder="انتخاب گروه خونی" />
+            </div>
+          </div>
+
+          <div>
+            <h4 className="text-xs font-bold text-slate-500 mb-3 uppercase tracking-wider">نشانی و سکونت</h4>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+              <Input label="استان" value={formData.province} onChange={(v) => setFormData((p) => ({ ...p, province: v }))} placeholder="استان" />
+              <Input label="شهر" value={formData.city} onChange={(v) => setFormData((p) => ({ ...p, city: v }))} placeholder="شهر" />
+              <Input label="کد پستی" value={formData.postal_code} onChange={(v) => setFormData((p) => ({ ...p, postal_code: v }))} placeholder="کد پستی" dir="ltr" />
+              <Input label="نشانی کامل منزل / محل کار" value={formData.address} onChange={(v) => setFormData((p) => ({ ...p, address: v }))} placeholder="آدرس دقیق..." className="md:col-span-3" />
+            </div>
+          </div>
+
+          <div>
+            <h4 className="text-xs font-bold text-slate-500 mb-3 uppercase tracking-wider">سوابق پزشکی و دارویی</h4>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              <Textarea label="تاریخچه پزشکی" value={formData.medical_history} onChange={(v) => setFormData((p) => ({ ...p, medical_history: v }))} placeholder="سابقه جراحی، بستری و..." rows={2} />
+              <Textarea label="حساسیت‌ها و آلرژی‌ها" value={formData.allergies} onChange={(v) => setFormData((p) => ({ ...p, allergies: v }))} placeholder="پنی‌سیلین، لاتکس، بی‌حسی، غذا..." rows={2} />
+              <Textarea label="داروهای در حال مصرف" value={formData.medications} onChange={(v) => setFormData((p) => ({ ...p, medications: v }))} placeholder="آسپرین، لوزارتان، متفورمین و..." rows={2} />
+              <Textarea label="بیماری‌های زمینه‌ای" value={formData.medical_conditions} onChange={(v) => setFormData((p) => ({ ...p, medical_conditions: v }))} placeholder="فشار خون، دیابت، قلبی، آسم..." rows={2} />
+            </div>
+          </div>
+
+          {/* Clinical Triage & High-Risk Factors (استاندارد بین‌المللی ADA CDT / نظام پزشکی) */}
+          <div className="p-4 rounded-2xl bg-rose-50/60 dark:bg-rose-950/20 border border-rose-200/80 dark:border-rose-900/50 space-y-3">
+            <h4 className="text-xs font-bold text-rose-800 dark:text-rose-300 flex items-center gap-1.5">
+              <AlertCircle size={15} className="text-rose-600" />
+              غربالگری بالینی، تریاژ و عوامل پرخطر دندانپزشکی (Clinical Triage & Risk Markers)
+            </h4>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+              <div className="space-y-1.5 p-3 rounded-xl bg-white/90 dark:bg-slate-850/90 border border-rose-100 dark:border-rose-900/40">
+                <label className="flex items-center gap-2 cursor-pointer text-xs font-bold text-slate-700 dark:text-slate-200">
+                  <input
+                    type="checkbox"
+                    checked={Boolean(formData.anticoagulant_use)}
+                    onChange={(e) => setFormData((p) => ({ ...p, anticoagulant_use: e.target.checked }))}
+                    className="w-4 h-4 rounded text-rose-600 focus:ring-rose-400"
+                  />
+                  مصرف داروی ضد انعقاد (وارفارین/پلاویکس)
+                </label>
+                <Input
+                  label="آخرین مقدار شاخص INR"
+                  value={formData.inr_value}
+                  onChange={(v) => setFormData((p) => ({ ...p, inr_value: v }))}
+                  placeholder="مثال: ۲.۵"
+                  dir="ltr"
+                />
+              </div>
+
+              <div className="space-y-1.5 p-3 rounded-xl bg-white/90 dark:bg-slate-850/90 border border-rose-100 dark:border-rose-900/40">
+                <label className="flex items-center gap-2 cursor-pointer text-xs font-bold text-slate-700 dark:text-slate-200">
+                  <input
+                    type="checkbox"
+                    checked={Boolean(formData.bisphosphonate_use)}
+                    onChange={(e) => setFormData((p) => ({ ...p, bisphosphonate_use: e.target.checked }))}
+                    className="w-4 h-4 rounded text-rose-600 focus:ring-rose-400"
+                  />
+                  مصرف بیس‌فسفونات‌ها
+                </label>
+                <p className="text-[11px] text-slate-500 leading-relaxed">ریسک استئونکروز فک (ONJ) در کشیدن و ایمپلنت</p>
+              </div>
+
+              <div className="space-y-1.5 p-3 rounded-xl bg-white/90 dark:bg-slate-850/90 border border-rose-100 dark:border-rose-900/40">
+                <label className="flex items-center gap-2 cursor-pointer text-xs font-bold text-slate-700 dark:text-slate-200">
+                  <input
+                    type="checkbox"
+                    checked={Boolean(formData.endocarditis_prophylaxis)}
+                    onChange={(e) => setFormData((p) => ({ ...p, endocarditis_prophylaxis: e.target.checked }))}
+                    className="w-4 h-4 rounded text-rose-600 focus:ring-rose-400"
+                  />
+                  ریسک اندوکاردیت عفونی
+                </label>
+                <p className="text-[11px] text-slate-500 leading-relaxed">ضرورت مصرف آنتی‌بیوتیک پروفیلاکسی ۱ ساعت پیش از کار</p>
+              </div>
+
+              <div className="space-y-1.5 p-3 rounded-xl bg-white/90 dark:bg-slate-850/90 border border-rose-100 dark:border-rose-900/40">
+                <div className="grid grid-cols-2 gap-2">
+                  <Input
+                    label="فشار سیستول (mmHg)"
+                    value={formData.bp_systolic}
+                    onChange={(v) => setFormData((p) => ({ ...p, bp_systolic: v }))}
+                    placeholder="۱۲۰"
+                    dir="ltr"
+                  />
+                  <Input
+                    label="فشار دیاستول (mmHg)"
+                    value={formData.bp_diastolic}
+                    onChange={(v) => setFormData((p) => ({ ...p, bp_diastolic: v }))}
+                    placeholder="۸۰"
+                    dir="ltr"
+                  />
+                </div>
+              </div>
+
+              <div className="space-y-1.5 p-3 rounded-xl bg-white/90 dark:bg-slate-850/90 border border-rose-100 dark:border-rose-900/40">
+                <Input
+                  label="قند خون سه‌ماهه (HbA1c ٪)"
+                  value={formData.diabetes_hba1c}
+                  onChange={(v) => setFormData((p) => ({ ...p, diabetes_hba1c: v }))}
+                  placeholder="مثال: ۶.۸"
+                  dir="ltr"
+                />
+                <p className="text-[11px] text-slate-500">کنترل التیام زخم و استئواینتگریشن ایمپلنت</p>
+              </div>
+
+              <div className="space-y-1.5 p-3 rounded-xl bg-white/90 dark:bg-slate-850/90 border border-rose-100 dark:border-rose-900/40">
+                <Select
+                  label="سه‌ماهه بارداری"
+                  value={formData.pregnancy_trimester}
+                  onChange={(v) => setFormData((p) => ({ ...p, pregnancy_trimester: v }))}
+                  options={[
+                    { value: '', label: 'باردار نیست / نامشخص' },
+                    { value: '1', label: 'سه‌ماهه اول (محدودیت دارو و رادیولوژی)' },
+                    { value: '2', label: 'سه‌ماهه دوم (ایمن‌ترین زمان درمان)' },
+                    { value: '3', label: 'سه‌ماهه سوم (احتیاط وضعیت خوابیده یونیت)' },
+                  ]}
+                />
+              </div>
+            </div>
+          </div>
+
+          <div>
+            <h4 className="text-xs font-bold text-slate-500 mb-3 uppercase tracking-wider">تنظیمات پرونده و پزشک اولیه</h4>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+              <Select
+                label="پزشک معالج اصلی"
+                value={formData.primary_doctor_id}
+                onChange={(v) => setFormData((p) => ({ ...p, primary_doctor_id: v }))}
+                options={doctors.filter((d) => d.is_active).map((d) => ({ value: d.id, label: `دکتر ${d.name || d.specialty || 'پزشک'}` }))}
+                placeholder="انتخاب پزشک معالج..."
+              />
+              <Select
+                label="سطح VIP بیمار"
+                value={formData.vip_level}
+                onChange={(v) => setFormData((p) => ({ ...p, vip_level: v }))}
+                options={[
+                  { value: '0', label: 'عادی' },
+                  { value: '1', label: 'نقره‌ای' },
+                  { value: '2', label: 'طلایی' },
+                  { value: '3', label: 'پلاتین' },
+                ]}
+              />
+              <Input
+                label="برچسب‌ها (با ویرگول جدا کنید)"
+                value={formData.tags}
+                onChange={(v) => setFormData((p) => ({ ...p, tags: v }))}
+                placeholder="ایمپلنت، ارتودنسی، ارجاعی..."
+              />
+              <Textarea
+                label="یادداشت‌های اختصاصی پرونده"
+                value={formData.notes}
+                onChange={(v) => setFormData((p) => ({ ...p, notes: v }))}
+                placeholder="توضیحات اختصاصی برای پذیرش و منشی..."
+                className="md:col-span-3"
+                rows={2}
+              />
+            </div>
+          </div>
+
+          <div className="flex justify-end gap-2 pt-4 border-t border-slate-100 dark:border-slate-800">
+            <Button variant="secondary" onClick={() => setEditModalOpen(false)}>
+              انصراف
+            </Button>
+            <Button variant="primary" onClick={handleSavePatient} disabled={saving}>
+              {saving ? <Spinner size={16} /> : 'ذخیره تغییرات پرونده'}
             </Button>
           </div>
         </div>

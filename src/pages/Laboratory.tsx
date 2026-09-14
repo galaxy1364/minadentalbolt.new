@@ -1,12 +1,21 @@
 // Laboratory.tsx - Persian RTL Dental Clinic Laboratory Management
 import { useState, useEffect, useCallback, useMemo } from 'react'
 import { SurfaceSelect } from '../components/SurfaceSelect'
+import { VitaShadePicker } from '../components/VitaShadePicker'
 import { formatSurfaces } from '../lib/toothSurfaces'
 import { clinicMilestones, nextClinicAction, deadlineState, MILESTONE_COLORS } from '../lib/labClinicMilestones'
 import { LEVEL_COLORS } from '../lib/openWork'
 import { PatientSelect } from '../components/PatientSelect'
 import { toothLabel, toothLabelWithWord } from '../lib/toothLabel'
-import { FlaskConical, Plus, Search, Clock, CheckCircle2, AlertCircle, Edit2, Phone, Filter, TrendingUp, Package, CalendarClock, ChevronLeft, RotateCcw, Ban, Archive, MessageSquare } from 'lucide-react'
+import { FlaskConical, Plus, Search, Clock, CheckCircle2, AlertCircle, Edit2, Phone, Filter, TrendingUp, Package, CalendarClock, ChevronLeft, RotateCcw, Ban, Archive, MessageSquare, Truck } from 'lucide-react'
+import {
+  DISPATCH_TYPE_OPTIONS,
+  getDispatchTypeLabel,
+  formatCourierBadge,
+  validateDispatchInfo,
+  isTransitOverdue,
+  generateLabDispatchSlip,
+} from '../lib/labCourierTracking'
 import { downloadICSReminder } from '../lib/icsReminder'
 import { fetchLabOrders, createLabOrder, updateLabOrder, fetchLabs, createLab, updateLab, fetchPatients, fetchDoctors, fetchTreatments, updateTreatment, updateImplantCase } from '../lib/api'
 import {
@@ -114,6 +123,7 @@ export default function Laboratory() {
   const [filterStatus, setFilterStatus] = useState('')
   const [filterLab, setFilterLab] = useState('')
   const [filterOverdue, setFilterOverdue] = useState(false)
+  const [filterInTransit, setFilterInTransit] = useState(false)
   const [showFilters, setShowFilters] = useState(false)
 
   // Order modal
@@ -167,6 +177,13 @@ export default function Laboratory() {
     work_done: false,
     delivered: false,
     material_returned: false,
+    // Courier & Dispatch Tracking (MOD-FEAT-028)
+    dispatch_type: 'clinic_courier' as 'clinic_courier' | 'lab_courier' | 'postal' | 'in_person',
+    courier_name: '',
+    courier_phone: '',
+    tracking_code: '',
+    dispatched_at: '',
+    expected_return_date: '',
   })
 
   // ===========================================================================
@@ -297,6 +314,11 @@ export default function Laboratory() {
       if (filterLab && o.lab_id !== filterLab) return false
       // Overdue filter
       if (filterOverdue && !isOverdue(o)) return false
+      // In transit courier filter (MOD-FEAT-028)
+      if (filterInTransit) {
+        const inTransit = Boolean(o.dispatched_at && !o.work_done && !o.delivered)
+        if (!inTransit && !isTransitOverdue(o)) return false
+      }
       return true
     })
     // Priority order, not just newest-first: an order due tomorrow
@@ -316,7 +338,7 @@ export default function Laboratory() {
       if (pa === 0 || pa === 1) return (a.deadline || '').localeCompare(b.deadline || '')
       return (b.created_at || '').localeCompare(a.created_at || '')
     })
-  }, [labOrders, searchQuery, filterStatus, filterLab, filterOverdue, patientMap, labMap])
+  }, [labOrders, searchQuery, filterStatus, filterLab, filterOverdue, filterInTransit, patientMap, labMap])
 
   const stats = useMemo(() => {
     const total = labOrders.length
@@ -399,6 +421,12 @@ export default function Laboratory() {
       shelf: '', shelf_number: '', shelf_space: '',
       alarm_date: '',
       work_done: false, delivered: false, material_returned: false,
+      dispatch_type: 'clinic_courier',
+      courier_name: '',
+      courier_phone: '',
+      tracking_code: '',
+      dispatched_at: '',
+      expected_return_date: '',
     })
     setOrderModalOpen(true)
   }
@@ -431,6 +459,12 @@ export default function Laboratory() {
       work_done: Boolean(order.work_done),
       delivered: Boolean(order.delivered),
       material_returned: Boolean(order.material_returned),
+      dispatch_type: (order.dispatch_type as any) || 'clinic_courier',
+      courier_name: order.courier_name || '',
+      courier_phone: order.courier_phone || '',
+      tracking_code: order.tracking_code || '',
+      dispatched_at: order.dispatched_at || '',
+      expected_return_date: order.expected_return_date || '',
     })
     setOrderModalOpen(true)
   }
@@ -454,6 +488,19 @@ export default function Laboratory() {
       shelf: orderForm.shelf, shelf_number: orderForm.shelf_number, shelf_space: orderForm.shelf_space,
     })
     if (shelfErrors.length) { chimes.playWarning(); showToast('error', shelfErrors[0]); return }
+
+    // Validate courier dispatch details (MOD-FEAT-028)
+    const dispatchValidation = validateDispatchInfo({
+      dispatch_type: orderForm.dispatch_type,
+      courier_phone: orderForm.courier_phone,
+      tracking_code: orderForm.tracking_code,
+    })
+    if (!dispatchValidation.isValid) {
+      chimes.playWarning()
+      showToast('error', dispatchValidation.errors[0])
+      return
+    }
+
     const payload = {
       lab_id: orderForm.lab_id,
       patient_id: orderForm.patient_id,
@@ -477,6 +524,12 @@ export default function Laboratory() {
       work_done: orderForm.work_done,
       delivered: orderForm.delivered,
       material_returned: orderForm.material_returned,
+      dispatch_type: orderForm.dispatch_type || null,
+      courier_name: orderForm.courier_name.trim() || null,
+      courier_phone: orderForm.courier_phone.trim() || null,
+      tracking_code: orderForm.tracking_code.trim() || null,
+      dispatched_at: orderForm.dispatched_at || null,
+      expected_return_date: orderForm.expected_return_date || null,
     } as any
     const patient = patientMap.get(orderForm.patient_id)
     const lab = labMap.get(orderForm.lab_id)
@@ -487,6 +540,7 @@ export default function Laboratory() {
         { label: 'بیمار', value: patient ? `${patient.first_name} ${patient.last_name}` : '-', highlight: true },
         { label: 'لابراتوار', value: lab?.name || '-' },
         { label: 'نوع کار', value: workTypes.find((w) => w.value === orderForm.work_type)?.label || orderForm.work_type },
+        { label: 'روش ارسال و پیک', value: getDispatchTypeLabel(orderForm.dispatch_type) + (orderForm.courier_name ? ` (${orderForm.courier_name})` : '') },
         { label: 'موعد', value: orderForm.deadline ? toJalaliDisplay(orderForm.deadline) : '-' },
         { label: 'هزینه', value: orderForm.cost ? `${formatCurrency(Number(orderForm.cost))} ت` : '-' },
         { label: 'مکان قفسه', value: formatShelfLocation({ shelf: orderForm.shelf, shelf_number: orderForm.shelf_number, shelf_space: orderForm.shelf_space }) || '-' },
@@ -875,6 +929,32 @@ export default function Laboratory() {
           </div>
         </div>
 
+        {/* Courier & Transit logistics (MOD-FEAT-028) */}
+        {(() => {
+          const courierMeta = formatCourierBadge(order)
+          return (
+            <div className={`flex items-center justify-between gap-1 px-2.5 py-1.5 rounded-xl mb-3 text-xs border ${
+              courierMeta.color === 'error'
+                ? 'bg-rose-50 border-rose-200 text-rose-700'
+                : courierMeta.color === 'warning'
+                  ? 'bg-amber-50 border-amber-200 text-amber-700'
+                  : courierMeta.color === 'success'
+                    ? 'bg-emerald-50 border-emerald-200 text-emerald-700'
+                    : 'bg-slate-50 dark:bg-slate-700/50 border-slate-200 dark:border-slate-600 text-slate-600 dark:text-slate-300'
+            }`}>
+              <span className="flex items-center gap-1.5 font-medium">
+                <Truck size={13} className={courierMeta.color === 'error' ? 'text-rose-500' : 'text-teal-600'} />
+                <span>{courierMeta.label}</span>
+              </span>
+              {order.tracking_code && (
+                <span className="text-[11px] font-mono text-slate-400" dir="ltr">
+                  #{toPersianDigits(order.tracking_code)}
+                </span>
+              )}
+            </div>
+          )
+        })()}
+
         {/* Pipeline stage progress — basic foundation, one tap to
             advance; only shown for orders still actively in the shop */}
         {/* MOD-FEAT-034: the clinic's chain, not the laboratory's.
@@ -1033,8 +1113,36 @@ export default function Laboratory() {
                 <CheckCircle2 size={14} /> تحویل
               </Button>
             )}
-            <Button size="sm" variant="ghost" onClick={() => openEditOrderModal(order)}>
+            <Button size="sm" variant="ghost" onClick={() => openEditOrderModal(order)} aria-label="ویرایش سفارش" title="ویرایش سفارش">
               <Edit2 size={14} />
+            </Button>
+            {/* Courier dispatch slip (MOD-FEAT-028) */}
+            <Button
+              size="sm"
+              variant="ghost"
+              onClick={() => {
+                h.tap()
+                const p = patientMap.get(order.patient_id)
+                const d = doctorMap.get(order.doctor_id || '')
+                const l = labMap.get(order.lab_id)
+                const slipHtml = generateLabDispatchSlip({
+                  order,
+                  patient: p,
+                  doctor: d,
+                  lab: l,
+                })
+                const w = window.open('', '_blank')
+                if (w) {
+                  w.document.write(slipHtml)
+                  w.document.close()
+                } else {
+                  showToast('error', 'امکان باز کردن پنجره چاپ وجود ندارد (مسدودکننده پاپ‌آپ را بررسی کنید)')
+                }
+              }}
+              aria-label="حواله پیک و بارنامه"
+              title="صدور و چاپ حواله رسمی پیک و بارنامه ارسال به لابراتوار"
+            >
+              <Truck size={14} className="text-teal-600" />
             </Button>
             {order.status !== 'cancelled' && order.status !== 'delivered' && (
               <Button size="sm" variant="ghost" onClick={() => handleDeleteOrder(order)} aria-label="لغو سفارش" title="لغو سفارش">
@@ -1079,16 +1187,20 @@ export default function Laboratory() {
           <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
             <Select label="وضعیت" value={filterStatus} onChange={setFilterStatus} options={labOrderStatuses.map((s) => ({ value: s.value, label: s.label }))} placeholder="همه وضعیت‌ها" />
             <Select label="لابراتوار" value={filterLab} onChange={setFilterLab} options={labs.map((l) => ({ value: l.id, label: l.name }))} placeholder="همه لابراتوارها" />
-            <div className="flex items-end gap-2">
-              <label className="flex items-center gap-2 text-xs font-medium text-slate-600 cursor-pointer pb-2">
+            <div className="flex flex-col gap-2 pb-1">
+              <label className="flex items-center gap-2 text-xs font-medium text-slate-600 cursor-pointer">
                 <input type="checkbox" checked={filterOverdue} onChange={(e) => setFilterOverdue(e.target.checked)} className="w-4 h-4 rounded text-primary-600" />
                 فقط سفارش‌های از موعد گذشته
               </label>
+              <label className="flex items-center gap-2 text-xs font-medium text-slate-600 cursor-pointer">
+                <input type="checkbox" checked={filterInTransit} onChange={(e) => setFilterInTransit(e.target.checked)} className="w-4 h-4 rounded text-teal-600" />
+                فقط مرسولات در مسیر پیک (In Transit)
+              </label>
             </div>
           </div>
-          {(filterStatus || filterLab || filterOverdue) && (
+          {(filterStatus || filterLab || filterOverdue || filterInTransit) && (
             <div className="mt-3">
-              <Button variant="ghost" size="sm" onClick={() => { setFilterStatus(''); setFilterLab(''); setFilterOverdue(false) }}>
+              <Button variant="ghost" size="sm" onClick={() => { setFilterStatus(''); setFilterLab(''); setFilterOverdue(false); setFilterInTransit(false) }}>
                 پاک کردن فیلترها
               </Button>
             </div>
@@ -1332,10 +1444,12 @@ export default function Laboratory() {
                   onChange={(v) => setOrderForm((p) => ({ ...p, tooth_surface: v }))}
                   hint="برای اینله و اونله و ونیر — در بقیه اختیاری"
                 />
-                <div className="grid grid-cols-2 gap-3">
-                  <Input label="رنگ" value={orderForm.shade} onChange={(v) => setOrderForm((p) => ({ ...p, shade: v }))} placeholder="مثال: A2" dir="ltr" />
-                  <Select label="جنس" value={orderForm.material} onChange={(v) => setOrderForm((p) => ({ ...p, material: v }))} options={materials} />
-                </div>
+                <Select label="جنس" value={orderForm.material} onChange={(v) => setOrderForm((p) => ({ ...p, material: v }))} options={materials} />
+                <VitaShadePicker
+                  label="رنگ"
+                  value={orderForm.shade}
+                  onChange={(v) => setOrderForm((p) => ({ ...p, shade: v }))}
+                />
               </>
             ),
           },
@@ -1394,6 +1508,61 @@ export default function Laboratory() {
                 )}
                 <CurrencyInput label="هزینه (تومان)" value={orderForm.cost} onChange={(v) => setOrderForm((p) => ({ ...p, cost: v }))} />
                 <Select label="وضعیت" value={orderForm.status} onChange={(v) => setOrderForm((p) => ({ ...p, status: v }))} options={labOrderStatuses.map((s) => ({ value: s.value, label: s.label }))} />
+              </>
+            ),
+          },
+          {
+            label: 'پیک و بارنامه',
+            validate: () => {
+              const res = validateDispatchInfo({
+                dispatch_type: orderForm.dispatch_type,
+                courier_phone: orderForm.courier_phone,
+                tracking_code: orderForm.tracking_code,
+              })
+              return res.isValid ? null : res.errors[0]
+            },
+            content: (
+              <>
+                <Select
+                  label="روش ارسال و تحویل"
+                  value={orderForm.dispatch_type}
+                  onChange={(v) => setOrderForm((p) => ({ ...p, dispatch_type: v as any }))}
+                  options={DISPATCH_TYPE_OPTIONS.map((opt) => ({ value: opt.value, label: `${opt.label} (${opt.description})` }))}
+                />
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                  <Input
+                    label="نام پیک / متصدی حمل"
+                    value={orderForm.courier_name}
+                    onChange={(v) => setOrderForm((p) => ({ ...p, courier_name: v }))}
+                    placeholder="مثلاً: علی رضایی یا تیپاکس"
+                  />
+                  <Input
+                    label="تلفن تماس پیک"
+                    value={orderForm.courier_phone}
+                    onChange={(v) => setOrderForm((p) => ({ ...p, courier_phone: v }))}
+                    placeholder="۰۹۱۲۳۴۵۶۷۸۹"
+                    dir="ltr"
+                  />
+                </div>
+                <Input
+                  label="کد رهگیری / شماره بارنامه"
+                  value={orderForm.tracking_code}
+                  onChange={(v) => setOrderForm((p) => ({ ...p, tracking_code: v }))}
+                  placeholder="کد پیگیری مرسوله پستی، تیپاکس یا بارنامه"
+                  dir="ltr"
+                />
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                  <PersianDateInput
+                    label="تاریخ خروج از مطب"
+                    value={orderForm.dispatched_at}
+                    onChange={(v) => setOrderForm((p) => ({ ...p, dispatched_at: v }))}
+                  />
+                  <PersianDateInput
+                    label="تاریخ تخمینی بازگشت از پیک"
+                    value={orderForm.expected_return_date}
+                    onChange={(v) => setOrderForm((p) => ({ ...p, expected_return_date: v }))}
+                  />
+                </div>
               </>
             ),
           },

@@ -29,7 +29,7 @@ import {
   ConsentFormInput, DashboardStats, DoctorInput, UnitInput,
   RolePermission, RolePermissionInput, CustomRole, CustomRoleInput,
   ManualReminder, ManualReminderInput, ImplantCostItem, ImplantCostItemInput,
-  PerioExam, PerioExamInput } from '../types'
+  PerioExam, PerioExamInput, OrthoExam, OrthoExamInput } from '../types'
 
 function uid(): string {
   if (typeof crypto !== 'undefined' && crypto.randomUUID) return crypto.randomUUID()
@@ -1093,6 +1093,42 @@ export async function updatePerioExam(id: string, updates: Partial<PerioExamInpu
   }
   await db.perio_exams.put(updated)
   await queueOperation('perio_exams', 'update', id, rest)
+  return updated
+}
+
+// ── Orthodontic & Occlusal Bite Examinations ────────────────
+export async function fetchOrthoExams(patientId?: string): Promise<OrthoExam[]> {
+  let items = await db.ortho_exams.where('clinic_id').equals(CLINIC_ID).toArray()
+  if (patientId) items = items.filter((p) => p.patient_id === patientId)
+  return items.sort((a, b) => (b.exam_date || '').localeCompare(a.exam_date || ''))
+}
+
+export async function createOrthoExam(input: OrthoExamInput): Promise<OrthoExam> {
+  const { clinic_id, ...rest } = input
+  const id = uid()
+  const exam: OrthoExam = {
+    ...rest,
+    id,
+    clinic_id: CLINIC_ID,
+    created_at: nowISO(),
+    updated_at: nowISO(),
+  }
+  await db.ortho_exams.put(exam)
+  await queueOperation('ortho_exams', 'insert', id, exam)
+  return exam
+}
+
+export async function updateOrthoExam(id: string, updates: Partial<OrthoExamInput>): Promise<OrthoExam> {
+  const existing = await db.ortho_exams.get(id)
+  if (!existing) throw new Error('آزمون ارتودنسی یافت نشد')
+  const { clinic_id, ...rest } = updates
+  const updated: OrthoExam = {
+    ...existing,
+    ...rest,
+    updated_at: nowISO(),
+  }
+  await db.ortho_exams.put(updated)
+  await queueOperation('ortho_exams', 'update', id, rest)
   return updated
 }
 

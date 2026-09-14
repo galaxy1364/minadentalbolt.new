@@ -7,7 +7,7 @@ import type {
   ToothRecord, InventoryItem, InventoryCategory, PaymentPlan, Installment,
   Cheque, DoctorSchedule, ImplantCase, ImplantComponent, SmsTemplate, PersonalFinanceItem, CashRegisterSession,
   RolePermission, CustomRole,
-  ManualReminder, ImplantCostItem, PerioExam } from '../types'
+  ManualReminder, ImplantCostItem, PerioExam, OrthoExam } from '../types'
 import type { PatientPolicy } from './insurance'
 
 export interface SyncQueueEntry {
@@ -92,6 +92,7 @@ class MinadentDB extends Dexie {
   manual_reminders!: Table<ManualReminder, string>
   patient_policies!: Table<PatientPolicy, string>
   perio_exams!: Table<PerioExam, string>
+  ortho_exams!: Table<OrthoExam, string>
 
   constructor() {
     super('minadent')
@@ -199,6 +200,14 @@ class MinadentDB extends Dexie {
     this.version(13).stores({
       perio_exams: 'id, clinic_id, patient_id, exam_date, doctor_id',
     })
+    // v14: Orthodontic & occlusal bite analysis examinations.
+    this.version(14).stores({
+      ortho_exams: 'id, clinic_id, patient_id, exam_date, doctor_id',
+    })
+    // v15: POS card terminal RRN financial auditing and duplicate prevention.
+    this.version(15).stores({
+      payments: 'id, clinic_id, patient_id, encounter_id, status, payment_date, payment_method, pos_rrn',
+    })
   }
 }
 
@@ -231,7 +240,7 @@ export const TABLE_NAMES = [
   'consent_forms', 'tooth_records', 'inventory_items', 'inventory_categories',
   'payment_plans', 'installments', 'cheques', 'doctor_schedules',
   'implant_cases', 'implant_components', 'implant_cost_items', 'sms_templates', 'personal_finance_items', 'cash_register_sessions',
-  'role_permissions', 'custom_roles', 'manual_reminders', 'patient_policies', 'perio_exams',
+  'role_permissions', 'custom_roles', 'manual_reminders', 'patient_policies', 'perio_exams', 'ortho_exams',
 ] as const
 
 export type TableName = typeof TABLE_NAMES[number]

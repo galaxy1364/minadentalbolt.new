@@ -2,10 +2,11 @@
 import { useState, useEffect, useCallback, useMemo } from 'react'
 import { createPortal } from 'react-dom'
 import { useNavigate } from 'react-router-dom'
-import { Image, Search, Filter, Eye, XCircle, Smile, Camera, Calendar, User, FileText, Download, ZoomIn, Plus, Edit2, Archive, MessageSquare } from 'lucide-react'
+import { Image, Search, Filter, Eye, XCircle, Smile, Camera, Calendar, User, FileText, Download, ZoomIn, Plus, Edit2, Archive, MessageSquare, CheckSquare, Square, Tags } from 'lucide-react'
 import { PieChart, Pie, Cell, XAxis, YAxis, Tooltip as RTooltip, ResponsiveContainer, Legend } from 'recharts'
 import { fetchRadiologyImages, fetchPatients, createRadiologyImage, updateRadiologyImage } from '../lib/api'
-import { toJalaliDisplay, toJalaliStringPretty, formatNumber, toPersianDigits } from '../lib/persianDate'
+import { toJalaliDisplay, toJalaliString, toJalaliStringPretty, formatNumber, toPersianDigits } from '../lib/persianDate'
+import { createPatientRadiologyZip, downloadBlob } from '../lib/zipArchive'
 import { RadiologyImage, Patient } from '../types'
 import { Card, Button, Badge, Spinner, EmptyState, Modal, Wizard, Input, Select, Textarea, showToast } from '../components/ui'
 import { PersianDateInput } from '../components/PersianDateInput'
@@ -16,6 +17,7 @@ import { useConfirmAction } from '../components/ConfirmAction'
 import { DentalRadiologyViewer } from '../components/DentalRadiologyViewer'
 import { toothLabel } from '../lib/toothLabel'
 import { chimes } from '../lib/chimes'
+import { h } from '../lib/haptics'
 
 // ============================================================================
 // Constants
@@ -53,6 +55,15 @@ export default function Radiology() {
   const [searchQuery, setSearchQuery] = useState('')
   const [filterType, setFilterType] = useState('')
 
+  // Batch Selection & ZIP export
+  const [selectedRadIds, setSelectedRadIds] = useState<Set<string>>(new Set())
+  const [batchTagModalOpen, setBatchTagModalOpen] = useState(false)
+  const [batchToothInput, setBatchToothInput] = useState('')
+  const [batchTypeInput, setBatchTypeInput] = useState('')
+  const [zippingArchive, setZippingArchive] = useState(false)
+  const [zipProgressText, setZipProgressText] = useState('')
+  const [savingBatchRad, setSavingBatchRad] = useState(false)
+
   // Detail modal
   const [selectedImage, setSelectedImage] = useState<RadiologyImage | null>(null)
 
@@ -79,6 +90,102 @@ export default function Radiology() {
     setUploadForm({ patient_id: '', image_type: 'panoramic', tooth_number: '', image_url: '', description: '', taken_at: new Date().toISOString().split('T')[0], notes: '' })
     setUploadWizardStep(0)
     setUploadModalOpen(true)
+  }
+
+  const handleToggleRadSelect = (imgId: string) => {
+    h.tap()
+    setSelectedRadIds((prev) => {
+      const next = new Set(prev)
+      if (next.has(imgId)) next.delete(imgId)
+      else next.add(imgId)
+      return next
+    })
+  }
+
+  const handleSelectAllRad = () => {
+    h.tap()
+    if (selectedRadIds.size === filteredImages.length) {
+      setSelectedRadIds(new Set())
+    } else {
+      setSelectedRadIds(new Set(filteredImages.map((i) => i.id)))
+    }
+  }
+
+  const handleDownloadZip = async (onlySelected = false) => {
+    const targetImages = onlySelected
+      ? images.filter((img) => selectedRadIds.has(img.id))
+      : filteredImages
+    if (targetImages.length === 0) {
+      showToast('error', 'هیچ تصویری برای خروجی یافت نشد')
+      return
+    }
+    h.tap()
+    chimes.playPop()
+    setZippingArchive(true)
+    setZipProgressText('در حال آماده‌سازی بسته ZIP تصاویر رادیولوژی...')
+    try {
+      const patientId = targetImages[0]?.patient_id
+      const samePatient = targetImages.every((img) => img.patient_id === patientId)
+      const patientObj = samePatient && patientId ? patients.find((p) => p.id === patientId) : null
+
+      const fallbackPatient: Patient = patientObj || ({
+        id: 'clinic-export',
+        clinic_id: 'cl-1',
+        first_name: 'آرشیو کلینیک',
+        last_name: 'دندانپزشکی',
+        file_number: 'ALL',
+        is_active: true,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      } as Patient)
+
+      const blob = await createPatientRadiologyZip({
+        patient: fallbackPatient,
+        images: targetImages,
+        includeDicomJson: true,
+        includeHtmlPortfolio: true,
+        onProgress: (_curr, _tot, msg) => setZipProgressText(msg),
+      })
+      const filename = `Radiology_Archive_${fallbackPatient.file_number || 'Export'}_${toJalaliString(new Date().toISOString()).replace(/\//g, '-')}.zip`
+      downloadBlob(blob, filename)
+      chimes.playSuccess()
+      showToast('success', `آرشیو ZIP با موفقیت دانلود شد (${toPersianDigits(targetImages.length)} تصویر)`)
+    } catch (err) {
+      console.error('Error generating radiology zip:', err)
+      showToast('error', 'خطا در تولید فایل ZIP')
+    } finally {
+      setZippingArchive(false)
+      setZipProgressText('')
+    }
+  }
+
+  const handleApplyBatchTag = async () => {
+    if (selectedRadIds.size === 0) return
+    if (!batchToothInput.trim() && !batchTypeInput.trim()) {
+      showToast('error', 'حداقل یکی از موارد شماره دندان یا نوع تصویر را وارد فرمایید')
+      return
+    }
+    setSavingBatchRad(true)
+    try {
+      const promises: Promise<any>[] = []
+      for (const radId of Array.from(selectedRadIds)) {
+        const patch: Partial<RadiologyImage> = {}
+        if (batchToothInput.trim()) patch.tooth_number = batchToothInput.trim()
+        if (batchTypeInput.trim()) patch.image_type = batchTypeInput.trim()
+        promises.push(updateRadiologyImage(radId, patch as any))
+      }
+      await Promise.all(promises)
+      chimes.playSuccess()
+      showToast('success', `برچسب‌های ${toPersianDigits(selectedRadIds.size)} تصویر با موفقیت به‌روزرسانی شد`)
+      setBatchTagModalOpen(false)
+      setSelectedRadIds(new Set())
+      await loadData()
+    } catch (err) {
+      console.error('Error updating batch radiology:', err)
+      showToast('error', 'خطا در به‌روزرسانی دسته‌ای تصاویر')
+    } finally {
+      setSavingBatchRad(false)
+    }
   }
 
   const openEditImageModal = (img: RadiologyImage) => {
@@ -326,7 +433,85 @@ export default function Radiology() {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Image Grid */}
         <Card className="p-5 lg:col-span-2">
-          <h2 className="text-base font-bold text-slate-800 mb-4">تصاویر رادیولوژی</h2>
+          <div className="flex items-center justify-between gap-3 mb-4 flex-wrap">
+            <h2 className="text-base font-bold text-slate-800">تصاویر رادیولوژی</h2>
+            <div className="flex items-center gap-2">
+              {filteredImages.length > 0 && (
+                <button
+                  onClick={handleSelectAllRad}
+                  className="px-2.5 py-1.5 rounded-xl text-xs font-medium bg-slate-50 dark:bg-slate-800 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-700 hover:bg-slate-100 flex items-center gap-1"
+                  title={selectedRadIds.size === filteredImages.length ? 'لغو انتخاب همه' : 'انتخاب همه تصاویر جاری'}
+                >
+                  {selectedRadIds.size === filteredImages.length ? <CheckSquare size={13} className="text-primary-600" /> : <Square size={13} />}
+                  <span>{selectedRadIds.size === filteredImages.length ? 'لغو انتخاب' : 'انتخاب همه'}</span>
+                </button>
+              )}
+              <Button
+                size="sm"
+                variant="secondary"
+                disabled={zippingArchive}
+                onClick={() => handleDownloadZip(false)}
+                className="text-xs flex items-center gap-1 text-emerald-700 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/40 border-emerald-200 dark:border-emerald-800"
+                title="دانلود تمامی تصاویر فیلترشده در یک فایل ZIP"
+              >
+                {zippingArchive ? <Spinner size={12} /> : <Download size={13} />}
+                دانلود ZIP
+              </Button>
+            </div>
+          </div>
+
+          {/* Progress Alert for ZIP Archive */}
+          {zippingArchive && (
+            <div className="flex items-center gap-2 p-3 mb-4 bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800 rounded-xl text-xs text-emerald-800 dark:text-emerald-200 animate-pulse">
+              <Spinner size={16} />
+              <span className="font-medium">{zipProgressText || 'در حال بسته‌بندی فایل ZIP...'}</span>
+            </div>
+          )}
+
+          {/* Sticky Batch Actions Bar */}
+          {selectedRadIds.size > 0 && (
+            <div className="sticky top-4 z-20 mb-4 flex items-center justify-between gap-3 p-3 rounded-2xl bg-slate-900 text-white shadow-lg border border-slate-700 flex-wrap">
+              <div className="flex items-center gap-2">
+                <span className="w-2.5 h-2.5 rounded-full bg-primary-400 animate-pulse" />
+                <span className="text-xs font-bold">
+                  {toPersianDigits(selectedRadIds.size)} تصویر انتخاب شده
+                </span>
+              </div>
+              <div className="flex items-center gap-2 flex-wrap">
+                <Button
+                  size="sm"
+                  variant="secondary"
+                  className="text-xs !bg-slate-800 !text-slate-100 hover:!bg-slate-700 border-slate-600 flex items-center gap-1.5"
+                  onClick={() => {
+                    setBatchToothInput('')
+                    setBatchTypeInput('')
+                    setBatchTagModalOpen(true)
+                  }}
+                >
+                  <Tags size={14} /> برچسب‌گذاری دسته‌ای
+                </Button>
+                <Button
+                  size="sm"
+                  variant="primary"
+                  disabled={zippingArchive}
+                  onClick={() => handleDownloadZip(true)}
+                  className="text-xs flex items-center gap-1.5"
+                >
+                  {zippingArchive ? <Spinner size={14} /> : <Download size={14} />}
+                  دانلود ZIP انتخابی
+                </Button>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  className="text-xs !text-slate-300 hover:!text-white hover:!bg-slate-800"
+                  onClick={() => setSelectedRadIds(new Set())}
+                >
+                  لغو
+                </Button>
+              </div>
+            </div>
+          )}
+
           {filteredImages.length === 0 ? (
             <EmptyState
               icon={<Image size={28} />}
@@ -337,12 +522,36 @@ export default function Radiology() {
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               {filteredImages.map((img) => {
                 const meta = getTypeMeta(img.image_type)
+                const isSelected = selectedRadIds.has(img.id)
                 return (
                   <div
                     key={img.id}
-                    className="rounded-xl border border-slate-100 overflow-hidden hover:card-shadow transition-all-smooth cursor-pointer"
+                    className={`rounded-xl border overflow-hidden transition-all-smooth cursor-pointer relative ${
+                      isSelected ? 'ring-2 ring-primary-500 border-primary-500 bg-primary-50/10' : 'border-slate-100 hover:card-shadow'
+                    }`}
                     onClick={() => setSelectedImage(img)}
                   >
+                    {/* Selection Checkbox */}
+                    <div
+                      className="absolute top-2 right-2 z-10"
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        handleToggleRadSelect(img.id)
+                      }}
+                    >
+                      <button
+                        type="button"
+                        className={`w-6 h-6 rounded-lg flex items-center justify-center transition-all ${
+                          isSelected
+                            ? 'bg-primary-600 text-white shadow-sm'
+                            : 'bg-black/50 text-white/90 hover:bg-black/70'
+                        }`}
+                        title={isSelected ? 'لغو انتخاب' : 'انتخاب تصویر جهت عملیات دسته‌ای'}
+                      >
+                        {isSelected ? <CheckSquare size={14} /> : <Square size={14} />}
+                      </button>
+                    </div>
+
                     {/* Image placeholder */}
                     <div className="aspect-video bg-gradient-to-br from-slate-100 to-slate-200 flex items-center justify-center relative">
                       {img.image_url ? (
@@ -350,7 +559,7 @@ export default function Radiology() {
                       ) : (
                         <Image size={40} className="text-slate-400" />
                       )}
-                      <div className="absolute top-2 right-2">
+                      <div className="absolute top-2 left-2">
                         <Badge color={meta.color}>{meta.label}</Badge>
                       </div>
                     </div>
@@ -581,6 +790,67 @@ export default function Radiology() {
           },
         ]}
       />
+      {/* Batch Tag Modal */}
+      {batchTagModalOpen && (
+        <Modal
+          open={batchTagModalOpen}
+          onClose={() => setBatchTagModalOpen(false)}
+          title={`برچسب‌گذاری دسته‌ای (${toPersianDigits(selectedRadIds.size)} تصویر)`}
+          size="md"
+        >
+          <div className="p-4 space-y-4">
+            <p className="text-xs text-slate-500">
+              مشخصات زیر بر روی تمامی {toPersianDigits(selectedRadIds.size)} تصویر انتخاب‌شده اعمال خواهد شد:
+            </p>
+
+            <div>
+              <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">
+                شماره دندان یا دندان‌ها (اختیاری):
+              </label>
+              <Input
+                value={batchToothInput}
+                onChange={(v) => setBatchToothInput(v)}
+                placeholder="مثال: 16 یا 14, 15, 16"
+                dir="ltr"
+              />
+              <span className="text-[11px] text-slate-400 mt-1 block">
+                می‌توانید چند شماره دندان را با کاما جدا نمایید.
+              </span>
+            </div>
+
+            <div>
+              <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">
+                نوع تصویر (اختیاری):
+              </label>
+              <Select
+                value={batchTypeInput}
+                onChange={(v) => setBatchTypeInput(v)}
+                options={[
+                  { value: '', label: 'بدون تغییر' },
+                  ...imageTypes.map((t) => ({ value: t.value, label: t.label })),
+                ]}
+              />
+            </div>
+
+            <div className="flex items-center justify-end gap-2 pt-3 border-t border-slate-100 dark:border-slate-800">
+              <Button variant="ghost" size="sm" onClick={() => setBatchTagModalOpen(false)}>
+                انصراف
+              </Button>
+              <Button
+                variant="primary"
+                size="sm"
+                disabled={savingBatchRad}
+                onClick={handleApplyBatchTag}
+                className="flex items-center gap-1.5"
+              >
+                {savingBatchRad ? <Spinner size={14} /> : <Tags size={14} />}
+                اعمال برچسب‌ها بر روی تصاویر
+              </Button>
+            </div>
+          </div>
+        </Modal>
+      )}
+
       {ConfirmActionModal}
     </div>
   )

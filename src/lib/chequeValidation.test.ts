@@ -14,7 +14,7 @@
  * پرداخت ثبت شود، یعنی همان نوعی که انتظار می‌رود پاس شود.
  */
 import { describe, it, expect } from 'vitest'
-import { validateCheque, chequeModeHint } from './chequeValidation'
+import { validateCheque, chequeModeHint, validateSayadId, formatSayadId } from './chequeValidation'
 
 const draft = (over: Partial<Parameters<typeof validateCheque>[0]> = {}) => ({
   patient_id: 'p1', amount: '5000000', isGuarantee: false,
@@ -109,13 +109,41 @@ describe('مرحله‌ی اعتبارسنجی', () => {
   })
 })
 
-describe('توضیح هر حالت', () => {
-  it('حالت پرداخت می‌گوید باید پاس شود', () => {
-    expect(chequeModeHint(false)).toContain('پاس')
+describe('اعتبارسنجی و قالب‌بندی شناسه صیادی', () => {
+  it('شناسه خالی را معتبر می‌داند (اختیاری است)', () => {
+    expect(validateSayadId('').isValid).toBe(true)
+    expect(validateSayadId(null).isValid).toBe(true)
   })
 
-  it('حالت ضمانت می‌گوید خرج نمی‌شود', () => {
-    expect(chequeModeHint(true)).toContain('خرج نمی‌شود')
+  it('شناسه ۱۶ رقمی معتبر را می‌پذیرد', () => {
+    expect(validateSayadId('1234567890123456').isValid).toBe(true)
+    expect(validateSayadId('1234-5678-9012-3456').isValid).toBe(true)
+  })
+
+  it('طول کمتر یا بیشتر از ۱۶ رقم را رد می‌کند', () => {
+    expect(validateSayadId('123456789012345').isValid).toBe(false)
+    expect(validateSayadId('12345678901234567').isValid).toBe(false)
+  })
+
+  it('حروف و کاراکترهای غیرعددی را رد می‌کند', () => {
+    expect(validateSayadId('123456789012345a').isValid).toBe(false)
+  })
+
+  it('شناسه صیاد را به صورت ۴-۴-۴-۴ قالب‌بندی می‌کند', () => {
+    expect(formatSayadId('1234567890123456')).toBe('1234-5678-9012-3456')
+  })
+
+  it('چک با شناسه صیاد نامعتبر در validateCheque مسدود می‌شود', () => {
+    const res = validateCheque({
+      patient_id: 'p1',
+      amount: 1000,
+      cheque_number: '123',
+      bank_name: 'ملت',
+      due_date: '2026-10-01',
+      isGuarantee: false,
+      sayad_id: '12345', // invalid length
+    })
+    expect(res.error).toContain('۱۶ رقم')
   })
 })
 

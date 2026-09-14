@@ -1,6 +1,6 @@
-import React, { useState, useEffect, useCallback } from 'react'
+import React, { useState, useEffect, useCallback, useRef } from 'react'
 import { createPortal } from 'react-dom'
-import { X, AlertCircle, CheckCircle2, Info, Loader2, ChevronRight, ChevronLeft } from 'lucide-react'
+import { X, AlertCircle, CheckCircle2, Info, Loader2, ChevronRight, ChevronLeft, ChevronDown } from 'lucide-react'
 import { h } from '../lib/haptics'
 import { chimes } from '../lib/chimes'
 import { toPersianDigits } from '../lib/persianDate'
@@ -72,7 +72,7 @@ export function Button({ children, onClick, variant = 'primary', size = 'md', cl
   )
 }
 
-export function Input({ label, value, onChange, placeholder, type = 'text', className = '', error, dir }: { label?: string; value: string | number; onChange: (v: string) => void; placeholder?: string; type?: string; className?: string; error?: string; dir?: string }) {
+export function Input({ label, value, onChange, placeholder, type = 'text', className = '', error, dir, hint }: { label?: string; value: string | number; onChange: (v: string) => void; placeholder?: string; type?: string; className?: string; error?: string; dir?: string; hint?: string }) {
   return (
     <div className={className}>
       {label && <label className="block text-xs font-medium text-slate-600 dark:text-slate-300 mb-1.5">{label}</label>}
@@ -86,6 +86,7 @@ export function Input({ label, value, onChange, placeholder, type = 'text', clas
         className={`w-full px-3 py-2 rounded-xl border bg-slate-50 dark:bg-slate-700 text-base text-slate-800 dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-primary-400 focus:border-transparent transition-all-smooth ${error ? 'border-error-300 dark:border-error-600' : 'border-slate-200 dark:border-slate-600'}`}
       />
       {error && <p className="text-xs text-error-500 mt-1">{error}</p>}
+      {!error && hint && <p className="text-[11px] text-slate-400 dark:text-slate-500 mt-1">{hint}</p>}
     </div>
   )
 }
@@ -296,18 +297,150 @@ export function Wizard({
   )
 }
 
-export function Tabs({ tabs, active, onChange }: { tabs: { key: string; label: string; icon?: React.ReactNode }[]; active: string; onChange: (key: string) => void }) {
+export function Tabs({
+  tabs,
+  active,
+  onChange,
+  className = '',
+}: {
+  tabs: { key: string; label: string; icon?: React.ReactNode }[]
+  active: string
+  onChange: (key: string) => void
+  className?: string
+}) {
+  const containerRef = useRef<HTMLDivElement | null>(null)
+  const [quickMenuOpen, setQuickMenuOpen] = useState(false)
+  const tabButtonRefs = useRef<Record<string, HTMLButtonElement | null>>({})
+
+  // Auto-scroll active tab into center view
+  useEffect(() => {
+    const activeEl = tabButtonRefs.current[active]
+    if (activeEl && containerRef.current) {
+      activeEl.scrollIntoView({
+        behavior: 'smooth',
+        inline: 'center',
+        block: 'nearest',
+      })
+    }
+  }, [active])
+
+  // Close quick menu when clicking outside or pressing Escape
+  useEffect(() => {
+    if (!quickMenuOpen) return
+    const handleClickOutside = (e: MouseEvent) => {
+      if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
+        setQuickMenuOpen(false)
+      }
+    }
+    const handleKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setQuickMenuOpen(false)
+    }
+    window.addEventListener('mousedown', handleClickOutside)
+    window.addEventListener('keydown', handleKey)
+    return () => {
+      window.removeEventListener('mousedown', handleClickOutside)
+      window.removeEventListener('keydown', handleKey)
+    }
+  }, [quickMenuOpen])
+
+  const activeTabObj = tabs.find((t) => t.key === active)
+
   return (
-    <div className="flex gap-1 p-1 bg-slate-100 dark:bg-slate-700 rounded-xl overflow-x-auto dock-scroll">
-      {tabs.map((tab) => (
-        <button
-          key={tab.key}
-          onClick={() => { h.select(); onChange(tab.key) }}
-          className={`flex-shrink-0 flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-medium transition-all-smooth press-scale ${active === tab.key ? 'bg-white dark:bg-slate-800 text-primary-700 dark:text-primary-400 card-shadow' : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200'}`}
-        >
-          {tab.icon}{tab.label}
-        </button>
-      ))}
+    <div className={`relative ${className}`} ref={containerRef}>
+      <div className="flex items-center gap-1.5 p-1.5 bg-slate-200/70 dark:bg-slate-800/80 backdrop-blur-md rounded-2xl border border-white/50 dark:border-white/10 shadow-xs">
+        {/* Scrollable Tab Strip */}
+        <div className="flex-1 flex gap-1 overflow-x-auto dock-scroll scroll-smooth py-0.5">
+          {tabs.map((tab) => {
+            const isCurrent = active === tab.key
+            return (
+              <button
+                key={tab.key}
+                ref={(el) => {
+                  tabButtonRefs.current[tab.key] = el
+                }}
+                type="button"
+                onClick={() => {
+                  h.select()
+                  onChange(tab.key)
+                }}
+                className={`flex-shrink-0 min-h-[42px] flex items-center gap-2 px-3.5 sm:px-4 py-2 rounded-xl text-xs sm:text-sm font-semibold transition-all-smooth press-scale ${
+                  isCurrent
+                    ? 'bg-white dark:bg-slate-700/90 text-primary-700 dark:text-primary-300 shadow-sm ring-1 ring-black/5 dark:ring-white/10'
+                    : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200 hover:bg-white/40 dark:hover:bg-slate-700/40'
+                }`}
+              >
+                {tab.icon && (
+                  <span className={`shrink-0 transition-transform ${isCurrent ? 'scale-110 text-primary-600 dark:text-primary-400' : ''}`}>
+                    {tab.icon}
+                  </span>
+                )}
+                <span>{tab.label}</span>
+              </button>
+            )
+          })}
+        </div>
+
+        {/* Quick-Jump Dropdown Button for extensive tab bars (> 6 tabs) */}
+        {tabs.length > 6 && (
+          <div className="relative shrink-0 border-r border-slate-300 dark:border-slate-700 pr-1 mr-0.5">
+            <button
+              type="button"
+              onClick={() => {
+                h.tap()
+                setQuickMenuOpen((prev) => !prev)
+              }}
+              title="دسترسی سریع به تمام تب‌ها"
+              aria-label="دسترسی سریع به تمام تب‌ها"
+              className={`flex items-center justify-center w-10 h-10 rounded-xl transition-all-smooth press-scale ${
+                quickMenuOpen
+                  ? 'bg-primary-600 text-white shadow-sm'
+                  : 'bg-white/80 dark:bg-slate-700/80 text-slate-600 dark:text-slate-300 hover:bg-white dark:hover:bg-slate-700'
+              }`}
+            >
+              <ChevronDown size={17} className={`transition-transform duration-200 ${quickMenuOpen ? 'rotate-180' : ''}`} />
+            </button>
+
+            {/* Quick Menu Popover */}
+            {quickMenuOpen && (
+              <div
+                className="absolute left-0 top-full mt-2 w-56 max-h-80 overflow-y-auto dock-scroll p-1.5 bg-white/95 dark:bg-slate-800/95 backdrop-blur-xl rounded-2xl shadow-xl border border-slate-200 dark:border-slate-700 z-50 animate-in fade-in slide-in-from-top-2 duration-150"
+                role="menu"
+              >
+                <div className="px-3 py-1.5 border-b border-slate-100 dark:border-slate-700/60 mb-1">
+                  <span className="text-[11px] font-bold text-slate-500 dark:text-slate-400">
+                    جهش سریع به بخش:
+                  </span>
+                </div>
+                <div className="space-y-0.5">
+                  {tabs.map((tab) => {
+                    const isCurrent = active === tab.key
+                    return (
+                      <button
+                        key={tab.key}
+                        type="button"
+                        onClick={() => {
+                          h.select()
+                          onChange(tab.key)
+                          setQuickMenuOpen(false)
+                        }}
+                        className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-medium transition-all-smooth text-right ${
+                          isCurrent
+                            ? 'bg-primary-50 dark:bg-primary-950/50 text-primary-700 dark:text-primary-300 font-bold border border-primary-200 dark:border-primary-800'
+                            : 'text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-700/60'
+                        }`}
+                      >
+                        {tab.icon && <span className="shrink-0">{tab.icon}</span>}
+                        <span className="truncate flex-1">{tab.label}</span>
+                        {isCurrent && <CheckCircle2 size={14} className="text-primary-600 shrink-0" />}
+                      </button>
+                    )
+                  })}
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+      </div>
     </div>
   )
 }

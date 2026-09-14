@@ -79,3 +79,9 @@ test('هیچ چیزی از عرض گوشی بیرون نمی‌زند', async ({
   expect(pageScroll, 'صفحه اسکرول افقی دارد').toBeLessThanOrEqual(viewport + 1)
   expect(offscreen, `محتوایی بیرون از قاب صفحه:\n${offscreen.join('\n')}`).toEqual([])
 })
+
+test('مانیتور سالن انتظار (Waiting Room TV) به درستی بارگذاری می‌شود', async ({ page }) => {
+  await page.goto('/#/waiting-room')
+  await expect(page.getByText('سالن انتظار').first()).toBeVisible({ timeout: 15_000 })
+  await expect(page.getByText(/صف حاضرین در سالن انتظار|وضعیت یونیت‌های کلینیک/).first()).toBeVisible()
+})

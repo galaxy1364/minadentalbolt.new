@@ -8,7 +8,7 @@
 import { describe, it, expect } from 'vitest'
 import {
   TREATMENT_STEP_ORDER, startingStepIndex, toothStepMode,
-  surfaceAlreadyKnown, seededSummary,
+  surfaceAlreadyKnown, seededSummary, findProcedureChain, DENTAL_PROCEDURE_CHAINS,
 } from './treatmentWizardFlow'
 
 const label = (v: string) => ({ occlusal: 'اکلوزال', distal: 'دیستال' }[v] || v)
@@ -117,5 +117,30 @@ describe('🔴 صفحه‌ی درمان‌ها ترتیب چارت‌محور ر
 
   it('امکان تغییر دندان باقی می‌ماند', () => {
     expect(treatmentsPage).toContain('تغییر دندان')
+  })
+})
+
+describe('زنجیره هوشمند رویه‌های بالینی دندانپزشکی', () => {
+  it('کلمات کلیدی عصب‌کشی، زنجیره نجات دندان (اندو تا روکش) را پیدا می‌کنند', () => {
+    const chain = findProcedureChain('عصب‌کشی دندان ۳ کاناله')
+    expect(chain).not.toBeNull()
+    expect(chain?.id).toBe('endo-crown')
+    expect(chain?.steps).toHaveLength(3)
+    expect(chain?.steps[0].name).toContain('عصب‌کشی')
+    expect(chain?.steps[1].name).toContain('پست')
+    expect(chain?.steps[2].name).toContain('روکش')
+  })
+
+  it('کلمات کلیدی ایمپلنت، زنجیره کاشت تا پروتز را پیدا می‌کنند', () => {
+    const chain = findProcedureChain('جراحی ایمپلنت دندان')
+    expect(chain).not.toBeNull()
+    expect(chain?.id).toBe('implant-prostho')
+    expect(chain?.steps.some((s) => s.needsLab)).toBe(true)
+  })
+
+  it('رویه‌های متفرقه (مانند جرم‌گیری) زنجیره ندارند و null برمی‌گردانند', () => {
+    expect(findProcedureChain('بروساژ و جرم‌گیری')).toBeNull()
+    expect(findProcedureChain('')).toBeNull()
+    expect(findProcedureChain(null)).toBeNull()
   })
 })

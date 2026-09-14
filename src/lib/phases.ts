@@ -18,6 +18,9 @@ export interface PhaseLike {
   estimated_duration_days?: number | null
   start_date?: string | null
   end_date?: string | null
+  plan_option?: string | null
+  plan_name?: string | null
+  is_accepted?: boolean | null
 }
 
 const DONE = new Set(['completed', 'done'])
@@ -144,7 +147,8 @@ export function validatePhase(phase: PhaseLike, existing: PhaseLike[] = []): str
   if (phase.phase_number == null || phase.phase_number < 1) {
     errors.push('شماره مرحله باید حداقل ۱ باشد')
   }
-  if (existing.some((p) => p.phase_number === phase.phase_number)) {
+  const targetOption = phase.plan_option?.trim().toUpperCase() || 'A'
+  if (existing.some((p) => p.phase_number === phase.phase_number && ((p.plan_option?.trim().toUpperCase()) || 'A') === targetOption)) {
     errors.push('شماره مرحله تکراری است')
   }
   if (phase.start_date && phase.end_date && phase.end_date < phase.start_date) {
@@ -167,9 +171,11 @@ export function validatePhase(phase: PhaseLike, existing: PhaseLike[] = []): str
 
 /** The next free phase number. Uses max + 1 rather than count + 1 so a
  * cancelled or renumbered phase cannot produce a duplicate. */
-export function nextPhaseNumber(phases: PhaseLike[]): number {
-  if (phases.length === 0) return 1
-  return Math.max(...phases.map((p) => p.phase_number || 0)) + 1
+export function nextPhaseNumber(phases: PhaseLike[], planOption: string = 'A'): number {
+  const target = planOption.trim().toUpperCase() || 'A'
+  const inPlan = phases.filter((p) => ((p.plan_option?.trim().toUpperCase()) || 'A') === target)
+  if (inPlan.length === 0) return 1
+  return Math.max(...inPlan.map((p) => p.phase_number || 0)) + 1
 }
 
 export interface PhaseCostCheck {

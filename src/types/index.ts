@@ -41,6 +41,17 @@ export interface Patient {
   postal_code: string | null
   insurance_number: string | null
   primary_doctor_id: string | null
+  anticoagulant_use?: boolean | null
+  inr_value?: number | null
+  bisphosphonate_use?: boolean | null
+  bp_systolic?: number | null
+  bp_diastolic?: number | null
+  diabetes_hba1c?: number | null
+  endocarditis_prophylaxis?: boolean | null
+  pregnancy_trimester?: number | null
+  /** Family / Household Linkage (Family Dentistry) */
+  family_head_id?: string | null
+  family_relationship?: 'head' | 'spouse' | 'child' | 'parent' | 'other' | string | null
 }
 
 export interface Doctor {
@@ -51,6 +62,7 @@ export interface Doctor {
   name: string | null
   specialty: string | null
   license_number: string | null
+  medical_council_number?: string | null
   /** Fixed color for this doctor, shown consistently everywhere an
    * appointment/schedule item needs to visually indicate whose it is
    * (booking wizard, calendar, appointment lists) — without this,
@@ -99,6 +111,10 @@ export interface Appointment {
   confirmed_at: string | null
   confirmed_by: string | null
   estimated_fee: number | null
+  /** ADA Operatory Workflow timestamps */
+  check_in_time?: string | null
+  chair_entry_time?: string | null
+  chair_exit_time?: string | null
 }
 
 export interface Encounter {
@@ -150,6 +166,12 @@ export interface Treatment {
   doctor_share_calculated: boolean | null
   insurance_share?: number | null
   patient_share?: number | null
+  primary_insurance_share?: number | null
+  supplementary_insurance_share?: number | null
+  franchise_amount?: number | null
+  plan_option?: string | null
+  prerequisite_override?: boolean | null
+  prerequisite_override_reason?: string | null
 }
 
 export interface Payment {
@@ -185,6 +207,14 @@ export interface Payment {
   created_at: string
   updated_at: string
   sync_version: number
+  /** POS Terminal Retrieval Reference Number (12-digit Shaparak RRN) */
+  pos_rrn?: string | null
+  /** POS Terminal ID (8 digits) */
+  pos_terminal_id?: string | null
+  /** Masked card last 4 digits */
+  card_last4?: string | null
+  /** Acquiring Bank / PSP Name */
+  pos_bank_name?: string | null
 }
 
 export interface Procedure {
@@ -267,6 +297,14 @@ export interface LabOrder {
   delivered: boolean | null
   /** Whether leftover material went back to the lab. */
   material_returned: boolean | null
+  // ── Courier & Dispatch tracking (MOD-FEAT-028) ──────────────────────
+  /** Courier service type: clinic_courier, lab_courier, postal, in_person */
+  dispatch_type?: 'clinic_courier' | 'lab_courier' | 'postal' | 'in_person' | null
+  courier_name?: string | null
+  courier_phone?: string | null
+  tracking_code?: string | null
+  dispatched_at?: string | null
+  expected_return_date?: string | null
   created_at: string
   updated_at: string
 }
@@ -280,6 +318,7 @@ export interface InsuranceCompany {
   address: string | null
   discount_percentage: number | null
   coverage_percentage: number | null
+  tier?: 'primary' | 'supplementary' | null
   is_active: boolean
   created_at: string
   updated_at: string
@@ -316,6 +355,8 @@ export interface Prescription {
   medications: Record<string, any> | null
   notes: string | null
   status: string
+  electronic_tracking_code?: string | null
+  insurance_system?: 'tamin' | 'salamat' | 'armed_forces' | 'other' | null
   created_at: string
   updated_at: string
 }
@@ -357,6 +398,9 @@ export interface TreatmentPhase {
   end_date: string | null
   created_at: string
   updated_at: string
+  plan_option?: string | null
+  plan_name?: string | null
+  is_accepted?: boolean | null
 }
 
 export interface PatientTimeline {
@@ -485,6 +529,49 @@ export interface PerioExam {
   updated_at: string
 }
 
+export type AngleMolarClass = 'class_1' | 'class_2_div_1' | 'class_2_div_2' | 'class_3' | 'not_applicable'
+export type AngleCanineClass = 'class_1' | 'class_2' | 'class_3' | 'not_applicable'
+export type ArchDiscrepancyDegree = 'none' | 'mild' | 'moderate' | 'severe'
+export type FacialProfileType = 'straight' | 'convex' | 'concave'
+export type LipCompetenceType = 'competent' | 'incompetent' | 'potentially_competent'
+export type TmjStatusType = 'normal' | 'clicking_right' | 'clicking_left' | 'clicking_bilateral' | 'pain' | 'limited_opening'
+export type OrthoTreatmentStage = 'initial_consult' | 'records_taken' | 'in_treatment' | 'retention' | 'completed'
+export type OrthoApplianceType = 'fixed_metal' | 'fixed_ceramic' | 'clear_aligners' | 'removable_functional' | 'palatal_expander' | 'orthognathic_surgery' | 'other'
+
+export interface OrthoExam {
+  id: string
+  clinic_id: string
+  patient_id: string
+  doctor_id: string | null
+  exam_date: string
+  molar_class_right: AngleMolarClass
+  molar_class_left: AngleMolarClass
+  canine_class_right: AngleCanineClass
+  canine_class_left: AngleCanineClass
+  overjet_mm: number
+  overbite_percent: number
+  midline_shift_upper_mm: number
+  midline_shift_lower_mm: number
+  crossbite_anterior: boolean
+  crossbite_posterior_right: boolean
+  crossbite_posterior_left: boolean
+  crowding_upper: ArchDiscrepancyDegree
+  crowding_lower: ArchDiscrepancyDegree
+  spacing_upper: ArchDiscrepancyDegree
+  spacing_lower: ArchDiscrepancyDegree
+  diastema_mm: number
+  facial_profile: FacialProfileType
+  lip_competence: LipCompetenceType
+  habits: string[]
+  tmj_status: TmjStatusType
+  treatment_stage: OrthoTreatmentStage
+  appliance_type: OrthoApplianceType
+  estimated_duration_months: number | null
+  notes: string | null
+  created_at: string
+  updated_at: string
+}
+
 export interface ToothRecord {
   id: string
   patient_id: string
@@ -581,6 +668,8 @@ export interface Cheque {
    * manually entered for now; foundation for real-time bank
    * verification later. */
   sayad_id: string | null
+  /** Sayad Credit Rating Status (سفید / زرد / نارنجی / قهوه‌ای / قرمز) */
+  sayad_status?: 'white' | 'yellow' | 'orange' | 'brown' | 'red' | null
   /** 'payment': a normal cheque representing an actual scheduled deposit.
    * 'guarantee': collateral held against a payment_plan's full remaining
    * balance — not itself a scheduled deposit, so it should never be
@@ -656,6 +745,14 @@ export interface ImplantCase {
   total_cost: number | null
   paid_amount: number | null
   warranty_years: number | null
+  /** ITI Biomechanical & Tracking Fields */
+  torque_ncm?: number | null
+  isq_value?: number | null
+  lot_number?: string | null
+  serial_number?: string | null
+  bone_density?: 'D1' | 'D2' | 'D3' | 'D4' | string | null
+  abutment_type?: string | null
+  crown_material?: string | null
   /** How the surgeon's share for THIS case is determined — an automatic
    * formula ((revenue minus deductible material costs) / 2, mirroring
    * the same net-split logic used for regular doctor commissions) or a
@@ -990,6 +1087,13 @@ export type ConsentFormInput = Omit<
 
 export type PerioExamInput = Omit<
   PerioExam,
+  'id' | 'created_at' | 'updated_at' | 'clinic_id'
+> & {
+  clinic_id?: string
+}
+
+export type OrthoExamInput = Omit<
+  OrthoExam,
   'id' | 'created_at' | 'updated_at' | 'clinic_id'
 > & {
   clinic_id?: string

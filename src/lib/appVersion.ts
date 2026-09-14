@@ -3,5 +3,5 @@
  * Synchronized automatically with package.json and public/version.json
  * by scripts/sync-version.mjs.
  */
-export const APP_VERSION = '1.234.4'
-export const BUILD_DATE = '2026-09-13'
+export const APP_VERSION = '1.235.0'
+export const BUILD_DATE = '2026-09-14'

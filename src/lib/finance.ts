@@ -1,4 +1,4 @@
-import type { Payment, Treatment } from '../types'
+import type { Payment, Treatment, Patient } from '../types'
 
 /** Minimal shape needed from an implant case — accepts the full
  * ImplantCase/ImplantCaseWithRelations type too since both satisfy this. */
@@ -89,6 +89,44 @@ export function calcAllPatientBalances(
     if (fin.balance > 0) totalOutstanding += fin.balance
   }
   return { byPatient, totalOutstanding }
+}
+
+/**
+ * Calculates the total balance for a family.
+ * A family consists of the head of household and all patients who share that head.
+ */
+export function calcFamilyBalance(
+  patientId: string,
+  patients: Patient[],
+  payments: Payment[],
+  treatments: Treatment[],
+  implantCases: ImplantCaseLike[] = [],
+): PatientBalance {
+  const patient = patients.find(p => p.id === patientId)
+  if (!patient) return { balance: 0, paid: 0, totalCost: 0 }
+  
+  // If this patient has a head, that's the head ID. Otherwise, they might be the head themselves.
+  const headId = patient.family_head_id || patient.id
+  
+  // A family member is the head themselves, or anyone whose family_head_id is the head.
+  const familyMembers = patients.filter(p => p.id === headId || p.family_head_id === headId)
+  
+  // If it's just one person (no one else shares this headId), just return their individual balance
+  if (familyMembers.length <= 1) {
+    return calcPatientBalance(
+      payments.filter(p => p.patient_id === patientId),
+      treatments.filter(t => t.patient_id === patientId),
+      implantCases.filter(c => c.patient_id === patientId)
+    )
+  }
+  
+  const familyIds = new Set(familyMembers.map(p => p.id))
+  
+  return calcPatientBalance(
+    payments.filter(p => familyIds.has(p.patient_id)),
+    treatments.filter(t => familyIds.has(t.patient_id)),
+    implantCases.filter(c => familyIds.has(c.patient_id))
+  )
 }
 
 export interface OverpaymentCheck {

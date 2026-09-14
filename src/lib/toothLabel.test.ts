@@ -217,7 +217,7 @@ describe('🔴 قوس آینه نمی‌شود', () => {
     // بدون این، flex در پوسته‌ی RTL برنامه آیتم اول را سمت راست می‌گذارد
     // و کل دهان برعکس می‌شود — علت دقیق همان باگ.
     expect(archSource).toContain('dir="ltr"')
-    expect(chartSource.match(/dir="ltr" className="flex items-center gap-1/g)?.length).toBe(4)
+    expect(chartSource.match(/dir="ltr" className="flex flex-col xl:flex-row/g)?.length).toBe(4)
   })
 })
 

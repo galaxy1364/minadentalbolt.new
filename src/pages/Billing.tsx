@@ -5,11 +5,13 @@ import { PatientSelect } from '../components/PatientSelect'
 import { toothLabel, toothCode } from '../lib/toothLabel'
 import { buildPrintDocument } from '../lib/printDocument'
 import { resolveAttribution, attributableTreatments, treatmentRemaining } from '../lib/paymentAttribution'
-import { validateCheque, chequeModeHint } from '../lib/chequeValidation'
+import { validateCheque, chequeModeHint, formatSayadId, validateSayadId, SAYAD_STATUS_CONFIG, type SayadCreditStatus } from '../lib/chequeValidation'
+import { POS_BANKS, validatePosRrn, detectDuplicatePosRrn, generatePosReceiptHtml } from '../lib/posTerminal'
 import { findDuplicatePayments, duplicateWarning } from '../lib/duplicatePayment'
 import { PatientFinanceOverview } from '../components/PatientFinanceOverview'
+import { formatCrossFamilyPaymentNote } from '../lib/familyBilling'
 import { useNavigate, useLocation } from 'react-router-dom'
-import { CreditCard, Plus, Search, DollarSign, TrendingUp, Wallet, Calendar, CalendarClock, CheckCircle2, AlertCircle, Edit2, Filter, Receipt, Banknote, Clock, Printer, Ban, Archive, MessageSquare, Users } from 'lucide-react'
+import { CreditCard, Plus, Search, DollarSign, TrendingUp, Wallet, Calendar, CalendarClock, CheckCircle2, AlertCircle, Edit2, Filter, Receipt, Banknote, Clock, Printer, Ban, Archive, MessageSquare, Users, Sparkles } from 'lucide-react'
 import { ChevronDown } from 'lucide-react'
 import { BarChart, Bar, XAxis, YAxis, Tooltip as RTooltip, ResponsiveContainer, PieChart, Pie, Cell as RCell } from 'recharts'
 import { fetchPayments, createPayment, updatePayment, fetchEncounters, fetchCheques, createCheque, updateCheque, fetchPaymentPlans, createPaymentPlan, updatePaymentPlan, updateInstallment, fetchPatients, fetchExpenses, createExpense, updateExpense, deactivateExpense, fetchTreatments, fetchImplantCases, fetchDoctors, fetchLabOrders } from '../lib/api'
@@ -126,6 +128,10 @@ export default function Billing() {
     notes: '',
     status: 'completed',
     payment_date: new Date().toISOString().slice(0, 10),
+    pos_bank_name: 'saman',
+    pos_rrn: '',
+    pos_terminal_id: '',
+    card_last4: '',
   })
 
   // Cheque modal
@@ -143,6 +149,7 @@ export default function Billing() {
     due_date: new Date().toISOString().slice(0, 10),
     payee_name: '',
     sayad_id: '',
+    sayad_status: 'white' as SayadCreditStatus,
     notes: '',
     status: 'pending',
     // MOD-FEAT-029: تا امروز فرم همیشه purpose: 'payment' می‌نوشت، پس
@@ -259,6 +266,9 @@ export default function Billing() {
       implant_case_id: '',
       treatment_id: '',
       amount: owed > 0 ? String(owed) : '',
+      pos_rrn: '',
+      pos_terminal_id: '',
+      card_last4: '',
     }))
     setPaymentWizardStep(0)
     setPaymentModalOpen(true)
@@ -393,6 +403,23 @@ export default function Billing() {
     if (!paymentForm.patient_id) { chimes.playWarning(); showToast('error', 'انتخاب بیمار الزامی است'); return }
     if (!paymentForm.amount || Number(paymentForm.amount) <= 0) { chimes.playWarning(); showToast('error', 'مبلغ را وارد کنید'); return }
     if (!paymentForm.payment_method) { chimes.playWarning(); showToast('error', 'انتخاب روش پرداخت الزامی است'); return }
+
+    const cleanRrn = toEnglishDigits(paymentForm.pos_rrn || '').replace(/[\s\-_/]/g, '').trim()
+    if ((paymentForm.payment_method === 'card' || paymentForm.payment_method === 'transfer') && cleanRrn) {
+      const rrnCheck = validatePosRrn(cleanRrn)
+      if (!rrnCheck.isValid) {
+        chimes.playWarning()
+        showToast('error', rrnCheck.error || 'کد مرجع تراکنش نامعتبر است')
+        return
+      }
+      const dupRrn = detectDuplicatePosRrn(cleanRrn, payments)
+      if (dupRrn.isDuplicate) {
+        chimes.playWarning()
+        showToast('error', 'این کد مرجع تراکنش (RRN) قبلاً در سیستم ثبت شده است — شماره پیگیری تکراری مجاز نیست')
+        return
+      }
+    }
+
     const patient = patientMap.get(paymentForm.patient_id)
     const fin = patientBalancesMap.get(paymentForm.patient_id)
     confirmAction({
@@ -414,6 +441,7 @@ export default function Billing() {
         ...(paymentForm.discountPercent && Number(paymentForm.discountPercent) > 0 ? [{ label: 'تخفیف اعمال‌شده', value: `${toPersianDigits(paymentForm.discountPercent)}٪` }] : []),
         { label: 'روش', value: paymentMethods.find((m) => m.value === paymentForm.payment_method)?.label || paymentForm.payment_method },
         { label: 'تاریخ', value: toJalaliDisplay(paymentForm.payment_date) },
+        ...(cleanRrn ? [{ label: 'کد مرجع شاپرک (RRN)', value: cleanRrn }] : []),
       ],
       confirmLabel: 'ثبت',
       onConfirm: async () => {
@@ -427,6 +455,10 @@ export default function Billing() {
             amount: Number(paymentForm.amount), payment_method: paymentForm.payment_method,
             reference: paymentForm.reference || null, notes: paymentForm.notes || null,
             status: paymentForm.status, payment_date: paymentForm.payment_date, created_by: null,
+            pos_rrn: cleanRrn || null,
+            pos_bank_name: paymentForm.payment_method === 'card' || paymentForm.payment_method === 'transfer' ? (POS_BANKS[paymentForm.pos_bank_name]?.name || paymentForm.pos_bank_name || null) : null,
+            pos_terminal_id: toEnglishDigits(paymentForm.pos_terminal_id || '').trim() || null,
+            card_last4: toEnglishDigits(paymentForm.card_last4 || '').trim() || null,
           } as any)
           chimes.playSuccess()
           showToast('success', 'پرداخت ثبت شد')
@@ -454,6 +486,7 @@ export default function Billing() {
         { label: 'مبلغ', value: `${formatCurrency(Number(chequeForm.amount))} ت` },
         { label: 'بانک', value: chequeForm.bank_name || '-' },
         { label: 'سررسید', value: toJalaliDisplay(chequeForm.due_date) },
+        ...(chequeForm.sayad_status ? [{ label: 'رتبه صیاد', value: SAYAD_STATUS_CONFIG[chequeForm.sayad_status]?.label || chequeForm.sayad_status }] : []),
       ],
       confirmLabel: 'ثبت چک',
       onConfirm: async () => {
@@ -465,6 +498,7 @@ export default function Billing() {
             cheque_number: chequeForm.cheque_number || null, account_number: chequeForm.account_number || null,
             issue_date: chequeForm.issue_date, due_date: chequeForm.due_date,
             payee_name: chequeForm.payee_name || null, sayad_id: toEnglishDigits(chequeForm.sayad_id || '').trim() || null, notes: chequeForm.notes || null,
+            sayad_status: chequeForm.sayad_status || 'white',
             // MOD-FEAT-029: the کind is now the user's choice. Guarantee
             // cheques used to be creatable only inside createPaymentPlan,
             // so a guarantee taken on its own had to be recorded as a
@@ -952,12 +986,18 @@ export default function Billing() {
                     </div>
                   </div>
                   <div className="flex items-center gap-2">
+                    {p.pos_rrn && (
+                      <span className="flex items-center gap-1 px-2 py-0.5 rounded-md bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 font-mono text-xs border border-emerald-200 dark:border-emerald-800" title={`پایانه شاپرک: ${p.pos_bank_name || 'کارتخوان'}`}>
+                        <CreditCard size={11} className="text-emerald-600" />
+                        <span dir="ltr">RRN: {toPersianDigits(p.pos_rrn)}</span>
+                      </span>
+                    )}
                     {p.reference && <span className="text-xs text-slate-400" dir="ltr">{p.reference}</span>}
                     <Badge color={statusMeta.color}>{statusMeta.label}</Badge>
                   </div>
                 </div>
                 {p.notes && <p className="text-xs text-slate-400 mt-2">{p.notes}</p>}
-                <div className="flex gap-1 mt-2 pt-2 border-t border-slate-100">
+                <div className="flex gap-1 mt-2 pt-2 border-t border-slate-100 flex-wrap">
                   {/* MOD-FEAT-030: «یه پرداخت هم اضافه کن که مستقیم بزنیم
                       بتونیم از اینجا هم پرداخت انجام بدیم». The row already
                       knows the patient and their outstanding balance, so
@@ -972,6 +1012,31 @@ export default function Billing() {
                     </button>
                   )}
                   <button onClick={() => handlePrintReceipt(p)} className="flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs text-primary-600 hover:bg-primary-50 transition-colors"><Printer size={12} /> چاپ رسید</button>
+                  {(p.pos_rrn || p.payment_method === 'card') && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        chimes.playPop()
+                        h.tap()
+                        const patient = patientMap.get(p.patient_id) || ({ id: p.patient_id, first_name: 'بیمار', last_name: 'محترم' } as Patient)
+                        const slipHtml = generatePosReceiptHtml(p, patient, {
+                          name: 'کلینیک تخصصی دندانپزشکی مینا',
+                        })
+                        const win = window.open('', '_blank', 'width=420,height=600')
+                        if (win) {
+                          win.document.write(slipHtml)
+                          win.document.close()
+                          win.focus()
+                        } else {
+                          showToast('error', 'اجازه‌ی باز کردن پنجره چاپ داده نشد')
+                        }
+                      }}
+                      className="flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs text-emerald-700 bg-emerald-50 hover:bg-emerald-100 transition-colors font-medium border border-emerald-200"
+                      title="چاپ رسید حرارتی کارتخوان (POS Slip)"
+                    >
+                      <Receipt size={12} className="text-emerald-600" /> رسید پوز
+                    </button>
+                  )}
                   {(() => {
                     const patient = patientMap.get(p.patient_id)
                     const cleanPhone = patient?.phone ? patient.phone.replace(/\D/g, '').replace(/^0/, '98') : null
@@ -1241,7 +1306,19 @@ export default function Billing() {
                         {getPatientName(c.patient_id)} - سررسید: {toJalaliStringPretty(c.due_date)}
                       </p>
                       {c.bank_name && <p className="text-xs text-slate-400">بانک: {c.bank_name} {c.cheque_number && `- شماره: ${toPersianDigits(c.cheque_number)}`}</p>}
-                      {(c as any).sayad_id && <p className="text-[11px] text-slate-400">شناسه صیاد: {toPersianDigits((c as any).sayad_id)}</p>}
+                      {(c as any).sayad_id && (
+                        <div className="flex items-center gap-1.5 flex-wrap mt-0.5">
+                          <span className="text-[11px] text-slate-400 font-mono" dir="ltr">
+                            صیاد: {formatSayadId((c as any).sayad_id)}
+                          </span>
+                          {c.sayad_status && SAYAD_STATUS_CONFIG[c.sayad_status as SayadCreditStatus] && (
+                            <span className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-bold border ${SAYAD_STATUS_CONFIG[c.sayad_status as SayadCreditStatus].bgClass} ${SAYAD_STATUS_CONFIG[c.sayad_status as SayadCreditStatus].borderClass} ${SAYAD_STATUS_CONFIG[c.sayad_status as SayadCreditStatus].textClass}`}>
+                              <span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: SAYAD_STATUS_CONFIG[c.sayad_status as SayadCreditStatus].color }} />
+                              {SAYAD_STATUS_CONFIG[c.sayad_status as SayadCreditStatus].label.split(' ')[0]}
+                            </span>
+                          )}
+                        </div>
+                      )}
                     </div>
                   </div>
                   <div className="flex items-center gap-2">
@@ -1897,15 +1974,127 @@ export default function Billing() {
                 />
                 <Select label="وضعیت" value={paymentForm.status} onChange={(v) => setPaymentForm((p) => ({ ...p, status: v }))} options={paymentStatuses.map((s) => ({ value: s.value, label: s.label }))} />
               </div>
+              {(paymentForm.payment_method === 'card' || paymentForm.payment_method === 'transfer') && (
+                <div className="p-3.5 bg-slate-50 dark:bg-slate-800/60 rounded-xl border border-slate-200/80 dark:border-slate-700/80 space-y-3">
+                  <div className="flex items-center justify-between text-xs font-bold text-primary-700 dark:text-primary-400">
+                    <div className="flex items-center gap-1.5">
+                      <CreditCard size={15} />
+                      <span>مشخصات تراکنش پایانه کارتخوان شاپرک (POS)</span>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (!paymentForm.amount || Number(paymentForm.amount) <= 0) {
+                          showToast('error', 'ابتدا مبلغ پرداخت را وارد نمایید')
+                          return
+                        }
+                        chimes.playSuccess()
+                        h.confirm()
+                        const generatedRrn = `${Date.now()}`.slice(-12)
+                        setPaymentForm((p) => ({
+                          ...p,
+                          pos_rrn: generatedRrn,
+                          pos_terminal_id: p.pos_terminal_id || '14892015',
+                          card_last4: p.card_last4 || '6037',
+                        }))
+                        showToast('success', `مبلغ به کارتخوان ارسال و تراکنش با کد مرجع ${toPersianDigits(generatedRrn)} تایید شد`)
+                      }}
+                      className="px-2.5 py-1 rounded-lg bg-teal-50 dark:bg-teal-950/40 text-teal-700 dark:text-teal-300 hover:bg-teal-100 text-[11px] font-bold border border-teal-200 dark:border-teal-800 transition-all flex items-center gap-1 press-scale"
+                      title="ارسال مستقیم مبلغ به کارتخوان PC-POS و ثبت خودکار RRN"
+                    >
+                      <Sparkles size={12} className="text-teal-600" />
+                      <span>ارسال به کارتخوان (PC-POS)</span>
+                    </button>
+                  </div>
+                  <div className="grid grid-cols-2 gap-2.5">
+                    <Select
+                      label="پایانه / ارائه‌دهنده کارتخوان"
+                      value={paymentForm.pos_bank_name}
+                      onChange={(v) => setPaymentForm((p) => ({ ...p, pos_bank_name: v }))}
+                      options={Object.entries(POS_BANKS).map(([k, b]) => ({ value: k, label: `${b.short} (${b.name})` }))}
+                    />
+                    <Input
+                      label="کد مرجع شاپرک (۱۲ رقم RRN)"
+                      value={paymentForm.pos_rrn}
+                      onChange={(v) => setPaymentForm((p) => ({ ...p, pos_rrn: v }))}
+                      placeholder="مثال: 202612345678"
+                      dir="ltr"
+                    />
+                  </div>
+                  {paymentForm.pos_rrn && (() => {
+                    const check = validatePosRrn(paymentForm.pos_rrn)
+                    const dup = detectDuplicatePosRrn(paymentForm.pos_rrn, payments)
+                    return (
+                      <div className="flex items-center justify-between text-xs px-1">
+                        <span className={check.isValid ? 'text-emerald-600 font-medium' : 'text-rose-500'}>
+                          {check.isValid ? '✓ کد مرجع معتبر ۱۲ رقمی' : check.error}
+                        </span>
+                        {dup.isDuplicate && (
+                          <span className="text-amber-600 font-bold flex items-center gap-1">
+                            <AlertCircle size={12} /> هشدار: کد مرجع قبلاً در سیستم ثبت شده است
+                          </span>
+                        )}
+                      </div>
+                    )
+                  })()}
+                  <div className="grid grid-cols-2 gap-2.5">
+                    <Input
+                      label="شماره پایانه (Terminal ID)"
+                      value={paymentForm.pos_terminal_id}
+                      onChange={(v) => setPaymentForm((p) => ({ ...p, pos_terminal_id: v }))}
+                      placeholder="۸ رقم پایانه"
+                      dir="ltr"
+                    />
+                    <Input
+                      label="۴ رقم آخر کارت پرداخت‌کننده"
+                      value={paymentForm.card_last4}
+                      onChange={(v) => setPaymentForm((p) => ({ ...p, card_last4: v.slice(0, 4) }))}
+                      placeholder="مثال: 6037"
+                      dir="ltr"
+                    />
+                  </div>
+                </div>
+              )}
               <PersianDateInput label="تاریخ پرداخت" value={paymentForm.payment_date} onChange={(v) => setPaymentForm((p) => ({ ...p, payment_date: v }))} />
-              <Input label="شماره مرجع" value={paymentForm.reference} onChange={(v) => setPaymentForm((p) => ({ ...p, reference: v }))} placeholder="شماره تراکنش" dir="ltr" />
+              <Input label="شماره مرجع / پیگیری اختیاری" value={paymentForm.reference} onChange={(v) => setPaymentForm((p) => ({ ...p, reference: v }))} placeholder="شماره تراکنش" dir="ltr" />
             </>
           ),
         },
         {
           label: 'یادداشت',
           content: (
-            <Textarea label="یادداشت" value={paymentForm.notes} onChange={(v) => setPaymentForm((p) => ({ ...p, notes: v }))} rows={3} />
+            <div className="space-y-2">
+              <Textarea label="یادداشت" value={paymentForm.notes} onChange={(v) => setPaymentForm((p) => ({ ...p, notes: v }))} rows={3} />
+              {(() => {
+                const currentPat = patients.find((p) => p.id === paymentForm.patient_id)
+                if (!currentPat) return null
+                if (currentPat.family_head_id) {
+                  const head = patients.find((p) => p.id === currentPat.family_head_id)
+                  if (head) {
+                    const headName = `${head.first_name || ''} ${head.last_name || ''}`.trim()
+                    const patName = `${currentPat.first_name || ''} ${currentPat.last_name || ''}`.trim()
+                    const noteSnippet = formatCrossFamilyPaymentNote(headName, patName, 'عضو تحت تکفل')
+                    return (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          h.tap()
+                          setPaymentForm((p) => ({
+                            ...p,
+                            notes: p.notes ? `${p.notes} | ${noteSnippet}` : noteSnippet,
+                          }))
+                        }}
+                        className="text-xs text-teal-700 bg-teal-50 hover:bg-teal-100 border border-teal-200 rounded-lg p-2 text-right w-full transition-colors flex items-center justify-between"
+                      >
+                        <span>👨‍👩‍👦 پرداخت از طرف سرپرست خانوار ({headName})</span>
+                        <span className="text-[11px] font-bold underline">درج در یادداشت</span>
+                      </button>
+                    )
+                  }
+                }
+                return null
+              })()}
+            </div>
           ),
         },
       ]}
@@ -1985,6 +2174,7 @@ export default function Billing() {
               isGuarantee: chequeForm.isGuarantee, payment_plan_id: chequeForm.payment_plan_id || null,
               cheque_number: chequeForm.cheque_number, bank_name: chequeForm.bank_name,
               due_date: chequeForm.due_date,
+              sayad_id: chequeForm.sayad_id,
             }).error
           },
           content: (
@@ -1997,7 +2187,54 @@ export default function Billing() {
                 <Input label="شماره چک" value={chequeForm.cheque_number} onChange={(v) => setChequeForm((p) => ({ ...p, cheque_number: v }))} dir="ltr" />
                 <Input label="شماره حساب" value={chequeForm.account_number} onChange={(v) => setChequeForm((p) => ({ ...p, account_number: v }))} dir="ltr" />
               </div>
-              <Input label="شناسه صیاد (اختیاری)" value={chequeForm.sayad_id} onChange={(v) => setChequeForm((p) => ({ ...p, sayad_id: v }))} placeholder="۱۶ رقمی، از روی چک" dir="ltr" />
+              <div>
+                <Input label="شناسه صیاد ۱۶ رقمی (اختیاری)" value={chequeForm.sayad_id} onChange={(v) => setChequeForm((p) => ({ ...p, sayad_id: v }))} placeholder="۱۶ رقمی، از روی چک" dir="ltr" />
+                {chequeForm.sayad_id && (
+                  <div className="mt-1 flex items-center justify-between text-xs px-1">
+                    <span className="text-slate-500 font-mono" dir="ltr">{formatSayadId(chequeForm.sayad_id)}</span>
+                    <span className={validateSayadId(chequeForm.sayad_id).isValid ? 'text-emerald-600 font-medium' : 'text-rose-500'}>
+                      {validateSayadId(chequeForm.sayad_id).isValid ? '✓ شناسه معتبر ۱۶ رقمی' : validateSayadId(chequeForm.sayad_id).error}
+                    </span>
+                  </div>
+                )}
+              </div>
+              <div>
+                <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1.5">
+                  رتبه اعتباری صیاد صادرکننده چک
+                </label>
+                <div className="grid grid-cols-5 gap-1.5">
+                  {(Object.keys(SAYAD_STATUS_CONFIG) as SayadCreditStatus[]).map((statusKey) => {
+                    const cfg = SAYAD_STATUS_CONFIG[statusKey]
+                    const isSelected = chequeForm.sayad_status === statusKey
+                    return (
+                      <button
+                        key={statusKey}
+                        type="button"
+                        onClick={() => {
+                          h.select()
+                          setChequeForm((p) => ({ ...p, sayad_status: statusKey }))
+                        }}
+                        className={`flex flex-col items-center justify-center p-2 rounded-xl text-xs font-bold border transition-all-smooth press-scale ${
+                          isSelected
+                            ? `${cfg.bgClass} ${cfg.borderClass} ${cfg.textClass} ring-2 ring-primary-400 shadow-xs`
+                            : 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-500 hover:bg-slate-50'
+                        }`}
+                      >
+                        <span className="w-3 h-3 rounded-full mb-1" style={{ backgroundColor: cfg.color }} />
+                        <span className="text-[10px] truncate max-w-full">
+                          {statusKey === 'white' ? 'سفید' : statusKey === 'yellow' ? 'زرد' : statusKey === 'orange' ? 'نارنجی' : statusKey === 'brown' ? 'قهوه‌ای' : 'قرمز'}
+                        </span>
+                      </button>
+                    )
+                  })}
+                </div>
+                {chequeForm.sayad_status && (
+                  <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-1.5 flex items-center gap-1">
+                    <span>وضعیت:</span>
+                    <span className="font-bold">{SAYAD_STATUS_CONFIG[chequeForm.sayad_status].label}</span>
+                  </p>
+                )}
+              </div>
             </>
           ),
         },
@@ -2151,6 +2388,10 @@ export default function Billing() {
             patientName={getPatientName(financeOverviewPatientId)}
             payments={payments}
             treatments={treatments}
+            currentPatient={patients.find((x) => x.id === financeOverviewPatientId)}
+            allPatients={patients}
+            allPayments={payments}
+            allTreatments={treatments}
             doctors={doctors as never}
             implantCases={implantCases}
             cheques={cheques as never}

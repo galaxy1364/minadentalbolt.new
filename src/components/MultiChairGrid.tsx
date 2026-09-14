@@ -10,12 +10,15 @@ import {
   Plus,
   Stethoscope,
   Armchair,
+  Volume2,
+  UserCheck,
 } from 'lucide-react'
 import { AppointmentWithRelations, Unit, Doctor } from '../types'
 import { toJalaliStringPretty, toPersianDigits, getJalaliDateInfo, persianWeekdaysShort } from '../lib/persianDate'
 import { doctorColor } from '../lib/doctorColors'
 import { h } from '../lib/haptics'
 import { chimes } from '../lib/chimes'
+import { computeWaitingTimeMinutes, formatWaitingTime, getTriageWaitingStatus } from '../lib/operatoryWorkflow'
 
 interface MultiChairGridProps {
   selectedDate: string
@@ -25,6 +28,8 @@ interface MultiChairGridProps {
   appointments: AppointmentWithRelations[]
   onSelectAppointment: (appt: AppointmentWithRelations) => void
   onNewAppointmentAtSlot: (date: string, startTime: string, unitId?: string, doctorId?: string) => void
+  onCallPatient?: (appt: AppointmentWithRelations) => void
+  onQuickStatus?: (appt: AppointmentWithRelations, newStatus: string) => void
 }
 
 const HOURS = [
@@ -40,6 +45,8 @@ export function MultiChairGrid({
   appointments,
   onSelectAppointment,
   onNewAppointmentAtSlot,
+  onCallPatient,
+  onQuickStatus,
 }: MultiChairGridProps) {
   const [groupBy, setGroupBy] = React.useState<'unit' | 'doctor'>('unit')
 
@@ -254,21 +261,88 @@ export function MultiChairGrid({
                                       {toPersianDigits(appt.start_time)}
                                     </span>
                                   </div>
-                                  <div className="flex items-center justify-between text-[10px] text-slate-500 mt-1">
-                                    <span className="truncate">
+                                  <div className="flex items-center justify-between text-[10px] text-slate-500 mt-1 flex-wrap gap-1">
+                                    <span className="truncate max-w-[90px]">
                                       {doc ? `دکتر ${doc.name || doc.specialty}` : 'بدون پزشک'}
                                     </span>
-                                    <span
-                                      className={`px-1.5 py-0.5 rounded text-[9px] font-medium ${
-                                        appt.status === 'completed'
-                                          ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400'
-                                          : appt.status === 'in_progress'
-                                          ? 'bg-amber-50 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400'
-                                          : 'bg-slate-100 text-slate-700 dark:bg-slate-700 dark:text-slate-300'
-                                      }`}
-                                    >
-                                      {appt.status === 'completed' ? 'تکمیل' : appt.status === 'in_progress' ? 'روی یونیت' : 'رزرو'}
-                                    </span>
+                                    <div className="flex items-center gap-1">
+                                      {appt.status === 'arrived' ? (
+                                        <>
+                                          {appt.check_in_time && (
+                                            <span
+                                              className={`px-1.5 py-0.5 rounded text-[8px] font-bold border ${getTriageWaitingStatus(computeWaitingTimeMinutes(appt.check_in_time)).badgeClass}`}
+                                              title={`زمان انتظار: ${formatWaitingTime(computeWaitingTimeMinutes(appt.check_in_time))}`}
+                                            >
+                                              ⏳ {toPersianDigits(computeWaitingTimeMinutes(appt.check_in_time))}د
+                                            </span>
+                                          )}
+                                          {onCallPatient && (
+                                            <button
+                                              type="button"
+                                              onClick={(e) => {
+                                                e.stopPropagation()
+                                                h.tap()
+                                                onCallPatient(appt)
+                                              }}
+                                              className="p-1 rounded bg-indigo-50 dark:bg-indigo-950/40 text-indigo-600 dark:text-indigo-400 hover:bg-indigo-100"
+                                              title="فراخوان صوتی بیمار به یونیت"
+                                            >
+                                              <Volume2 size={11} />
+                                            </button>
+                                          )}
+                                          {onQuickStatus && (
+                                            <button
+                                              type="button"
+                                              onClick={(e) => {
+                                                e.stopPropagation()
+                                                h.tap()
+                                                onQuickStatus(appt, 'in_chair')
+                                              }}
+                                              className="p-1 rounded bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-400 hover:bg-amber-100"
+                                              title="نشاندن بیمار روی صندلی یونیت"
+                                            >
+                                              <Armchair size={11} />
+                                            </button>
+                                          )}
+                                        </>
+                                      ) : (
+                                        <div className="flex items-center gap-1">
+                                          <span
+                                            className={`px-1.5 py-0.5 rounded text-[9px] font-medium ${
+                                              appt.status === 'completed'
+                                                ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400'
+                                                : appt.status === 'in_chair' || appt.status === 'in_progress'
+                                                ? 'bg-amber-50 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400 font-bold'
+                                                : appt.status === 'confirmed'
+                                                ? 'bg-primary-50 text-primary-700 dark:bg-primary-950/40 dark:text-primary-300'
+                                                : 'bg-slate-100 text-slate-700 dark:bg-slate-700 dark:text-slate-300'
+                                            }`}
+                                          >
+                                            {appt.status === 'completed'
+                                              ? 'تکمیل'
+                                              : appt.status === 'in_chair' || appt.status === 'in_progress'
+                                              ? 'روی یونیت'
+                                              : appt.status === 'confirmed'
+                                              ? 'تایید شده'
+                                              : 'رزرو'}
+                                          </span>
+                                          {(appt.status === 'scheduled' || appt.status === 'confirmed') && onQuickStatus && (
+                                            <button
+                                              type="button"
+                                              onClick={(e) => {
+                                                e.stopPropagation()
+                                                h.tap()
+                                                onQuickStatus(appt, 'arrived')
+                                              }}
+                                              className="p-1 rounded bg-teal-50 dark:bg-teal-950/40 text-teal-700 dark:text-teal-400 hover:bg-teal-100"
+                                              title="اعلام حضور بیمار در کلینیک"
+                                            >
+                                              <UserCheck size={11} />
+                                            </button>
+                                          )}
+                                        </div>
+                                      )}
+                                    </div>
                                   </div>
                                 </div>
                               )

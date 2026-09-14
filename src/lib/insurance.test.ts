@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest'
 import {
   toRial, isConsumingClaim, usedCeiling, remainingCeiling, isPolicyValidOn,
   splitCoverage, ceilingUsagePercent, selectApplicablePolicy, validatePolicy,
+  splitMultiTierCoverage, generateInsuranceClaimHtml, generateInsuranceClaimPrintData,
 } from './insurance'
 import type { PatientPolicy } from './insurance'
 import type { InsuranceClaim } from '../types'
@@ -17,6 +18,8 @@ function policy(over: Partial<PatientPolicy> = {}): PatientPolicy {
     end_date: over.end_date !== undefined ? over.end_date : '2027-03-20',
     coverage_percentage: over.coverage_percentage !== undefined ? over.coverage_percentage : 60,
     ceiling_amount: over.ceiling_amount !== undefined ? over.ceiling_amount : 100_000_000,
+    tier: over.tier !== undefined ? over.tier : null,
+    deductible_percentage: over.deductible_percentage !== undefined ? over.deductible_percentage : null,
     is_active: over.is_active !== undefined ? over.is_active : true,
     notes: null,
     created_at: '2025-03-01T00:00:00.000Z',
@@ -353,5 +356,102 @@ describe('treatment form integration', () => {
     const future = policy({ start_date: '2026-08-10', end_date: '2027-08-10' })
     expect(selectApplicablePolicy([future], [], '2026-08-01')).toBeNull()
     expect(splitCoverage(1_000_000, future, [], '2026-08-01').insuranceShare).toBe(0)
+  })
+})
+
+describe('splitMultiTierCoverage', () => {
+  it('splits cost between primary and supplementary policies accurately with franchise', () => {
+    const primary = policy({
+      id: 'prim1',
+      tier: 'primary',
+      coverage_percentage: 30,
+      ceiling_amount: 50_000_000,
+    })
+    const supplementary = policy({
+      id: 'supp1',
+      tier: 'supplementary',
+      coverage_percentage: 80,
+      deductible_percentage: 10,
+      ceiling_amount: 50_000_000,
+    })
+
+    const split = splitMultiTierCoverage(10_000_000, [primary, supplementary], [], DATE)
+
+    // Cost: 10,000,000
+    // Primary: 30% of 10M = 3,000,000
+    expect(split.primaryShare).toBe(3_000_000)
+    // Remainder: 7,000,000
+    // Supp gross: 80% of 7M = 5,600,000
+    // Franchise: 10% of 5.6M = 560,000
+    // Net Supp: 5,600,000 - 560,000 = 5,040,000
+    expect(split.franchiseAmount).toBe(560_000)
+    expect(split.supplementaryShare).toBe(5_040_000)
+    expect(split.totalInsuranceShare).toBe(8_040_000)
+    expect(split.patientShare).toBe(1_960_000)
+    expect(split.primaryCapped).toBe(false)
+    expect(split.supplementaryCapped).toBe(false)
+  })
+
+  it('caps primary insurance share when ceiling is reached and passes remaining to supplementary', () => {
+    const primary = policy({
+      id: 'prim1',
+      tier: 'primary',
+      coverage_percentage: 30,
+      ceiling_amount: 2_000_000, // smaller than 3,000,000
+    })
+    const supplementary = policy({
+      id: 'supp1',
+      tier: 'supplementary',
+      coverage_percentage: 80,
+      deductible_percentage: 0,
+      ceiling_amount: 50_000_000,
+    })
+
+    const split = splitMultiTierCoverage(10_000_000, [primary, supplementary], [], DATE)
+    expect(split.primaryShare).toBe(2_000_000)
+    expect(split.primaryCapped).toBe(true)
+    // Remainder: 8,000,000 -> 80% = 6,400,000
+    expect(split.supplementaryShare).toBe(6_400_000)
+    expect(split.patientShare).toBe(1_600_000)
+    expect(split.warning).toContain('سقف تعهد بیمه پایه')
+  })
+
+  it('validates deductible percentage', () => {
+    expect(validatePolicy({ coverage_percentage: 50, deductible_percentage: 120 })).toContain('درصد فرانشیز باید بین ۰ تا ۱۰۰ باشد')
+    expect(validatePolicy({ coverage_percentage: 50, deductible_percentage: -5 })).toContain('درصد فرانشیز باید بین ۰ تا ۱۰۰ باشد')
+    expect(validatePolicy({ coverage_percentage: 50, deductible_percentage: 15 })).toHaveLength(0)
+  })
+})
+
+describe('generateInsuranceClaimHtml & print data', () => {
+  it('generates a formal insurance claim document with patient details and procedure list', () => {
+    const html = generateInsuranceClaimHtml({
+      claimNumber: 'CLM-789012',
+      patientName: 'سارا رضایی',
+      nationalId: '0019876543',
+      insuranceCompany: 'بیمه ایران',
+      policyNumber: '99887766',
+      items: [
+        { toothNumber: 16, procedureName: 'عصب‌کشی ۳ کانال', totalFee: 5_000_000, primaryDeduction: 1_000_000, supplementaryClaimed: 3_500_000, patientPaid: 500_000 },
+        { toothNumber: 16, procedureName: 'روکش زیرکونیا', totalFee: 6_000_000, primaryDeduction: 0, supplementaryClaimed: 4_800_000, patientPaid: 1_200_000 },
+      ],
+      doctorName: 'علی مینایی',
+      doctorMedicalCouncilId: '123456',
+    })
+
+    expect(html).toContain('سارا رضایی')
+    expect(html).toContain('بیمه ایران')
+    expect(html).toContain('عصب‌کشی ۳ کانال')
+    expect(html).toContain('روکش زیرکونیا')
+    expect(html).toContain('گواهی تأیید انجام خدمات دندانپزشکی')
+    expect(html).toContain('علی مینایی')
+
+    const printData = generateInsuranceClaimPrintData({
+      patientName: 'سارا رضایی',
+      insuranceCompany: 'بیمه ایران',
+      items: [],
+    })
+    expect(printData).toContain('mnd-bar')
+    expect(printData).toContain('سارا رضایی')
   })
 })

@@ -168,4 +168,27 @@ describe('alertChips', () => {
     const alerts = buildPatientAlerts(pat({ allergies: 'a،b،c،d،e' }), null)
     expect(alertChips(alerts, 2)).toHaveLength(2)
   })
+
+  it('includes structured clinical flags in alerts and chips', () => {
+    const alerts = buildPatientAlerts(
+      pat({
+        anticoagulant_use: true,
+        inr_value: 2.8,
+        bisphosphonate_use: true,
+        endocarditis_prophylaxis: true,
+        bp_systolic: 150,
+        bp_diastolic: 95,
+        diabetes_hba1c: 7.9,
+        pregnancy_trimester: 2,
+      }),
+      null,
+    )
+    const chips = alertChips(alerts, 10)
+    expect(chips.some((c) => c.includes('ضد انعقاد') && c.includes('2.8'))).toBe(true)
+    expect(chips.some((c) => c.includes('بیس‌فسفونات'))).toBe(true)
+    expect(chips.some((c) => c.includes('اندوکاردیت'))).toBe(true)
+    expect(chips.some((c) => c.includes('فشار خون بالا') && c.includes('150/95'))).toBe(true)
+    expect(chips.some((c) => c.includes('دیابت') && c.includes('7.9'))).toBe(true)
+    expect(chips.some((c) => c.includes('بارداری'))).toBe(true)
+  })
 })

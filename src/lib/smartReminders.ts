@@ -4,6 +4,7 @@ import { toothLabel } from './toothLabel'
 import { calcAllPatientBalances } from './finance'
 import { nextImplantAction } from './implantMilestones'
 import { daysUntilDue } from './labClinicMilestones'
+import { findPostOpCheckups, findSutureRemovalReminders, findHygieneRecalls } from './patientRecallChurn'
 
 export type ReminderCategory =
   | 'birthday'
@@ -16,6 +17,9 @@ export type ReminderCategory =
   | 'cheque_due'
   | 'implant_stage_due'
   | 'lab_overdue'
+  | 'post_op_checkup'
+  | 'suture_removal'
+  | 'hygiene_recall'
 
 export interface SmartReminder {
   id?: string
@@ -174,6 +178,9 @@ export const REMINDER_CATEGORY_META: Record<ReminderCategory, { label: string; i
   cheque_due: { label: 'چک سررسید و برگشتی', icon: '🧾', color: '#ea580c' },
   implant_stage_due: { label: 'مرحله ایمپلنت', icon: '🔩', color: '#0284c7' },
   lab_overdue: { label: 'سفارش لابراتوار', icon: '🔬', color: '#9333ea' },
+  post_op_checkup: { label: 'پیگیری پس از جراحی', icon: '🩺', color: '#0d9488' },
+  suture_removal: { label: 'کشیدن بخیه', icon: '✂️', color: '#e11d48' },
+  hygiene_recall: { label: 'چکاپ دوره‌ای ۶ ماهه', icon: '🪥', color: '#0284c7' },
 }
 
 /**
@@ -531,6 +538,9 @@ export function getUrgentClinicAlarms(data: {
   const noShows = data.appointments ? findNoShows(data.appointments, patients) : []
   const unresolvedAppts = data.appointments ? findUnresolvedPastAppointments(data.appointments, patients, todayObj) : []
   const unfinishedTreatments = data.treatments && data.appointments ? findUnfinishedTreatmentFollowups(data.treatments, data.appointments, patients, todayObj) : []
+  const postOpCheckups = data.treatments ? findPostOpCheckups(data.treatments, patients, todayObj) : []
+  const sutureRemovals = data.treatments ? findSutureRemovalReminders(data.treatments, patients, data.appointments || [], todayObj) : []
+  const hygieneRecalls = data.encounters ? findHygieneRecalls(patients, data.encounters, data.appointments || [], 180, todayObj) : []
 
   const counts: Record<ReminderCategory, number> = {
     cheque_due: chequesDue.length,
@@ -543,6 +553,9 @@ export function getUrgentClinicAlarms(data: {
     no_show: noShows.length,
     unresolved_appointment: unresolvedAppts.length,
     unfinished_treatment: unfinishedTreatments.length,
+    post_op_checkup: postOpCheckups.length,
+    suture_removal: sutureRemovals.length,
+    hygiene_recall: hygieneRecalls.length,
   }
 
   const all: SmartReminder[] = [
@@ -550,10 +563,13 @@ export function getUrgentClinicAlarms(data: {
     ...installmentsDue,
     ...labOverdue,
     ...implantDue,
+    ...postOpCheckups,
+    ...sutureRemovals,
     ...noShows,
     ...debtors.slice(0, 15),
     ...unfinishedTreatments.slice(0, 15),
     ...unresolvedAppts.slice(0, 15),
+    ...hygieneRecalls.slice(0, 15),
     ...birthdays,
     ...lapsed.slice(0, 10),
   ].sort((a, b) => b.priority - a.priority)
@@ -564,10 +580,12 @@ export function getUrgentClinicAlarms(data: {
     labOverdue.length +
     implantDue.length +
     noShows.length +
-    unresolvedAppts.length
+    unresolvedAppts.length +
+    postOpCheckups.length +
+    sutureRemovals.length
 
   const hasUrgentFinancial = chequesDue.length > 0 || installmentsDue.length > 0
-  const hasUrgentClinical = labOverdue.length > 0 || implantDue.length > 0
+  const hasUrgentClinical = labOverdue.length > 0 || implantDue.length > 0 || postOpCheckups.length > 0 || sutureRemovals.length > 0
   const hasCriticalItems = hasUrgentFinancial || hasUrgentClinical
 
   return {

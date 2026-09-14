@@ -570,6 +570,7 @@ const Archive      = lazyPage('/archive')
 const CalendarPage = lazyPage('/calendar')
 const PersonalFinance = lazyPage('/personal-finance')
 const PublicBooking = React.lazy(() => import('../pages/PublicBooking'))
+const WaitingRoomDisplay = React.lazy(() => import('../pages/WaitingRoomDisplay'))
 const SMS = lazyPage('/sms')
 const Reminders = lazyPage('/reminders')
 
@@ -642,6 +643,15 @@ export function Layout() {
     )
   }
 
+  // Public Waiting Room Lounge TV screen (مانیتور سالن انتظار و فراخوان بیمار)
+  if (window.location.hash.startsWith('#/waiting-room')) {
+    return (
+      <React.Suspense fallback={<div className="min-h-screen flex items-center justify-center bg-slate-950 text-white"><Spinner size={32} /></div>}>
+        <WaitingRoomDisplay />
+      </React.Suspense>
+    )
+  }
+
   if (REQUIRE_LOGIN && loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-slate-50 dark:bg-slate-900">
@@ -709,6 +719,7 @@ export function Layout() {
           <Route path="/personal-finance" element={<LL path="/personal-finance"><PersonalFinance /></LL>} />
           <Route path="/sms" element={<LL path="/sms"><SMS /></LL>} />
           <Route path="/reminders" element={<LL path="/reminders"><Reminders /></LL>} />
+          <Route path="/waiting-room" element={<WaitingRoomDisplay />} />
           <Route path="*"                element={<NotFound />} />
         </Routes>
       </LayoutInner>

@@ -35,10 +35,93 @@ export interface ChequeDraft {
   cheque_number?: string | null
   bank_name?: string | null
   due_date?: string | null
+  /** شناسه ۱۶ رقمی صیادی */
+  sayad_id?: string | null
   /** گزینه‌ی «این چک ضمانت است». */
   isGuarantee: boolean
   /** طرح قسطی که این ضمانت پشتش است. */
   payment_plan_id?: string | null
+}
+
+export type SayadCreditStatus = 'white' | 'yellow' | 'orange' | 'brown' | 'red'
+
+export interface SayadStatusConfig {
+  label: string
+  color: string
+  bgClass: string
+  borderClass: string
+  textClass: string
+  riskLevel: 'safe' | 'low' | 'medium' | 'high' | 'blocked'
+}
+
+export const SAYAD_STATUS_CONFIG: Record<SayadCreditStatus, SayadStatusConfig> = {
+  white: {
+    label: 'سفید (خوش‌حساب — بدون چک برگشتی)',
+    color: '#10b981',
+    bgClass: 'bg-emerald-50 dark:bg-emerald-950/30',
+    borderClass: 'border-emerald-200 dark:border-emerald-800',
+    textClass: 'text-emerald-700 dark:text-emerald-300',
+    riskLevel: 'safe',
+  },
+  yellow: {
+    label: 'زرد (کم‌ریسک — ۱ فقره برگشتی)',
+    color: '#eab308',
+    bgClass: 'bg-amber-50 dark:bg-amber-950/30',
+    borderClass: 'border-amber-200 dark:border-amber-800',
+    textClass: 'text-amber-700 dark:text-amber-300',
+    riskLevel: 'low',
+  },
+  orange: {
+    label: 'نارنجی (ریسک متوسط — ۲ فقره برگشتی)',
+    color: '#f97316',
+    bgClass: 'bg-orange-50 dark:bg-orange-950/30',
+    borderClass: 'border-orange-200 dark:border-orange-800',
+    textClass: 'text-orange-700 dark:text-orange-300',
+    riskLevel: 'medium',
+  },
+  brown: {
+    label: 'قهوه‌ای (پرریسک — ۳ تا ۴ فقره برگشتی)',
+    color: '#a16207',
+    bgClass: 'bg-yellow-900/10 dark:bg-yellow-950/40',
+    borderClass: 'border-yellow-700/30 dark:border-yellow-700/60',
+    textClass: 'text-yellow-800 dark:text-yellow-200',
+    riskLevel: 'high',
+  },
+  red: {
+    label: 'قرمز (بسیار پرخطر — ۵+ فقره برگشتی)',
+    color: '#ef4444',
+    bgClass: 'bg-rose-50 dark:bg-rose-950/30',
+    borderClass: 'border-rose-200 dark:border-rose-800',
+    textClass: 'text-rose-700 dark:text-rose-300',
+    riskLevel: 'blocked',
+  },
+}
+
+/** Validates 16-digit Iranian Sayad Cheque ID. */
+export function validateSayadId(sayadId: string | null | undefined): { isValid: boolean; error: string | null } {
+  if (!sayadId || !String(sayadId).trim()) {
+    return { isValid: true, error: null }
+  }
+  const cleaned = String(sayadId).replace(/[\s-]/g, '')
+  if (!/^\d+$/.test(cleaned)) {
+    return { isValid: false, error: 'شناسه صیاد فقط باید شامل ارقام باشد' }
+  }
+  if (cleaned.length !== 16) {
+    return { isValid: false, error: 'شناسه صیاد باید دقیقاً ۱۶ رقم باشد' }
+  }
+  return { isValid: true, error: null }
+}
+
+/** Formats a 16-digit Sayad ID as 4-4-4-4 (e.g. 1234-5678-9012-3456). */
+export function formatSayadId(sayadId: string | null | undefined): string {
+  if (!sayadId) return ''
+  const digits = String(sayadId).replace(/\D/g, '').slice(0, 16)
+  if (!digits) return ''
+  const chunks: string[] = []
+  for (let i = 0; i < digits.length; i += 4) {
+    chunks.push(digits.slice(i, i + 4))
+  }
+  return chunks.join('-')
 }
 
 export interface ChequeValidation {
@@ -90,12 +173,19 @@ export function validateCheque(
     return { error: 'تاریخ سررسید برای چک پرداخت الزامی است', purpose }
   }
 
+  if (draft.sayad_id) {
+    const sayadCheck = validateSayadId(draft.sayad_id)
+    if (!sayadCheck.isValid) {
+      return { error: sayadCheck.error, purpose }
+    }
+  }
+
   return { error: null, purpose }
 }
 
-/** توضیح یک‌خطی هر حالت، برای نمایش کنار خود گزینه. */
 export function chequeModeHint(isGuarantee: boolean): string {
   return isGuarantee
     ? 'نگه داشته می‌شود و خرج نمی‌شود. بدهی تا تسویه‌ی کامل اقساط باقی می‌ماند.'
     : 'این چک باید پاس شود. وقتی پاس شد، به‌عنوان پرداخت ثبت می‌شود و از بدهی کم می‌شود.'
 }
+
