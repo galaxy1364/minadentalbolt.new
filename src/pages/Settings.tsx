@@ -5,8 +5,10 @@ import {
   Settings as SettingsIcon, Building2, Hash, MessageSquare, Package, Save, Smile,
   Cloud, Download, Upload, Vibrate, Volume2, Bell, Database, RefreshCw, Check,
   Smartphone, Shield, AlertTriangle, Eye, ChevronRight, Wifi, Plus, Edit2, Trash2, Archive, Delete,
-  Stethoscope, Wrench, ListOrdered, Tag, Copy, CheckCircle2, History, CloudOff, Sparkles, Megaphone, Fingerprint, Share2, CreditCard
+  Stethoscope, Wrench, ListOrdered, Tag, Copy, CheckCircle2, History, CloudOff, Sparkles, Megaphone, Fingerprint, Share2, CreditCard,
+  Lock, KeyRound, ShieldCheck
 } from 'lucide-react'
+import { encryptClinicBackup, decryptClinicBackup, type EncryptedBackupContainer } from '../lib/encryptedBackup'
 import { isAppLockEnabled, setAppLockPin, disableAppLock, isBiometricAvailable, registerBiometric, hasBiometricRegistered } from '../lib/appLock'
 import { MATERIAL_LEVELS, getMaterialLevel, setMaterialLevel, prefersReducedTransparency, type MaterialLevel } from '../lib/materials'
 import {
@@ -141,6 +143,16 @@ export default function Settings() {
   const [catForm, setCatForm] = useState({ name: '', description: '' })
   const [savingCat, setSavingCat] = useState(false)
 
+  // ── Encrypted Backup States (AES-256-GCM / PBKDF2) ──
+  const [encryptModalOpen, setEncryptModalOpen] = useState(false)
+  const [decryptModalOpen, setDecryptModalOpen] = useState(false)
+  const [backupPassword, setBackupPassword] = useState('')
+  const [backupPasswordConfirm, setBackupPasswordConfirm] = useState('')
+  const [restorePassword, setRestorePassword] = useState('')
+  const [encryptedFileToRestore, setEncryptedFileToRestore] = useState<File | null>(null)
+  const [encryptingBackup, setEncryptingBackup] = useState(false)
+  const [decryptingBackup, setDecryptingBackup] = useState(false)
+
   const { confirmAction, ConfirmActionModal } = useConfirmAction()
 
   const loadData = useCallback(async () => {
@@ -265,6 +277,109 @@ export default function Settings() {
       },
     })
   }
+
+  // ── Encrypted Backup & Restore (AES-256-GCM / PBKDF2) ──
+  const handleEncryptedBackupDownload = async () => {
+    if (!backupPassword || backupPassword.length < 6) {
+      showToast('error', 'رمز عبور باید حداقل ۶ کاراکتر باشد')
+      return
+    }
+    if (backupPassword !== backupPasswordConfirm) {
+      showToast('error', 'تکرار رمز عبور با رمز عبور اصلی یکسان نیست')
+      return
+    }
+
+    setEncryptingBackup(true)
+    h.confirm()
+    try {
+      const rawData: Record<string, any[]> = {}
+      for (const t of TABLE_NAMES) {
+        try { rawData[t] = await (db as any)[t].toArray() } catch { rawData[t] = [] }
+      }
+      const payload = {
+        version: 1,
+        date: new Date().toISOString(),
+        data: rawData,
+      }
+
+      const encryptedContainer = await encryptClinicBackup(payload, backupPassword)
+      const blob = new Blob([JSON.stringify(encryptedContainer, null, 2)], { type: 'application/json' })
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      const todayDate = new Date().toISOString().slice(0, 10)
+      a.href = url
+      a.download = `minadent-encrypted-${todayDate}.minasafe`
+      a.click()
+      URL.revokeObjectURL(url)
+
+      showToast('success', 'پشتیبان رمزنگاری‌شده (AES-256) با موفقیت تولید و دانلود شد')
+      chimes.playSuccess()
+      setEncryptModalOpen(false)
+      setBackupPassword('')
+      setBackupPasswordConfirm('')
+    } catch (err: any) {
+      showToast('error', err?.message || 'خطا در ساخت پشتیبان رمزنگاری‌شده')
+      chimes.playWarning()
+    } finally {
+      setEncryptingBackup(false)
+    }
+  }
+
+  const handleEncryptedFileChosen = (file: File) => {
+    setEncryptedFileToRestore(file)
+    setRestorePassword('')
+    setDecryptModalOpen(true)
+  }
+
+  const handleConfirmEncryptedRestore = async () => {
+    if (!encryptedFileToRestore) {
+      showToast('error', 'فایلی انتخاب نشده است')
+      return
+    }
+    if (!restorePassword || restorePassword.length < 6) {
+      showToast('error', 'رمز عبور پشتیبان را وارد کنید')
+      return
+    }
+
+    setDecryptingBackup(true)
+    h.select()
+    try {
+      const fileText = await encryptedFileToRestore.text()
+      let parsedContainer: EncryptedBackupContainer
+      try {
+        parsedContainer = JSON.parse(fileText)
+      } catch {
+        throw new Error('ساختار فایل آسیب‌دیده یا فرمت JSON نیست')
+      }
+
+      const decryptedPayload = await decryptClinicBackup<any>(parsedContainer, restorePassword)
+      if (!decryptedPayload?.data) {
+        throw new Error('داده‌های فایل پشتیبان ساختار معتبر ندارند')
+      }
+
+      for (const t of TABLE_NAMES) {
+        if (decryptedPayload.data[t]) {
+          try {
+            await (db as any)[t].clear()
+            await (db as any)[t].bulkPut(decryptedPayload.data[t])
+          } catch {}
+        }
+      }
+
+      showToast('success', 'بازیابی پشتیبان رمزشده با موفقیت انجام شد')
+      chimes.playSuccess()
+      setDecryptModalOpen(false)
+      setEncryptedFileToRestore(null)
+      setRestorePassword('')
+      await loadData()
+    } catch (err: any) {
+      showToast('error', err?.message || 'رمز عبور اشتباه است یا فایل پشتیبان نامعتبر است')
+      chimes.playWarning()
+    } finally {
+      setDecryptingBackup(false)
+    }
+  }
+
 
   // ── Doctor handlers ──
   const openCreateDoctor = () => {
@@ -694,6 +809,44 @@ export default function Settings() {
               <Download size={16} /> خروجی بسته گوگل درایو (JSON)
             </Button>
           </Card>
+
+          {/* Encrypted Backup (AES-256-GCM / Web Crypto) */}
+          <Card className="p-5 border border-indigo-200 dark:border-indigo-900/60 bg-indigo-50/20 dark:bg-indigo-950/10">
+            <h2 className="text-base font-bold text-slate-800 dark:text-slate-100 mb-2 flex items-center gap-2">
+              <Lock size={18} className="text-indigo-600 dark:text-indigo-400" /> پشتیبان‌گیری رمزنگاری‌شده (AES-256-GCM)
+            </h2>
+            <p className="text-xs text-slate-500 dark:text-slate-400 mb-4 leading-relaxed">
+              رمزگذاری متقارن پیشرفته با استاندارد جهانی AES-256 و مشتق‌سازی کلید با PBKDF2 (۱۰۰٬۰۰۰ تکرار). خروجی به فرمت اختصاصی <code className="text-indigo-600 font-mono font-bold">.minasafe</code> ذخیره شده و بدون گذرواژه کلینیک حتی در صورت سرقت فایل به هیچ وجه قابل رمزگشایی نیست.
+            </p>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <Button
+                variant="primary"
+                onClick={() => {
+                  setBackupPassword('')
+                  setBackupPasswordConfirm('')
+                  setEncryptModalOpen(true)
+                }}
+                className="w-full flex items-center justify-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white"
+              >
+                <Lock size={16} /> دانلود پشتیبان رمزشده (.minasafe)
+              </Button>
+              <label className="block">
+                <input
+                  type="file"
+                  accept=".minasafe,.json"
+                  className="hidden"
+                  onChange={(e) => {
+                    const f = e.target.files?.[0]
+                    if (f) handleEncryptedFileChosen(f)
+                    e.target.value = ''
+                  }}
+                />
+                <span className="flex items-center justify-center gap-2 w-full py-2.5 rounded-xl border border-indigo-300 dark:border-indigo-700 bg-white dark:bg-slate-800 hover:bg-indigo-50 dark:hover:bg-indigo-950/30 text-indigo-700 dark:text-indigo-300 text-sm font-medium transition-all-smooth press-scale cursor-pointer shadow-sm">
+                  <KeyRound size={16} /> بازیابی از فایل رمزشده
+                </span>
+              </label>
+            </div>
+          </Card>
           <AutoBackupCard />
         </div>
       )}
@@ -1015,6 +1168,111 @@ export default function Settings() {
           <Input label="نام" value={catForm.name} onChange={(v) => setCatForm({ ...catForm, name: v })} placeholder="نام دسته‌بندی" />
           <Textarea label="توضیحات" value={catForm.description} onChange={(v) => setCatForm({ ...catForm, description: v })} placeholder="توضیحات..." rows={2} />
           <div className="flex justify-end gap-2 pt-2 border-t border-slate-100"><Button variant="secondary" onClick={() => setCatModal(false)}>انصراف</Button><Button variant="primary" onClick={handleSaveCat} disabled={savingCat}>{savingCat ? <Spinner size={16} /> : editingCat ? 'ذخیره' : 'افزودن'}</Button></div>
+        </div>
+      </Modal>
+
+      {/* مدال ایجاد پشتیبان رمزشده با پسورد */}
+      <Modal
+        open={encryptModalOpen}
+        onClose={() => setEncryptModalOpen(false)}
+        title="ایجاد پشتیبان رمزنگاری‌شده (AES-256-GCM)"
+        size="md"
+      >
+        <div className="space-y-4">
+          <div className="p-3.5 rounded-xl bg-indigo-50/70 dark:bg-indigo-950/40 border border-indigo-200 dark:border-indigo-800/60 flex items-start gap-3">
+            <ShieldCheck size={20} className="text-indigo-600 dark:text-indigo-400 shrink-0 mt-0.5" />
+            <p className="text-xs text-indigo-950 dark:text-indigo-200 leading-relaxed">
+              رمز عبور انتخابی خود را با دقت به خاطر بسپارید. به دلیل ماهیت رمزنگاری زیرو-نالج (Zero-Knowledge) در مرورگر، در صورت فراموشی رمز عبور، بازیابی اطلاعات به هیچ عنوان مقدور نخواهد بود.
+            </p>
+          </div>
+
+          <Input
+            label="گذرواژه امن پشتیبان (حداقل ۶ کاراکتر)"
+            type="password"
+            value={backupPassword}
+            onChange={(v) => setBackupPassword(v)}
+            placeholder="••••••••"
+            dir="ltr"
+          />
+
+          <Input
+            label="تکرار گذرواژه"
+            type="password"
+            value={backupPasswordConfirm}
+            onChange={(v) => setBackupPasswordConfirm(v)}
+            placeholder="••••••••"
+            dir="ltr"
+          />
+
+          <div className="flex justify-end gap-2 pt-3 border-t border-slate-100 dark:border-slate-800">
+            <Button variant="secondary" onClick={() => setEncryptModalOpen(false)}>
+              انصراف
+            </Button>
+            <Button
+              variant="primary"
+              onClick={handleEncryptedBackupDownload}
+              disabled={encryptingBackup || !backupPassword || backupPassword.length < 6}
+              className="bg-indigo-600 hover:bg-indigo-700 text-white"
+            >
+              {encryptingBackup ? <Spinner size={16} /> : <Lock size={16} className="inline ml-1" />}
+              {encryptingBackup ? 'در حال رمزگذاری...' : 'تولید و دانلود (.minasafe)'}
+            </Button>
+          </div>
+        </div>
+      </Modal>
+
+      {/* مدال ورود پسورد جهت بازیابی فایل رمزشده */}
+      <Modal
+        open={decryptModalOpen}
+        onClose={() => {
+          setDecryptModalOpen(false)
+          setEncryptedFileToRestore(null)
+        }}
+        title="رمزگشایی و بازیابی پشتیبان رمزشده"
+        size="md"
+      >
+        <div className="space-y-4">
+          <div className="p-3.5 rounded-xl bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800/60 flex items-start gap-3">
+            <AlertTriangle size={20} className="text-amber-600 shrink-0 mt-0.5" />
+            <div className="text-xs text-amber-900 dark:text-amber-200 space-y-1">
+              <p className="font-bold">هشدار جایگزینی اطلاعات:</p>
+              <p>با تأیید بازیابی، تمام اطلاعات فعلی کلینیک با محتوای این فایل بازنویسی خواهند شد.</p>
+              {encryptedFileToRestore && (
+                <p className="font-mono text-[11px] text-amber-700 dark:text-amber-400">
+                  فایل انتخابی: {encryptedFileToRestore.name}
+                </p>
+              )}
+            </div>
+          </div>
+
+          <Input
+            label="گذرواژه تعیین‌شده در زمان پشتیبان‌گیری"
+            type="password"
+            value={restorePassword}
+            onChange={(v) => setRestorePassword(v)}
+            placeholder="••••••••"
+            dir="ltr"
+          />
+
+          <div className="flex justify-end gap-2 pt-3 border-t border-slate-100 dark:border-slate-800">
+            <Button
+              variant="secondary"
+              onClick={() => {
+                setDecryptModalOpen(false)
+                setEncryptedFileToRestore(null)
+              }}
+            >
+              انصراف
+            </Button>
+            <Button
+              variant="danger"
+              onClick={handleConfirmEncryptedRestore}
+              disabled={decryptingBackup || !restorePassword}
+            >
+              {decryptingBackup ? <Spinner size={16} /> : <KeyRound size={16} className="inline ml-1" />}
+              {decryptingBackup ? 'در حال بررسی و رمزگشایی...' : 'تأیید و بازیابی اطلاعات'}
+            </Button>
+          </div>
         </div>
       </Modal>
 

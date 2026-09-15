@@ -1,12 +1,12 @@
 import { useState, useEffect, useMemo } from 'react'
 import { toothLabel, toothLabelWithWord } from '../lib/toothLabel'
 import { useNavigate } from 'react-router-dom'
-import { Archive as ArchiveIcon, Search, Users, IdCard, RotateCcw, User, Building2, Syringe, FlaskConical, Settings2 } from 'lucide-react'
+import { Archive as ArchiveIcon, Search, Users, IdCard, RotateCcw, User, Building2, Syringe, FlaskConical, Settings2, Download, Calendar } from 'lucide-react'
 import { fetchPatients, fetchStaff, updatePatient, updateStaff, fetchInsuranceCompanies, updateInsuranceCompany, fetchImplantCases, updateImplantCase, fetchLabs, updateLab,
   fetchDoctors, updateDoctor, fetchUnits, updateUnit, fetchProcedures, updateProcedure,
   fetchInventoryItems, updateInventoryItem, fetchTreatmentPackages, updateTreatmentPackage,
   fetchSmsTemplates, updateSmsTemplate } from '../lib/api'
-import { toJalaliStringPretty, toPersianDigits, formatCurrency } from '../lib/persianDate'
+import { toJalaliStringPretty, toJalaliString, toPersianDigits, formatCurrency } from '../lib/persianDate'
 import type { Patient, Staff as StaffType, InsuranceCompany, ImplantCaseWithRelations, Laboratory } from '../types'
 import { Card, Button, Spinner, EmptyState, Tabs, showToast, HighlightText } from '../components/ui'
 import { ModuleHeader } from '../components/ModuleHeader'
@@ -24,6 +24,7 @@ export default function Archive() {
   const [companies, setCompanies] = useState<InsuranceCompany[]>([])
   const [implantCases, setImplantCases] = useState<ImplantCaseWithRelations[]>([])
   const [labs, setLabs] = useState<Laboratory[]>([])
+  const [selectedYear, setSelectedYear] = useState<string>('all')
   /** Everything deactivated in Settings. Migration 026 stopped these
    * being deleted, which left them one-way: you could retire a procedure
    * or a doctor and had no way to bring it back except through the
@@ -68,14 +69,56 @@ export default function Archive() {
 
   useEffect(() => { loadData() }, [])
 
+  const availableYears = useMemo(() => {
+    const years = new Set<string>()
+    patients.forEach((p) => {
+      const dt = p.created_at || p.updated_at
+      if (dt) {
+        const jYear = toJalaliString(dt).slice(0, 4)
+        if (jYear && jYear.length === 4) years.add(jYear)
+      }
+    })
+    return Array.from(years).sort().reverse()
+  }, [patients])
+
   const filteredPatients = useMemo(() => {
-    if (!search.trim()) return patients
-    return patients
+    let list = patients
+    if (selectedYear !== 'all') {
+      list = list.filter((p) => {
+        const dt = p.created_at || p.updated_at
+        return dt && toJalaliString(dt).slice(0, 4) === selectedYear
+      })
+    }
+    if (!search.trim()) return list
+    return list
       .map((p) => ({ p, score: scoreFields(search, [{ value: `${p.first_name} ${p.last_name}`, weight: 1.2 }, { value: p.phone || '' }, { value: p.file_number || '' }]) }))
       .filter((r) => r.score !== null)
       .sort((a, b) => (b.score as number) - (a.score as number))
       .map((r) => r.p)
-  }, [patients, search])
+  }, [patients, search, selectedYear])
+
+  const handleExportCsv = () => {
+    if (filteredPatients.length === 0) {
+      showToast('info', 'موردی برای خروجی در این فیلتر وجود ندارد')
+      return
+    }
+    h.confirm()
+    chimes.playSuccess()
+    const header = 'نام,نام خانوادگی,شماره پرونده,شماره تماس,کد ملی,تاریخ پذیرش / ثبت\n'
+    const rows = filteredPatients.map((p) => {
+      const dateStr = p.created_at ? toJalaliString(p.created_at) : '-'
+      return `"${p.first_name}","${p.last_name}","${p.file_number || ''}","${p.phone || ''}","${p.national_id || ''}","${dateStr}"`
+    }).join('\n')
+
+    const blob = new Blob(['\uFEFF' + header + rows], { type: 'text/csv;charset=utf-8;' })
+    const url = URL.createObjectURL(blob)
+    const link = document.createElement('a')
+    link.href = url
+    link.download = `minadent-archive-patients-${selectedYear === 'all' ? 'all' : selectedYear}.csv`
+    link.click()
+    URL.revokeObjectURL(url)
+    showToast('success', 'فایل اکسل/CSV بیماران بایگانی با موفقیت دانلود شد')
+  }
 
   const filteredStaff = useMemo(() => {
     if (!search.trim()) return staff
@@ -277,10 +320,57 @@ export default function Archive() {
       )}
 
       {tab === 'patients' && (
-        filteredPatients.length === 0 ? (
-          <EmptyState icon={<ArchiveIcon size={40} />} title="بایگانی بیماران خالی است" description="بیماران غیرفعال‌شده اینجا نمایش داده می‌شوند" />
-        ) : (
-          <div className="space-y-2">
+        <div className="space-y-3">
+          {/* Year Filter & Export Actions Bar */}
+          <div className="flex flex-wrap items-center justify-between gap-2 p-2.5 bg-slate-50 dark:bg-slate-800/60 rounded-2xl border border-slate-200/80 dark:border-slate-700/80">
+            <div className="flex items-center gap-1.5 flex-wrap">
+              <span className="text-xs font-semibold text-slate-500 dark:text-slate-400 flex items-center gap-1 pl-1">
+                <Calendar size={13} className="text-primary-600" />
+                سال پذیرش / ثبت:
+              </span>
+              <button
+                type="button"
+                onClick={() => { h.tap(); setSelectedYear('all') }}
+                className={`px-2.5 py-1 rounded-xl text-xs font-bold transition-all ${
+                  selectedYear === 'all'
+                    ? 'bg-primary-600 text-white shadow-xs'
+                    : 'bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-100 border border-slate-200 dark:border-slate-700'
+                }`}
+              >
+                همه سال‌ها
+              </button>
+              {availableYears.map((yr) => (
+                <button
+                  key={yr}
+                  type="button"
+                  onClick={() => { h.tap(); setSelectedYear(yr) }}
+                  className={`px-2.5 py-1 rounded-xl text-xs font-bold transition-all ${
+                    selectedYear === yr
+                      ? 'bg-primary-600 text-white shadow-xs'
+                      : 'bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-100 border border-slate-200 dark:border-slate-700'
+                  }`}
+                >
+                  سال {toPersianDigits(yr)}
+                </button>
+              ))}
+            </div>
+
+            <Button
+              size="sm"
+              variant="secondary"
+              onClick={handleExportCsv}
+              disabled={filteredPatients.length === 0}
+              className="text-xs"
+            >
+              <Download size={13} className="inline ml-1 text-primary-600" />
+              خروجی اکسل / CSV ({toPersianDigits(filteredPatients.length)})
+            </Button>
+          </div>
+
+          {filteredPatients.length === 0 ? (
+            <EmptyState icon={<ArchiveIcon size={40} />} title="بیماری با این مشخصات در بایگانی یافت نشد" description="فیلتر سال یا متن جستجو را تغییر دهید" />
+          ) : (
+            <div className="space-y-2">
             {filteredPatients.map((p) => (
               <Card key={p.id} className="p-3.5 flex items-center gap-3">
                 <div className="w-10 h-10 rounded-xl bg-slate-100 dark:bg-slate-700 flex items-center justify-center text-slate-500 dark:text-slate-400 font-bold text-sm shrink-0">
@@ -298,7 +388,8 @@ export default function Archive() {
               </Card>
             ))}
           </div>
-        )
+          )}
+        </div>
       )}
 
       {tab === 'staff' && (

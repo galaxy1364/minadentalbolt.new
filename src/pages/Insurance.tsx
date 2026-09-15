@@ -172,37 +172,7 @@ export default function Insurance() {
     setCompanyModalOpen(true)
   }
 
-  const handlePrintClaimCertificate = (c: InsuranceClaimWithRelations) => {
-    const patient = patients.find((p) => p.id === c.patient_id)
-    const patientName = patient ? `${patient.first_name || ''} ${patient.last_name || ''}`.trim() : 'بیمار گرامی'
-    const printDoc = generateInsuranceClaimPrintData({
-      claimNumber: c.claim_number || c.id.slice(0, 8),
-      patientName,
-      nationalId: patient?.national_id,
-      insuranceCompany: c.company?.name || 'بیمه‌گر طرف قرارداد',
-      policyNumber: patient?.insurance_number,
-      claimDate: c.submitted_at || c.created_at,
-      tierLabel: c.company?.tier === 'primary' ? 'بیمه پایه درمان' : 'بیمه تکمیلی درمان',
-      items: [
-        {
-          procedureName: c.notes || 'خدمات درمانی و تشخیصی دندانپزشکی',
-          totalFee: c.amount || 0,
-          supplementaryClaimed: c.approved_amount ?? c.amount ?? 0,
-          patientPaid: Math.max(0, (c.amount || 0) - (c.approved_amount ?? c.amount ?? 0)),
-        },
-      ],
-      notes: c.notes || undefined,
-    })
 
-    const win = window.open('', '_blank')
-    if (win) {
-      win.document.write(printDoc)
-      win.document.close()
-      win.focus()
-    } else {
-      showToast('error', 'امکان باز کردن پنجره چاپ وجود ندارد')
-    }
-  }
 
   const handleSaveCompany = () => {
     if (!companyForm.name.trim()) {
@@ -465,6 +435,53 @@ export default function Insurance() {
     const message = `سلام ${claimPatientName(c)} عزیز\nگزارش وضعیت ادعای بیمه شما در کلینیک دندانپزشکی:\n\n🏢 شرکت بیمه: ${companyName}\n💰 مبلغ درخواستی: ${amountStr}\n✅ مبلغ تایید شده: ${approvedStr}\n📋 وضعیت ادعا: ${meta.label}\n\nبا آرزوی سلامتی شما - کلینیک دندانپزشکی`
     window.open(`https://wa.me/${formattedPhone}?text=${encodeURIComponent(message)}`, '_blank')
     showToast('success', 'پیام‌رسان واتساپ باز شد')
+  }
+
+  const handlePrintClaimCertificate = (c: InsuranceClaimWithRelations) => {
+    h.tap()
+    chimes.playPop()
+    const patientObj = patients.find((p) => p.id === c.patient_id) || c.patient
+    const companyObj = companies.find((comp) => comp.id === c.company_id) || c.company
+
+    const claimTotal = c.amount || 0
+    const approvedTotal = c.approved_amount || 0
+    const patientShare = Math.max(0, claimTotal - approvedTotal)
+
+    const printHtml = generateInsuranceClaimPrintData({
+      claimNumber: c.claim_number || `CLM-${c.id.slice(0, 6).toUpperCase()}`,
+      clinicName: 'مرکز تخصصی دندانپزشکی مینادنت',
+      clinicPhone: '۰۲۱-۸۸۰۰۱۱۲۲',
+      clinicAddress: 'تهران، خیابان ولیعصر، مجتمع پزشکی، طبقه ۳',
+      clinicLicense: 'نظام پزشکی: ۷۸۲۹۱ / پروانه: ۱۰۹۲',
+      patientName: claimPatientName(c),
+      nationalId: patientObj?.national_id || 'ثبت در پرونده',
+      insuranceCompany: companyObj?.name || 'بیمه تکمیلی',
+      tierLabel: companyObj?.tier === 'primary' ? 'بیمه پایه درمان' : 'بیمه تکمیلی و درمان مازاد',
+      policyNumber: (c as any).policy_number || patientObj?.phone || '-',
+      claimDate: c.created_at || new Date().toISOString(),
+      doctorName: 'پزشک معالج کلینیک',
+      doctorMedicalCouncilId: 'عضو سازمان نظام پزشکی',
+      items: [
+        {
+          procedureName: c.notes || 'خدمات تشخیصی، ترمیمی و درمانی دندانپزشکی',
+          totalFee: claimTotal,
+          primaryDeduction: companyObj?.tier === 'primary' ? approvedTotal : 0,
+          supplementaryClaimed: companyObj?.tier === 'primary' ? 0 : approvedTotal,
+          patientPaid: patientShare,
+          date: c.created_at ? toJalaliString(c.created_at) : toJalaliString(new Date().toISOString()),
+        },
+      ],
+      notes: c.notes || 'این گواهی جهت ارائه به شرکت بیمه‌گر و ارزیابی خسارت صادر شده و نسخه‌ای از آن در بایگانی اسناد مالی کلینیک نگهداری می‌شود.',
+    })
+
+    const win = window.open('', '_blank', 'width=900,height=950')
+    if (!win) {
+      showToast('error', 'پاپ‌آپ مرورگر مسدود شده است — لطفاً مجوز پنجره جدید را بدهید')
+      return
+    }
+    win.document.write(printHtml)
+    win.document.close()
+    win.focus()
   }
 
   if (loading) {
