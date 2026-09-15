@@ -4,6 +4,7 @@ import {
   extractPersianAmount,
   extractPersianTime,
   parseClinicCommand,
+  parseDentalVoiceExam,
 } from './persianClinicNlp'
 
 describe('Persian Clinic Conversational NLP Engine', () => {
@@ -71,6 +72,41 @@ describe('Persian Clinic Conversational NLP Engine', () => {
       expect(res.intent).toBe('record_treatment')
       expect(res.toothNumber).toBe(16)
       expect(res.service).toContain('روکش تمام سرامیک زیرکونیا')
+    })
+  })
+
+  describe('parseDentalVoiceExam (Hands-Free Voice Dictation)', () => {
+    it('parses tooth number and condition correctly', () => {
+      const res1 = parseDentalVoiceExam('دندان ۱۶ پوسیدگی دیستال')
+      expect(res1).not.toBeNull()
+      expect(res1?.toothNumber).toBe(16)
+      expect(res1?.condition).toBe('caries')
+      expect(res1?.surface).toBe('distal')
+
+      const res2 = parseDentalVoiceExam('دندان ۴۶ نیاز به عصب کشی')
+      expect(res2).not.toBeNull()
+      expect(res2?.toothNumber).toBe(46)
+      expect(res2?.condition).toBe('rct')
+
+      const res3 = parseDentalVoiceExam('دندان ۳۸ کشیده شده')
+      expect(res3).not.toBeNull()
+      expect(res3?.toothNumber).toBe(38)
+      expect(res3?.condition).toBe('extraction')
+
+      const res4 = parseDentalVoiceExam('دندان ۲۱ کاملاً سالم')
+      expect(res4).not.toBeNull()
+      expect(res4?.toothNumber).toBe(21)
+      expect(res4?.condition).toBe('healthy')
+
+      const res5 = parseDentalVoiceExam('دندان ۱۱ روکش سرامیک')
+      expect(res5).not.toBeNull()
+      expect(res5?.toothNumber).toBe(11)
+      expect(res5?.condition).toBe('crown')
+    })
+
+    it('returns null when no valid tooth number is mentioned', () => {
+      expect(parseDentalVoiceExam('سلام خسته نباشید')).toBeNull()
+      expect(parseDentalVoiceExam('لطفاً نوبت ثبت کنید')).toBeNull()
     })
   })
 })

@@ -377,3 +377,85 @@ export function parseClinicCommand(rawInput: string): ParsedAiAction {
     rawText: text,
   }
 }
+
+// ── Voice Examination Dictation Parser (Hands-Free Dental Charting) ───────────
+
+export interface DentalVoiceExamResult {
+  toothNumber: number
+  condition: string
+  surface?: string
+  actionDescription: string
+}
+
+/**
+ * Parses hands-free speech input during dental examination directly to tooth condition and surface.
+ * Examples:
+ * - "دندان ۱۶ پوسیدگی دیستال" -> { toothNumber: 16, condition: 'caries', surface: 'distal' }
+ * - "دندان ۴۶ عصب کشی" -> { toothNumber: 46, condition: 'rct' }
+ * - "دندان ۳۸ کشیده شده" -> { toothNumber: 38, condition: 'extraction' }
+ * - "دندان ۱۱ ترمیم باکال" -> { toothNumber: 11, condition: 'restored', surface: 'buccal' }
+ * - "دندان ۲۱ سالم" -> { toothNumber: 21, condition: 'healthy' }
+ */
+export function parseDentalVoiceExam(speechText: string): DentalVoiceExamResult | null {
+  const text = speechText.trim()
+  const norm = normalizePersianDigits(text).toLowerCase()
+
+  // Extract tooth number (11-48, 51-85)
+  const tooth = extractToothNumber(text)
+  if (!tooth) return null
+
+  // Detect Surface if specified
+  let surface: string | undefined = undefined
+  if (norm.includes('اکلوزال') || norm.includes('جونده') || norm.includes('occlusal')) {
+    surface = 'occlusal'
+  } else if (norm.includes('مزیال') || norm.includes('mesial')) {
+    surface = 'mesial'
+  } else if (norm.includes('دیستال') || norm.includes('distal')) {
+    surface = 'distal'
+  } else if (norm.includes('باکال') || norm.includes('بیرونی') || norm.includes('گونه') || norm.includes('buccal')) {
+    surface = 'buccal'
+  } else if (norm.includes('لینگوال') || norm.includes('داخلی') || norm.includes('زبانی') || norm.includes('lingual')) {
+    surface = 'lingual'
+  }
+
+  // Detect Condition
+  let condition = 'caries' // default when mentioning a tooth in exam
+  let desc = 'پوسیدگی'
+
+  if (norm.includes('سالم') || norm.includes('بدون پوسیدگی') || norm.includes('پاک')) {
+    condition = 'healthy'
+    desc = 'سالم'
+  } else if (norm.includes('عصب‌کشی') || norm.includes('عصب کشی') || norm.includes('اندو') || norm.includes('rct')) {
+    condition = 'rct'
+    desc = 'نیاز به عصب‌کشی'
+  } else if (norm.includes('روکش') || norm.includes('کراون') || norm.includes('crown')) {
+    condition = 'crown'
+    desc = 'روکش دندان'
+  } else if (norm.includes('کشیده') || norm.includes('کشیدن') || norm.includes('غایب') || norm.includes('missing') || norm.includes('extraction')) {
+    condition = 'extraction'
+    desc = 'کشیده شده / غایب'
+  } else if (norm.includes('ایمپلنت') || norm.includes('فیکسچر') || norm.includes('کاشت')) {
+    condition = 'implant'
+    desc = 'ایمپلنت'
+  } else if (norm.includes('ترمیم') || norm.includes('پر شده') || norm.includes('پرشده') || norm.includes('کامپوزیت') || norm.includes('آمالگام')) {
+    condition = 'restored'
+    desc = 'ترمیم‌شده'
+  } else if (norm.includes('شکسته') || norm.includes('شکستگی')) {
+    condition = 'fractured'
+    desc = 'شکسته'
+  } else if (norm.includes('نهفته')) {
+    condition = 'impacted'
+    desc = 'دندان نهفته'
+  } else if (norm.includes('پوسیده') || norm.includes('پوسیدگی') || norm.includes('کرم') || norm.includes('خراب')) {
+    condition = 'caries'
+    desc = 'پوسیدگی'
+  }
+
+  const surfaceText = surface ? ` (سطح ${surface})` : ''
+  return {
+    toothNumber: tooth,
+    condition,
+    surface,
+    actionDescription: `دندان ${tooth}: ${desc}${surfaceText}`,
+  }
+}

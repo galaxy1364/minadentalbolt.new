@@ -1,6 +1,6 @@
 // DentalChart.tsx — Professional interactive dental chart with SVG tooth shapes
 // Supports: FDI numbering, surfaces, conditions, treatment history, primary teeth
-import { useState, useMemo, useEffect } from 'react'
+import { useState, useMemo, useEffect, useRef } from 'react'
 import { conditionMeta, deriveToothConditions } from '../lib/toothConditions'
 import type { ToothCondition, ToothSurface, ToothSurfaceCondition } from '../lib/toothConditions'
 // MOD-FEAT-024: the tooth drawing now lives in its own file so every
@@ -8,7 +8,7 @@ import type { ToothCondition, ToothSurface, ToothSurfaceCondition } from '../lib
 import { ToothGlyph as ToothSVG } from './ToothGlyph'
 import { toothLabel } from '../lib/toothLabel'
 import { createPortal } from 'react-dom'
-import { Smile, Plus, Activity, AlertCircle, Clock, Grid3x3, Sparkles, Image as ImageIcon } from 'lucide-react'
+import { Smile, Plus, Activity, AlertCircle, Clock, Grid3x3, Sparkles, Image as ImageIcon, Mic, MicOff } from 'lucide-react'
 import { h } from '../lib/haptics'
 import { chimes } from '../lib/chimes'
 import { ToothRecord, Treatment, RadiologyImage } from '../types'
@@ -16,6 +16,7 @@ import { matchesRadiologyTooth } from '../lib/radiologyExport'
 import { toPersianDigits, toJalaliStringPretty } from '../lib/persianDate'
 import { toothShape, hasRootFilling, hasCrownCap, toothKind, isUpperTooth, toothVisualLabel } from '../lib/toothVisual'
 import { surfaceSectors, centreLetter } from '../lib/surfaceGlyph'
+import { parseDentalVoiceExam } from '../lib/persianClinicNlp'
 import { Badge, showToast } from './ui'
 
 // ── Types ─────────────────────────────────────────────────────
@@ -474,6 +475,115 @@ export default function DentalChart({
   const [chairsideMode, setChairsideMode] = useState(false)
   const [activeStamp, setActiveStamp] = useState<ToothCondition | null>('caries')
 
+  // ── Hands-Free Clinical Voice Dictation ──────────────────────────
+  const [isListening, setIsListening] = useState(false)
+  const [voiceTranscript, setVoiceTranscript] = useState('')
+  const [lastVoiceAction, setLastVoiceAction] = useState<string | null>(null)
+  const recognitionRef = useRef<any>(null)
+
+  const stopListening = () => {
+    if (recognitionRef.current) {
+      try {
+        recognitionRef.current.stop()
+      } catch {}
+      recognitionRef.current = null
+    }
+    setIsListening(false)
+  }
+
+  const startListening = () => {
+    const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition
+    if (!SpeechRecognition) {
+      showToast('info', 'قابلیت تشخیص گفتار در این مرورگر پشتیبانی نمی‌شود (از مرورگر کروم استفاده نمایید)')
+      return
+    }
+
+    try {
+      const rec = new SpeechRecognition()
+      rec.lang = 'fa-IR'
+      rec.continuous = true
+      rec.interimResults = false
+
+      rec.onstart = () => {
+        setIsListening(true)
+        h.confirm()
+        chimes.playPop()
+        showToast('info', 'دیکته صوتی بالینی فعال شد (بگویید: دندان ۱۶ پوسیدگی)')
+      }
+
+      rec.onresult = (event: any) => {
+        const lastIndex = event.results.length - 1
+        const transcript = event.results[lastIndex][0]?.transcript || ''
+        setVoiceTranscript(transcript)
+
+        const parsed = parseDentalVoiceExam(transcript)
+        if (parsed) {
+          h.confirm()
+          chimes.playSuccess()
+          setLastVoiceAction(parsed.actionDescription)
+
+          const toothData = getToothData(parsed.toothNumber)
+          const surfaces = parsed.surface
+            ? [{ surface: parsed.surface as ToothSurface, condition: parsed.condition as ToothCondition }]
+            : toothData.surfaces
+
+          onUpdateTooth(String(parsed.toothNumber), {
+            is_missing: parsed.condition === 'missing' || parsed.condition === 'extraction',
+            is_implant: parsed.condition === 'implant',
+            condition: parsed.condition,
+            notes: toothData.notes || '',
+            surfaces: JSON.stringify(surfaces),
+          })
+          onToothSelect?.(String(parsed.toothNumber))
+          showToast('success', `✓ ${parsed.actionDescription} با صدا ثبت شد`)
+        } else {
+          h.tap()
+        }
+      }
+
+      rec.onerror = (err: any) => {
+        console.warn('Speech recognition error:', err)
+        if (err.error !== 'no-speech') {
+          setIsListening(false)
+        }
+      }
+
+      rec.onend = () => {
+        if (recognitionRef.current) {
+          try {
+            rec.start()
+          } catch {
+            setIsListening(false)
+          }
+        } else {
+          setIsListening(false)
+        }
+      }
+
+      recognitionRef.current = rec
+      rec.start()
+    } catch (err) {
+      console.error('Failed to start speech recognition:', err)
+      setIsListening(false)
+    }
+  }
+
+  const toggleVoiceDictation = () => {
+    h.toggle()
+    if (isListening) {
+      stopListening()
+      showToast('info', 'دیکته صوتی متوقف شد')
+    } else {
+      startListening()
+    }
+  }
+
+  useEffect(() => {
+    return () => {
+      stopListening()
+    }
+  }, [])
+
   const handleToothClick = (data: ToothData, num: number) => {
     onToothSelect?.(String(num))
     if (chairsideMode && activeStamp) {
@@ -786,7 +896,21 @@ export default function DentalChart({
             }`}
           >
             <Sparkles size={14} className={chairsideMode ? 'animate-spin' : ''} />
-            {chairsideMode ? '✓ حالت کنار یونیت فعال' : 'حالت کنار یونیت (Chairside)'}
+            {chairsideMode ? '✓ حالت کنار یونیت فعال' : 'حالت کنار یونیت'}
+          </button>
+
+          <button
+            type="button"
+            onClick={toggleVoiceDictation}
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition-all press-scale border ${
+              isListening
+                ? 'bg-rose-500 text-white border-rose-400 shadow-md animate-pulse'
+                : 'bg-indigo-50 dark:bg-indigo-950/40 text-indigo-700 dark:text-indigo-300 border-indigo-200 dark:border-indigo-800 hover:bg-indigo-100'
+            }`}
+            title="ثبت وضعیت دندان‌ها با گفتار بدون نیاز به لمس موس و کیبورد"
+          >
+            {isListening ? <MicOff size={14} className="text-white" /> : <Mic size={14} className="text-indigo-600 dark:text-indigo-400" />}
+            {isListening ? 'در حال شنیدن دیکته صوتی...' : 'معاینه صوتی (هندزفری)'}
           </button>
         </div>
         <label className="flex items-center gap-2 text-xs text-slate-500 cursor-pointer">
@@ -803,6 +927,47 @@ export default function DentalChart({
           نمایش دندان‌های شیری
         </label>
       </div>
+
+      {/* Hands-Free Voice Dictation Live Banner */}
+      {isListening && (
+        <div className="p-3 bg-gradient-to-r from-rose-500/15 via-indigo-500/10 to-sky-500/15 dark:from-rose-950/40 dark:to-indigo-950/40 border-2 border-rose-400/60 rounded-2xl space-y-1.5 animate-scale-in">
+          <div className="flex items-center justify-between text-xs">
+            <div className="flex items-center gap-2 text-rose-900 dark:text-rose-200 font-bold">
+              <span className="relative flex h-3 w-3">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-rose-400 opacity-75"></span>
+                <span className="relative inline-flex rounded-full h-3 w-3 bg-rose-500"></span>
+              </span>
+              <span>دیکته صوتی بالینی فعال است — دستکش‌ها استریل بماند و با صدای رسا صحبت کنید:</span>
+            </div>
+            <button
+              onClick={stopListening}
+              className="px-2 py-0.5 rounded-lg bg-rose-100 dark:bg-rose-900/60 text-rose-700 dark:text-rose-200 text-[11px] font-bold hover:bg-rose-200"
+            >
+              قطع میکروفون
+            </button>
+          </div>
+          <div className="text-xs text-slate-600 dark:text-slate-300 flex flex-wrap items-center gap-2">
+            <span className="font-semibold text-slate-700 dark:text-slate-200">الگوهای قابل تشخیص:</span>
+            <code className="px-1.5 py-0.5 bg-white dark:bg-slate-800 rounded border text-[11px]">«دندان ۱۶ پوسیدگی دیستال»</code>
+            <code className="px-1.5 py-0.5 bg-white dark:bg-slate-800 rounded border text-[11px]">«دندان ۴۶ عصب‌کشی»</code>
+            <code className="px-1.5 py-0.5 bg-white dark:bg-slate-800 rounded border text-[11px]">«دندان ۳۸ کشیده شده»</code>
+            <code className="px-1.5 py-0.5 bg-white dark:bg-slate-800 rounded border text-[11px]">«دندان ۲۱ سالم»</code>
+          </div>
+          {(voiceTranscript || lastVoiceAction) && (
+            <div className="pt-1 flex items-center gap-2 text-xs">
+              <span className="text-slate-500">آخرین دریافت:</span>
+              <span className="font-bold text-slate-800 dark:text-slate-100 bg-white/70 dark:bg-slate-800/80 px-2 py-0.5 rounded-md border">
+                {voiceTranscript || '...'}
+              </span>
+              {lastVoiceAction && (
+                <Badge color="success">
+                  ✓ {lastVoiceAction}
+                </Badge>
+              )}
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Chairside Quick Stamp Bar */}
       {chairsideMode && (
