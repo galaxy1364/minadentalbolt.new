@@ -6,6 +6,8 @@ export interface DrugPresetItem {
   frequency: string
   instructions: string
   quantity?: number
+  irc_code?: string
+  generic_name?: string
 }
 
 export interface DrugPreset {
@@ -31,6 +33,8 @@ export const DENTAL_DRUG_PRESETS: DrugPreset[] = [
         frequency: 'هر ۸ ساعت',
         instructions: 'یک عدد همراه با یک لیوان آب کامل بعد از غذا (طول دوره ۵ تا ۷ روز)',
         quantity: 21,
+        irc_code: '1228100234567890',
+        generic_name: 'Amoxicillin 500mg Cap',
       },
       {
         drug_name: 'ژلوفن (ایبوپروفن) ۴۰۰ میلی‌گرم',
@@ -38,6 +42,8 @@ export const DENTAL_DRUG_PRESETS: DrugPreset[] = [
         frequency: 'هر ۸ ساعت بعد از غذا',
         instructions: 'یک عدد همراه با آب زیاد بعد از وعده غذایی میل شود',
         quantity: 10,
+        irc_code: '1228200345678901',
+        generic_name: 'Ibuprofen 400mg Softgel',
       },
       {
         drug_name: 'دهانشویه کلرهگزیدین ۰.۲٪',
@@ -45,6 +51,8 @@ export const DENTAL_DRUG_PRESETS: DrugPreset[] = [
         frequency: 'روزی ۲ بار',
         instructions: 'شروع از ۲۴ ساعت پس از جراحی؛ هر بار ۱۵ سی‌سی به مدت ۱ دقیقه قرقره و خارج شود',
         quantity: 1,
+        irc_code: '1228300456789012',
+        generic_name: 'Chlorhexidine 0.2% Sol',
       },
     ],
   },

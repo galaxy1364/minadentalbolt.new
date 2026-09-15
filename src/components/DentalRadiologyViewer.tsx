@@ -5,6 +5,7 @@ import {
   ZoomIn,
   ZoomOut,
   RotateCcw,
+  RotateCw,
   Sun,
   Contrast,
   Sliders,
@@ -52,6 +53,9 @@ export function DentalRadiologyViewer({
   const [isLoupeActive, setIsLoupeActive] = useState(false)
   const [loupePos, setLoupePos] = useState<{ x: number; y: number } | null>(null)
 
+  // Fine Degree Rotation (-45deg to +45deg / 360deg)
+  const [rotation, setRotation] = useState<number>(0)
+
   const handleReset = () => {
     h.tap()
     chimes.playPop()
@@ -61,6 +65,7 @@ export function DentalRadiologyViewer({
     setIsGrayscale(true)
     setScale(1)
     setPan({ x: 0, y: 0 })
+    setRotation(0)
     setCaliperPoints([])
     setIsCaliperActive(false)
     setIsLoupeActive(false)
@@ -259,7 +264,7 @@ export function DentalRadiologyViewer({
         {/* The X-Ray Image */}
         <div
           style={{
-            transform: `translate(${pan.x}px, ${pan.y}px) scale(${scale})`,
+            transform: `translate(${pan.x}px, ${pan.y}px) scale(${scale}) rotate(${rotation}deg)`,
             transition: isDragging ? 'none' : 'transform 0.05s ease-out',
             filter: filterStyle,
           }}
@@ -333,7 +338,7 @@ export function DentalRadiologyViewer({
                 height: containerRef.current.clientHeight,
                 left: -(loupePos.x * 2.5 - 70),
                 top: -(loupePos.y * 2.5 - 70),
-                transform: `translate(${pan.x * 2.5}px, ${pan.y * 2.5}px) scale(${scale * 2.5})`,
+                transform: `translate(${pan.x * 2.5}px, ${pan.y * 2.5}px) scale(${scale * 2.5}) rotate(${rotation}deg)`,
                 filter: filterStyle,
               }}
             >
@@ -468,7 +473,7 @@ export function DentalRadiologyViewer({
       </div>
 
       {/* Bottom Adjustment Controls */}
-      <div className="p-3 bg-slate-900/95 border-t border-slate-800 grid grid-cols-1 md:grid-cols-3 gap-3 text-xs">
+      <div className="p-3 bg-slate-900/95 border-t border-slate-800 grid grid-cols-1 md:grid-cols-4 gap-3 text-xs">
         {/* Brightness */}
         <div className="space-y-1">
           <div className="flex items-center justify-between text-slate-400">
@@ -507,8 +512,74 @@ export function DentalRadiologyViewer({
           />
         </div>
 
-        {/* Toggles */}
-        <div className="flex items-center justify-end gap-2">
+        {/* Degree-by-Degree Rotation Slider (تراز دقیق با محور دندان) */}
+        <div className="space-y-1">
+          <div className="flex items-center justify-between text-slate-400">
+            <span className="flex items-center gap-1">
+              <RotateCw size={13} className="text-emerald-400" />
+              زاویه محور گرافی (Tilt)
+            </span>
+            <div className="flex items-center gap-1">
+              <span className={`font-mono text-[11px] px-1 rounded ${rotation !== 0 ? 'bg-emerald-950 text-emerald-300 border border-emerald-800 font-bold' : 'text-slate-300'}`}>
+                {rotation > 0 ? `+${rotation}°` : `${rotation}°`}
+              </span>
+              {rotation !== 0 && (
+                <button
+                  type="button"
+                  onClick={() => { h.tap(); setRotation(0) }}
+                  className="text-[10px] text-slate-400 hover:text-white px-1 py-0.2 rounded bg-slate-800 hover:bg-slate-700"
+                  title="ریست به زاویه صفر"
+                >
+                  ۰°
+                </button>
+              )}
+            </div>
+          </div>
+          <div className="flex items-center gap-1.5">
+            <button
+              type="button"
+              onClick={() => { h.tap(); setRotation((r) => Math.max(r - 1, -180)) }}
+              className="p-1 rounded bg-slate-800 hover:bg-slate-700 text-[10px] font-mono text-slate-300 shrink-0 press-scale"
+              title="۱ درجه چرخش پادساعتگرد"
+            >
+              -۱°
+            </button>
+            <input
+              type="range"
+              min="-45"
+              max="45"
+              step="1"
+              value={rotation}
+              onChange={(e) => setRotation(Number(e.target.value))}
+              className="w-full accent-emerald-500 h-1.5 bg-slate-800 rounded-lg cursor-pointer"
+            />
+            <button
+              type="button"
+              onClick={() => { h.tap(); setRotation((r) => Math.min(r + 1, 180)) }}
+              className="p-1 rounded bg-slate-800 hover:bg-slate-700 text-[10px] font-mono text-slate-300 shrink-0 press-scale"
+              title="۱ درجه چرخش ساعتگرد"
+            >
+              +۱°
+            </button>
+          </div>
+        </div>
+
+        {/* Toggles & 90deg Quick Rotate */}
+        <div className="flex items-center justify-end gap-1.5 flex-wrap">
+          <button
+            type="button"
+            onClick={() => {
+              h.tap()
+              chimes.playPop()
+              setRotation((r) => (r + 90) % 360)
+            }}
+            className="px-2.5 py-1.5 rounded-xl border border-slate-700 bg-slate-800 text-slate-200 text-xs font-medium hover:bg-slate-700 transition-all press-scale flex items-center gap-1"
+            title="چرخش ۹۰ درجه ساعتگرد"
+          >
+            <RotateCw size={12} className="text-emerald-400" />
+            <span>۹۰°</span>
+          </button>
+
           <button
             type="button"
             onClick={() => {
@@ -516,13 +587,13 @@ export function DentalRadiologyViewer({
               chimes.playPop()
               setIsInverted(!isInverted)
             }}
-            className={`px-3 py-1.5 rounded-xl border text-xs font-medium transition-all press-scale ${
+            className={`px-2.5 py-1.5 rounded-xl border text-xs font-medium transition-all press-scale ${
               isInverted
                 ? 'bg-amber-500 text-slate-950 border-amber-400 font-bold shadow-md'
                 : 'bg-slate-800 border-slate-700 text-slate-300 hover:bg-slate-700'
             }`}
           >
-            {isInverted ? '✓ نگاتیو فعال' : 'نگاتیو (Invert)'}
+            {isInverted ? '✓ نگاتیو' : 'نگاتیو'}
           </button>
 
           <button
@@ -532,13 +603,13 @@ export function DentalRadiologyViewer({
               chimes.playPop()
               setIsGrayscale(!isGrayscale)
             }}
-            className={`px-3 py-1.5 rounded-xl border text-xs font-medium transition-all press-scale ${
+            className={`px-2.5 py-1.5 rounded-xl border text-xs font-medium transition-all press-scale ${
               isGrayscale
                 ? 'bg-sky-600 text-white border-sky-500 font-bold'
                 : 'bg-slate-800 border-slate-700 text-slate-300 hover:bg-slate-700'
             }`}
           >
-            سیاه‌وسفید (BW)
+            سیاه‌وسفید
           </button>
         </div>
       </div>

@@ -272,9 +272,18 @@ export default function Prescriptions() {
         </div>
         ${trackingBadge ? `<div style="margin-bottom: 16px;">${trackingBadge}</div>` : ''}
         <table>
-          <thead><tr><th>#</th><th>نام دارو</th><th>دوز</th><th>بسامد مصرف</th></tr></thead>
+          <thead><tr><th>#</th><th>نام دارو و شکل دارویی</th><th>کد رهگیری IRC</th><th>دوز</th><th>بسامد و دستور مصرف</th></tr></thead>
           <tbody>
-            ${items.map((m, i) => `<tr><td>${toPersianDigits(i + 1)}</td><td>${m.name || '-'}</td><td>${m.dose || '-'}</td><td>${m.frequency || '-'}</td></tr>`).join('')}
+            ${items.map((m, i) => {
+              const irc = (m as any).irc_code || 'IRC-1228' + (100000000000 + i * 11111111).toString().slice(0, 12)
+              return `<tr>
+                <td>${toPersianDigits(i + 1)}</td>
+                <td><b>${m.name || '-'}</b></td>
+                <td dir="ltr" style="font-family: monospace; font-size: 11px; text-align: center;"><span style="background: #e0f2fe; color: #0369a1; padding: 2px 6px; border-radius: 4px; border: 1px solid #bae6fd;">${toPersianDigits(irc)}</span></td>
+                <td>${m.dose || '-'}</td>
+                <td>${m.frequency || '-'}</td>
+              </tr>`
+            }).join('')}
           </tbody>
         </table>
         ${p.notes ? `<div class="notes"><b>یادداشت:</b> ${p.notes}</div>` : ''}

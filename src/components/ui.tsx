@@ -11,7 +11,7 @@ export function Spinner({ size = 24 }: { size?: number }) {
 }
 
 export function Card({ children, className = '', style, onClick }: { children: React.ReactNode; className?: string; style?: React.CSSProperties; onClick?: () => void }) {
-  return <div style={style} onClick={onClick} className={`bg-white dark:bg-slate-800 rounded-2xl border border-slate-200/60 dark:border-slate-700/60 card-shadow dark:card-shadow transition-all duration-200 ${className}`}>{children}</div>
+  return <div style={style} onClick={onClick} className={`gemini-ambient-card rounded-2xl border border-slate-200/60 dark:border-slate-700/60 card-shadow dark:card-shadow transition-all duration-200 ${className}`}>{children}</div>
 }
 
 export function StatCard({ icon, title, value, color = 'primary', subtitle }: { icon: React.ReactNode; title: string; value: string | number; color?: string; subtitle?: string }) {
@@ -297,25 +297,112 @@ export function Wizard({
   )
 }
 
+export interface TabItem {
+  key: string
+  label: string
+  icon?: React.ReactNode
+  color?: string
+  badge?: string | number
+}
+
 export function Tabs({
   tabs,
   active,
   onChange,
   className = '',
 }: {
-  tabs: { key: string; label: string; icon?: React.ReactNode }[]
+  tabs: (TabItem | { key: string; label: string; icon?: React.ReactNode; color?: string; badge?: string | number })[]
   active: string
   onChange: (key: string) => void
   className?: string
 }) {
   const containerRef = useRef<HTMLDivElement | null>(null)
+  const scrollStripRef = useRef<HTMLDivElement | null>(null)
   const [quickMenuOpen, setQuickMenuOpen] = useState(false)
   const tabButtonRefs = useRef<Record<string, HTMLButtonElement | null>>({})
+  const [isDragging, setIsDragging] = useState(false)
+  const [startX, setStartX] = useState(0)
+  const [scrollLeftState, setScrollLeftState] = useState(0)
+
+  // Color mapping for clinical tabs
+  const colorMap: Record<string, { activeBg: string; activeText: string; activeBorder: string; iconColor: string; inactiveHover: string }> = {
+    teal: {
+      activeBg: 'bg-teal-600 text-white shadow-teal-500/25',
+      activeText: 'text-white',
+      activeBorder: 'border-teal-500',
+      iconColor: 'text-teal-600 dark:text-teal-400',
+      inactiveHover: 'hover:bg-teal-50 dark:hover:bg-teal-950/40 hover:text-teal-700 dark:hover:text-teal-300',
+    },
+    blue: {
+      activeBg: 'bg-blue-600 text-white shadow-blue-500/25',
+      activeText: 'text-white',
+      activeBorder: 'border-blue-500',
+      iconColor: 'text-blue-600 dark:text-blue-400',
+      inactiveHover: 'hover:bg-blue-50 dark:hover:bg-blue-950/40 hover:text-blue-700 dark:hover:text-blue-300',
+    },
+    purple: {
+      activeBg: 'bg-purple-600 text-white shadow-purple-500/25',
+      activeText: 'text-white',
+      activeBorder: 'border-purple-500',
+      iconColor: 'text-purple-600 dark:text-purple-400',
+      inactiveHover: 'hover:bg-purple-50 dark:hover:bg-purple-950/40 hover:text-purple-700 dark:hover:text-purple-300',
+    },
+    amber: {
+      activeBg: 'bg-amber-600 text-white shadow-amber-500/25',
+      activeText: 'text-white',
+      activeBorder: 'border-amber-500',
+      iconColor: 'text-amber-600 dark:text-amber-400',
+      inactiveHover: 'hover:bg-amber-50 dark:hover:bg-amber-950/40 hover:text-amber-700 dark:hover:text-amber-300',
+    },
+    emerald: {
+      activeBg: 'bg-emerald-600 text-white shadow-emerald-500/25',
+      activeText: 'text-white',
+      activeBorder: 'border-emerald-500',
+      iconColor: 'text-emerald-600 dark:text-emerald-400',
+      inactiveHover: 'hover:bg-emerald-50 dark:hover:bg-emerald-950/40 hover:text-emerald-700 dark:hover:text-emerald-300',
+    },
+    rose: {
+      activeBg: 'bg-rose-600 text-white shadow-rose-500/25',
+      activeText: 'text-white',
+      activeBorder: 'border-rose-500',
+      iconColor: 'text-rose-600 dark:text-rose-400',
+      inactiveHover: 'hover:bg-rose-50 dark:hover:bg-rose-950/40 hover:text-rose-700 dark:hover:text-rose-300',
+    },
+    indigo: {
+      activeBg: 'bg-indigo-600 text-white shadow-indigo-500/25',
+      activeText: 'text-white',
+      activeBorder: 'border-indigo-500',
+      iconColor: 'text-indigo-600 dark:text-indigo-400',
+      inactiveHover: 'hover:bg-indigo-50 dark:hover:bg-indigo-950/40 hover:text-indigo-700 dark:hover:text-indigo-300',
+    },
+    cyan: {
+      activeBg: 'bg-cyan-600 text-white shadow-cyan-500/25',
+      activeText: 'text-white',
+      activeBorder: 'border-cyan-500',
+      iconColor: 'text-cyan-600 dark:text-cyan-400',
+      inactiveHover: 'hover:bg-cyan-50 dark:hover:bg-cyan-950/40 hover:text-cyan-700 dark:hover:text-cyan-300',
+    },
+    violet: {
+      activeBg: 'bg-violet-600 text-white shadow-violet-500/25',
+      activeText: 'text-white',
+      activeBorder: 'border-violet-500',
+      iconColor: 'text-violet-600 dark:text-violet-400',
+      inactiveHover: 'hover:bg-violet-50 dark:hover:bg-violet-950/40 hover:text-violet-700 dark:hover:text-violet-300',
+    },
+  }
+
+  const defaultTheme = {
+    activeBg: 'bg-primary-600 text-white shadow-primary-500/25',
+    activeText: 'text-white',
+    activeBorder: 'border-primary-500',
+    iconColor: 'text-primary-600 dark:text-primary-400',
+    inactiveHover: 'hover:bg-white/60 dark:hover:bg-slate-700/60 hover:text-primary-700 dark:hover:text-primary-300',
+  }
 
   // Auto-scroll active tab into center view
   useEffect(() => {
     const activeEl = tabButtonRefs.current[active]
-    if (activeEl && containerRef.current) {
+    if (activeEl && scrollStripRef.current) {
       activeEl.scrollIntoView({
         behavior: 'smooth',
         inline: 'center',
@@ -323,6 +410,40 @@ export function Tabs({
       })
     }
   }, [active])
+
+  // Mouse scroll helper (arrow buttons)
+  const handleScrollBy = (offset: number) => {
+    if (scrollStripRef.current) {
+      scrollStripRef.current.scrollBy({ left: offset, behavior: 'smooth' })
+    }
+  }
+
+  // Mouse Wheel horizontal scroll
+  const handleWheel = (e: React.WheelEvent) => {
+    if (scrollStripRef.current && Math.abs(e.deltaY) > Math.abs(e.deltaX)) {
+      scrollStripRef.current.scrollLeft += e.deltaY * 0.8
+    }
+  }
+
+  // Mouse Drag to scroll
+  const handleMouseDown = (e: React.MouseEvent) => {
+    if (!scrollStripRef.current) return
+    setIsDragging(true)
+    setStartX(e.pageX - scrollStripRef.current.offsetLeft)
+    setScrollLeftState(scrollStripRef.current.scrollLeft)
+  }
+
+  const handleMouseMove = (e: React.MouseEvent) => {
+    if (!isDragging || !scrollStripRef.current) return
+    e.preventDefault()
+    const x = e.pageX - scrollStripRef.current.offsetLeft
+    const walk = (x - startX) * 1.5
+    scrollStripRef.current.scrollLeft = scrollLeftState - walk
+  }
+
+  const handleMouseUpOrLeave = () => {
+    setIsDragging(false)
+  }
 
   // Close quick menu when clicking outside or pressing Escape
   useEffect(() => {
@@ -343,15 +464,36 @@ export function Tabs({
     }
   }, [quickMenuOpen])
 
-  const activeTabObj = tabs.find((t) => t.key === active)
-
   return (
-    <div className={`relative ${className}`} ref={containerRef}>
-      <div className="flex items-center gap-1.5 p-1.5 bg-slate-200/70 dark:bg-slate-800/80 backdrop-blur-md rounded-2xl border border-white/50 dark:border-white/10 shadow-xs">
-        {/* Scrollable Tab Strip */}
-        <div className="flex-1 flex gap-1 overflow-x-auto dock-scroll scroll-smooth py-0.5">
+    <div className={`relative group/tabs ${className}`} ref={containerRef}>
+      <div className="relative flex items-center gap-1.5 p-1.5 bg-gradient-to-r from-slate-100/90 via-white/80 to-slate-100/90 dark:from-slate-850/90 dark:via-slate-800/90 dark:to-slate-850/90 backdrop-blur-xl rounded-2xl border border-slate-200/80 dark:border-slate-700/80 shadow-xs">
+        {/* Scroll Left Button (Rightwards in RTL) */}
+        <button
+          type="button"
+          onClick={() => handleScrollBy(180)}
+          title="پیمایش به راست"
+          aria-label="پیمایش به راست"
+          className="hidden sm:flex items-center justify-center w-8 h-8 rounded-xl bg-white/80 dark:bg-slate-700/70 hover:bg-white dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 shadow-2xs border border-slate-200/60 dark:border-slate-600/60 transition-all shrink-0 press-scale"
+        >
+          <ChevronRight size={16} />
+        </button>
+
+        {/* Scrollable Tab Strip with Mouse Drag and Wheel Support */}
+        <div
+          ref={scrollStripRef}
+          onWheel={handleWheel}
+          onMouseDown={handleMouseDown}
+          onMouseMove={handleMouseMove}
+          onMouseUp={handleMouseUpOrLeave}
+          onMouseLeave={handleMouseUpOrLeave}
+          className={`flex-1 flex gap-1.5 overflow-x-auto tabs-scroll-container scroll-smooth py-1 px-0.5 select-none ${
+            isDragging ? 'cursor-grabbing' : 'cursor-grab'
+          }`}
+        >
           {tabs.map((tab) => {
             const isCurrent = active === tab.key
+            const theme = (tab.color && colorMap[tab.color]) || defaultTheme
+
             return (
               <button
                 key={tab.key}
@@ -363,26 +505,52 @@ export function Tabs({
                   h.select()
                   onChange(tab.key)
                 }}
-                className={`flex-shrink-0 min-h-[42px] flex items-center gap-2 px-3.5 sm:px-4 py-2 rounded-xl text-xs sm:text-sm font-semibold transition-all-smooth press-scale ${
+                className={`flex-shrink-0 min-h-[42px] flex items-center gap-2 px-3.5 sm:px-4 py-2 rounded-xl text-xs sm:text-sm font-bold transition-all duration-200 press-scale border ${
                   isCurrent
-                    ? 'bg-white dark:bg-slate-700/90 text-primary-700 dark:text-primary-300 shadow-sm ring-1 ring-black/5 dark:ring-white/10'
-                    : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200 hover:bg-white/40 dark:hover:bg-slate-700/40'
+                    ? `${theme.activeBg} ${theme.activeBorder} shadow-md scale-[1.02]`
+                    : `bg-white/60 dark:bg-slate-800/60 text-slate-700 dark:text-slate-300 border-slate-200/60 dark:border-slate-700/60 ${theme.inactiveHover}`
                 }`}
               >
                 {tab.icon && (
-                  <span className={`shrink-0 transition-transform ${isCurrent ? 'scale-110 text-primary-600 dark:text-primary-400' : ''}`}>
+                  <span
+                    className={`shrink-0 transition-transform duration-200 ${
+                      isCurrent ? 'scale-110 text-white' : theme.iconColor
+                    }`}
+                  >
                     {tab.icon}
                   </span>
                 )}
                 <span>{tab.label}</span>
+                {tab.badge !== undefined && (
+                  <span
+                    className={`text-[10px] px-1.5 py-0.5 rounded-full font-black ${
+                      isCurrent
+                        ? 'bg-white/20 text-white'
+                        : 'bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-200'
+                    }`}
+                  >
+                    {toPersianDigits(String(tab.badge))}
+                  </span>
+                )}
               </button>
             )
           })}
         </div>
 
+        {/* Scroll Right Button (Leftwards in RTL) */}
+        <button
+          type="button"
+          onClick={() => handleScrollBy(-180)}
+          title="پیمایش به چپ"
+          aria-label="پیمایش به چپ"
+          className="hidden sm:flex items-center justify-center w-8 h-8 rounded-xl bg-white/80 dark:bg-slate-700/70 hover:bg-white dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 shadow-2xs border border-slate-200/60 dark:border-slate-600/60 transition-all shrink-0 press-scale"
+        >
+          <ChevronLeft size={16} />
+        </button>
+
         {/* Quick-Jump Dropdown Button for extensive tab bars (> 6 tabs) */}
         {tabs.length > 6 && (
-          <div className="relative shrink-0 border-r border-slate-300 dark:border-slate-700 pr-1 mr-0.5">
+          <div className="relative shrink-0 border-r border-slate-300/80 dark:border-slate-700/80 pr-1.5 mr-0.5">
             <button
               type="button"
               onClick={() => {
@@ -391,10 +559,10 @@ export function Tabs({
               }}
               title="دسترسی سریع به تمام تب‌ها"
               aria-label="دسترسی سریع به تمام تب‌ها"
-              className={`flex items-center justify-center w-10 h-10 rounded-xl transition-all-smooth press-scale ${
+              className={`flex items-center justify-center w-10 h-10 rounded-xl transition-all-smooth press-scale border ${
                 quickMenuOpen
-                  ? 'bg-primary-600 text-white shadow-sm'
-                  : 'bg-white/80 dark:bg-slate-700/80 text-slate-600 dark:text-slate-300 hover:bg-white dark:hover:bg-slate-700'
+                  ? 'bg-primary-600 text-white shadow-sm border-primary-500'
+                  : 'bg-white/80 dark:bg-slate-700/80 text-slate-700 dark:text-slate-200 hover:bg-white dark:hover:bg-slate-700 border-slate-200/80 dark:border-slate-600/80 shadow-2xs'
               }`}
             >
               <ChevronDown size={17} className={`transition-transform duration-200 ${quickMenuOpen ? 'rotate-180' : ''}`} />
@@ -403,17 +571,21 @@ export function Tabs({
             {/* Quick Menu Popover */}
             {quickMenuOpen && (
               <div
-                className="absolute left-0 top-full mt-2 w-56 max-h-80 overflow-y-auto dock-scroll p-1.5 bg-white/95 dark:bg-slate-800/95 backdrop-blur-xl rounded-2xl shadow-xl border border-slate-200 dark:border-slate-700 z-50 animate-in fade-in slide-in-from-top-2 duration-150"
+                className="absolute left-0 top-full mt-2 w-64 max-h-80 overflow-y-auto dock-scroll p-2 bg-white/95 dark:bg-slate-850/95 backdrop-blur-2xl rounded-2xl shadow-2xl border border-slate-200 dark:border-slate-700 z-50 animate-in fade-in slide-in-from-top-2 duration-150"
                 role="menu"
               >
-                <div className="px-3 py-1.5 border-b border-slate-100 dark:border-slate-700/60 mb-1">
+                <div className="px-3 py-1.5 border-b border-slate-100 dark:border-slate-700/60 mb-1.5 flex items-center justify-between">
                   <span className="text-[11px] font-bold text-slate-500 dark:text-slate-400">
                     جهش سریع به بخش:
                   </span>
+                  <span className="text-[10px] text-slate-400 font-mono">
+                    {toPersianDigits(tabs.length)} بخش
+                  </span>
                 </div>
-                <div className="space-y-0.5">
+                <div className="space-y-1">
                   {tabs.map((tab) => {
                     const isCurrent = active === tab.key
+                    const theme = (tab.color && colorMap[tab.color]) || defaultTheme
                     return (
                       <button
                         key={tab.key}
@@ -423,15 +595,19 @@ export function Tabs({
                           onChange(tab.key)
                           setQuickMenuOpen(false)
                         }}
-                        className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-medium transition-all-smooth text-right ${
+                        className={`w-full flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-xs font-bold transition-all-smooth text-right ${
                           isCurrent
-                            ? 'bg-primary-50 dark:bg-primary-950/50 text-primary-700 dark:text-primary-300 font-bold border border-primary-200 dark:border-primary-800'
-                            : 'text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-700/60'
+                            ? `${theme.activeBg} shadow-xs font-extrabold`
+                            : `text-slate-700 dark:text-slate-200 hover:bg-slate-100/80 dark:hover:bg-slate-800/80`
                         }`}
                       >
-                        {tab.icon && <span className="shrink-0">{tab.icon}</span>}
+                        {tab.icon && (
+                          <span className={`shrink-0 ${isCurrent ? 'text-white' : theme.iconColor}`}>
+                            {tab.icon}
+                          </span>
+                        )}
                         <span className="truncate flex-1">{tab.label}</span>
-                        {isCurrent && <CheckCircle2 size={14} className="text-primary-600 shrink-0" />}
+                        {isCurrent && <CheckCircle2 size={14} className="text-white shrink-0" />}
                       </button>
                     )
                   })}

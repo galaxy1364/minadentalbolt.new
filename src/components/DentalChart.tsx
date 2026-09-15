@@ -257,12 +257,90 @@ function ToothDetailPanel({
               collapses to 5 chips + up to 11 options shown only when
               actually needed, with a smooth expand/collapse instead of
               everything visible and competing for attention at once.
-              Reuses `activeSurface` state that already existed but was
-              never wired to anything. */}
+          {/* Surface Conditions — with fast clinical presets (O, MO, DO, MOD, B, L) */}
           {condition !== 'missing' && condition !== 'extraction' && (
-            <div>
-              <h4 className="text-xs font-bold text-slate-500 mb-2">سطوح دندان — روی هر سطح بزنید تا وضعیتش را تنظیم کنید</h4>
-              <div className="grid grid-cols-5 gap-1.5 mb-2">
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
+                <h4 className="text-xs font-bold text-slate-700 dark:text-slate-200">
+                  سطوح دندان — انتخاب تکی یا الگوهای بالینی سریع
+                </h4>
+                {surfaceConditions.some((s) => s.condition !== 'healthy') && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      h.tap()
+                      setSurfaceConditions([])
+                    }}
+                    className="text-[11px] text-primary-600 hover:text-primary-700 font-bold"
+                  >
+                    پاکسازی همه سطوح
+                  </button>
+                )}
+              </div>
+
+              {/* Fast Clinical Presets (O, MO, DO, MOD, B, L) */}
+              <div className="p-2.5 rounded-2xl bg-gradient-to-r from-teal-50/70 via-white to-teal-50/70 dark:from-slate-800/80 dark:via-slate-850 dark:to-slate-800/80 border border-teal-200/70 dark:border-teal-800/50 space-y-2">
+                <span className="text-[11px] font-bold text-teal-800 dark:text-teal-300 block">
+                  الگوهای سریع بالینی (تک‌کلیک):
+                </span>
+                <div className="flex flex-wrap gap-1.5">
+                  {[
+                    { label: 'O (تک‌سطحی)', surfaces: ['occlusal'] as ToothSurface[], desc: 'اکلوزال' },
+                    { label: 'MO (۲ سطحی)', surfaces: ['mesial', 'occlusal'] as ToothSurface[], desc: 'مزیو-اکلوزال' },
+                    { label: 'DO (۲ سطحی)', surfaces: ['distal', 'occlusal'] as ToothSurface[], desc: 'دیستو-اکلوزال' },
+                    { label: 'MOD (۳ سطحی)', surfaces: ['mesial', 'occlusal', 'distal'] as ToothSurface[], desc: 'مزیو-اکلوزو-دیستال' },
+                    { label: 'B (طوق/باکال)', surfaces: ['buccal'] as ToothSurface[], desc: 'باکال' },
+                    { label: 'L (لینگوال)', surfaces: ['lingual'] as ToothSurface[], desc: 'لینگوال' },
+                  ].map((preset) => (
+                    <button
+                      key={preset.label}
+                      type="button"
+                      onClick={() => {
+                        h.tap()
+                        chimes.playPop()
+                        setSurfaceConditions(preset.surfaces.map((s) => ({ surface: s, condition: 'caries' })))
+                        showToast('info', `الگوی ${preset.label} به عنوان پوسیدگی ثبت شد.`)
+                      }}
+                      className="px-2.5 py-1.5 rounded-xl text-xs font-black bg-white dark:bg-slate-700 text-teal-700 dark:text-teal-300 border border-teal-300/80 dark:border-teal-700 shadow-2xs hover:bg-teal-600 hover:text-white dark:hover:bg-teal-600 transition-all press-scale"
+                      title={preset.desc}
+                    >
+                      {preset.label}
+                    </button>
+                  ))}
+                </div>
+
+                {/* Quick 1-click batch actions on active surface set */}
+                {surfaceConditions.length > 0 && (
+                  <div className="flex items-center gap-2 pt-1 border-t border-teal-100 dark:border-teal-800/40">
+                    <span className="text-[10px] text-slate-500">اعمال بر سطوح فعال:</span>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        h.select()
+                        chimes.playPop()
+                        setSurfaceConditions((prev) => prev.map((s) => ({ ...s, condition: 'caries' })))
+                      }}
+                      className="text-[10px] px-2 py-0.5 rounded-lg bg-rose-50 text-rose-700 dark:bg-rose-950/40 dark:text-rose-300 font-bold border border-rose-200"
+                    >
+                      پوسیدگی
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        h.select()
+                        chimes.playSuccess()
+                        setSurfaceConditions((prev) => prev.map((s) => ({ ...s, condition: 'restored' })))
+                      }}
+                      className="text-[10px] px-2 py-0.5 rounded-lg bg-blue-50 text-blue-700 dark:bg-blue-950/40 dark:text-blue-300 font-bold border border-blue-200"
+                    >
+                      ترمیم کامپوزیت
+                    </button>
+                  </div>
+                )}
+              </div>
+
+              {/* Individual Surface Buttons */}
+              <div className="grid grid-cols-5 gap-1.5">
                 {(Object.keys(surfaceLabels) as ToothSurface[]).map((surface) => {
                   const sc = getSurfaceCondition(surface)
                   const meta = conditionMeta[sc]
@@ -275,39 +353,50 @@ function ToothDetailPanel({
                         chimes.playPop()
                         setActiveSurface(isActive ? null : surface)
                       }}
-                      className={`min-h-[48px] flex flex-col justify-center items-center gap-1 py-2 rounded-xl border-2 transition-all-smooth press-scale ${isActive ? 'border-primary-400 bg-primary-50 scale-105' : `${meta.border} ${meta.bg}`}`}
+                      className={`min-h-[48px] flex flex-col justify-center items-center gap-1 py-2 rounded-xl border-2 transition-all-smooth press-scale ${
+                        isActive ? 'border-primary-400 bg-primary-50 scale-105' : `${meta.border} ${meta.bg}`
+                      }`}
                     >
                       <span className={`w-3 h-3 rounded-full ${meta.dot}`} />
-                      <span className="text-[10px] font-bold text-slate-600 leading-tight text-center">{surfaceLabels[surface]}</span>
+                      <span className="text-[10px] font-bold text-slate-600 leading-tight text-center">
+                        {surfaceLabels[surface]}
+                      </span>
                     </button>
                   )
                 })}
               </div>
+
               {activeSurface && (
-                <div className="p-3 rounded-xl bg-slate-50 border border-slate-200 animate-scale-in">
-                  <p className="text-[11px] text-slate-500 mb-2">وضعیت سطح «{surfaceLabels[activeSurface]}»:</p>
+                <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 animate-scale-in">
+                  <p className="text-[11px] text-slate-500 dark:text-slate-400 mb-2">
+                    وضعیت سطح «{surfaceLabels[activeSurface]}»:
+                  </p>
                   <div className="flex flex-wrap gap-1.5">
-                    {conditionOptions.filter((o) => o.value !== 'missing' && o.value !== 'extraction').map((opt) => {
-                      const isSelected = getSurfaceCondition(activeSurface) === opt.value
-                      const optMeta = conditionMeta[opt.value]
-                      return (
-                        <button
-                          key={opt.value}
-                          onClick={() => {
-                            h.select()
-                            chimes.playPop()
-                            toggleSurfaceCondition(activeSurface, opt.value)
-                            setActiveSurface(null)
-                          }}
-                          className={`min-h-[48px] flex items-center gap-1.5 px-3 py-2 rounded-xl border-2 text-xs font-medium transition-all-smooth press-scale ${
-                            isSelected ? `${optMeta.bg} ${optMeta.border} ${optMeta.color}` : 'bg-white border-slate-200 text-slate-600 hover:border-slate-300'
-                          }`}
-                        >
-                          <span className={`w-2 h-2 rounded-full ${optMeta.dot}`} />
-                          {opt.label}
-                        </button>
-                      )
-                    })}
+                    {conditionOptions
+                      .filter((o) => o.value !== 'missing' && o.value !== 'extraction')
+                      .map((opt) => {
+                        const isSelected = getSurfaceCondition(activeSurface) === opt.value
+                        const optMeta = conditionMeta[opt.value]
+                        return (
+                          <button
+                            key={opt.value}
+                            onClick={() => {
+                              h.select()
+                              chimes.playPop()
+                              toggleSurfaceCondition(activeSurface, opt.value)
+                              setActiveSurface(null)
+                            }}
+                            className={`min-h-[44px] flex items-center gap-1.5 px-3 py-2 rounded-xl border-2 text-xs font-medium transition-all-smooth press-scale ${
+                              isSelected
+                                ? `${optMeta.bg} ${optMeta.border} ${optMeta.color}`
+                                : 'bg-white dark:bg-slate-700 border-slate-200 dark:border-slate-600 text-slate-600 dark:text-slate-200 hover:border-slate-300'
+                            }`}
+                          >
+                            <span className={`w-2 h-2 rounded-full ${optMeta.dot}`} />
+                            {opt.label}
+                          </button>
+                        )
+                      })}
                   </div>
                 </div>
               )}

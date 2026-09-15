@@ -1657,9 +1657,9 @@ export default function PatientDetail() {
           </div>
 
           {/* Action buttons */}
-          <div className="flex gap-2 flex-wrap">
-            <Button
-              variant="primary"
+          <div className="flex gap-2 flex-wrap items-center">
+            <button
+              type="button"
               onClick={() => {
                 h.tap()
                 navigate('/appointments', {
@@ -1670,14 +1670,19 @@ export default function PatientDetail() {
                   },
                 })
               }}
+              className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs sm:text-sm font-bold bg-gradient-to-r from-teal-600 to-emerald-600 hover:from-teal-700 hover:to-emerald-700 text-white shadow-md shadow-teal-500/20 press-scale transition-all"
             >
               <Calendar size={16} /> نوبت جدید
-            </Button>
-            <Button variant="secondary" onClick={handlePrintFullChart}>
-              <Printer size={16} /> چاپ پرونده
-            </Button>
-            <Button
-              variant="secondary"
+            </button>
+            <button
+              type="button"
+              onClick={handlePrintFullChart}
+              className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs sm:text-sm font-bold bg-indigo-50 dark:bg-indigo-950/40 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800/80 hover:bg-indigo-100 dark:hover:bg-indigo-900/60 shadow-2xs press-scale transition-all"
+            >
+              <Printer size={16} className="text-indigo-600 dark:text-indigo-400" /> چاپ پرونده
+            </button>
+            <button
+              type="button"
               onClick={() => {
                 h.tap()
                 chimes.playPop()
@@ -1721,9 +1726,10 @@ export default function PatientDetail() {
                 }
                 setEditModalOpen(true)
               }}
+              className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs sm:text-sm font-bold bg-sky-50 dark:bg-sky-950/40 text-sky-700 dark:text-sky-300 border border-sky-200 dark:border-sky-800/80 hover:bg-sky-100 dark:hover:bg-sky-900/60 shadow-2xs press-scale transition-all"
             >
-              <Edit2 size={16} /> ویرایش پرونده
-            </Button>
+              <Edit2 size={16} className="text-sky-600 dark:text-sky-400" /> ویرایش پرونده
+            </button>
           </div>
           {/* MOD-FEAT-027: the balance was already computed on this page and
               shown only inside the printed record. Putting it in the header
@@ -1747,22 +1753,22 @@ export default function PatientDetail() {
   // ===========================================================================
 
   const tabs = [
-    { key: 'overview', label: 'نمای کلی', icon: <FileText size={16} /> },
-    { key: 'timeline', label: 'تایم‌لاین', icon: <Clock size={16} /> },
-    { key: 'treatments', label: 'درمان‌ها', icon: <Activity size={16} /> },
-    { key: 'implants', label: 'ایمپلنت', icon: <Bone size={16} /> },
-    { key: 'labOrders', label: 'لابراتوار', icon: <FlaskConical size={16} /> },
-    { key: 'phases', label: 'طرح درمان مرحله‌ای', icon: <Layers size={16} /> },
-    { key: 'consent', label: 'فرم رضایت‌نامه', icon: <FileSignature size={16} /> },
-    { key: 'appointments', label: 'نوبت‌ها', icon: <Calendar size={16} /> },
-    { key: 'payments', label: 'پرداخت‌ها', icon: <CreditCard size={16} /> },
-    { key: 'teeth', label: 'نمودار دندان‌ها', icon: <Smile size={16} /> },
-    { key: 'perio', label: 'چارت پریودنتال', icon: <Activity size={16} /> },
-    { key: 'ortho', label: 'آنالیز ارتودنسی', icon: <Sparkles size={16} /> },
-    { key: 'prescriptions', label: 'نسخه‌ها', icon: <Pill size={16} /> },
-    { key: 'radiology', label: 'رادیولوژی', icon: <ImageIcon size={16} /> },
-    { key: 'insurance', label: 'بیمه', icon: <Shield size={16} /> },
-    { key: 'documents', label: 'اسناد', icon: <FileText size={16} /> },
+    { key: 'overview', label: 'نمای کلی', icon: <FileText size={16} />, color: 'blue' },
+    { key: 'timeline', label: 'تایم‌لاین', icon: <Clock size={16} />, color: 'cyan' },
+    { key: 'treatments', label: 'درمان‌ها', icon: <Activity size={16} />, color: 'emerald' },
+    { key: 'implants', label: 'ایمپلنت', icon: <Bone size={16} />, color: 'purple' },
+    { key: 'labOrders', label: 'لابراتوار', icon: <FlaskConical size={16} />, color: 'amber' },
+    { key: 'phases', label: 'طرح درمان مرحله‌ای', icon: <Layers size={16} />, color: 'indigo' },
+    { key: 'consent', label: 'فرم رضایت‌نامه', icon: <FileSignature size={16} />, color: 'violet' },
+    { key: 'appointments', label: 'نوبت‌ها', icon: <Calendar size={16} />, color: 'teal' },
+    { key: 'payments', label: 'پرداخت‌ها', icon: <CreditCard size={16} />, color: 'emerald' },
+    { key: 'teeth', label: 'نمودار دندان‌ها', icon: <Smile size={16} />, color: 'teal' },
+    { key: 'perio', label: 'چارت پریودنتال', icon: <Activity size={16} />, color: 'rose' },
+    { key: 'ortho', label: 'آنالیز ارتودنسی', icon: <Sparkles size={16} />, color: 'purple' },
+    { key: 'prescriptions', label: 'نسخه‌ها', icon: <Pill size={16} />, color: 'emerald' },
+    { key: 'radiology', label: 'رادیولوژی', icon: <ImageIcon size={16} />, color: 'blue' },
+    { key: 'insurance', label: 'بیمه', icon: <Shield size={16} />, color: 'amber' },
+    { key: 'documents', label: 'اسناد', icon: <FileText size={16} />, color: 'indigo' },
   ]
 
   // ===========================================================================

@@ -1233,3 +1233,75 @@ input, textarea, select { font-size: 16px !important; }
 .bg-white:not(.dark .bg-white):not(svg *) {
   background-color: color-mix(in srgb, var(--module-color, #0d9488) 9%, #ffffff);
 }
+
+/* ── Gemini Breathing Ambient Cards & Panels ─────────────────────────
+   Smooth pulsating/breathing ambient gradient from crisp pearl to gentle
+   gemini emerald/mint tint, so cards feel alive and vibrant rather than flat. */
+@keyframes geminiCardAura {
+  0%, 100% {
+    background-color: color-mix(in srgb, var(--module-color, #0d9488) 6%, #ffffff);
+    box-shadow: 0 4px 20px -2px color-mix(in srgb, var(--module-color, #0d9488) 8%, transparent), 0 1px 3px rgba(0, 0, 0, 0.04);
+    border-color: color-mix(in srgb, var(--module-color, #0d9488) 18%, rgba(226, 232, 240, 0.8));
+  }
+  50% {
+    background-color: color-mix(in srgb, var(--module-color, #0d9488) 14%, #ffffff);
+    box-shadow: 0 10px 28px -4px color-mix(in srgb, var(--module-color, #0d9488) 22%, transparent), 0 2px 6px rgba(0, 0, 0, 0.06);
+    border-color: color-mix(in srgb, var(--module-color, #0d9488) 36%, rgba(203, 213, 225, 0.9));
+  }
+}
+
+.gemini-ambient-card {
+  animation: geminiCardAura 8s ease-in-out infinite;
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  transition: transform 250ms ease, box-shadow 250ms ease;
+}
+
+.dark .gemini-ambient-card {
+  animation: geminiCardAuraDark 8s ease-in-out infinite;
+}
+
+@keyframes geminiCardAuraDark {
+  0%, 100% {
+    background-color: color-mix(in srgb, var(--module-color, #0d9488) 12%, #1e293b);
+    box-shadow: 0 4px 24px -2px rgba(0, 0, 0, 0.4);
+    border-color: color-mix(in srgb, var(--module-color, #0d9488) 24%, rgba(51, 65, 85, 0.7));
+  }
+  50% {
+    background-color: color-mix(in srgb, var(--module-color, #0d9488) 22%, #0f172a);
+    box-shadow: 0 10px 32px -4px color-mix(in srgb, var(--module-color, #0d9488) 28%, transparent);
+    border-color: color-mix(in srgb, var(--module-color, #0d9488) 48%, rgba(71, 85, 105, 0.9));
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .gemini-ambient-card { animation: none !important; }
+}
+
+/* Custom smooth scroll track for tabs rail */
+.tabs-scroll-container {
+  scrollbar-width: thin;
+  scrollbar-color: color-mix(in srgb, var(--module-color, #0d9488) 45%, transparent) transparent;
+  -webkit-overflow-scrolling: touch;
+}
+
+.tabs-scroll-container::-webkit-scrollbar {
+  height: 6px;
+}
+
+.tabs-scroll-container::-webkit-scrollbar-track {
+  background: rgba(0, 0, 0, 0.04);
+  border-radius: 9999px;
+  margin: 0 8px;
+}
+
+.tabs-scroll-container::-webkit-scrollbar-thumb {
+  background: color-mix(in srgb, var(--module-color, #0d9488) 45%, #cbd5e1);
+  border-radius: 9999px;
+  transition: background 200ms ease;
+}
+
+.tabs-scroll-container::-webkit-scrollbar-thumb:hover {
+  background: var(--module-color, #0d9488);
+}
+
