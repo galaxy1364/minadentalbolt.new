@@ -3,6 +3,8 @@ import {
   analyzeOverjet,
   analyzeOverbite,
   calculateOrthoComplexity,
+  calculateIotnGrade,
+  parseOrthoVoiceExam,
   createEmptyOrthoExam,
   generateOrthoReportHtml,
   ANGLE_MOLAR_LABELS,
@@ -283,6 +285,69 @@ describe('orthodontic.ts — Clinical Orthodontic & Occlusal Bite Analysis Engin
       expect(html).toContain(ANGLE_CANINE_LABELS.class_2.label)
       expect(html).toContain('D8080')
       expect(html).toContain('الاستیک کلاس ۲')
+    })
+  })
+
+  describe('calculateIotnGrade (Index of Orthodontic Treatment Need)', () => {
+    it('rates excessive overjet > 9mm as IOTN Grade 5 (Very Great Need)', () => {
+      const iotn = calculateIotnGrade({ overjet_mm: 10 })
+      expect(iotn.grade).toBe(5)
+      expect(iotn.needLevel).toBe('very_great')
+      expect(iotn.color).toBe('error')
+      expect(iotn.rationales[0]).toContain('Grade 5a')
+    })
+
+    it('rates severe anterior reverse crossbite < -3.5mm as IOTN Grade 5', () => {
+      const iotn = calculateIotnGrade({ overjet_mm: -4.5 })
+      expect(iotn.grade).toBe(5)
+      expect(iotn.needLevel).toBe('very_great')
+      expect(iotn.rationales[0]).toContain('Grade 5m')
+    })
+
+    it('rates severe crowding or overjet 7mm as IOTN Grade 4 (Great Need)', () => {
+      const iotn = calculateIotnGrade({ overjet_mm: 7, crowding_upper: 'severe' })
+      expect(iotn.grade).toBe(4)
+      expect(iotn.needLevel).toBe('great')
+      expect(iotn.color).toBe('error')
+    })
+
+    it('rates borderline overjet 5mm or crossbite as IOTN Grade 3', () => {
+      const iotn = calculateIotnGrade({ overjet_mm: 5, crossbite_anterior: true })
+      expect(iotn.grade).toBe(3)
+      expect(iotn.needLevel).toBe('moderate')
+      expect(iotn.color).toBe('warning')
+    })
+
+    it('rates physiological normal occlusion as IOTN Grade 1 (No Need)', () => {
+      const iotn = calculateIotnGrade({ overjet_mm: 2, overbite_percent: 25 })
+      expect(iotn.grade).toBe(1)
+      expect(iotn.needLevel).toBe('none')
+      expect(iotn.color).toBe('success')
+    })
+  })
+
+  describe('parseOrthoVoiceExam (Hands-free Voice NLP)', () => {
+    it('parses Class II Div 1 with overjet and overbite from spoken speech', () => {
+      const parsed = parseOrthoVoiceExam('کلاس دو دیویژن یک اورجت ۵ میلی‌متر اوربایت ۶۰ درصد')
+      expect(parsed.molar_class_right).toBe('class_2_div_1')
+      expect(parsed.molar_class_left).toBe('class_2_div_1')
+      expect(parsed.overjet_mm).toBe(5)
+      expect(parsed.overbite_percent).toBe(60)
+    })
+
+    it('parses Class III with anterior crossbite and negative overjet', () => {
+      const parsed = parseOrthoVoiceExam('کلاس سه کراس بایت قدامی اورجت منفی ۳')
+      expect(parsed.molar_class_right).toBe('class_3')
+      expect(parsed.crossbite_anterior).toBe(true)
+      expect(parsed.overjet_mm).toBe(-3)
+    })
+
+    it('parses open bite and severe upper crowding', () => {
+      const parsed = parseOrthoVoiceExam('اپن بایت کراس بایت خلفی راست کراویدینگ شدید بالا پروفایل محدب')
+      expect(parsed.overbite_percent).toBe(-30)
+      expect(parsed.crossbite_posterior_right).toBe(true)
+      expect(parsed.crowding_upper).toBe('severe')
+      expect(parsed.facial_profile).toBe('convex')
     })
   })
 })

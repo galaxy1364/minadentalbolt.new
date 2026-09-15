@@ -594,3 +594,217 @@ export function generateOrthoReportHtml(
     </div>
   `
 }
+
+// ============================================================================
+// IOTN (Index of Orthodontic Treatment Need) - Dental Health Component (DHC)
+// ============================================================================
+
+export interface IotnResult {
+  grade: 1 | 2 | 3 | 4 | 5
+  gradeLabel: string
+  needLevel: 'none' | 'mild' | 'moderate' | 'great' | 'very_great'
+  needText: string
+  color: 'success' | 'info' | 'warning' | 'error'
+  rationales: string[]
+}
+
+export function calculateIotnGrade(exam: Partial<OrthoExamInput>): IotnResult {
+  const rationales: string[] = []
+  const oj = exam.overjet_mm ?? 2
+  const ob = exam.overbite_percent ?? 25
+  const hasCrossbite = exam.crossbite_anterior || exam.crossbite_posterior_right || exam.crossbite_posterior_left
+
+  // Grade 5: Very Great Need
+  if (oj > 9) {
+    rationales.push(`اورجت بسیار شدید (${toPersianDigits(oj)}mm > 9mm) با ریسک ترومای حاد دندانی (Grade 5a)`)
+  }
+  if (oj < -3.5) {
+    rationales.push(`کراس‌بایت قدامی معکوس شدید (${toPersianDigits(Math.abs(oj))}mm > 3.5mm) با اختلال عملکردی (Grade 5m)`)
+  }
+  if (rationales.length > 0) {
+    return {
+      grade: 5,
+      gradeLabel: 'گرید ۵ (Very Great Need)',
+      needLevel: 'very_great',
+      needText: 'نیاز حیاتی و بسیار شدید به درمان ارتودنسی',
+      color: 'error',
+      rationales,
+    }
+  }
+
+  // Grade 4: Great Need
+  if (oj > 6 && oj <= 9) {
+    rationales.push(`اورجت افزایش‌یافته قابل‌توجه (${toPersianDigits(oj)}mm) با خطر آسیب دندانی (Grade 4a)`)
+  }
+  if (oj < 0 && oj >= -3.5) {
+    rationales.push(`کراس‌بایت معکوس قدامی (${toPersianDigits(Math.abs(oj))}mm) (Grade 4m)`)
+  }
+  if (ob >= 75) {
+    rationales.push(`دیپ بایت شدید با ترومای لثه‌ای یا کانتکت پالاتال (${toPersianDigits(ob)}٪) (Grade 4f)`)
+  }
+  if (ob < -20) {
+    rationales.push(`اپن بایت قدامی بارز (${toPersianDigits(Math.abs(ob))}٪) (Grade 4e)`)
+  }
+  if (exam.crowding_upper === 'severe' || exam.crowding_lower === 'severe') {
+    rationales.push('کراودینگ شدید قوس با کمبود فضای بیش از ۴ میلی‌متر (Grade 4d)')
+  }
+  if (hasCrossbite && exam.midline_shift_upper_mm && Math.abs(exam.midline_shift_upper_mm) > 2) {
+    rationales.push('کراس‌بایت همراه با شیفت اکلوزال و انحراف خط میانی (Grade 4c)')
+  }
+  if (rationales.length > 0) {
+    return {
+      grade: 4,
+      gradeLabel: 'گرید ۴ (Great Need)',
+      needLevel: 'great',
+      needText: 'نیاز قطعی و بالا به مداخله ارتودنسی',
+      color: 'error',
+      rationales,
+    }
+  }
+
+  // Grade 3: Borderline Need
+  if (oj > 3.5 && oj <= 6) {
+    rationales.push(`اورجت متوسط (${toPersianDigits(oj)}mm) با احتمال بی‌کفایتی لب‌ها (Grade 3a)`)
+  }
+  if (ob >= 50 && ob < 75) {
+    rationales.push(`دیپ بایت متوسط بدون آسیب لثه‌ای (${toPersianDigits(ob)}٪) (Grade 3f)`)
+  }
+  if (ob < 0 && ob >= -20) {
+    rationales.push('اپن بایت قدامی خفیف تا متوسط (Grade 3e)')
+  }
+  if (hasCrossbite) {
+    rationales.push('کراس‌بایت قدامی یا خلفی بدون جابجایی شدید مندیبل (Grade 3c)')
+  }
+  if (exam.crowding_upper === 'moderate' || exam.crowding_lower === 'moderate') {
+    rationales.push('کراودینگ متوسط قوس دندانی (Grade 3d)')
+  }
+  if (rationales.length > 0) {
+    return {
+      grade: 3,
+      gradeLabel: 'گرید ۳ (Borderline Need)',
+      needLevel: 'moderate',
+      needText: 'نیاز حدواسط / انتخابی با ارزیابی زیبایی و تمایل بیمار',
+      color: 'warning',
+      rationales,
+    }
+  }
+
+  // Grade 2: Little Need
+  if (exam.crowding_upper === 'mild' || exam.crowding_lower === 'mild' || exam.spacing_upper === 'mild' || exam.spacing_lower === 'mild') {
+    rationales.push('نامنظمی یا فاصله خفیف دندان‌ها کمتر از ۲ تا ۳ میلی‌متر (Grade 2d)')
+  }
+  if (rationales.length > 0) {
+    return {
+      grade: 2,
+      gradeLabel: 'گرید ۲ (Little Need)',
+      needLevel: 'mild',
+      needText: 'ناهنجاری خفیف / نیاز اندک بالینی',
+      color: 'info',
+      rationales,
+    }
+  }
+
+  // Grade 1: No Need
+  return {
+    grade: 1,
+    gradeLabel: 'گرید ۱ (No Need)',
+    needLevel: 'none',
+    needText: 'اکلوژن ایده‌آل و طبیعی / بدون نیاز بالینی به درمان ارتودنسی',
+    color: 'success',
+    rationales: ['اکلوژن در محدوده نرمال فیزیولوژیک'],
+  }
+}
+
+// ============================================================================
+// Orthodontic Voice Dictation NLP Parser (Persian Clinical Speech)
+// ============================================================================
+
+export function parseOrthoVoiceExam(transcript: string): Partial<OrthoExamInput> {
+  const result: Partial<OrthoExamInput> = {}
+  if (!transcript || typeof transcript !== 'string') return result
+
+  const text = transcript
+    .replace(/[۰-۹]/g, (d) => '۰۱۲۳۴۵۶۷۸۹'.indexOf(d).toString())
+    .toLowerCase()
+
+  // 1. Molar Classes
+  if (text.includes('کلاس دو بخش یک') || text.includes('کلاس ۲ بخش ۱') || text.includes('کلاس دو دیویژن یک') || text.includes('کلاس ۲ دیویژن ۱') || text.includes('کلاس دو یک')) {
+    result.molar_class_right = 'class_2_div_1'
+    result.molar_class_left = 'class_2_div_1'
+  } else if (text.includes('کلاس دو بخش دو') || text.includes('کلاس ۲ بخش ۲') || text.includes('کلاس دو دیویژن دو') || text.includes('کلاس ۲ دیویژن ۲') || text.includes('کلاس دو دو')) {
+    result.molar_class_right = 'class_2_div_2'
+    result.molar_class_left = 'class_2_div_2'
+  } else if (text.includes('کلاس سه') || text.includes('کلاس ۳')) {
+    result.molar_class_right = 'class_3'
+    result.molar_class_left = 'class_3'
+  } else if (text.includes('کلاس یک') || text.includes('کلاس ۱') || text.includes('نرمال مولار')) {
+    result.molar_class_right = 'class_1'
+    result.molar_class_left = 'class_1'
+  }
+
+  // 2. Overjet (اورجت)
+  const ojMatch = text.match(/اورجت\s*(منفی|-)?\s*(\d+(?:\.\d+)?)/)
+  if (ojMatch) {
+    const isNeg = !!ojMatch[1]
+    const val = parseFloat(ojMatch[2])
+    result.overjet_mm = isNeg ? -val : val
+  } else if (text.includes('لبه به لبه')) {
+    result.overjet_mm = 0
+    result.overbite_percent = 0
+  }
+
+  // 3. Overbite (اوربایت)
+  const obMatch = text.match(/اوربایت\s*(منفی|-)?\s*(\d+)/)
+  if (obMatch) {
+    const isNeg = !!obMatch[1]
+    const val = parseInt(obMatch[2], 10)
+    result.overbite_percent = isNeg ? -val : val
+  } else if (text.includes('اپن بایت')) {
+    result.overbite_percent = -30
+  } else if (text.includes('دیپ بایت شدید')) {
+    result.overbite_percent = 85
+  } else if (text.includes('دیپ بایت')) {
+    result.overbite_percent = 60
+  }
+
+  // 4. Crossbites (کراس بایت)
+  if (text.includes('کراس بایت قدامی') || text.includes('کراس‌بایت قدامی')) {
+    result.crossbite_anterior = true
+  }
+  if (text.includes('کراس بایت خلفی راست') || text.includes('کراس‌بایت خلفی راست')) {
+    result.crossbite_posterior_right = true
+  }
+  if (text.includes('کراس بایت خلفی چپ') || text.includes('کراس‌بایت خلفی چپ')) {
+    result.crossbite_posterior_left = true
+  }
+
+  // 5. Crowding & Spacing
+  const isCrowdUpper = text.includes('کراودینگ') || text.includes('کراویدینگ') || text.includes('کرادینگ')
+  if (isCrowdUpper && (text.includes('شدید بالا') || text.includes('بالا شدید'))) {
+    result.crowding_upper = 'severe'
+  } else if (isCrowdUpper && (text.includes('متوسط بالا') || text.includes('بالا متوسط'))) {
+    result.crowding_upper = 'moderate'
+  } else if (isCrowdUpper && (text.includes('خفیف بالا') || text.includes('بالا خفیف'))) {
+    result.crowding_upper = 'mild'
+  }
+
+  if (isCrowdUpper && (text.includes('شدید پایین') || text.includes('پایین شدید'))) {
+    result.crowding_lower = 'severe'
+  } else if (isCrowdUpper && (text.includes('متوسط پایین') || text.includes('پایین متوسط'))) {
+    result.crowding_lower = 'moderate'
+  } else if (isCrowdUpper && (text.includes('خفیف پایین') || text.includes('پایین خفیف'))) {
+    result.crowding_lower = 'mild'
+  }
+
+  // 6. Facial Profile
+  if (text.includes('پروفایل محدب')) {
+    result.facial_profile = 'convex'
+  } else if (text.includes('پروفایل مقعر')) {
+    result.facial_profile = 'concave'
+  } else if (text.includes('پروفایل مستقیم') || text.includes('پروفایل صاف')) {
+    result.facial_profile = 'straight'
+  }
+
+  return result
+}
+

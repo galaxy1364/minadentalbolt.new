@@ -1,5 +1,5 @@
 // OrthodonticChart.tsx — Professional Orthodontic & Occlusal Bite Analysis Chart
-import React, { useState, useMemo } from 'react'
+import React, { useState, useMemo, useEffect, useRef } from 'react'
 import {
   OrthoExam,
   OrthoExamInput,
@@ -27,6 +27,8 @@ import {
   analyzeOverjet,
   analyzeOverbite,
   calculateOrthoComplexity,
+  calculateIotnGrade,
+  parseOrthoVoiceExam,
   createEmptyOrthoExam,
   generateOrthoReportHtml,
 } from '../lib/orthodontic'
@@ -46,10 +48,144 @@ import {
   ShieldCheck,
   FileCheck,
   Loader2,
+  Mic,
+  MicOff,
+  Eye,
+  Award,
 } from 'lucide-react'
 import { buildPrintDocument } from '../lib/printDocument'
 import { h } from '../lib/haptics'
 import { chimes } from '../lib/chimes'
+
+// ── Interactive Incisor Bite Cross-Section Visualizer (SVG) ──
+function IncisorBiteVisualizer({ overjetMm, overbitePercent }: { overjetMm: number; overbitePercent: number }) {
+  // Base coordinate system:
+  // Upper incisor fixed at X=120, Y=35 (crown tip at Y=85)
+  // Lower incisor:
+  // Baseline physiological position: X=110 (OJ=2mm), Y=70 (OB=25% overlap)
+  // Shift X based on overjet: 1mm = 4px (positive overjet pushes lower incisor to left/lingual: X = 120 - overjet * 4)
+  // Shift Y based on overbite: 10% = 3px (higher overbite pushes lower incisor up: Y = 85 - (overbite / 100) * 40)
+
+  const lowerX = Math.max(50, Math.min(170, 128 - overjetMm * 4.5))
+  const lowerY = Math.max(40, Math.min(125, 95 - (overbitePercent / 100) * 35))
+
+  const isCrossbite = overjetMm < 0
+  const isOpenBite = overbitePercent < 0
+  const isDeepBite = overbitePercent >= 60
+
+  return (
+    <div className="p-3 bg-slate-900 text-slate-100 rounded-2xl border border-slate-700/80 shadow-inner flex flex-col items-center select-none">
+      <div className="w-full flex items-center justify-between text-[11px] font-semibold text-slate-300 pb-1.5 border-b border-slate-800">
+        <span className="flex items-center gap-1.5 text-indigo-400">
+          <Eye size={13} />
+          نمایشگر شماتیک مقطع قدامی (Incisor Sagittal Section)
+        </span>
+        <span className="font-mono text-[10px] px-1.5 py-0.5 rounded bg-slate-800 text-slate-300">
+          OJ: {overjetMm}mm | OB: {overbitePercent}%
+        </span>
+      </div>
+
+      <div className="relative w-full max-w-[240px] h-[140px] my-1">
+        {/* SVG Schematic Tooth Canvas */}
+        <svg viewBox="0 0 240 140" className="w-full h-full">
+          {/* Subtle Grid */}
+          <defs>
+            <pattern id="ortho-grid" width="15" height="15" patternUnits="userSpaceOnUse">
+              <path d="M 15 0 L 0 0 0 15" fill="none" stroke="#1e293b" strokeWidth="0.8" />
+            </pattern>
+            {/* Tooth Gradient Upper */}
+            <linearGradient id="upperToothGrad" x1="0" y1="0" x2="1" y2="1">
+              <stop offset="0%" stopColor="#f8fafc" />
+              <stop offset="100%" stopColor="#cbd5e1" />
+            </linearGradient>
+            {/* Tooth Gradient Lower */}
+            <linearGradient id="lowerToothGrad" x1="0" y1="0" x2="1" y2="1">
+              <stop offset="0%" stopColor="#f1f5f9" />
+              <stop offset="100%" stopColor="#94a3b8" />
+            </linearGradient>
+          </defs>
+
+          <rect width="240" height="140" fill="url(#ortho-grid)" />
+
+          {/* Occlusal Reference Plane */}
+          <line x1="10" y1="90" x2="230" y2="90" stroke="#475569" strokeDasharray="3,3" strokeWidth="1" />
+          <text x="15" y="85" fill="#64748b" fontSize="8" fontFamily="sans-serif">پلن اکلوزال</text>
+
+          {/* Upper Incisor (Fixed Maxillary Incisor) */}
+          <g transform="translate(130, 25)">
+            {/* Root */}
+            <path
+              d="M 8 0 C 15 15, 18 35, 16 50 L 0 50 C -2 35, 1 15, 8 0 Z"
+              fill="#94a3b8"
+              opacity="0.5"
+            />
+            {/* Crown */}
+            <path
+              d="M 16 50 C 18 62, 14 75, 10 75 C 6 75, -1 62, 0 50 Z"
+              fill="url(#upperToothGrad)"
+              stroke="#38bdf8"
+              strokeWidth="1.5"
+            />
+            <text x="22" y="65" fill="#38bdf8" fontSize="8" fontWeight="bold">فک بالا (۱۱)</text>
+          </g>
+
+          {/* Lower Incisor (Dynamic Mandibular Incisor) */}
+          <g transform={`translate(${lowerX}, ${lowerY})`} style={{ transition: 'transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1)' }}>
+            {/* Crown */}
+            <path
+              d="M 12 20 C 14 8, 11 -2, 7 -2 C 3 -2, -1 8, 0 20 Z"
+              fill="url(#lowerToothGrad)"
+              stroke={isCrossbite ? '#f43f5e' : '#a855f7'}
+              strokeWidth="1.5"
+            />
+            {/* Root */}
+            <path
+              d="M 0 20 C 2 35, 4 50, 7 60 C 10 50, 11 35, 12 20 Z"
+              fill="#94a3b8"
+              opacity="0.5"
+            />
+            <text x="-25" y="15" fill={isCrossbite ? '#f43f5e' : '#c084fc'} fontSize="8" fontWeight="bold">فک پایین (۴۱)</text>
+          </g>
+        </svg>
+      </div>
+
+      {/* Clinical Status Badges under Visualizer */}
+      <div className="flex items-center gap-1.5 flex-wrap justify-center text-[10px] pt-1">
+        {isCrossbite ? (
+          <span className="px-2 py-0.5 rounded-full bg-rose-500/20 text-rose-300 font-bold border border-rose-500/40">
+            کراس‌بایت معکوس (Crossbite)
+          </span>
+        ) : overjetMm === 0 ? (
+          <span className="px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-300 font-bold border border-amber-500/40">
+            لبه‌به‌لبه (Edge-to-Edge)
+          </span>
+        ) : overjetMm > 6 ? (
+          <span className="px-2 py-0.5 rounded-full bg-orange-500/20 text-orange-300 font-bold border border-orange-500/40">
+            اورجت بالا (Increased OJ)
+          </span>
+        ) : (
+          <span className="px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 font-bold border border-emerald-500/40">
+            اورجت نرمال (Normal OJ)
+          </span>
+        )}
+
+        {isOpenBite ? (
+          <span className="px-2 py-0.5 rounded-full bg-rose-500/20 text-rose-300 font-bold border border-rose-500/40">
+            اپن‌بایت (Open Bite)
+          </span>
+        ) : isDeepBite ? (
+          <span className="px-2 py-0.5 rounded-full bg-purple-500/20 text-purple-300 font-bold border border-purple-500/40">
+            دیپ‌بایت (Deep Bite)
+          </span>
+        ) : (
+          <span className="px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 font-bold border border-emerald-500/40">
+            هم‌پوشانی عمودی نرمال
+          </span>
+        )}
+      </div>
+    </div>
+  )
+}
 
 interface OrthodonticChartProps {
   patientId: string
@@ -83,6 +219,86 @@ export function OrthodonticChart({
   const ojAnalysis = useMemo(() => analyzeOverjet(formData.overjet_mm), [formData.overjet_mm])
   const obAnalysis = useMemo(() => analyzeOverbite(formData.overbite_percent), [formData.overbite_percent])
   const complexity = useMemo(() => calculateOrthoComplexity(formData, patient), [formData, patient])
+  const iotn = useMemo(() => calculateIotnGrade(formData), [formData])
+
+  // Hands-free Voice Dictation for sterile clinical exam
+  const [isListening, setIsListening] = useState(false)
+  const [voiceText, setVoiceText] = useState('')
+  const recognitionRef = useRef<any>(null)
+
+  useEffect(() => {
+    return () => {
+      if (recognitionRef.current) {
+        try {
+          recognitionRef.current.abort()
+        } catch {
+          // ignore
+        }
+      }
+    }
+  }, [])
+
+  const toggleVoiceDictation = () => {
+    const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition
+    if (!SpeechRecognition) {
+      showToast('error', 'مرورگر شما از قابلیت Web Speech API پشتیبانی نمی‌کند')
+      return
+    }
+
+    if (isListening) {
+      try {
+        recognitionRef.current?.stop()
+      } catch {
+        // ignore
+      }
+      setIsListening(false)
+      h.tap()
+      return
+    }
+
+    try {
+      const recognition = new SpeechRecognition()
+      recognition.lang = 'fa-IR'
+      recognition.continuous = true
+      recognition.interimResults = true
+
+      recognition.onstart = () => {
+        setIsListening(true)
+        h.confirm()
+        chimes.playPop()
+      }
+
+      recognition.onresult = (event: any) => {
+        const last = event.results.length - 1
+        const transcript = event.results[last][0].transcript
+        setVoiceText(transcript)
+
+        if (event.results[last].isFinal) {
+          const parsed = parseOrthoVoiceExam(transcript)
+          if (Object.keys(parsed).length > 0) {
+            h.success()
+            chimes.playSuccess()
+            setFormData((prev) => ({ ...prev, ...parsed }))
+            showToast('success', `یافته‌های صوتی ارتودنسی اعمال شد: ${transcript}`)
+          }
+        }
+      }
+
+      recognition.onerror = () => {
+        setIsListening(false)
+      }
+
+      recognition.onend = () => {
+        setIsListening(false)
+      }
+
+      recognitionRef.current = recognition
+      recognition.start()
+    } catch {
+      setIsListening(false)
+      showToast('error', 'خطا در فعال‌سازی میکروفون')
+    }
+  }
 
   const currentDoctor = useMemo(() => {
     return doctors.find((d) => d.id === formData.doctor_id) || null
@@ -178,6 +394,18 @@ export function OrthodonticChart({
           </div>
 
           <div className="flex flex-wrap items-center gap-2">
+            <button
+              type="button"
+              onClick={toggleVoiceDictation}
+              className={`min-h-[44px] px-3.5 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 shadow-sm ${
+                isListening
+                  ? 'bg-rose-600 text-white animate-pulse shadow-rose-500/30'
+                  : 'bg-white dark:bg-slate-800 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800 hover:bg-indigo-50'
+              }`}
+            >
+              {isListening ? <MicOff className="w-4 h-4" /> : <Mic className="w-4 h-4 text-indigo-600" />}
+              <span>{isListening ? 'در حال شنود...' : 'معاینه صوتی (هندزفری)'}</span>
+            </button>
             <Button
               type="button"
               variant="secondary"
@@ -204,8 +432,26 @@ export function OrthodonticChart({
           </div>
         </div>
 
+        {/* بنر زنده شنود گفتار بالینی */}
+        {isListening && (
+          <div className="mt-4 p-3 bg-indigo-900/90 text-white rounded-2xl border border-indigo-700 shadow-md animate-fadeIn flex items-center justify-between gap-3 text-xs">
+            <div className="flex items-center gap-2">
+              <span className="w-2.5 h-2.5 rounded-full bg-rose-500 animate-ping shrink-0" />
+              <span className="font-semibold text-indigo-200">گفتار بالینی:</span>
+              <span className="font-mono text-white text-sm">{voiceText || '«کلاس دو دیویژن یک، اورجت ۵ میلی‌متر، کراس‌بایت قدامی...»'}</span>
+            </div>
+            <button
+              onClick={toggleVoiceDictation}
+              className="px-2.5 py-1 rounded-lg bg-indigo-800 hover:bg-indigo-700 text-[11px] font-bold text-indigo-200 shrink-0"
+            >
+              توقف شنود
+            </button>
+          </div>
+        )}
+
         {/* Dynamic Severity & Complexity Banner */}
-        <div className="mt-5 pt-4 border-t border-indigo-100/80 dark:border-slate-700/80 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+        <div className="mt-5 pt-4 border-t border-indigo-100/80 dark:border-slate-700/80 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
+          {/* OCS Complexity Score */}
           <div className="p-3 bg-white/80 dark:bg-slate-800/80 rounded-xl border border-slate-200/80 dark:border-slate-700">
             <span className="text-[11px] text-slate-400 font-medium">شاخص پیچیدگی درمان (OCS)</span>
             <div className="flex items-center justify-between mt-1">
@@ -224,6 +470,23 @@ export function OrthodonticChart({
                 }
               >
                 {complexity.tierLabel}
+              </Badge>
+            </div>
+          </div>
+
+          {/* IOTN Treatment Need Index */}
+          <div className="p-3 bg-white/80 dark:bg-slate-800/80 rounded-xl border border-slate-200/80 dark:border-slate-700">
+            <span className="text-[11px] text-slate-400 font-medium flex items-center justify-between">
+              <span>شاخص نیاز ارتودنسی</span>
+              <span className="font-mono text-[10px] text-indigo-500 font-bold">IOTN-DHC</span>
+            </span>
+            <div className="flex items-center justify-between mt-1">
+              <span className="text-sm font-bold text-slate-800 dark:text-slate-100 flex items-center gap-1">
+                <Award size={14} className="text-indigo-600" />
+                گرید {toPersianDigits(iotn.grade)}
+              </span>
+              <Badge color={iotn.color === 'error' ? 'error' : iotn.color === 'warning' ? 'warning' : iotn.color === 'info' ? 'accent' : 'success'}>
+                {iotn.needLevel === 'very_great' ? 'حیاتی' : iotn.needLevel === 'great' ? 'شدید' : iotn.needLevel === 'moderate' ? 'مرزی' : iotn.needLevel === 'mild' ? 'خفیف' : 'نرمال'}
               </Badge>
             </div>
           </div>
@@ -516,6 +779,30 @@ export function OrthodonticChart({
                   : 'دارای شیفت خط میانی نسبت به پلن صورتی'}
               </div>
             </div>
+          </div>
+        </div>
+
+        {/* Interactive Bite Visualizer & IOTN Diagnostic Rationales */}
+        <div className="mt-5 pt-4 border-t border-slate-100 dark:border-slate-750 grid grid-cols-1 lg:grid-cols-3 gap-4 items-center">
+          <div className="lg:col-span-1">
+            <IncisorBiteVisualizer overjetMm={formData.overjet_mm} overbitePercent={formData.overbite_percent} />
+          </div>
+
+          <div className="lg:col-span-2 p-4 bg-indigo-50/50 dark:bg-indigo-950/20 border border-indigo-100 dark:border-indigo-900/50 rounded-2xl space-y-2">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-bold text-indigo-950 dark:text-indigo-200 flex items-center gap-1.5">
+                <Award size={15} className="text-indigo-600" />
+                ارزیابی شاخص نیاز درمان ارتودنسی (IOTN Grade {toPersianDigits(iotn.grade)} - {iotn.needText}):
+              </span>
+              <Badge color={iotn.color === 'error' ? 'error' : iotn.color === 'warning' ? 'warning' : iotn.color === 'info' ? 'accent' : 'success'}>
+                {iotn.gradeLabel}
+              </Badge>
+            </div>
+            <ul className="text-xs text-slate-600 dark:text-slate-300 space-y-1 list-disc list-inside">
+              {iotn.rationales.map((r, i) => (
+                <li key={i}>{r}</li>
+              ))}
+            </ul>
           </div>
         </div>
       </Card>
