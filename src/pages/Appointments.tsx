@@ -25,6 +25,7 @@ import { detectSpecialty, CANCELLATION_REASONS } from '../lib/appointmentColorMa
 import { tileThemes, getHashColor } from '../lib/colors'
 import { computeWaitingTimeMinutes, formatWaitingTime, announcePatientCall, broadcastPatientCall, computeAverageWaitingTime } from '../lib/operatoryWorkflow'
 import { matchWaitingListForCancelledSlot, MatchCandidate, SlotInfo } from '../lib/waitingListMatcher'
+import { recordAuditLog } from '../lib/auditLogger'
 
 const typeMeta: Record<string, { label: string; color: string; bg: string; dot: string }> = {
   consultation:  { label: 'مشاوره',      color: 'text-primary-700',  bg: 'bg-primary-50',  dot: 'bg-primary-500' },
@@ -622,6 +623,12 @@ export default function Appointments() {
     await updateAppointment(cancelModalAppt.id, {
       status: 'cancelled',
       notes: updatedNotes,
+    })
+    await recordAuditLog({
+      table_name: 'appointments',
+      operation: 'delete',
+      record_id: cancelModalAppt.id,
+      summary: `لغو نوبت ${cancelModalAppt.patient ? `${cancelModalAppt.patient.first_name} ${cancelModalAppt.patient.last_name}` : ''} به علت: «${cancelReason}»`,
     })
     chimes.playPop()
     setCancelModalAppt(null)

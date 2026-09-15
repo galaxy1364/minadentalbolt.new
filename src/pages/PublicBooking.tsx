@@ -1,12 +1,6 @@
-// PublicBooking.tsx — نوبت‌دهی آنلاین: a public form with NO login
-// required, meant to be linked/embedded from the clinic's own website
-// (e.g. minadent-clinic.com/book -> this app's #/book route). Writes
-// directly to online_booking_requests via the anon key, which is only
-// allowed to INSERT on this one table (see migration 018) — every
-// other table in this app stays locked to authenticated-only.
 import { useState } from 'react'
 import { createClient } from '@supabase/supabase-js'
-import { CheckCircle2, Calendar, Phone, User, MessageSquare, ArrowRight } from 'lucide-react'
+import { CheckCircle2, Calendar, Phone, User, MessageSquare, ArrowRight, Copy, Check, Navigation, MapPin, Clock } from 'lucide-react'
 import { MinadentLogo } from '../components/MinadentLogo'
 import { PersianCalendar } from '../components/PersianCalendar'
 import { toJalaliStringPretty, toPersianDigits } from '../lib/persianDate'
@@ -20,6 +14,13 @@ const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || ''
 // is public and unauthenticated by design, so it must never touch the
 // staff app's own login session in localStorage.
 const publicClient = createClient(supabaseUrl, supabaseAnonKey, { auth: { persistSession: false } })
+
+// مختصات کلینیک جهت مسیریابی (تهران، نمونه مطب مرکزی)
+const CLINIC_LAT = '35.7219'
+const CLINIC_LNG = '51.4056'
+const CLINIC_PHONE = '02188001122'
+const CLINIC_PHONE_DISPLAY = '۰۲۱-۸۸۰۰۱۱۲۲'
+const CLINIC_ADDRESS = 'تهران، خیابان ولیعصر، نرسیده به میدان ونک، مجتمع پزشکان، طبقه ۳'
 
 function normalizePhone(str: string): string {
   return str
@@ -37,9 +38,20 @@ export default function PublicBooking() {
   const [reason, setReason] = useState('')
   const [submitting, setSubmitting] = useState(false)
   const [done, setDone] = useState(false)
+  const [trackingCode, setTrackingCode] = useState('')
+  const [copied, setCopied] = useState(false)
   const [error, setError] = useState('')
 
   const timeSlots = ['۰۹:۰۰', '۱۰:۰۰', '۱۱:۰۰', '۱۲:۰۰', '۱۵:۰۰', '۱۶:۰۰', '۱۷:۰۰', '۱۸:۰۰']
+
+  const handleCopyTrackingCode = () => {
+    if (!trackingCode) return
+    navigator.clipboard?.writeText(trackingCode)
+    setCopied(true)
+    h.tap()
+    chimes.playSuccess()
+    setTimeout(() => setCopied(false), 2500)
+  }
 
   const handleSubmit = async () => {
     setError('')
@@ -55,6 +67,8 @@ export default function PublicBooking() {
       return
     }
     setSubmitting(true)
+    // تولید کد پیگیری منحصربه‌فرد برای مراجع
+    const generatedCode = `MN-${Math.floor(10000 + Math.random() * 90000)}`
     try {
       const { error: insertError } = await publicClient.from('online_booking_requests').insert({
         clinic_id: CLINIC_ID,
@@ -62,12 +76,13 @@ export default function PublicBooking() {
         phone: cleanPhone,
         preferred_date: date || null,
         preferred_time: time || null,
-        reason: reason.trim() || null,
+        reason: (reason.trim() ? `${reason.trim()} [کد پیگیری: ${generatedCode}]` : `[کد پیگیری: ${generatedCode}]`),
         status: 'pending',
       })
       if (insertError) throw insertError
       h.success()
       chimes.playSuccess()
+      setTrackingCode(generatedCode)
       setDone(true)
     } catch {
       chimes.playWarning()
@@ -84,21 +99,99 @@ export default function PublicBooking() {
     setDate('')
     setTime('')
     setReason('')
+    setTrackingCode('')
     setDone(false)
     setError('')
   }
 
   if (done) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-primary-50 via-white to-primary-50 p-6" dir="rtl">
-        <div className="max-w-sm w-full bg-white/90 backdrop-blur-xl border border-slate-200/80 rounded-3xl p-6 text-center shadow-xl">
-          <div className="w-16 h-16 rounded-2xl bg-emerald-100 flex items-center justify-center mx-auto mb-4 text-emerald-600 shadow-sm">
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-primary-50 via-white to-primary-50 p-4 sm:p-6" dir="rtl">
+        <div className="max-w-md w-full bg-white/95 backdrop-blur-xl border border-slate-200/80 rounded-3xl p-6 text-center shadow-xl space-y-5">
+          <div className="w-16 h-16 rounded-2xl bg-emerald-100 flex items-center justify-center mx-auto text-emerald-600 shadow-sm animate-bounce">
             <CheckCircle2 size={36} />
           </div>
-          <h1 className="text-xl font-extrabold text-slate-800 mb-2">درخواست شما با موفقیت ثبت شد</h1>
-          <p className="text-xs text-slate-500 leading-relaxed mb-6">
-            همکاران ما در کلینیک دندانپزشکی مینا به‌زودی جهت هماهنگی نهایی نوبت با شماره <span className="font-mono font-bold text-primary-600 dir-ltr inline-block">{toPersianDigits(normalizePhone(phone))}</span> تماس حاصل خواهند کرد.
-          </p>
+          <div>
+            <h1 className="text-xl font-extrabold text-slate-800 mb-1">درخواست شما با موفقیت ثبت شد</h1>
+            <p className="text-xs text-slate-500 leading-relaxed">
+              همکاران ما در کلینیک دندانپزشکی مینا به‌زودی جهت هماهنگی نهایی با شماره <span className="font-mono font-bold text-primary-600 dir-ltr inline-block">{toPersianDigits(normalizePhone(phone))}</span> تماس خواهند گرفت.
+            </p>
+          </div>
+
+          {/* کارت کد رهگیری */}
+          <div className="bg-slate-50 border border-slate-200 rounded-2xl p-3 flex items-center justify-between">
+            <div className="text-right">
+              <span className="text-[11px] text-slate-400 block">کد رهگیری نوبت:</span>
+              <span className="font-mono font-black text-slate-800 text-base tracking-wider">{trackingCode}</span>
+            </div>
+            <button
+              onClick={handleCopyTrackingCode}
+              type="button"
+              className="px-3 py-1.5 rounded-xl bg-white border border-slate-200 text-xs font-semibold text-slate-700 hover:bg-slate-100 flex items-center gap-1.5 transition-colors shadow-xs"
+            >
+              {copied ? <Check size={14} className="text-emerald-600" /> : <Copy size={14} />}
+              <span>{copied ? 'کپی شد' : 'کپی کد'}</span>
+            </button>
+          </div>
+
+          {/* تماس سریع و ساعت کاری */}
+          <div className="bg-primary-50/70 border border-primary-100 rounded-2xl p-3.5 text-right space-y-2 text-xs text-slate-700">
+            <div className="flex items-center justify-between">
+              <span className="flex items-center gap-1.5 font-bold text-primary-900">
+                <Phone size={14} className="text-primary-600" />
+                تلفن پذیرش کلینیک:
+              </span>
+              <a
+                href={`tel:${CLINIC_PHONE}`}
+                className="font-mono font-bold text-primary-700 hover:text-primary-800 underline dir-ltr"
+              >
+                {CLINIC_PHONE_DISPLAY}
+              </a>
+            </div>
+            <div className="flex items-center gap-1.5 text-slate-600 text-[11px]">
+              <Clock size={13} className="text-slate-400" />
+              <span>شنبه تا چهارشنبه ۹:۰۰ الی ۲۰:۰۰ | پنجشنبه‌ها ۹:۰۰ الی ۱۴:۰۰</span>
+            </div>
+            <div className="flex items-start gap-1.5 text-slate-600 text-[11px] pt-1 border-t border-primary-100/60">
+              <MapPin size={13} className="text-slate-400 shrink-0 mt-0.5" />
+              <span>{CLINIC_ADDRESS}</span>
+            </div>
+          </div>
+
+          {/* دکمه‌های مسیریابی هوشمند */}
+          <div className="pt-1">
+            <div className="flex items-center gap-1.5 text-xs font-bold text-slate-700 mb-2">
+              <Navigation size={14} className="text-primary-600" />
+              <span>مسیریابی سریع به کلینیک:</span>
+            </div>
+            <div className="grid grid-cols-3 gap-2">
+              <a
+                href={`https://nshn.ir/?lat=${CLINIC_LAT}&lng=${CLINIC_LNG}`}
+                target="_blank"
+                rel="noreferrer"
+                className="py-2 px-1 rounded-xl bg-blue-50 hover:bg-blue-100 text-blue-700 text-xs font-bold transition-colors text-center border border-blue-200/60"
+              >
+                نقشه نشان
+              </a>
+              <a
+                href={`https://balad.ir/location?latitude=${CLINIC_LAT}&longitude=${CLINIC_LNG}`}
+                target="_blank"
+                rel="noreferrer"
+                className="py-2 px-1 rounded-xl bg-emerald-50 hover:bg-emerald-100 text-emerald-700 text-xs font-bold transition-colors text-center border border-emerald-200/60"
+              >
+                نقشه بلد
+              </a>
+              <a
+                href={`https://www.google.com/maps/search/?api=1&query=${CLINIC_LAT},${CLINIC_LNG}`}
+                target="_blank"
+                rel="noreferrer"
+                className="py-2 px-1 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold transition-colors text-center border border-slate-200"
+              >
+                گوگل مپ
+              </a>
+            </div>
+          </div>
+
           <button
             onClick={resetForm}
             className="w-full py-3 rounded-2xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs transition-colors flex items-center justify-center gap-1.5"
@@ -161,11 +254,22 @@ export default function PublicBooking() {
           <button
             onClick={handleSubmit}
             disabled={submitting}
-            className="w-full py-3 rounded-2xl bg-primary-600 text-white font-bold text-sm disabled:opacity-60"
+            className="w-full py-3 rounded-2xl bg-primary-600 text-white font-bold text-sm disabled:opacity-60 hover:bg-primary-700 transition-colors shadow-sm"
           >
             {submitting ? 'در حال ارسال...' : 'ثبت درخواست نوبت'}
           </button>
           <p className="text-[11px] text-slate-400 text-center">این یک درخواست است، نوبت شما پس از تماس همکاران ما نهایی می‌شود.</p>
+        </div>
+
+        {/* اطلاعات تماس پذیرش در پایین صفحه */}
+        <div className="mt-4 text-center space-y-1 text-xs text-slate-500">
+          <p>
+            نیاز به راهنمایی فوری دارید؟{' '}
+            <a href={`tel:${CLINIC_PHONE}`} className="font-bold text-primary-600 hover:text-primary-700 underline">
+              تماس با پذیرش کلینیک ({CLINIC_PHONE_DISPLAY})
+            </a>
+          </p>
+          <p className="text-[11px] text-slate-400">ساعات پاسخگویی: شنبه تا چهارشنبه ۹ الی ۲۰ — پنجشنبه ۹ الی ۱۴</p>
         </div>
       </div>
     </div>

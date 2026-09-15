@@ -4,6 +4,7 @@ import { Users, Search, Plus, Phone, Mail, Calendar, DollarSign, Smile, Briefcas
 import { PieChart, Pie, Cell, Tooltip as RTooltip, ResponsiveContainer } from 'recharts'
 import { staffSaveMessage, LoginOutcome } from '../lib/staffSaveOutcome'
 import { fetchStaff, createStaff, updateStaff, fetchEncounters, fetchLabOrders, fetchTreatments, createExpense, fetchDoctors, fetchStaffLoginStatuses, setStaffLoginActive } from '../lib/api'
+import { fetchAuditLogs, AuditLogEntry, formatAuditActionTitle, OPERATION_LABELS, TABLE_PERSIAN_LABELS } from '../lib/auditLogger'
 import { CLINIC_ID, supabase } from '../lib/supabase'
 import { toJalaliDisplay, toJalaliStringPretty, formatCurrency, formatNumber, toPersianDigits } from '../lib/persianDate'
 import type { Staff as StaffType, StaffInput, EncounterWithRelations, LabOrderWithRelations, Treatment } from '../types'
@@ -88,6 +89,28 @@ export default function Staff() {
   const todayStr = () => new Date().toISOString().slice(0, 10)
   const [sharePeriodStart, setSharePeriodStart] = useState(monthStart())
   const [sharePeriodEnd, setSharePeriodEnd] = useState(todayStr())
+
+  // ── Clinical Audit Trail State ──────────────────────────────────
+  const [showAuditPanel, setShowAuditPanel] = useState(false)
+  const [auditLogs, setAuditLogs] = useState<AuditLogEntry[]>([])
+  const [loadingAudit, setLoadingAudit] = useState(false)
+  const [auditSearchQuery, setAuditSearchQuery] = useState('')
+
+  const loadAuditLogs = useCallback(async () => {
+    setLoadingAudit(true)
+    try {
+      const logs = await fetchAuditLogs(100)
+      setAuditLogs(logs)
+    } finally {
+      setLoadingAudit(false)
+    }
+  }, [])
+
+  useEffect(() => {
+    if (showAuditPanel) {
+      loadAuditLogs()
+    }
+  }, [showAuditPanel, loadAuditLogs])
 
   const [formData, setFormData] = useState({
     full_name: '',
@@ -642,6 +665,120 @@ export default function Staff() {
           <EmptyState icon={<Calculator size={28} />} title="هنوز محاسبه نشده است" description="روی دکمه «محاسبه سهم» کلیک کنید" />
         ) : (
           <p className="text-sm text-slate-500">{formatNumber(doctors.length)} پزشک ثبت شده است. برای مشاهده سهم‌بندی، پنل را باز کنید.</p>
+        )}
+      </Card>
+
+      {/* Audit Trail & Security Panel (HIPAA & Clinical Audit) */}
+      <Card className="p-5 border-slate-200/80">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <Shield size={20} className="text-emerald-600" />
+            <div>
+              <h3 className="text-sm font-bold text-slate-800 dark:text-slate-100 flex items-center gap-2">
+                ردپای امنیتی و ممیزی رویدادها (Audit Trail)
+                <Badge color="slate">{toPersianDigits(auditLogs.length)} رخداد اخیر</Badge>
+              </h3>
+              <p className="text-xs text-slate-400 mt-0.5">ثبت غیرقابل دستکاری کلیه تراکنش‌ها، تغییرات پرونده‌ها و دسترسی‌های پرسنل</p>
+            </div>
+          </div>
+          <div className="flex items-center gap-2">
+            {showAuditPanel && (
+              <Button variant="ghost" size="sm" onClick={loadAuditLogs} disabled={loadingAudit} title="تازه‌سازی لاگ‌ها">
+                <RotateCcw size={14} className={loadingAudit ? 'animate-spin' : ''} />
+              </Button>
+            )}
+            <Button
+              variant="secondary"
+              size="sm"
+              onClick={() => {
+                h.tap()
+                chimes.playPop()
+                setShowAuditPanel(!showAuditPanel)
+              }}
+            >
+              {showAuditPanel ? <ChevronUp size={14} className="inline ml-1" /> : <ChevronDown size={14} className="inline ml-1" />}
+              {showAuditPanel ? 'بستن ردپا' : 'مشاهده لاگ‌های ممیزی'}
+            </Button>
+          </div>
+        </div>
+
+        {showAuditPanel && (
+          <div className="mt-4 pt-4 border-t border-slate-100 dark:border-slate-700/60 space-y-3 animate-fade-in">
+            <div className="flex items-center gap-2">
+              <div className="relative flex-1">
+                <Search size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                <input
+                  type="text"
+                  value={auditSearchQuery}
+                  onChange={(e) => setAuditSearchQuery(e.target.value)}
+                  placeholder="جستجو در شرح رویدادها، نام کاربر، یا شناسه رکورد..."
+                  className="w-full pr-8 pl-3 py-1.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-xs focus:outline-none focus:ring-2 focus:ring-primary-400"
+                />
+              </div>
+            </div>
+
+            {loadingAudit ? (
+              <div className="flex items-center justify-center py-8">
+                <Spinner size={24} />
+              </div>
+            ) : auditLogs.length === 0 ? (
+              <div className="text-center py-6 text-xs text-slate-400">
+                هنوز هیچ رویدادی در لاگ ممیزی امنیتی ثبت نشده است.
+              </div>
+            ) : (
+              <div className="overflow-x-auto border border-slate-100 dark:border-slate-700/60 rounded-xl">
+                <table className="w-full text-xs">
+                  <thead>
+                    <tr className="bg-slate-50 dark:bg-slate-800/80 text-slate-500 border-b border-slate-200 dark:border-slate-700">
+                      <th className="text-right py-2 px-3">زمان و تاریخ</th>
+                      <th className="text-right py-2 px-3">عملیات</th>
+                      <th className="text-right py-2 px-3">بخش / جدول</th>
+                      <th className="text-right py-2 px-3">شرح رویداد</th>
+                      <th className="text-right py-2 px-3">کاربر / نقش</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+                    {auditLogs
+                      .filter((l) => {
+                        if (!auditSearchQuery.trim()) return true
+                        const q = auditSearchQuery.toLowerCase()
+                        return (
+                          l.summary?.toLowerCase().includes(q) ||
+                          l.actor_name?.toLowerCase().includes(q) ||
+                          l.table_name?.toLowerCase().includes(q) ||
+                          l.record_id?.toLowerCase().includes(q)
+                        )
+                      })
+                      .slice(0, 50)
+                      .map((log, idx) => {
+                        const opMeta = OPERATION_LABELS[log.operation] || { label: log.operation, color: 'slate' }
+                        const tblName = TABLE_PERSIAN_LABELS[log.table_name] || log.table_name
+                        return (
+                          <tr key={log.id || idx} className="hover:bg-slate-50/70 dark:hover:bg-slate-800/50 transition-colors">
+                            <td className="py-2 px-3 font-mono text-slate-500 whitespace-nowrap">
+                              {toJalaliStringPretty(log.created_at.slice(0, 10))} — {log.created_at.slice(11, 16)}
+                            </td>
+                            <td className="py-2 px-3 whitespace-nowrap">
+                              <Badge color={opMeta.color}>{opMeta.label}</Badge>
+                            </td>
+                            <td className="py-2 px-3 font-medium text-slate-700 dark:text-slate-300 whitespace-nowrap">
+                              {tblName}
+                            </td>
+                            <td className="py-2 px-3 text-slate-800 dark:text-slate-200">
+                              {log.summary}
+                            </td>
+                            <td className="py-2 px-3 whitespace-nowrap text-slate-600 dark:text-slate-400">
+                              <span className="font-bold text-slate-700 dark:text-slate-300">{log.actor_name}</span>
+                              {log.actor_role && <span className="text-[10px] text-slate-400 mr-1">({log.actor_role})</span>}
+                            </td>
+                          </tr>
+                        )
+                      })}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
         )}
       </Card>
 
