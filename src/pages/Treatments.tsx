@@ -22,6 +22,7 @@ import { procedureDefaultPrice } from '../lib/selectionHints'
 import { groupPatientTreatments } from '../lib/patientTreatmentGroups'
 import type { PatientPolicy } from '../lib/insurance'
 import { PatientSelect } from '../components/PatientSelect'
+import { PatientAlerts } from '../components/PatientAlerts'
 import { toJalaliDisplay, toJalaliStringPretty, formatCurrency, formatNumber, toPersianDigits } from '../lib/persianDate'
 import { Encounter, EncounterWithRelations, Treatment, Procedure, Patient, Doctor, Laboratory, ToothRecord, LabOrder, InsuranceClaim, Payment, Cheque, Installment, ImplantCaseWithRelations, InventoryItemWithRelations } from '../types'
 import { Card, Button, Badge, Spinner, EmptyState, Tabs, Input, Select, Textarea, Modal, Wizard, showToast } from '../components/ui'
@@ -1478,6 +1479,11 @@ export default function Treatments() {
                     </div>
                   )}
                 </div>
+                {encForm.patient_id && (
+                  <div className="mt-2">
+                    <PatientAlerts patient={patientMap.get(encForm.patient_id) || null} balance={null} />
+                  </div>
+                )}
                 {doctors.filter((d) => d.is_active).length === 0 ? (
                   <div className="p-4 rounded-2xl bg-warning-50 border border-warning-200 text-center">
                     <p className="text-sm font-bold text-warning-700 mb-1">هنوز پزشکی ثبت نشده است</p>
@@ -1526,24 +1532,11 @@ export default function Treatments() {
       <Modal open={!!detailEnc} onClose={() => { h.cancel(); setDetailEnc(null); setLastSelectedTooth('') }} title={detailEnc ? `ویزیت: ${encounterPatientName(detailEnc)}` : ''} size="full">
         {detailEnc && (
           <div className="space-y-5">
-            {/* Smart Medical Alerts */}
-            {(() => {
-              const p = patientMap.get(detailEnc.patient_id)
-              const hasAlerts = p?.allergies || p?.medical_conditions
-              if (!hasAlerts) return null
-              return (
-                <div className="flex flex-col sm:flex-row sm:items-center gap-3 p-3 rounded-xl border border-red-200/60 bg-red-50 dark:bg-red-900/20 glass glass-specular shadow-sm">
-                  <div className="flex items-center gap-2 text-red-700 dark:text-red-400 font-bold text-sm shrink-0">
-                    <AlertCircle size={18} className="animate-pulse" />
-                    هشدار پزشکی:
-                  </div>
-                  <div className="flex flex-wrap items-center gap-1.5 text-[11px] font-medium text-red-800 dark:text-red-200">
-                    {p.allergies?.split(',').map(s => s.trim()).filter(Boolean).map(a => <span key={`a-${a}`} className="px-2 py-0.5 rounded-md bg-red-100 dark:bg-red-800/40">{a}</span>)}
-                    {p.medical_conditions?.split(',').map(s => s.trim()).filter(Boolean).map(c => <span key={`c-${c}`} className="px-2 py-0.5 rounded-md bg-red-100 dark:bg-red-800/40">{c}</span>)}
-                  </div>
-                </div>
-              )
-            })()}
+            {/* Clinical & Medical Alerts */}
+            <PatientAlerts
+              patient={detailEnc.patient || patientMap.get(detailEnc.patient_id) || null}
+              balance={null}
+            />
 
             {/* Info bar */}
             <div className="flex flex-wrap items-center gap-3 p-3 rounded-xl bg-slate-50">

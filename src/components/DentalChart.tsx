@@ -849,16 +849,28 @@ export default function DentalChart({
 
   const glyphSize = jawView === 'all' ? 36 : 44
 
-  const renderQuadrant = (teeth: number[]) => (
+  const renderQuadrant = (teeth: number[], jaw: 'upper' | 'lower') => (
     <div className="flex items-center gap-0.5 relative shrink-0">
       {teeth.map((num) => {
         const data = getToothData(num)
+        const palmerText = fdiToPalmer(num)
+        const isPrimaryTooth = num >= 51 && num <= 85
+        const displayLabel = isPrimaryTooth ? palmerText : toPersianDigits(palmerText)
         return (
           <div
             key={num}
+            aria-label={`دندان ${toothLabel(num)}`}
             onClick={() => handleToothClick(data, num)}
-            className={`relative rounded-lg p-0.5 cursor-pointer transition-all-smooth hover:bg-slate-100 shrink-0 press-scale ${selectedTooth?.number === num ? 'bg-primary-50 ring-2 ring-primary-300' : ''} ${data.isPlannedOnly ? 'opacity-60' : ''}`}
+            className={`flex flex-col items-center relative rounded-xl p-1 cursor-pointer transition-all-smooth hover:bg-slate-100 dark:hover:bg-slate-800 shrink-0 press-scale ${
+              selectedTooth?.number === num ? 'bg-primary-50 ring-2 ring-primary-400 dark:bg-primary-950/40' : ''
+            } ${data.isPlannedOnly ? 'opacity-60' : ''}`}
           >
+            {/* For lower jaw, Palmer number sits above the tooth toward occlusal line */}
+            {jaw === 'lower' && (
+              <span className="text-[11px] font-extrabold text-slate-600 dark:text-slate-300 select-none mb-0.5 leading-none">
+                {displayLabel}
+              </span>
+            )}
             <ToothSVG
               number={num}
               condition={data.condition}
@@ -866,6 +878,12 @@ export default function DentalChart({
               size={glyphSize}
               selected={selectedTooth?.number === num}
             />
+            {/* For upper jaw, Palmer number sits below the tooth toward occlusal line */}
+            {jaw === 'upper' && (
+              <span className="text-[11px] font-extrabold text-slate-600 dark:text-slate-300 select-none mt-0.5 leading-none">
+                {displayLabel}
+              </span>
+            )}
             {data.isPlannedOnly && (
               <span className="absolute -top-0.5 -left-0.5 w-3 h-3 rounded-full bg-warning-400 border border-white flex items-center justify-center" title="برنامه‌ریزی‌شده — هنوز انجام نشده">
                 <Clock size={8} className="text-white" />
@@ -1104,20 +1122,24 @@ export default function DentalChart({
       )}
 
       {/* Permanent Teeth Chart */}
-      <div className="bg-white rounded-2xl border border-slate-100 p-4 md:p-6">
+      <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-100 dark:border-slate-800 p-3 sm:p-5 shadow-xs">
         {/* Upper Jaw */}
         {(jawView === 'all' || jawView === 'upper') && (
           <div className={jawView === 'all' ? 'mb-6' : ''}>
-            <p className="text-xs text-slate-400 mb-3 text-center font-medium">فک بالا (ماکسیلاری)</p>
-            <div dir="ltr" className="flex flex-col xl:flex-row items-center gap-4 xl:gap-1 px-1 py-1 justify-center overflow-x-auto dock-scroll">
-              <div className="flex items-center gap-1">
-                {renderQuadrant(upperRight)}
-                <span className="text-2xl font-bold text-slate-400 select-none ml-2 xl:ml-0">{palmerSymbols.upperRight}</span>
+            <div dir="ltr" className="flex items-center justify-between px-2 text-[10px] text-slate-400 dark:text-slate-500 mb-2 font-medium">
+              <span className="font-bold text-slate-600 dark:text-slate-400">راست بیمار (UR)</span>
+              <span className="text-xs font-bold text-slate-700 dark:text-slate-300">فک بالا (ماکسیلاری)</span>
+              <span className="font-bold text-slate-600 dark:text-slate-400">چپ بیمار (UL)</span>
+            </div>
+            <div dir="ltr" className="flex items-center justify-center gap-0.5 sm:gap-1 px-1 py-1 overflow-x-auto dock-scroll min-w-full">
+              <div className="flex items-center gap-0.5 shrink-0">
+                {renderQuadrant(upperRight, 'upper')}
+                <span className="text-2xl font-black text-primary-600 dark:text-primary-400 select-none ml-1">{palmerSymbols.upperRight}</span>
               </div>
-              <div className="hidden xl:block w-px h-12 bg-slate-200 mx-1" />
-              <div className="flex items-center gap-1">
-                <span className="text-2xl font-bold text-slate-400 select-none mr-2 xl:mr-0">{palmerSymbols.upperLeft}</span>
-                {renderQuadrant(upperLeft)}
+              <div className="w-0.5 h-12 bg-slate-300 dark:bg-slate-600 mx-1 shrink-0 rounded-full" />
+              <div className="flex items-center gap-0.5 shrink-0">
+                <span className="text-2xl font-black text-primary-600 dark:text-primary-400 select-none mr-1">{palmerSymbols.upperLeft}</span>
+                {renderQuadrant(upperLeft, 'upper')}
               </div>
             </div>
           </div>
@@ -1126,16 +1148,20 @@ export default function DentalChart({
         {/* Lower Jaw */}
         {(jawView === 'all' || jawView === 'lower') && (
           <div>
-            <p className="text-xs text-slate-400 mb-3 text-center font-medium">فک پایین (ماندیبول)</p>
-            <div dir="ltr" className="flex flex-col xl:flex-row items-center gap-4 xl:gap-1 px-1 py-1 justify-center overflow-x-auto dock-scroll">
-              <div className="flex items-center gap-1">
-                {renderQuadrant(lowerRight)}
-                <span className="text-2xl font-bold text-slate-400 select-none ml-2 xl:ml-0">{palmerSymbols.lowerRight}</span>
+            <div dir="ltr" className="flex items-center justify-between px-2 text-[10px] text-slate-400 dark:text-slate-500 mb-2 font-medium">
+              <span className="font-bold text-slate-600 dark:text-slate-400">راست بیمار (LR)</span>
+              <span className="text-xs font-bold text-slate-700 dark:text-slate-300">فک پایین (ماندیبول)</span>
+              <span className="font-semibold text-slate-600 dark:text-slate-400">چپ بیمار (LL)</span>
+            </div>
+            <div dir="ltr" className="flex items-center justify-center gap-0.5 sm:gap-1 px-1 py-1 overflow-x-auto dock-scroll min-w-full">
+              <div className="flex items-center gap-0.5 shrink-0">
+                {renderQuadrant(lowerRight, 'lower')}
+                <span className="text-2xl font-black text-primary-600 dark:text-primary-400 select-none ml-1">{palmerSymbols.lowerRight}</span>
               </div>
-              <div className="hidden xl:block w-px h-12 bg-slate-200 mx-1" />
-              <div className="flex items-center gap-1">
-                <span className="text-2xl font-bold text-slate-400 select-none mr-2 xl:mr-0">{palmerSymbols.lowerLeft}</span>
-                {renderQuadrant(lowerLeft)}
+              <div className="w-0.5 h-12 bg-slate-300 dark:bg-slate-600 mx-1 shrink-0 rounded-full" />
+              <div className="flex items-center gap-0.5 shrink-0">
+                <span className="text-2xl font-black text-primary-600 dark:text-primary-400 select-none mr-1">{palmerSymbols.lowerLeft}</span>
+                {renderQuadrant(lowerLeft, 'lower')}
               </div>
             </div>
           </div>
@@ -1144,34 +1170,34 @@ export default function DentalChart({
 
       {/* Primary Teeth Chart */}
       {showPrimary && (
-        <div className="bg-amber-50/30 rounded-2xl border border-amber-100 p-4 md:p-6 space-y-4">
-          <p className="text-xs text-amber-600 mb-3 text-center font-medium">دندان‌های شیری</p>
+        <div className="bg-amber-50/40 dark:bg-amber-950/20 rounded-2xl border border-amber-200/80 dark:border-amber-800/40 p-3 sm:p-5 space-y-4 shadow-xs">
+          <p className="text-xs text-amber-700 dark:text-amber-300 mb-2 text-center font-bold">دندان‌های شیری (Deciduous / Primary Teeth)</p>
           {(jawView === 'all' || jawView === 'upper') && (
             <div className={jawView === 'all' ? 'mb-4' : ''}>
-              <div dir="ltr" className="flex flex-col xl:flex-row items-center gap-4 xl:gap-1 px-1 py-1 justify-center overflow-x-auto dock-scroll">
-                <div className="flex items-center gap-1">
-                  {renderQuadrant(primaryUpperRight)}
-                  <span className="text-xl font-bold text-amber-500 select-none ml-2 xl:ml-0">{palmerSymbols.primaryUpperRight}</span>
+              <div dir="ltr" className="flex items-center justify-center gap-0.5 sm:gap-1 px-1 py-1 overflow-x-auto dock-scroll min-w-full">
+                <div className="flex items-center gap-0.5 shrink-0">
+                  {renderQuadrant(primaryUpperRight, 'upper')}
+                  <span className="text-xl font-bold text-amber-600 select-none ml-1">{palmerSymbols.primaryUpperRight}</span>
                 </div>
-                <div className="hidden xl:block w-px h-10 bg-amber-200 mx-1" />
-                <div className="flex items-center gap-1">
-                  <span className="text-xl font-bold text-amber-500 select-none mr-2 xl:mr-0">{palmerSymbols.primaryUpperLeft}</span>
-                  {renderQuadrant(primaryUpperLeft)}
+                <div className="w-0.5 h-10 bg-amber-300 dark:bg-amber-700 mx-1 shrink-0 rounded-full" />
+                <div className="flex items-center gap-0.5 shrink-0">
+                  <span className="text-xl font-bold text-amber-600 select-none mr-1">{palmerSymbols.primaryUpperLeft}</span>
+                  {renderQuadrant(primaryUpperLeft, 'upper')}
                 </div>
               </div>
             </div>
           )}
           {(jawView === 'all' || jawView === 'lower') && (
             <div>
-              <div dir="ltr" className="flex flex-col xl:flex-row items-center gap-4 xl:gap-1 px-1 py-1 justify-center overflow-x-auto dock-scroll">
-                <div className="flex items-center gap-1">
-                  {renderQuadrant(primaryLowerRight)}
-                  <span className="text-xl font-bold text-amber-500 select-none ml-2 xl:ml-0">{palmerSymbols.primaryLowerRight}</span>
+              <div dir="ltr" className="flex items-center justify-center gap-0.5 sm:gap-1 px-1 py-1 overflow-x-auto dock-scroll min-w-full">
+                <div className="flex items-center gap-0.5 shrink-0">
+                  {renderQuadrant(primaryLowerRight, 'lower')}
+                  <span className="text-xl font-bold text-amber-600 select-none ml-1">{palmerSymbols.primaryLowerRight}</span>
                 </div>
-                <div className="hidden xl:block w-px h-10 bg-amber-200 mx-1" />
-                <div className="flex items-center gap-1">
-                  <span className="text-xl font-bold text-amber-500 select-none mr-2 xl:mr-0">{palmerSymbols.primaryLowerLeft}</span>
-                  {renderQuadrant(primaryLowerLeft)}
+                <div className="w-0.5 h-10 bg-amber-300 dark:bg-amber-700 mx-1 shrink-0 rounded-full" />
+                <div className="flex items-center gap-0.5 shrink-0">
+                  <span className="text-xl font-bold text-amber-600 select-none mr-1">{palmerSymbols.primaryLowerLeft}</span>
+                  {renderQuadrant(primaryLowerLeft, 'lower')}
                 </div>
               </div>
             </div>

@@ -1,6 +1,7 @@
 // Prescriptions.tsx - Persian RTL Dental Clinic Prescriptions Management
 import { useState, useEffect, useCallback, useMemo } from 'react'
 import { PatientSelect } from '../components/PatientSelect'
+import { PatientAlerts } from '../components/PatientAlerts'
 import { buildPrintDocument } from '../lib/printDocument'
 import { useNavigate, useLocation } from 'react-router-dom'
 import { readChartHandoff } from '../lib/chartHandoff'
@@ -644,6 +645,11 @@ export default function Prescriptions() {
             content: (
               <>
                 <PatientSelect required value={formData.patient_id} onChange={(v) => setFormData({ ...formData, patient_id: v })} patients={patients} />
+                {selectedPatient && (
+                  <div className="my-2">
+                    <PatientAlerts patient={selectedPatient} balance={null} />
+                  </div>
+                )}
                 <Select label="پزشک" value={formData.doctor_id} onChange={(v) => setFormData({ ...formData, doctor_id: v })} options={doctorOptions} placeholder="انتخاب پزشک" />
               </>
             ),
