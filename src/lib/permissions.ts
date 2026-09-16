@@ -47,7 +47,7 @@ export type Role = keyof typeof ROLES
 const ALL_PATHS = [
   '/', '/patients', '/appointments', '/treatments', '/billing', '/laboratory',
   '/implants', '/insurance', '/inventory', '/prescriptions', '/radiology',
-  '/staff', '/reports', '/waiting-list', '/settings', '/archive', '/calendar', '/personal-finance', '/sms', '/reminders',
+  '/staff', '/reports', '/waiting-list', '/settings', '/archive', '/calendar', '/personal-finance', '/sms', '/reminders', '/roadmap',
 ]
 
 /** Route path prefixes each role is allowed to open. '/' always included. */
@@ -59,10 +59,10 @@ const ROLE_ACCESS: Record<Role, string[]> = {
   // Doctors send work to the lab, so they can see what they sent — the
   // treatment form creates the order and previously the doctor could not
   // then look at it.
-  doctor: ['/', '/patients', '/appointments', '/treatments', '/prescriptions', '/radiology', '/implants', '/laboratory', '/waiting-list', '/reports', '/settings', '/calendar'],
-  receptionist: ['/', '/patients', '/appointments', '/billing', '/waiting-list', '/insurance', '/archive', '/settings', '/calendar', '/sms', '/reminders'],
-  assistant: ['/', '/patients', '/appointments', '/treatments', '/waiting-list', '/settings', '/calendar'],
-  hygienist: ['/', '/patients', '/appointments', '/treatments', '/waiting-list', '/settings', '/calendar'],
+  doctor: ['/', '/patients', '/appointments', '/treatments', '/prescriptions', '/radiology', '/implants', '/laboratory', '/waiting-list', '/reports', '/settings', '/calendar', '/roadmap'],
+  receptionist: ['/', '/patients', '/appointments', '/billing', '/waiting-list', '/insurance', '/archive', '/settings', '/calendar', '/sms', '/reminders', '/roadmap'],
+  assistant: ['/', '/patients', '/appointments', '/treatments', '/waiting-list', '/settings', '/calendar', '/roadmap'],
+  hygienist: ['/', '/patients', '/appointments', '/treatments', '/waiting-list', '/settings', '/calendar', '/roadmap'],
   lab_technician: ['/', '/laboratory', '/implants', '/settings', '/calendar'],
   accountant: ['/', '/billing', '/insurance', '/reports', '/archive', '/settings', '/personal-finance', '/reminders'],
   // Present on the payroll, not users of the clinical system. Listed so

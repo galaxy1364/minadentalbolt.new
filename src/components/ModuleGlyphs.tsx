@@ -279,3 +279,16 @@ export function GlyphReminders({ size = 24 }: GlyphProps) {
     </svg>
   )
 }
+
+// نقشه راه و مرکز هوشمندی — a compass / navigation milestone shape
+export function GlyphRoadmap({ size = 24 }: GlyphProps) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+      <circle cx="11.5" cy="11.5" r="8.5" stroke="currentColor" strokeWidth="2.2" />
+      <polygon points="15.5,7.5 13,12 8.5,15.5 11,11" fill="currentColor" />
+      <circle cx="11.5" cy="11.5" r="1.5" fill="white" />
+      {toothAccent}
+    </svg>
+  )
+}
+

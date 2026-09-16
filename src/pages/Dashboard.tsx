@@ -16,7 +16,7 @@ import {
   RadialBarChart, RadialBar, PolarAngleAxis, BarChart, Bar, Cell,
 } from 'recharts'
 import { ModuleIconBadge } from '../components/ModuleIconBadge'
-import { GlyphPatients, GlyphAppointments, GlyphBilling, GlyphLaboratory, GlyphImplants, GlyphWaitingList, GlyphInventory } from '../components/ModuleGlyphs'
+import { GlyphPatients, GlyphAppointments, GlyphBilling, GlyphLaboratory, GlyphImplants, GlyphWaitingList, GlyphInventory, GlyphRoadmap } from '../components/ModuleGlyphs'
 import {
   fetchDashboardStats, fetchAppointments, fetchPatients, fetchPayments,
   fetchEncounters, fetchInventoryItems, fetchLabOrders, fetchWaitingList,
@@ -1036,6 +1036,7 @@ export default function Dashboard() {
   const allQuickActions: { key: string; label: string; icon: React.ReactNode; color: TileColor; path: string }[] = [
     { key: 'appt',   label: 'نوبت جدید',   icon: <GlyphAppointments size={20} />, color: 'amber', path: '/appointments' },
     { key: 'patient',label: 'بیمار جدید',  icon: <GlyphPatients size={20} />,    color: 'violet', path: '/patients' },
+    { key: 'roadmap',label: 'نقشه راه',     icon: <GlyphRoadmap size={20} />,     color: 'violet', path: '/roadmap' },
     { key: 'implant',label: 'ایمپلنت',      icon: <GlyphImplants size={20} />,    color: 'sky',   path: '/implants' },
     { key: 'wait',   label: 'لیست انتظار', icon: <GlyphWaitingList size={20} />,    color: 'lime',  path: '/waiting-list' },
     { key: 'cash',   label: 'صندوق',        icon: <GlyphBilling size={20} />,   color: 'pink',  path: '/billing' },
@@ -1043,14 +1044,14 @@ export default function Dashboard() {
   ]
 
   // Role-aware ordering: each role's most-used actions float to the front
-  // (all six stay available — this only changes priority, never hides).
+  // (all stay available — this only changes priority, never hides).
   const roleActionPriority: Record<string, string[]> = {
-    doctor: ['appt', 'patient', 'wait', 'implant', 'cash', 'inv'],
-    receptionist: ['patient', 'appt', 'wait', 'cash', 'implant', 'inv'],
-    assistant: ['appt', 'wait', 'patient', 'implant', 'cash', 'inv'],
-    lab: ['implant', 'appt', 'patient', 'wait', 'cash', 'inv'],
-    accountant: ['cash', 'inv', 'appt', 'patient', 'wait', 'implant'],
-    owner: ['appt', 'patient', 'implant', 'wait', 'cash', 'inv'],
+    doctor: ['appt', 'patient', 'roadmap', 'wait', 'implant', 'cash', 'inv'],
+    receptionist: ['patient', 'appt', 'wait', 'cash', 'roadmap', 'implant', 'inv'],
+    assistant: ['appt', 'wait', 'patient', 'roadmap', 'implant', 'cash', 'inv'],
+    lab: ['implant', 'appt', 'patient', 'wait', 'roadmap', 'cash', 'inv'],
+    accountant: ['cash', 'inv', 'appt', 'patient', 'wait', 'roadmap', 'implant'],
+    owner: ['roadmap', 'appt', 'patient', 'implant', 'wait', 'cash', 'inv'],
   }
   const priority = roleActionPriority[role] || roleActionPriority.owner
   const [customOrder, setCustomOrder] = useState<string[] | null>(() => {

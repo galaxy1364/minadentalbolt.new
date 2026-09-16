@@ -1,5 +1,5 @@
 import type { ComponentType } from 'react'
-import { GlyphAppointments, GlyphPatients, GlyphTreatments, GlyphBilling, GlyphLaboratory, GlyphDashboard, GlyphImplants, GlyphInsurance, GlyphPersonalFinance, GlyphSms, GlyphReminders, GlyphInventory, GlyphPrescriptions, GlyphRadiology, GlyphStaff, GlyphReports, GlyphWaitingList, GlyphSettings, GlyphArchive, GlyphCalendar } from '../components/ModuleGlyphs'
+import { GlyphAppointments, GlyphPatients, GlyphTreatments, GlyphBilling, GlyphLaboratory, GlyphDashboard, GlyphImplants, GlyphInsurance, GlyphPersonalFinance, GlyphSms, GlyphReminders, GlyphInventory, GlyphPrescriptions, GlyphRadiology, GlyphStaff, GlyphReports, GlyphWaitingList, GlyphSettings, GlyphArchive, GlyphCalendar, GlyphRoadmap } from '../components/ModuleGlyphs'
 
 export interface ModuleIdentity {
   path: string
@@ -195,10 +195,19 @@ export const modules: Record<string, ModuleIdentity> = {
     colorDark: '#7c2d12',
     gradient: ['#fb923c', '#ea580c'],
   },
+  roadmap: {
+    path: '/roadmap',
+    label: 'نقشه راه و هوشمندی',
+    icon: GlyphRoadmap,
+    color: '#7c3aed',
+    colorLight: '#f5f3ff',
+    colorDark: '#4c1d95',
+    gradient: ['#8b5cf6', '#6d28d9'],
+  },
 }
 
 export const primaryModuleKeys = ['dashboard', 'patients', 'appointments', 'treatments', 'billing', 'laboratory']
-export const secondaryModuleKeys = ['implants', 'insurance', 'inventory', 'prescriptions', 'radiology', 'staff', 'reports', 'waitingList', 'calendar', 'personalFinance', 'sms', 'reminders', 'archive', 'settings']
+export const secondaryModuleKeys = ['roadmap', 'implants', 'insurance', 'inventory', 'prescriptions', 'radiology', 'staff', 'reports', 'waitingList', 'calendar', 'personalFinance', 'sms', 'reminders', 'archive', 'settings']
 
 export const primaryModules = primaryModuleKeys.map(k => modules[k])
 export const secondaryModules = secondaryModuleKeys.map(k => modules[k])
@@ -206,7 +215,7 @@ export const allModules = [...primaryModules, ...secondaryModules]
 
 export function getModuleByPath(pathname: string): ModuleIdentity | undefined {
   if (pathname === '/') return modules.dashboard
-  return allModules.find(m => pathname.startsWith(m.path))
+  return allModules.find(m => m.path !== '/' && pathname.startsWith(m.path)) || modules.dashboard
 }
 
 export function setModuleTheme(mod: ModuleIdentity | undefined) {

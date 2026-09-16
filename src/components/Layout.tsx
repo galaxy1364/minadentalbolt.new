@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react'
 import { HashRouter, Routes, Route, useNavigate, useLocation } from 'react-router-dom'
 import {
-  MoreHorizontal, X, Wifi, WifiOff, RefreshCw, Moon, Sun, LogOut, AlertTriangle, Sparkles, Bell,
+  MoreHorizontal, X, Wifi, WifiOff, RefreshCw, Moon, Sun, LogOut, AlertTriangle, Sparkles, Bell, Compass,
 } from 'lucide-react'
 import { Spinner, ToastContainer, Button, Modal } from './ui'
 import AICommandBar from './AICommandBar'
@@ -616,6 +616,14 @@ function LayoutInner({ children }: { children: React.ReactNode }) {
             </div>
           </button>
           <div className="flex items-center gap-2">
+            <button
+              onClick={() => { h.tap(); navigate('/roadmap') }}
+              aria-label="نقشه راه و مرکز هوشمندی"
+              title="نقشه راه و مرکز هوشمندی مینادنت"
+              className="flex items-center justify-center w-9 h-9 rounded-xl glass border border-white/60 dark:border-white/10 text-violet-600 dark:text-violet-400 hover:text-violet-800 dark:hover:text-violet-300 transition-all-smooth active:scale-90"
+            >
+              <Compass size={17} />
+            </button>
             <HeaderAlarmButton onClick={() => setAlarmCenterOpen(true)} />
             <DarkModeToggle />
             <LogoutButton />
@@ -665,6 +673,7 @@ const routeImports: Record<string, () => Promise<unknown>> = {
   '/personal-finance': () => import('../pages/PersonalFinance'),
   '/sms': () => import('../pages/SMS'),
   '/reminders': () => import('../pages/Reminders'),
+  '/roadmap': () => import('../pages/Roadmap'),
 }
 
 const prefetched = new Set<string>()
@@ -699,6 +708,7 @@ const PublicBooking = React.lazy(() => import('../pages/PublicBooking'))
 const WaitingRoomDisplay = React.lazy(() => import('../pages/WaitingRoomDisplay'))
 const SMS = lazyPage('/sms')
 const Reminders = lazyPage('/reminders')
+const Roadmap = lazyPage('/roadmap')
 
 function LL({ children, path }: { children: React.ReactNode; path: string }) {
   const { profile, session } = useAuth()
@@ -846,6 +856,7 @@ export function Layout() {
           <Route path="/personal-finance" element={<LL path="/personal-finance"><PersonalFinance /></LL>} />
           <Route path="/sms" element={<LL path="/sms"><SMS /></LL>} />
           <Route path="/reminders" element={<LL path="/reminders"><Reminders /></LL>} />
+          <Route path="/roadmap" element={<LL path="/roadmap"><Roadmap /></LL>} />
           <Route path="/waiting-room" element={<WaitingRoomDisplay />} />
           <Route path="*"                element={<NotFound />} />
         </Routes>

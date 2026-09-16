@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useMemo } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
-import { Calendar, Clock, CheckCircle2, User, ChevronRight, ChevronLeft, Plus, Search, AlertCircle, Edit2, Stethoscope, DollarSign, FileText, Activity, List, Grid, X, UserPlus, Globe, Ban, Printer, MessageSquare, UserCheck, Volume2, Armchair, Sparkles, Tv } from 'lucide-react'
-import { fetchTreatments, fetchPayments, fetchImplantCases, fetchAppointments, createAppointment, updateAppointment, checkConflict, fetchPatients, updatePatient, fetchDoctors, fetchUnits, peekNextFileNumber, createPatient, createEncounter, fetchDoctorSchedules, fetchOnlineBookingRequests, rejectBookingRequest, updateLabOrder, updateImplantCase, fetchWaitingList, updateWaitingEntry } from '../lib/api'
+import { Calendar, Clock, CheckCircle2, User, ChevronRight, ChevronLeft, Plus, Search, AlertCircle, Edit2, Stethoscope, DollarSign, FileText, Activity, List, Grid, X, UserPlus, Globe, Ban, Printer, MessageSquare, UserCheck, Volume2, Armchair, Sparkles, Tv, FlaskConical } from 'lucide-react'
+import { fetchTreatments, fetchPayments, fetchImplantCases, fetchAppointments, createAppointment, updateAppointment, checkConflict, fetchPatients, updatePatient, fetchDoctors, fetchUnits, peekNextFileNumber, createPatient, createEncounter, fetchDoctorSchedules, fetchOnlineBookingRequests, rejectBookingRequest, updateLabOrder, fetchLabOrders, updateImplantCase, fetchWaitingList, updateWaitingEntry } from '../lib/api'
 import { supabase } from '../lib/supabase'
 import { toJalaliString, toJalaliStringPretty, getJalaliDateInfo, formatTime, timeParts, formatCurrency, toPersianDigits, persianWeekdaysShort, getHoliday, jsDateToPersianWeekday } from '../lib/persianDate'
 import { doctorColor } from '../lib/doctorColors'
@@ -11,7 +11,7 @@ import { doctorsForDay, unitAvailability, patientPickerHint } from '../lib/selec
 import { calcAllPatientBalances } from '../lib/finance'
 import { buildPatientAlerts, alertChips } from '../lib/patientAlerts'
 import { PatientAlerts } from '../components/PatientAlerts'
-import { Appointment, AppointmentWithRelations, Patient, Doctor, Unit, DoctorSchedule } from '../types'
+import { Appointment, AppointmentWithRelations, Patient, Doctor, Unit, DoctorSchedule, LabOrder } from '../types'
 import { Modal, Card, Button, Input, Select, Textarea, EmptyState, showToast, Badge, Spinner } from '../components/ui'
 import { ModuleHeader } from '../components/ModuleHeader'
 import { useConfirmAction, ConfirmActionConfig } from '../components/ConfirmAction'
@@ -181,6 +181,7 @@ export default function Appointments() {
   const { config, confirmAction, close, ConfirmActionModal } = useConfirmAction()
 
   const [schedules, setSchedules] = useState<DoctorSchedule[]>([])
+  const [labOrders, setLabOrders] = useState<LabOrder[]>([])
   // Read for the patient picker's debt flag. These are local IndexedDB
   // reads, so the cost is small; the alternative was booking a patient
   // with no sign that they owe the clinic money.
@@ -189,12 +190,14 @@ export default function Appointments() {
   const loadData = useCallback(async () => {
     setLoading(true)
     try {
-      const [a, p, d, u, br, sch, tr, pay, imp] = await Promise.all([
+      const [a, p, d, u, br, sch, tr, pay, imp, labs] = await Promise.all([
         fetchAppointments(), fetchPatients(), fetchDoctors(), fetchUnits(),
         fetchOnlineBookingRequests().catch(() => []), fetchDoctorSchedules().catch(() => []),
         fetchTreatments().catch(() => []), fetchPayments().catch(() => []), fetchImplantCases().catch(() => []),
+        fetchLabOrders().catch(() => []),
       ])
       setAppointments(a); setPatients(p); setDoctors(d); setUnits(u); setSchedules(sch)
+      setLabOrders(labs as any[])
       setBalanceInputs({ treatments: tr as any[], payments: pay as any[], implants: imp as any[] })
       setBookingRequests(br.filter((r: any) => r.status === 'pending'))
     } catch { showToast('error', 'خطا در بارگذاری نوبت‌ها') }
@@ -247,6 +250,28 @@ export default function Appointments() {
     () => calcAllPatientBalances(balanceInputs.payments, balanceInputs.treatments, balanceInputs.implants).byPatient,
     [balanceInputs],
   )
+
+  /**
+   * Lab Due-Date Collision Guard:
+   * Cross-reference active lab orders for this patient to prevent scheduling
+   * crown/prosthesis delivery before the lab order has arrived or been delivered.
+   */
+  const activeLabOrderForPatient = useMemo(() => {
+    if (!wizardData.patient_id) return null
+    return labOrders.find(
+      (lo) => lo.patient_id === wizardData.patient_id && lo.status !== 'delivered' && lo.status !== 'cancelled'
+    ) || null
+  }, [wizardData.patient_id, labOrders])
+
+  const hasLabConflict = useMemo(() => {
+    if (!activeLabOrderForPatient) return false
+    if (activeLabOrderForPatient.deadline && wizardData.date && wizardData.date < activeLabOrderForPatient.deadline) {
+      return true
+    }
+    const noteStr = `${wizardData.notes || ''} ${wizardData.custom_type || ''} ${wizardData.type || ''}`.toLowerCase()
+    const isDeliveryRelated = ['تحویل', 'روکش', 'پروتز', 'امتحان', 'crown', 'bridge', 'فریم'].some((kw) => noteStr.includes(kw))
+    return isDeliveryRelated
+  }, [activeLabOrderForPatient, wizardData.date, wizardData.notes, wizardData.custom_type, wizardData.type])
 
   const patientSearchResults = useMemo(() => {
     // Archived patients are now findable here too (with a badge marking
@@ -1621,6 +1646,45 @@ export default function Appointments() {
                     </div>
                   )}
                 </div>
+
+                {/* Lab Due-Date Collision Guard Alert */}
+                {activeLabOrderForPatient && (
+                  <div className={`p-3.5 rounded-2xl border transition-all-smooth flex items-start gap-3 ${
+                    hasLabConflict
+                      ? 'bg-amber-50/90 dark:bg-amber-950/40 border-amber-300 dark:border-amber-800 text-amber-900 dark:text-amber-200 shadow-sm'
+                      : 'bg-cyan-50/80 dark:bg-cyan-950/40 border-cyan-200 dark:border-cyan-800 text-cyan-900 dark:text-cyan-200'
+                  }`}>
+                    <FlaskConical size={18} className={hasLabConflict ? 'text-amber-600 mt-0.5 shrink-0 animate-bounce' : 'text-cyan-600 mt-0.5 shrink-0'} />
+                    <div className="flex-1 min-w-0 text-xs leading-relaxed">
+                      <div className="flex items-center justify-between gap-2">
+                        <p className="font-bold flex items-center gap-1.5">
+                          {hasLabConflict ? '⚠️ هشدار هوشمند تداخل لابراتوار' : 'اطلاعیه سفارش لابراتوار این بیمار'}
+                        </p>
+                        <Badge color={hasLabConflict ? 'warning' : 'primary'}>
+                          {activeLabOrderForPatient.status === 'in_progress' ? 'در حال ساخت' : activeLabOrderForPatient.status === 'sent' ? 'ارسال‌شده به لابراتوار' : activeLabOrderForPatient.status}
+                        </Badge>
+                      </div>
+                      <p className="mt-1">
+                        سفارش باز پروتز ({activeLabOrderForPatient.work_type || 'پروتز/روکش'}) با کد {toPersianDigits(activeLabOrderForPatient.id.slice(0, 8))} در جریان است.
+                        {activeLabOrderForPatient.deadline && (
+                          <span className="font-bold block mt-0.5 text-amber-800 dark:text-amber-300">
+                            موعد پیش‌بینی‌شده تحویل از لابراتوار: {toJalaliStringPretty(activeLabOrderForPatient.deadline)}
+                          </span>
+                        )}
+                      </p>
+                      <div className="mt-2">
+                        <button
+                          type="button"
+                          onClick={() => { h.tap(); navigate('/laboratory') }}
+                          className="inline-flex items-center gap-1 text-[11px] font-bold text-cyan-700 dark:text-cyan-300 hover:underline"
+                        >
+                          <span>مشاهده کارتابل لابراتوار</span>
+                          <ChevronLeft size={12} />
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                )}
                 {/* Editable details */}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                   <Select label="نوع نوبت *" value={wizardData.type} onChange={(v) => { h.select(); setWizardData((p) => ({ ...p, type: v })) }} options={typeOptions} />

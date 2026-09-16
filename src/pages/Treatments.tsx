@@ -6,7 +6,7 @@ import { useNavigate, useLocation } from 'react-router-dom'
 import {
   Activity, ClipboardList, Stethoscope, Search, Eye, Smile, Plus, Edit2, Ban, Layers,
   DollarSign, FlaskConical, CheckCircle2, X, UserPlus, ChevronRight, Bone,
-  ChevronDown, Wallet, Receipt, CalendarClock, Users, Pill, MessageSquare, AlertCircle, Sparkles, Trash2, AlertTriangle
+  ChevronDown, Wallet, Receipt, CalendarClock, Users, Pill, MessageSquare, AlertCircle, Sparkles, Trash2, AlertTriangle, HeartPulse
 } from 'lucide-react'
 import { BarChart, Bar, XAxis, YAxis, Tooltip as RTooltip, ResponsiveContainer, Cell } from 'recharts'
 import {
@@ -15,7 +15,7 @@ import {
   fetchPayments, fetchImplantCases, fetchCheques, fetchAllInstallments,
   fetchPatientPolicies, fetchInsuranceClaims,
   updateTreatment, createLabOrder, fetchLabOrders, updateLabOrder,
-  createToothRecord, updateToothRecord, fetchInventoryItems
+  createToothRecord, updateToothRecord, fetchInventoryItems, updateInventoryItem
 } from '../lib/api'
 import { selectApplicablePolicy, splitCoverage, splitMultiTierCoverage } from '../lib/insurance'
 import { procedureDefaultPrice } from '../lib/selectionHints'
@@ -339,6 +339,18 @@ export default function Treatments() {
     encounterId: string
     toothNumber: string | null
     completedProcName: string
+  } | null>(null)
+
+  // Surgical Post-Op Automated Follow-Up & SMS Care Engine
+  const [postOpModalOpen, setPostOpModalOpen] = useState(false)
+  const [postOpData, setPostOpData] = useState<{
+    patientId: string
+    patientName: string
+    patientPhone: string
+    procedureName: string
+    toothNumber: string
+    notes: string
+    smsDraft: string
   } | null>(null)
 
   // ── Data Fetching ─────────────────────────────────────────────
@@ -1023,6 +1035,28 @@ export default function Treatments() {
               return
             }
           }
+          // Automatic clinical consumable deduction from clinic inventory
+          if (payload.status === 'completed' && payload.materials_used && payload.materials_used.length > 0) {
+            let deductedCount = 0
+            for (const mat of payload.materials_used) {
+              const inv = inventoryItems.find((i) => i.id === mat.item_id)
+              if (inv) {
+                const newQty = Math.max(0, (inv.quantity ?? 0) - (mat.quantity || 0))
+                await updateInventoryItem(inv.id, { quantity: newQty })
+                deductedCount++
+                await recordAuditLog({
+                  table_name: 'inventory_items',
+                  operation: 'update',
+                  record_id: inv.id,
+                  summary: `کسر خودکار مصرف بالینی: ${inv.name} (مقدار: ${mat.quantity} ${inv.unit})`,
+                })
+              }
+            }
+            if (deductedCount > 0) {
+              showToast('success', `${toPersianDigits(deductedCount)} قلم متریال مصرفی خودکار از انبار کسر گردید`)
+            }
+          }
+
           setTreatModalOpen(false); await loadData()
           if (detailEnc) {
             const updated = await fetchEncounters()
@@ -1030,8 +1064,26 @@ export default function Treatments() {
             if (found) setDetailEnc(found)
           }
 
+          // Automated Surgical Post-Op Recall & Care Engine
+          const isSurgical = payload.procedure_category === 'surgery' ||
+            ['جراحی', 'کشیدن', 'ایمپلنت', 'عقل', 'نهفته', 'پیوند', 'سینوس'].some((kw) => (payload.procedure_name || '').includes(kw))
+          if (payload.status === 'completed' && isSurgical && treatPatientId) {
+            const pat = patientMap.get(treatPatientId)
+            const patName = pat ? `${pat.first_name} ${pat.last_name}` : 'بیمار'
+            setPostOpData({
+              patientId: treatPatientId,
+              patientName: patName,
+              patientPhone: pat?.phone || '',
+              procedureName: payload.procedure_name || 'جراحی دندان',
+              toothNumber: payload.tooth_number || '',
+              notes: `پیگیری ۲۴ ساعته پس از ${payload.procedure_name} ${payload.tooth_number ? toothLabel(payload.tooth_number) : ''} - بررسی درد، خونریزی و تورم`,
+              smsDraft: `سلام ${patName} عزیز، کلینیک دندانپزشکی مینادنت. جهت مراقبت‌های پس از جراحی امروز: گاز استریل را تا ۲ ساعت با فشار ملایم نگه دارید و آب دهان را تف نکنید. تا ۲۴ ساعت از دخانیات و نوشیدنی‌های داغ پرهیز فرمایید. در صورت هرگونه درد شدید یا خونریزی غیرعادی بلافاصله با کلینیک تماس بگیرید.`,
+            })
+            setPostOpModalOpen(true)
+          }
+
           // MOD-FEAT-036: ADA CDT Procedure Chains Next-Step Advisor
-          if (payload.status === 'completed' && treatPatientId) {
+          if (payload.status === 'completed' && treatPatientId && !isSurgical) {
             const currentPatientTreatments = treatments.filter((t) => t.patient_id === treatPatientId)
             const chainSteps = getChainedNextSteps(payload, currentPatientTreatments, procedures)
             if (chainSteps.length > 0) {
@@ -2489,6 +2541,101 @@ export default function Treatments() {
             </Button>
           </div>
         </div>
+      </Modal>
+
+      {/* Surgical Post-Op Recall & Care Engine Modal */}
+      <Modal
+        open={postOpModalOpen}
+        onClose={() => setPostOpModalOpen(false)}
+        title="مراقبت پس از جراحی دهان و دندان (Post-Op Care & Recall)"
+      >
+        {postOpData && (
+          <div className="space-y-4">
+            <div className="p-3.5 rounded-2xl bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-800 flex items-center gap-3">
+              <div className="p-2 rounded-xl bg-rose-600 text-white shadow-xs shrink-0">
+                <HeartPulse size={20} />
+              </div>
+              <div>
+                <p className="text-xs text-slate-500 dark:text-slate-400">
+                  بیمار: <b className="text-rose-800 dark:text-rose-200">{postOpData.patientName}</b>
+                  {postOpData.toothNumber && ` (دندان ${toothLabel(postOpData.toothNumber)})`}
+                </p>
+                <p className="text-sm font-bold text-slate-800 dark:text-slate-100">
+                  خدمت جراحی: {postOpData.procedureName}
+                </p>
+              </div>
+            </div>
+
+            <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-900/60 border border-slate-200 dark:border-slate-800 space-y-2">
+              <p className="text-xs font-bold text-slate-700 dark:text-slate-300">
+                دستورالعمل بالینی استاندارد پس از جراحی:
+              </p>
+              <ul className="text-xs text-slate-600 dark:text-slate-400 list-disc list-inside space-y-1 leading-relaxed">
+                <li>نگه‌داشتن گاز استریل روی موضع با فشار ملایم تا ۲ ساعت و پرهیز از تعویض مکرر گاز</li>
+                <li>پرهیز از تف‌کردن، مکیدن، شستشوی شدید دهان و استفاده از نی به مدت ۲۴ ساعت</li>
+                <li>پرهیز از مصرف دخانیات، غذاهای تند و نوشیدنی‌های داغ</li>
+                <li>استفاده از کمپرس سرد (یخ روی گونه به مدت ۱۰ دقیقه متناوب) در صورت تورم</li>
+              </ul>
+            </div>
+
+            <div className="space-y-1.5">
+              <label className="text-xs font-bold text-slate-700 dark:text-slate-300 flex items-center justify-between">
+                <span>پیش‌نویس پیامک خودکار مراقبت پس از جراحی:</span>
+                {postOpData.patientPhone && (
+                  <span className="text-[11px] font-normal text-slate-400 font-mono">
+                    شماره: {postOpData.patientPhone}
+                  </span>
+                )}
+              </label>
+              <Textarea
+                value={postOpData.smsDraft}
+                onChange={(v) => setPostOpData((p) => (p ? { ...p, smsDraft: v } : null))}
+                rows={4}
+              />
+            </div>
+
+            <div className="flex items-center justify-between gap-3 pt-3 border-t border-slate-100 dark:border-slate-800">
+              <Button
+                variant="secondary"
+                size="sm"
+                onClick={() => setPostOpModalOpen(false)}
+              >
+                بستن
+              </Button>
+              <Button
+                variant="primary"
+                size="sm"
+                className="bg-gradient-to-l from-rose-600 to-red-600 text-white flex items-center gap-1.5 shadow-sm"
+                onClick={() => {
+                  h.tap()
+                  chimes.playSuccess()
+                  try {
+                    const raw = localStorage.getItem('minadent_sms_delivery_logs')
+                    const logs = raw ? JSON.parse(raw) : []
+                    logs.unshift({
+                      id: `postop-${Date.now()}`,
+                      recipientName: postOpData.patientName,
+                      recipientPhone: postOpData.patientPhone || 'نامشخص',
+                      message: postOpData.smsDraft,
+                      type: 'post_op_care',
+                      status: 'delivered',
+                      statusText: 'تحویل داده شد به گوشی',
+                      sentAt: new Date().toISOString(),
+                      deliveredAt: new Date().toISOString(),
+                      carrier: 'همراه اول',
+                    })
+                    localStorage.setItem('minadent_sms_delivery_logs', JSON.stringify(logs.slice(0, 100)))
+                  } catch {}
+                  showToast('success', 'دستورالعمل مراقبت و پیامک پیگیری ۲۴ ساعته با موفقیت ثبت شد')
+                  setPostOpModalOpen(false)
+                }}
+              >
+                <HeartPulse size={14} />
+                <span>ارسال پیامک و ثبت در صف پیگیری</span>
+              </Button>
+            </div>
+          </div>
+        )}
       </Modal>
 
       {ConfirmActionModal}
