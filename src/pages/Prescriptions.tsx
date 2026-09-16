@@ -23,6 +23,7 @@ import { chimes } from '../lib/chimes'
 import { useConfirmAction } from '../components/ConfirmAction'
 import { Prescription, PrescriptionWithRelations, Patient, Doctor } from '../types'
 import { Wizard, Card, Button, Input, Select, Textarea, Badge, Spinner, EmptyState, showToast } from '../components/ui'
+import { recordAuditLog } from '../lib/auditLogger'
 import { ModuleHeader, ModuleStatCard, ReorderableStatGrid } from '../components/ModuleHeader'
 import { DENTAL_DRUG_PRESETS, DrugPreset } from '../lib/drugPresets'
 import { toothLabel } from '../lib/toothLabel'
@@ -405,10 +406,22 @@ export default function Prescriptions() {
         try {
           if (editingRx) {
             await updatePrescription(editingRx.id, payload as any)
+            await recordAuditLog({
+              table_name: 'prescriptions',
+              operation: 'update',
+              record_id: editingRx.id,
+              summary: `ویرایش نسخه برای بیمار`,
+            })
             chimes.playSuccess()
             showToast('success', 'نسخه ویرایش شد')
           } else {
-            await createPrescription({ ...payload, status: 'active' } as any)
+            const newRx = await createPrescription({ ...payload, status: 'active' } as any)
+            await recordAuditLog({
+              table_name: 'prescriptions',
+              operation: 'insert',
+              record_id: newRx.id,
+              summary: `ایجاد نسخه برای بیمار`,
+            })
             chimes.playSuccess()
             showToast('success', 'نسخه ایجاد شد')
           }
@@ -437,6 +450,12 @@ export default function Prescriptions() {
       onConfirm: async () => {
         try {
           await updatePrescription(p.id, { status: 'cancelled' } as any)
+          await recordAuditLog({
+            table_name: 'prescriptions',
+            operation: 'update',
+            record_id: p.id,
+            summary: `لغو نسخه`,
+          })
           chimes.playPop()
           showToast('success', 'نسخه لغو شد — در سوابق باقی ماند')
           await loadData()

@@ -6,6 +6,7 @@ import { fetchPatients, createPatient, updatePatient, fetchDoctors, fetchPayment
 import { toJalaliStringPretty, formatCurrency, toPersianDigits } from '../lib/persianDate'
 import { Patient, Doctor, Payment, Treatment, ImplantCase } from '../types'
 import { Modal, Card, Button, Input, Select, Textarea, Spinner, EmptyState, showToast, HighlightText, SkeletonList } from '../components/ui'
+import { recordAuditLog } from '../lib/auditLogger'
 import { PatientPhotoUpload } from '../components/PatientPhotoUpload'
 import { PatientSelect } from '../components/PatientSelect'
 import { PersianDateInput } from '../components/PersianDateInput'
@@ -283,10 +284,22 @@ export default function Patients() {
         try {
           if (editingPatient) {
             await updatePatient(editingPatient.id, payload)
+            await recordAuditLog({
+              table_name: 'patients',
+              operation: 'update',
+              record_id: editingPatient.id,
+              summary: `به‌روزرسانی بیمار: ${payload.first_name} ${payload.last_name}`,
+            })
             chimes.playSuccess()
             showToast('success', 'اطلاعات پرونده بیمار به‌روزرسانی شد')
           } else {
-            await createPatient(payload)
+            const newPatient = await createPatient(payload)
+            await recordAuditLog({
+              table_name: 'patients',
+              operation: 'insert',
+              record_id: newPatient.id,
+              summary: `ایجاد بیمار جدید: ${payload.first_name} ${payload.last_name}`,
+            })
             chimes.playSuccess()
             showToast('success', 'پرونده بیمار جدید با موفقیت ثبت شد')
           }
@@ -320,6 +333,12 @@ export default function Patients() {
       onConfirm: async () => {
         try {
           await updatePatient(patient.id, { is_active: false })
+          await recordAuditLog({
+            table_name: 'patients',
+            operation: 'update',
+            record_id: patient.id,
+            summary: `غیرفعال کردن بیمار: ${patient.first_name} ${patient.last_name}`,
+          })
           chimes.playPop()
           showToast('success', 'بیمار غیرفعال شد — سوابق حفظ شد')
           await loadData()

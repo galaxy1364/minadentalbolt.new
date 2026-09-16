@@ -1,10 +1,10 @@
 // Staff.tsx - Persian RTL Dental Clinic Staff Management with Doctor Revenue Sharing
 import { useState, useEffect, useCallback, useMemo } from 'react'
-import { Users, Search, Plus, Phone, Mail, Calendar, DollarSign, Smile, Briefcase, Edit2, Stethoscope, Calculator, Award, TrendingUp, Percent, UserCheck, ChevronDown, ChevronUp, Shield, Lock, Unlock, RotateCcw, Archive } from 'lucide-react'
+import { Users, Search, Plus, Phone, Mail, Calendar, DollarSign, Smile, Briefcase, Edit2, Stethoscope, Calculator, Award, TrendingUp, Percent, UserCheck, ChevronDown, ChevronUp, Shield, Lock, Unlock, RotateCcw, Archive, Download } from 'lucide-react'
 import { PieChart, Pie, Cell, Tooltip as RTooltip, ResponsiveContainer } from 'recharts'
 import { staffSaveMessage, LoginOutcome } from '../lib/staffSaveOutcome'
 import { fetchStaff, createStaff, updateStaff, fetchEncounters, fetchLabOrders, fetchTreatments, createExpense, fetchDoctors, fetchStaffLoginStatuses, setStaffLoginActive } from '../lib/api'
-import { fetchAuditLogs, AuditLogEntry, formatAuditActionTitle, OPERATION_LABELS, TABLE_PERSIAN_LABELS } from '../lib/auditLogger'
+import { fetchAuditLogs, exportAuditLogsAsJson, AuditLogEntry, formatAuditActionTitle, OPERATION_LABELS, TABLE_PERSIAN_LABELS } from '../lib/auditLogger'
 import { CLINIC_ID, supabase } from '../lib/supabase'
 import { toJalaliDisplay, toJalaliStringPretty, formatCurrency, formatNumber, toPersianDigits } from '../lib/persianDate'
 import type { Staff as StaffType, StaffInput, EncounterWithRelations, LabOrderWithRelations, Treatment } from '../types'
@@ -683,10 +683,32 @@ export default function Staff() {
           </div>
           <div className="flex items-center gap-2">
             {showAuditPanel && (
+            <>
               <Button variant="ghost" size="sm" onClick={loadAuditLogs} disabled={loadingAudit} title="تازه‌سازی لاگ‌ها">
                 <RotateCcw size={14} className={loadingAudit ? 'animate-spin' : ''} />
               </Button>
-            )}
+              <Button
+                variant="ghost" size="sm" 
+                onClick={async () => {
+                  h.tap()
+                  chimes.playPop()
+                  const json = await exportAuditLogsAsJson()
+                  const blob = new Blob([json], { type: 'application/json' })
+                  const url = URL.createObjectURL(blob)
+                  const a = document.createElement('a')
+                  a.href = url
+                  a.download = `audit-logs-${new Date().toISOString().slice(0, 10)}.json`
+                  document.body.appendChild(a)
+                  a.click()
+                  document.body.removeChild(a)
+                  URL.revokeObjectURL(url)
+                }}
+                title="دانلود لاگ‌های ممیزی"
+              >
+                <Download size={14} />
+              </Button>
+            </>
+          )}
             <Button
               variant="secondary"
               size="sm"

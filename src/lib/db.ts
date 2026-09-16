@@ -38,6 +38,8 @@ export interface AuditLogEntry {
   actor_name: string
   actor_role: string | null
   created_at: string
+  ip_address?: string
+  user_agent?: string
 }
 
 export interface BackupSnapshot {

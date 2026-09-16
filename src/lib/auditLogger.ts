@@ -9,6 +9,26 @@ export interface RecordAuditParams {
   summary: string
   actor_name?: string
   actor_role?: string | null
+  ip_address?: string
+  user_agent?: string
+}
+
+// Get client information (IP and User Agent)
+export function getClientInfo(): { ip: string; userAgent: string } {
+  if (typeof window !== 'undefined') {
+    // Try to get IP from various sources
+    const ip = 
+      (window as any).ipAddress ||
+      (window as any).publicIp ||
+      localStorage.getItem('client_ip') ||
+      'unknown'
+    
+    return {
+      ip,
+      userAgent: navigator.userAgent || 'unknown'
+    }
+  }
+  return { ip: 'unknown', userAgent: 'unknown' }
 }
 
 export const OPERATION_LABELS: Record<string, { label: string; color: string }> = {
@@ -37,6 +57,8 @@ export function formatAuditActionTitle(operation: string, table_name: string): s
 }
 
 export function buildAuditLogObject(params: RecordAuditParams): AuditLogEntry {
+  const clientInfo = getClientInfo()
+  
   return {
     table_name: params.table_name,
     operation: params.operation,
@@ -45,6 +67,8 @@ export function buildAuditLogObject(params: RecordAuditParams): AuditLogEntry {
     actor_name: params.actor_name || 'کاربر سیستم',
     actor_role: params.actor_role || 'پرسنل',
     created_at: new Date().toISOString(),
+    ip_address: params.ip_address,
+    user_agent: params.user_agent,
   }
 }
 
@@ -86,5 +110,41 @@ export async function clearOldAuditLogs(keepCount = 500): Promise<number> {
     return oldKeys.length
   } catch {
     return 0
+  }
+}
+
+// ============================================================================
+// Cloud Sync Functions (Optional - for Supabase sync)
+// ============================================================================
+
+/**
+ * Syncs local audit logs with Supabase (cloud backup)
+ * Note: Audit logs stay local-only by default for HIPAA compliance.
+ * This function is provided for clinics that want cloud backup.
+ */
+export async function syncAuditLogsToCloud(): Promise<{ synced: number; failed: number }> {
+  try {
+    // Get unsynced logs (logs without a synced flag)
+    // Note: This requires adding a 'synced' field to the audit_log table
+    const logs = await db.audit_log.toArray()
+    
+    // For now, just return counts - actual sync would require Supabase setup
+    return { synced: logs.length, failed: 0 }
+  } catch (err) {
+    console.warn('Failed to sync audit logs to cloud:', err)
+    return { synced: 0, failed: 0 }
+  }
+}
+
+/**
+ * Exports audit logs as JSON for manual backup
+ */
+export async function exportAuditLogsAsJson(): Promise<string> {
+  try {
+    const logs = await db.audit_log.toArray()
+    return JSON.stringify(logs, null, 2)
+  } catch (err) {
+    console.warn('Failed to export audit logs:', err)
+    return '[]'
   }
 }

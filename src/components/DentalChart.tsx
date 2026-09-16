@@ -130,8 +130,8 @@ function ToothDetailPanel({
   onAddTreatment?: (toothNumber: string, surface?: string | null, condition?: ToothCondition) => void
   /** MOD-FEAT-022: the chart is the natural starting point for lab work
    *  and implants too, not only treatments. */
-  onAddLabOrder?: (toothNumber: string, surface?: string | null) => void
-  onAddImplantCase?: (toothNumber: string, surface?: string | null) => void
+  onAddLabOrder?: (toothNumber: string, surface?: string | null, condition?: ToothCondition) => void
+  onAddImplantCase?: (toothNumber: string, surface?: string | null, condition?: ToothCondition) => void
   onViewRadiology?: (toothNumber: string) => void
 }) {
   const [condition, setCondition] = useState<ToothCondition>(tooth.condition)
@@ -479,7 +479,7 @@ function ToothDetailPanel({
                   onClick={() => {
                     h.tap()
                     chimes.playPop()
-                    onAddLabOrder(String(tooth.number), firstSurface)
+                    onAddLabOrder(String(tooth.number), firstSurface, condition)
                     onClose()
                   }}
                   className="w-full py-3 rounded-xl bg-primary-50 text-primary-700 font-medium text-sm hover:bg-primary-100 transition-all-smooth flex items-center justify-center gap-1.5 border border-primary-200 press-scale"
@@ -492,7 +492,7 @@ function ToothDetailPanel({
                   onClick={() => {
                     h.tap()
                     chimes.playPop()
-                    onAddImplantCase(String(tooth.number), firstSurface)
+                    onAddImplantCase(String(tooth.number), firstSurface, condition)
                     onClose()
                   }}
                   className="w-full py-3 rounded-xl bg-slate-100 text-slate-700 font-medium text-sm hover:bg-slate-200 transition-all-smooth flex items-center justify-center gap-1.5 border border-slate-300 press-scale"
@@ -531,8 +531,8 @@ interface DentalChartProps {
   onAddTreatment?: (toothNumber: string, surface?: string | null, condition?: ToothCondition) => void
   /** MOD-FEAT-022: the chart is the natural starting point for lab work
    *  and implants too, not only treatments. */
-  onAddLabOrder?: (toothNumber: string, surface?: string | null) => void
-  onAddImplantCase?: (toothNumber: string, surface?: string | null) => void
+  onAddLabOrder?: (toothNumber: string, surface?: string | null, condition?: ToothCondition) => void
+  onAddImplantCase?: (toothNumber: string, surface?: string | null, condition?: ToothCondition) => void
   /** Fires every time a tooth gets clicked/selected on the chart — lets
    * the parent remember "the last tooth someone actually pointed at"
    * so the general '+ درمان جدید' button (not the per-tooth one, which

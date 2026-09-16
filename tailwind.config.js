@@ -23,6 +23,14 @@ export default {
         ios: '14px',
         'ios-lg': '22px',
         'ios-xl': '28px',
+        // Standardized corner radius tokens for consistency
+        'card': '12px',      // rounded-xl
+        'button': '8px',     // rounded-lg
+        'sheet': '16px',     // rounded-2xl
+        'dialog': '20px',    // rounded-2xl
+        'input': '8px',      // rounded-lg
+        'badge': '20px',     // rounded-full equivalent
+        'circle': '9999px',  // rounded-full
       },
       backdropBlur: {
         ios: '40px',

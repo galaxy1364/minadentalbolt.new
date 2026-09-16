@@ -17,9 +17,12 @@
 
 export type ChartDestination = 'treatment' | 'lab' | 'implant' | 'prescription'
 
+import type { ToothCondition } from './toothConditions'
+
 export interface ChartToothContext {
   toothNumber?: string
   surface?: string | null
+  condition?: ToothCondition | null
   patientId: string
   doctorId?: string | null
 }
@@ -31,6 +34,7 @@ export interface ChartHandoff {
   state: {
     quickStartToothNumber: string
     quickStartToothSurface: string | null
+    quickStartToothCondition: ToothCondition | null
     quickStartPatientId: string
     quickStartDoctorId: string | null
   }
@@ -63,6 +67,7 @@ export function buildChartHandoff(
     state: {
       quickStartToothNumber: String(ctx.toothNumber || (destination === 'prescription' ? 'general' : '')),
       quickStartToothSurface: ctx.surface || null,
+      quickStartToothCondition: ctx.condition || null,
       quickStartPatientId: ctx.patientId,
       quickStartDoctorId: ctx.doctorId || null,
     },
@@ -72,6 +77,7 @@ export function buildChartHandoff(
 export interface ReceivedHandoff {
   toothNumber: string
   surface: string | null
+  condition: ToothCondition | null
   patientId: string
   doctorId: string | null
 }
@@ -94,6 +100,7 @@ export function readChartHandoff(state: unknown): ReceivedHandoff | null {
   return {
     toothNumber,
     surface: typeof s.quickStartToothSurface === 'string' ? s.quickStartToothSurface : null,
+    condition: s.quickStartToothCondition as ToothCondition | null,
     patientId,
     doctorId: typeof s.quickStartDoctorId === 'string' ? s.quickStartDoctorId : null,
   }

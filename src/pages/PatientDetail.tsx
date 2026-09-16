@@ -623,13 +623,13 @@ export default function PatientDetail() {
     plan_option: 'A', plan_name: '', is_accepted: false,
   })
 
-  const openCreatePhase = (prefillToothNumber?: string, defaultOption: string = 'A') => {
+  const openCreatePhase = (prefillToothNumber?: string, surface?: string | null, condition?: string | null, defaultOption: string = 'A') => {
     h.tap()
     setEditingPhase(null)
     setPhaseWizardStep(0)
     setPhaseForm({
       doctor_id: '', title: prefillToothNumber ? `درمان دندان ${toothCode(prefillToothNumber)}` : '', description: '',
-      procedures: prefillToothNumber ? `دندان ${toothCode(prefillToothNumber)}` : '',
+      procedures: prefillToothNumber ? `دندان ${toothCode(prefillToothNumber)}${surface ? ` سطح ${surface}` : ''}${condition ? ` (${condition})` : ''}` : '',
       estimated_cost: '', actual_cost: '', estimated_duration_days: '', status: 'planned', start_date: '', end_date: '',
       plan_option: defaultOption || 'A', plan_name: '', is_accepted: false,
     })
@@ -2993,13 +2993,14 @@ export default function PatientDetail() {
       treatments={treatments}
       radiologyImages={radiologyImages}
       onUpdateTooth={handleUpdateTooth}
-      onAddTreatment={(toothNumber) => {
+      onAddTreatment={(toothNumber, surface, condition) => {
         // Links the tooth chart directly into the treatment-phases
         // workflow: starting a plan for a specific tooth from the chart
         // itself, instead of the chart being a dead-end visualization
         // disconnected from how treatment actually gets planned.
+        // surface and condition are now also passed through for better context.
         setActiveTab('phases')
-        openCreatePhase(toothNumber)
+        openCreatePhase(toothNumber, surface, condition)
       }}
       onViewRadiology={(toothNumber) => {
         setRadToothFilter(toothNumber)

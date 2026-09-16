@@ -8,7 +8,7 @@
 import { describe, it, expect } from 'vitest'
 import { buildChartHandoff, readChartHandoff } from './chartHandoff'
 
-const ctx = { toothNumber: '38', surface: 'distal', patientId: 'pat-1', doctorId: 'doc-1' }
+const ctx = { toothNumber: '38', surface: 'distal', condition: 'caries' as const, patientId: 'pat-1', doctorId: 'doc-1' }
 
 describe('🔴 چارت حالا به لابراتوار و ایمپلنت هم در دارد', () => {
   it('لابراتوار مقصد درست را می‌گیرد', () => {
@@ -19,10 +19,11 @@ describe('🔴 چارت حالا به لابراتوار و ایمپلنت هم 
     expect(buildChartHandoff('implant', ctx)?.path).toBe('/implants')
   })
 
-  it('دندان و سطح هر دو منتقل می‌شوند', () => {
+  it('دندان، سطح و وضعیت هر سه منتقل می‌شوند', () => {
     const h = buildChartHandoff('lab', ctx)!
     expect(h.state.quickStartToothNumber).toBe('38')
     expect(h.state.quickStartToothSurface).toBe('distal')
+    expect(h.state.quickStartToothCondition).toBe('caries')
   })
 
   it('بیمار و پزشک هم همراه می‌روند', () => {
@@ -60,7 +61,7 @@ describe('صفحه‌ی مقصد تحویل را می‌خواند', () => {
   it('رفت و برگشت کامل سالم است', () => {
     const h = buildChartHandoff('implant', ctx)!
     expect(readChartHandoff(h.state)).toEqual({
-      toothNumber: '38', surface: 'distal', patientId: 'pat-1', doctorId: 'doc-1',
+      toothNumber: '38', surface: 'distal', condition: 'caries', patientId: 'pat-1', doctorId: 'doc-1',
     })
   })
 
@@ -104,9 +105,11 @@ describe('🔴 چارت سه در دارد، نه یکی', () => {
     }
   })
 
-  it('سطح دندان هم همراه شماره منتقل می‌شود', () => {
+  it('سطح و وضعیت دندان هم همراه شماره منتقل می‌شوند', () => {
     expect(dentalChart).toContain('firstSurface')
-    expect(dentalChart).toMatch(/onAddLabOrder\(String\(tooth\.number\), firstSurface\)/)
+    expect(dentalChart).toContain('condition')
+    expect(dentalChart).toMatch(/onAddLabOrder\(String\(tooth\.number\), firstSurface, condition\)/)
+    expect(dentalChart).toMatch(/onAddImplantCase\(String\(tooth\.number\), firstSurface, condition\)/)
   })
 
   it('صفحه‌ی ویزیت هر دو در جدید را وصل کرده', () => {

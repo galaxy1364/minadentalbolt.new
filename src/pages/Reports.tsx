@@ -15,6 +15,7 @@ import { Card, Button, Badge, Spinner, EmptyState, Tabs, showToast } from '../co
 import { ModuleHeader, ModuleStatCard, ReorderableStatGrid } from '../components/ModuleHeader'
 import { PatientDebtBar } from '../components/PatientDebtBar'
 import { tileThemes, getHashColor } from '../lib/colors'
+import { CashFlowChart } from '../components/CashFlowChart'
 
 // ============================================================================
 // Constants
@@ -766,6 +767,7 @@ export default function Reports() {
       <Tabs
         tabs={[
           { key: 'revenue', label: 'درآمد', icon: <DollarSign size={16} /> },
+          { key: 'cashflow', label: 'نقدینگی', icon: <TrendingUp size={16} /> },
           { key: 'aging', label: 'سن بدهی', icon: <AlertTriangle size={16} /> },
           { key: 'patients', label: 'بیماران', icon: <Users size={16} /> },
           { key: 'treatments', label: 'درمان‌ها', icon: <Activity size={16} /> },
@@ -774,6 +776,19 @@ export default function Reports() {
         active={activeTab}
         onChange={(t) => { h.select(); setActiveTab(t) }}
       />
+
+      {/* Cash Flow Tab */}
+      {activeTab === 'cashflow' && (
+        <div className="space-y-6">
+          <Card className="p-5">
+            <h2 className="text-base font-bold text-slate-800 dark:text-slate-100 mb-4 flex items-center gap-2">
+              <TrendingUp size={18} className="text-primary-600" />
+              روند نقدینگی ماهانه
+            </h2>
+            <CashFlowChart payments={payments} expenses={expenses} />
+          </Card>
+        </div>
+      )}
 
       {/* Revenue Tab */}
       {activeTab === 'revenue' && (

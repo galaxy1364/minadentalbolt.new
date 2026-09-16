@@ -25,6 +25,7 @@ import { PatientSelect } from '../components/PatientSelect'
 import { toJalaliDisplay, toJalaliStringPretty, formatCurrency, formatNumber, toPersianDigits } from '../lib/persianDate'
 import { Encounter, EncounterWithRelations, Treatment, Procedure, Patient, Doctor, Laboratory, ToothRecord, LabOrder, InsuranceClaim, Payment, Cheque, Installment, ImplantCaseWithRelations, InventoryItemWithRelations } from '../types'
 import { Card, Button, Badge, Spinner, EmptyState, Tabs, Input, Select, Textarea, Modal, Wizard, showToast } from '../components/ui'
+import { recordAuditLog } from '../lib/auditLogger'
 import { PersianDateInput } from '../components/PersianDateInput'
 import { ToothArchSelect } from '../components/ToothArchSelect'
 import { deriveToothConditions } from '../lib/toothConditions'
@@ -242,7 +243,7 @@ export default function Treatments() {
       // offline sync queue replay in the same order the dentist entered
       // them, which matters when reviewing what happened later.
       for (const i of basket) {
-        await createTreatment({
+        const newTreatment = await createTreatment({
           clinic_id: undefined as never,
           encounter_id: bulkEncounterId,
           patient_id: bulkPatientId,
@@ -259,6 +260,13 @@ export default function Treatments() {
           status: 'planned',
           notes: null,
         } as never)
+        
+        await recordAuditLog({
+          table_name: 'treatments',
+          operation: 'insert',
+          record_id: newTreatment.id,
+          summary: `ایجاد درمان دسته‌ای: ${i.procedureName || i.procedureCode}`,
+        })
       }
 
       const newTotal = basketTotal(basket)
@@ -937,12 +945,24 @@ export default function Treatments() {
 
           if (editingTreat) {
             await updateTreatment(editingTreat.id, payload)
+            await recordAuditLog({
+              table_name: 'treatments',
+              operation: 'update',
+              record_id: editingTreat.id,
+              summary: `ویرایش درمان: ${payload.procedure_name || payload.procedure_code}`,
+            })
             await applyLabAction()
             await syncEncounterTotal(treatEncounterId)
             chimes.playSuccess()
             showToast('success', `درمان ویرایش شد${labMessage}`)
           } else {
-            await createTreatment(payload)
+            const newTreatment = await createTreatment(payload)
+            await recordAuditLog({
+              table_name: 'treatments',
+              operation: 'insert',
+              record_id: newTreatment.id,
+              summary: `ایجاد درمان: ${payload.procedure_name || payload.procedure_code}`,
+            })
             await applyLabAction()
             // Every save gets confirmation now. Previously a treatment
             // saved without a lab produced no toast at all, so the only
@@ -1071,7 +1091,21 @@ export default function Treatments() {
       onConfirm: async () => {
         try {
           await updateTreatment(t.id, { status: 'cancelled' })
-          if (linkedOrder) await updateLabOrder(linkedOrder.id, { status: 'cancelled' })
+          await recordAuditLog({
+            table_name: 'treatments',
+            operation: 'update',
+            record_id: t.id,
+            summary: `لغو درمان: ${t.procedure_name || t.procedure_code}`,
+          })
+          if (linkedOrder) {
+            await updateLabOrder(linkedOrder.id, { status: 'cancelled' })
+            await recordAuditLog({
+              table_name: 'lab_orders',
+              operation: 'update',
+              record_id: linkedOrder.id,
+              summary: `لغو سفارش لابراتوار مرتبط با درمان ${t.id}`,
+            })
+          }
           if (t.encounter_id) await syncEncounterTotal(t.encounter_id)
           chimes.playPop()
           showToast('success', linkedOrder ? 'درمان لغو و سفارش لابراتوار مرتبط لغو شد' : 'درمان لغو شد — در پرونده باقی ماند')
@@ -1584,17 +1618,17 @@ export default function Treatments() {
                   setMatInputQty('1'); 
                   setTreatModalOpen(true); 
                 }}
-                onAddLabOrder={(toothNum, surface) => {
+                onAddLabOrder={(toothNum, surface, condition) => {
                   // MOD-FEAT-022: lab work now starts where the dentist is
                   // looking, instead of in a blank Palmer picker two screens
-                  // away.
+                  // away. Condition is now also passed through.
                   if (!detailEnc) return
-                  const handoff = buildChartHandoff('lab', { toothNumber: toothNum, surface, patientId: detailEnc.patient_id, doctorId: detailEnc.doctor_id })
+                  const handoff = buildChartHandoff('lab', { toothNumber: toothNum, surface, condition, patientId: detailEnc.patient_id, doctorId: detailEnc.doctor_id })
                   if (handoff) navigate(handoff.path, { state: handoff.state })
                 }}
-                onAddImplantCase={(toothNum, surface) => {
+                onAddImplantCase={(toothNum, surface, condition) => {
                   if (!detailEnc) return
-                  const handoff = buildChartHandoff('implant', { toothNumber: toothNum, surface, patientId: detailEnc.patient_id, doctorId: detailEnc.doctor_id })
+                  const handoff = buildChartHandoff('implant', { toothNumber: toothNum, surface, condition, patientId: detailEnc.patient_id, doctorId: detailEnc.doctor_id })
                   if (handoff) navigate(handoff.path, { state: handoff.state })
                 }}
               />

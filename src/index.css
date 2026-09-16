@@ -4,6 +4,9 @@
 
 * { -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; box-sizing: border-box; -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }
 
+/* Import accessibility fixes */
+@import './styles/accessibility.css';
+
 /* ── Living module background ────────────────────────────
    Requested directly: no bare white anywhere, every section tinted with
    its own colour, drifting rather than static, in the manner of Gemini's

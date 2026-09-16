@@ -28,6 +28,7 @@ import { chimes } from '../lib/chimes'
 import { useConfirmAction } from '../components/ConfirmAction'
 import type { LabOrder, Laboratory, Patient, Doctor, Treatment } from '../types'
 import { Wizard, Card, Button, Input, Select, Textarea, Badge, Spinner, EmptyState, showToast } from '../components/ui'
+import { recordAuditLog } from '../lib/auditLogger'
 import { PersianDateInput } from '../components/PersianDateInput'
 // MOD-FEAT-024: the same arch the chart draws, instead of a separate row of numbers.
 import { ToothArchSelect } from '../components/ToothArchSelect'
@@ -552,16 +553,34 @@ export default function Laboratory() {
         try {
           if (editingOrder) {
             await updateLabOrder(editingOrder.id, payload)
+            await recordAuditLog({
+              table_name: 'lab_orders',
+              operation: 'update',
+              record_id: editingOrder.id,
+              summary: `ویرایش سفارش لابراتوار`,
+            })
             chimes.playSuccess()
             showToast('success', 'سفارش ویرایش شد')
           } else {
             const created = await createLabOrder(payload)
+            await recordAuditLog({
+              table_name: 'lab_orders',
+              operation: 'insert',
+              record_id: created.id,
+              summary: `ایجاد سفارش لابراتوار جدید`,
+            })
             // MOD-FEAT-041: close the loop with the implant case, so its
             // chain moves to «ارسال به لابراتوار» and the lab chain owns
             // the rest. Failing to link must not read as a failed order.
             if (pendingImplantCaseId && created?.id) {
               try {
                 await updateImplantCase(pendingImplantCaseId, { lab_order_id: created.id } as never)
+                await recordAuditLog({
+                  table_name: 'implant_cases',
+                  operation: 'update',
+                  record_id: pendingImplantCaseId,
+                  summary: `اتصال سفارش لابراتوار به مورد ایمپلنت`,
+                })
                 chimes.playSuccess()
                 showToast('success', 'سفارش ثبت و به مورد ایمپلنت وصل شد')
               } catch {
@@ -601,6 +620,12 @@ export default function Laboratory() {
       onConfirm: async () => {
         try {
           await updateLabOrder(order.id, { status: 'cancelled' })
+          await recordAuditLog({
+            table_name: 'lab_orders',
+            operation: 'update',
+            record_id: order.id,
+            summary: `لغو سفارش لابراتوار`,
+          })
           chimes.playPop()
           showToast('success', 'سفارش لغو شد')
           await loadData()

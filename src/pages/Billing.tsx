@@ -32,6 +32,7 @@ import { PersianDateInput } from '../components/PersianDateInput'
 import { CurrencyInput } from '../components/CurrencyInput'
 import { tileThemes, getHashColor } from '../lib/colors'
 import { ModuleHeader, ModuleStatCard, ReorderableStatGrid } from '../components/ModuleHeader'
+import { recordAuditLog } from '../lib/auditLogger'
 
 // ============================================================================
 // Constants
@@ -447,7 +448,7 @@ export default function Billing() {
       onConfirm: async () => {
         setSavingPayment(true)
         try {
-          await createPayment({
+          const newPayment = await createPayment({
             patient_id: paymentForm.patient_id, encounter_id: paymentForm.encounter_id || null,
             implant_case_id: paymentForm.implant_case_id || null,
             treatment_id: paymentForm.treatment_id || null,
@@ -460,6 +461,14 @@ export default function Billing() {
             pos_terminal_id: toEnglishDigits(paymentForm.pos_terminal_id || '').trim() || null,
             card_last4: toEnglishDigits(paymentForm.card_last4 || '').trim() || null,
           } as any)
+          
+          await recordAuditLog({
+            table_name: 'payments',
+            operation: 'insert',
+            record_id: newPayment.id,
+            summary: `پرداخت جدید: ${paymentForm.amount} تومان با روش ${paymentForm.payment_method}`,
+          })
+          
           chimes.playSuccess()
           showToast('success', 'پرداخت ثبت شد')
           setPaymentModalOpen(false)

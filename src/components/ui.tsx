@@ -11,7 +11,7 @@ export function Spinner({ size = 24 }: { size?: number }) {
 }
 
 export function Card({ children, className = '', style, onClick }: { children: React.ReactNode; className?: string; style?: React.CSSProperties; onClick?: () => void }) {
-  return <div style={style} onClick={onClick} className={`gemini-ambient-card rounded-2xl border border-slate-200/60 dark:border-slate-700/60 card-shadow dark:card-shadow transition-all duration-200 ${className}`}>{children}</div>
+  return <div style={style} onClick={onClick} className={`gemini-ambient-card rounded-card border border-slate-200/60 dark:border-slate-700/60 card-shadow dark:card-shadow transition-all duration-200 ${className}`}>{children}</div>
 }
 
 export function StatCard({ icon, title, value, color = 'primary', subtitle }: { icon: React.ReactNode; title: string; value: string | number; color?: string; subtitle?: string }) {
@@ -57,7 +57,13 @@ export function Button({ children, onClick, variant = 'primary', size = 'md', cl
     danger: 'bg-error-600 hover:bg-error-700 text-white',
     success: 'bg-success-600 hover:bg-success-700 text-white',
   }
-  const sizes: Record<string, string> = { sm: 'px-3 py-1.5 text-xs', md: 'px-4 py-2 text-sm', lg: 'px-6 py-3 text-base' }
+  // Ensure touch targets are at least 48px for glove-friendly UX (WCAG 2.2 AA)
+  // min-h-[44px] for sm (44px is acceptable for dense areas), min-h-[48px] for md/lg
+  const sizes: Record<string, string> = { 
+    sm: 'px-3 py-1.5 text-xs min-h-[44px]', 
+    md: 'px-4 py-2 text-sm min-h-[48px]', 
+    lg: 'px-6 py-3 text-base min-h-[48px]'
+  }
   return (
     <button
       type={type}
@@ -65,7 +71,7 @@ export function Button({ children, onClick, variant = 'primary', size = 'md', cl
       disabled={disabled}
       title={title}
       aria-label={ariaLabel}
-      className={`rounded-xl font-medium transition-all duration-150 active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed ${variants[variant]} ${sizes[size]} ${className}`}
+      className={`rounded-button font-medium transition-all duration-150 active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed ${variants[variant]} ${sizes[size]} ${className}`}
     >
       {children}
     </button>
@@ -83,7 +89,7 @@ export function Input({ label, value, onChange, placeholder, type = 'text', clas
         onFocus={() => h.light()}
         placeholder={placeholder}
         dir={dir}
-        className={`w-full px-3 py-2 rounded-xl border bg-slate-50 dark:bg-slate-700 text-base text-slate-800 dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-primary-400 focus:border-transparent transition-all-smooth ${error ? 'border-error-300 dark:border-error-600' : 'border-slate-200 dark:border-slate-600'}`}
+        className={`w-full px-3 py-2 rounded-input border bg-slate-50 dark:bg-slate-700 text-base text-slate-800 dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-primary-400 focus:border-transparent transition-all-smooth ${error ? 'border-error-300 dark:border-error-600' : 'border-slate-200 dark:border-slate-600'}`}
       />
       {error && <p className="text-xs text-error-500 mt-1">{error}</p>}
       {!error && hint && <p className="text-[11px] text-slate-400 dark:text-slate-500 mt-1">{hint}</p>}
@@ -98,7 +104,7 @@ export function Select({ label, value, onChange, options, className = '', placeh
       <select
         value={value}
         onChange={(e) => { h.select(); onChange(e.target.value) }}
-        className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-600 bg-slate-50 dark:bg-slate-700 text-base text-slate-800 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-primary-400 transition-all-smooth"
+        className="w-full px-3 py-2 rounded-input border border-slate-200 dark:border-slate-600 bg-slate-50 dark:bg-slate-700 text-base text-slate-800 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-primary-400 transition-all-smooth"
       >
         {placeholder && <option value="">{placeholder}</option>}
         {options.map((opt) => <option key={opt.value} value={opt.value}>{opt.label}</option>)}
@@ -117,7 +123,7 @@ export function Textarea({ label, value, onChange, placeholder, rows = 3, classN
         onFocus={() => h.light()}
         placeholder={placeholder}
         rows={rows}
-        className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-600 bg-slate-50 dark:bg-slate-700 text-base text-slate-800 dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-primary-400 transition-all-smooth resize-none"
+        className="w-full px-3 py-2 rounded-input border border-slate-200 dark:border-slate-600 bg-slate-50 dark:bg-slate-700 text-base text-slate-800 dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-primary-400 transition-all-smooth resize-none"
       />
     </div>
   )
@@ -133,12 +139,12 @@ export function Badge({ children, color = 'slate' }: { children: React.ReactNode
     accent: 'bg-accent-100 dark:bg-accent-900/40 text-accent-700 dark:text-accent-300',
     secondary: 'bg-secondary-100 dark:bg-secondary-900/40 text-secondary-700 dark:text-secondary-300',
   }
-  return <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${colorMap[color] || colorMap.slate}`}>{children}</span>
+  return <span className={`inline-flex items-center px-2.5 py-0.5 rounded-badge text-xs font-medium ${colorMap[color] || colorMap.slate}`}>{children}</span>
 }
 
 export function EmptyState({ icon, title, description, action }: { icon: React.ReactNode; title: string; description?: string; action?: React.ReactNode }) {
   return (
-    <div className="flex flex-col items-center justify-center py-16 text-center relative overflow-hidden rounded-3xl group">
+    <div className="flex flex-col items-center justify-center py-16 text-center relative overflow-hidden rounded-dialog group">
       {/* Dynamic Background */}
       <div className="absolute inset-0 bg-gradient-to-br from-slate-50 to-slate-100/50 dark:from-slate-800/50 dark:to-slate-900/50 transition-colors duration-500" />
       <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-48 h-48 bg-primary-400/10 dark:bg-primary-500/10 rounded-full blur-3xl breathe-slow mix-blend-multiply dark:mix-blend-screen pointer-events-none opacity-50 group-hover:opacity-100 transition-opacity duration-700" />

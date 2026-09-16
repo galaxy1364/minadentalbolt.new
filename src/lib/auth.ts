@@ -32,66 +32,82 @@ interface AuthState {
 
 export const AuthContext = createContext<AuthState | null>(null)
 
+export const CACHED_PROFILE_KEY = 'minadent_cached_profile'
+
+function getCachedProfile(): StaffProfile | null {
+  try {
+    const raw = typeof localStorage !== 'undefined' ? localStorage.getItem(CACHED_PROFILE_KEY) : null
+    if (raw) return JSON.parse(raw) as StaffProfile
+  } catch {
+    // ignore parse error
+  }
+  return null
+}
+
 export function useOptionalAuth(): AuthState | null {
   return useContext(AuthContext)
 }
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [session, setSession] = useState<Session | null>(null)
-  const [profile, setProfile] = useState<StaffProfile | null>(null)
+  const [profile, setProfile] = useState<StaffProfile | null>(() => getCachedProfile())
   const [loading, setLoading] = useState(true)
   const [notice, setNotice] = useState<string | null>(null)
 
   async function loadProfile(userId: string) {
-    const { data, error } = await supabase.from('users').select('id, clinic_id, full_name, role, doctor_id, is_active').eq('id', userId).maybeSingle()
-    if (!error && data && (data as any).is_active === false) {
-      // Login access was suspended (e.g. staff member on leave, access
-      // revoked) — the row still exists so their history/attribution
-      // stays intact, but they must not be able to use the app while
-      // suspended. Sign out immediately rather than silently letting
-      // them in, which is what happened before this check existed.
-      await supabase.auth.signOut()
-      setProfile(null)
-      setNotice('دسترسی این حساب غیرفعال شده است — با مدیر کلینیک تماس بگیرید')
-      currentActor.name = null
-      currentActor.role = null
-      return
-    }
-    if (!error && data) {
-      setProfile(data as StaffProfile)
-      setNotice(null)
-      currentActor.name = (data as StaffProfile).full_name
-      currentActor.role = (data as StaffProfile).role
-    } else {
-      // The password was accepted but this user has no row in `users`,
-      // so they have no clinic and no role. canAccess() correctly limits
-      // them to the dashboard, but without a word of explanation the app
-      // just looks broken. This happens when invite-staff creates the
-      // auth user and then fails to insert the profile row.
-      setProfile(null)
-      setNotice('حساب شما به هیچ کلینیکی وصل نیست — با مدیر کلینیک تماس بگیرید')
-      currentActor.name = null
-      currentActor.role = null
+    try {
+      const { data, error } = await supabase.from('users').select('id, clinic_id, full_name, role, doctor_id, is_active').eq('id', userId).maybeSingle()
+      if (error) {
+        // Network failure, offline, timeout, or DB transient error:
+        // Do NOT clear the profile! Retain whatever valid profile is already cached.
+        console.warn('[auth] loadProfile network error, keeping cached profile:', error.message)
+        return
+      }
+      if (data && (data as any).is_active === false) {
+        // Login access was suspended — clear session and storage immediately
+        try { await supabase.auth.signOut({ scope: 'local' }) } catch {}
+        try {
+          localStorage.removeItem(CACHED_PROFILE_KEY)
+          localStorage.removeItem('minadent-auth')
+        } catch {}
+        setSession(null)
+        setProfile(null)
+        setNotice('دسترسی این حساب غیرفعال شده است — با مدیر کلینیک تماس بگیرید')
+        currentActor.name = null
+        currentActor.role = null
+        return
+      }
+      if (data) {
+        const staffProf = data as StaffProfile
+        setProfile(staffProf)
+        try {
+          localStorage.setItem(CACHED_PROFILE_KEY, JSON.stringify(staffProf))
+        } catch {}
+        setNotice(null)
+        currentActor.name = staffProf.full_name
+        currentActor.role = staffProf.role
+      } else {
+        // Query succeeded (200 OK) but no user row exists in `users`
+        const cached = getCachedProfile()
+        if (cached && cached.id === userId) {
+          // If we had a matching cached profile for this user ID, retain it
+          return
+        }
+        setProfile(null)
+        try { localStorage.removeItem(CACHED_PROFILE_KEY) } catch {}
+        setNotice('حساب شما به هیچ کلینیکی وصل نیست — با مدیر کلینیک تماس بگیرید')
+        currentActor.name = null
+        currentActor.role = null
+      }
+    } catch (err) {
+      console.warn('[auth] loadProfile unexpected error, keeping cached profile:', err)
     }
   }
 
   useEffect(() => {
     // MOD-FIX-032: the loading gate must NEVER depend on the network
-    // resolving. Startup used to `await` getSession() and then
-    // loadProfile() before `setLoading(false)`. When the phone is truly
-    // offline those reject fast, so the gate cleared and the app opened
-    // on local Dexie data — which is why "it used to open without
-    // internet". But on a live-but-unreachable network (LTE up, the free
-    // Supabase project paused or filtered) the request neither resolves
-    // nor rejects — it hangs — so `setLoading(false)` never ran and the
-    // app sat on the spinner forever. Reproduced identically on v1.226.0,
-    // so this is a pre-existing bug, not a regression.
-    //
-    // The fix: bound the gate with a timeout. Whatever the network does,
-    // the app becomes interactive within STARTUP_BUDGET; the profile
-    // lookup still runs and, when it lands, onAuthStateChange /
-    // loadProfile fills the role in. An offline-first app has no business
-    // holding first paint hostage to a server it may never reach.
+    // resolving. Bound the gate with a timeout so the app opens within
+    // STARTUP_BUDGET even on slow or offline networks.
     const STARTUP_BUDGET_MS = 4000
     let settled = false
     const clearGate = () => { if (!settled) { settled = true; setLoading(false) } }
@@ -99,32 +115,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     supabase.auth.getSession().then(async ({ data }) => {
       setSession(data.session)
-      // Still prefer to have the role/profile ready before first render —
-      // otherwise role-filtered menus (بیشتر, nav, route access) briefly
-      // compute as empty because canAccess(undefined, …) only allows '/'.
-      // But this is now a best-effort race against the budget above, not
-      // a hard block: a hung profile query can no longer freeze the app.
       if (data.session?.user) await loadProfile(data.session.user.id)
     }).catch(() => { /* offline / unreachable — open on local data anyway */ })
       .finally(() => { clearTimeout(budget); clearGate() })
 
     const { data: sub } = supabase.auth.onAuthStateChange(async (_event, newSession) => {
       setSession(newSession)
-      if (newSession?.user) await loadProfile(newSession.user.id)
-      else setProfile(null)
+      if (newSession?.user) {
+        await loadProfile(newSession.user.id)
+      } else if (!newSession) {
+        setProfile(null)
+        try { localStorage.removeItem(CACHED_PROFILE_KEY) } catch {}
+      }
     })
 
-    // Safety net for the exact scenario this clinic app will actually
-    // see: the PWA left open for a full workday, phone locked/
-    // backgrounded for hours in between patients. Mobile browsers can
-    // throttle or fully suspend JS timers while backgrounded, so
-    // supabase-js's own autoRefreshToken timer isn't guaranteed to fire
-    // in time — the token can quietly expire while nobody's looking.
-    // Since RLS now requires a real authenticated session (no more
-    // permissive anon fallback), an expired token means sync silently
-    // stops working for the rest of the day unless something notices.
-    // Re-checking on visibility/focus forces supabase-js to refresh if
-    // the token's stale, catching this before it causes a real problem.
     const revalidateSession = () => { supabase.auth.getSession() }
     const onVisible = () => { if (document.visibilityState === 'visible') revalidateSession() }
     window.addEventListener('focus', revalidateSession)
@@ -144,21 +148,50 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       ? await supabase.auth.signInWithPassword({ phone: identifier, password })
       : await supabase.auth.signInWithPassword({ email: identifier, password })
     if (error) {
-      // The generic fallback message ("خطا در ورود") hid the actual
-      // cause, which made a real login failure impossible to diagnose
-      // from the phone — the only place it can be reproduced. Log the
-      // real error and record it in Settings → گزارش خطاها so there's
-      // something concrete to look at instead of a guess.
       console.error('[auth] signIn failed:', error.status, error.message)
       logError(error, 'react', `signIn status=${error.status ?? 'none'}`)
     }
     return { error: error ? mapAuthError(error.message, error.status) : null }
   }
 
-  async function signOut() {
-    await supabase.auth.signOut()
+  async function signOut(): Promise<void> {
+    // 1. Attempt graceful Supabase sign out with local scope and a fast timeout
+    // so network failure can NEVER hang or prevent logout.
+    try {
+      await Promise.race([
+        supabase.auth.signOut({ scope: 'local' }),
+        new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), 1500)),
+      ])
+    } catch (e) {
+      console.warn('[auth] supabase.auth.signOut local error/timeout:', e)
+    }
+
+    // 2. Clear all local storage keys related to auth and profile
+    try {
+      localStorage.removeItem('minadent-auth')
+      localStorage.removeItem(CACHED_PROFILE_KEY)
+      sessionStorage.removeItem('minadent-auth')
+      for (let i = localStorage.length - 1; i >= 0; i--) {
+        const key = localStorage.key(i)
+        if (key && (key.startsWith('sb-') || key.includes('auth'))) {
+          localStorage.removeItem(key)
+        }
+      }
+    } catch (e) {
+      console.warn('[auth] storage cleanup error:', e)
+    }
+
+    // 3. Immediately reset all React state
+    setSession(null)
+    setProfile(null)
+    setNotice(null)
     currentActor.name = null
     currentActor.role = null
+
+    // 4. Reset hash to '/' so when they re-login they land cleanly on dashboard
+    if (window.location.hash && window.location.hash !== '#/' && window.location.hash !== '') {
+      window.location.hash = '#/'
+    }
   }
 
   return createElement(AuthContext.Provider, {

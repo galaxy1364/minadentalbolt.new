@@ -11,6 +11,7 @@ import { RadiologyImage, Patient } from '../types'
 import { Card, Button, Badge, Spinner, EmptyState, Modal, Wizard, Input, Select, Textarea, showToast } from '../components/ui'
 import { PersianDateInput } from '../components/PersianDateInput'
 import { PatientSelect } from '../components/PatientSelect'
+import { recordAuditLog } from '../lib/auditLogger'
 import { ToothArchSelect } from '../components/ToothArchSelect'
 import { ModuleHeader, ModuleStatCard, ReorderableStatGrid } from '../components/ModuleHeader'
 import { useConfirmAction } from '../components/ConfirmAction'
@@ -221,6 +222,12 @@ export default function Radiology() {
               tooth_number: uploadForm.tooth_number || null, image_url: uploadForm.image_url || null,
               description: uploadForm.description || null, taken_at: uploadForm.taken_at || null, notes: uploadForm.notes || null,
             } as any)
+            await recordAuditLog({
+              table_name: 'radiology_images',
+              operation: 'update',
+              record_id: editingImage.id,
+              summary: `ویرایش تصویر رادیولوژی`,
+            })
             chimes.playSuccess()
             showToast('success', 'تصویر ویرایش شد')
             setUploadModalOpen(false)
@@ -228,7 +235,7 @@ export default function Radiology() {
             setSavingImage(false)
             return
           }
-          await createRadiologyImage({
+          const newImage = await createRadiologyImage({
             clinic_id: undefined as any,
             patient_id: uploadForm.patient_id,
             doctor_id: null,
@@ -239,6 +246,12 @@ export default function Radiology() {
             description: uploadForm.description || null,
             taken_at: uploadForm.taken_at || null,
             notes: uploadForm.notes || null,
+          })
+          await recordAuditLog({
+            table_name: 'radiology_images',
+            operation: 'insert',
+            record_id: newImage.id,
+            summary: `ایجاد تصویر رادیولوژی: ${uploadForm.image_type}`,
           })
           chimes.playSuccess()
           showToast('success', 'تصویر رادیولوژی ثبت شد')
@@ -266,6 +279,12 @@ export default function Radiology() {
       onConfirm: async () => {
         try {
           await updateRadiologyImage(img.id, { is_active: false } as any)
+          await recordAuditLog({
+            table_name: 'radiology_images',
+            operation: 'update',
+            record_id: img.id,
+            summary: `آرشیو تصویر رادیولوژی`,
+          })
           chimes.playPop()
           showToast('success', 'تصویر آرشیو شد')
           loadData()

@@ -3,7 +3,7 @@ import { HashRouter, Routes, Route, useNavigate, useLocation } from 'react-route
 import {
   MoreHorizontal, X, Wifi, WifiOff, RefreshCw, Moon, Sun, LogOut, AlertTriangle, Sparkles, Bell,
 } from 'lucide-react'
-import { Spinner, ToastContainer, Button } from './ui'
+import { Spinner, ToastContainer, Button, Modal } from './ui'
 import AICommandBar from './AICommandBar'
 import { DynamicIsland, pushIslandNotification } from './DynamicIsland'
 import { ErrorBoundary } from './ErrorBoundary'
@@ -12,7 +12,7 @@ import { ClinicalAlarmCenter, useClinicAlarmSummary } from './ClinicalAlarmCente
 import { PersianClinicAiAssistant } from './PersianClinicAiAssistant'
 import Login from '../pages/Login'
 import { useAuth } from '../lib/auth'
-import { canAccess, REQUIRE_LOGIN } from '../lib/permissions'
+import { canAccess, REQUIRE_LOGIN, roleLabel } from '../lib/permissions'
 import { isAppLockEnabled } from '../lib/appLock'
 import { AppLockScreen } from './AppLockScreen'
 import { ModuleIconBadge } from './ModuleIconBadge'
@@ -222,58 +222,162 @@ function SyncIndicator() {
 }
 
 // ── Offline banner ──────────────────────────────────────
+function LogoutConfirmModal({
+  open,
+  onClose,
+  onConfirm,
+  loading = false,
+}: {
+  open: boolean
+  onClose: () => void
+  onConfirm: () => void
+  loading?: boolean
+}) {
+  const { profile } = useAuth()
+  if (!open) return null
+
+  return (
+    <Modal open={open} onClose={onClose} title="خروج از حساب کاربری" size="sm">
+      <div className="text-center py-2 space-y-4">
+        <div className="w-14 h-14 mx-auto rounded-2xl bg-error-50 dark:bg-error-900/30 text-error-600 dark:text-error-400 flex items-center justify-center">
+          <LogOut size={26} />
+        </div>
+        <div>
+          <p className="text-sm font-bold text-slate-800 dark:text-slate-100 mb-1">
+            آیا می‌خواهید از حساب کاربری خارج شوید؟
+          </p>
+          <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed">
+            {profile?.full_name ? (
+              <>
+                کاربر جاری: <span className="font-semibold text-slate-700 dark:text-slate-200">{profile.full_name}</span>
+                {profile.role ? ` (${roleLabel(profile.role)})` : ''}
+              </>
+            ) : (
+              'برای ورود مجدد باید نام کاربری و رمز عبور خود را وارد کنید.'
+            )}
+          </p>
+        </div>
+        <div className="flex items-center gap-2 pt-2">
+          <Button
+            variant="danger"
+            className="flex-1 min-h-[44px]"
+            disabled={loading}
+            onClick={() => {
+              h.confirm()
+              onConfirm()
+            }}
+          >
+            {loading ? <Spinner size={16} /> : 'خروج از حساب'}
+          </Button>
+          <Button
+            variant="secondary"
+            className="flex-1 min-h-[44px]"
+            disabled={loading}
+            onClick={() => {
+              h.cancel()
+              onClose()
+            }}
+          >
+            انصراف
+          </Button>
+        </div>
+      </div>
+    </Modal>
+  )
+}
+
 // ── More drawer ─────────────────────────────────────────
 function MoreDrawer({ open, onClose }: { open: boolean; onClose: () => void }) {
   const navigate = useNavigate()
   const location = useLocation()
-  const { profile } = useAuth()
+  const { profile, session, signOut } = useAuth()
+  const [logoutConfirmOpen, setLogoutConfirmOpen] = useState(false)
+  const [loggingOut, setLoggingOut] = useState(false)
+  const effectiveRole = profile?.role || (session ? 'owner' : undefined)
   const isActive = (path: string) => path === '/' ? location.pathname === '/' : location.pathname.startsWith(path)
-  const visibleModules = secondaryModules.filter((item: ModuleIdentity) => canAccess(profile?.role, item.path))
+  const visibleModules = secondaryModules.filter((item: ModuleIdentity) => canAccess(effectiveRole, item.path))
+
+  const handleLogout = async () => {
+    setLoggingOut(true)
+    try {
+      await signOut()
+      onClose()
+    } finally {
+      setLoggingOut(false)
+      setLogoutConfirmOpen(false)
+    }
+  }
 
   if (!open) return null
   return (
-    <div className="fixed inset-0 z-50" onClick={() => { h.cancel(); onClose() }}>
-      <div className="absolute inset-0 bg-black/25 backdrop-blur-sm" />
-      <div
-        className="absolute bottom-0 left-0 right-0 rounded-t-3xl shadow-ios-xl pb-safe drawer-in flex flex-col overflow-hidden"
-        style={{
-          maxHeight: '90dvh',
-          background: 'linear-gradient(160deg, rgba(139,92,246,0.12), rgba(6,182,212,0.10) 45%, rgba(255,255,255,1) 75%)',
-        }}
-        onClick={(e) => e.stopPropagation()}
-      >
-        <div className="dark:bg-slate-800/95 absolute inset-0 -z-10 dark:block hidden" />
-        <div className="flex justify-center pt-3 pb-2 shrink-0">
-          <div className="w-10 h-1 rounded-full bg-slate-200 dark:bg-slate-600" />
-        </div>
-        <div className="flex items-center justify-between px-5 pb-3 shrink-0">
-          <h3 className="text-sm font-bold text-slate-700 dark:text-slate-200">همه ماژول‌ها</h3>
-          <button onClick={() => { h.cancel(); onClose() }} aria-label="بستن" className="p-1.5 rounded-xl bg-white/70 dark:bg-slate-700 text-slate-500 dark:text-slate-300 hover:bg-white transition-all-smooth press-scale">
-            <X size={16} />
-          </button>
-        </div>
-        <div className="grid grid-cols-4 gap-2 px-4 pb-6 overflow-y-auto min-h-0">
-          {visibleModules.map((item: ModuleIdentity) => {
-            const Icon = item.icon
-            const active = isActive(item.path)
-            return (
-              <button
-                key={item.path}
-                onClick={() => { h.select(); navigate(item.path); onClose() }}
-                className={`flex flex-col items-center gap-2 p-3 rounded-2xl transition-all-smooth press-scale ${
-                  active ? 'text-slate-700 dark:text-slate-200' : 'text-slate-500 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-700/50'
-                }`}
-              >
-                <ModuleIconBadge color={item.color} size={38}>
-                  <Icon size={34} />
-                </ModuleIconBadge>
-                <span className={`text-[11px] font-medium text-center leading-tight ${active ? 'font-bold' : ''}`}>{item.label}</span>
-              </button>
-            )
-          })}
+    <>
+      <div className="fixed inset-0 z-50" onClick={() => { h.cancel(); onClose() }}>
+        <div className="absolute inset-0 bg-black/25 backdrop-blur-sm" />
+        <div
+          className="absolute bottom-0 left-0 right-0 rounded-t-3xl shadow-ios-xl pb-safe drawer-in flex flex-col overflow-hidden"
+          style={{
+            maxHeight: '90dvh',
+            background: 'linear-gradient(160deg, rgba(139,92,246,0.12), rgba(6,182,212,0.10) 45%, rgba(255,255,255,1) 75%)',
+          }}
+          onClick={(e) => e.stopPropagation()}
+        >
+          <div className="dark:bg-slate-800/95 absolute inset-0 -z-10 dark:block hidden" />
+          <div className="flex justify-center pt-3 pb-2 shrink-0">
+            <div className="w-10 h-1 rounded-full bg-slate-200 dark:bg-slate-600" />
+          </div>
+          <div className="flex items-center justify-between px-5 pb-3 shrink-0">
+            <h3 className="text-sm font-bold text-slate-700 dark:text-slate-200">همه ماژول‌ها</h3>
+            <button onClick={() => { h.cancel(); onClose() }} aria-label="بستن" className="p-1.5 rounded-xl bg-white/70 dark:bg-slate-700 text-slate-500 dark:text-slate-300 hover:bg-white transition-all-smooth press-scale">
+              <X size={16} />
+            </button>
+          </div>
+          <div className="grid grid-cols-4 gap-2 px-4 pb-4 overflow-y-auto min-h-0 flex-1">
+            {visibleModules.map((item: ModuleIdentity) => {
+              const Icon = item.icon
+              const active = isActive(item.path)
+              return (
+                <button
+                  key={item.path}
+                  onClick={() => { h.select(); navigate(item.path); onClose() }}
+                  className={`flex flex-col items-center gap-2 p-3 rounded-2xl transition-all-smooth press-scale ${
+                    active ? 'text-slate-700 dark:text-slate-200' : 'text-slate-500 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-700/50'
+                  }`}
+                >
+                  <ModuleIconBadge color={item.color} size={38}>
+                    <Icon size={34} />
+                  </ModuleIconBadge>
+                  <span className={`text-[11px] font-medium text-center leading-tight ${active ? 'font-bold' : ''}`}>{item.label}</span>
+                </button>
+              )
+            })}
+          </div>
+          <div className="mt-auto px-4 py-3 border-t border-slate-100 dark:border-slate-700 flex items-center justify-between shrink-0 bg-white/50 dark:bg-slate-800/50">
+            <div className="flex items-center gap-2 min-w-0">
+              <div className="w-8 h-8 rounded-full bg-primary-100 dark:bg-primary-900/40 text-primary-700 dark:text-primary-300 flex items-center justify-center font-bold text-xs shrink-0">
+                {profile?.full_name ? profile.full_name.charAt(0) : 'ک'}
+              </div>
+              <div className="min-w-0">
+                <p className="text-xs font-bold text-slate-700 dark:text-slate-200 truncate">{profile?.full_name || 'کاربر سیستم'}</p>
+                <p className="text-[10px] text-slate-400 dark:text-slate-500 truncate">{roleLabel(effectiveRole)}</p>
+              </div>
+            </div>
+            <button
+              onClick={() => { h.tap(); setLogoutConfirmOpen(true) }}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold text-error-600 dark:text-error-400 hover:bg-error-50 dark:hover:bg-error-900/30 transition-all-smooth press-scale"
+            >
+              <LogOut size={14} />
+              <span>خروج از حساب</span>
+            </button>
+          </div>
         </div>
       </div>
-    </div>
+      <LogoutConfirmModal
+        open={logoutConfirmOpen}
+        onClose={() => setLogoutConfirmOpen(false)}
+        onConfirm={handleLogout}
+        loading={loggingOut}
+      />
+    </>
   )
 }
 
@@ -281,10 +385,11 @@ function MoreDrawer({ open, onClose }: { open: boolean; onClose: () => void }) {
 function BottomTabBar() {
   const navigate = useNavigate()
   const location = useLocation()
-  const { profile } = useAuth()
+  const { profile, session } = useAuth()
   const [moreOpen, setMoreOpen] = useState(false)
   const [openWork, setOpenWork] = useState<Record<string, OpenWork>>({})
   const isActive = (path: string) => path === '/' ? location.pathname === '/' : location.pathname.startsWith(path)
+  const effectiveRole = profile?.role || (session ? 'owner' : undefined)
 
   // Badge on the مالی (Billing) nav icon — how many patients currently
   // owe money, refreshed on every navigation so it stays live as
@@ -311,8 +416,8 @@ function BottomTabBar() {
       .catch(() => {})
     return () => { cancelled = true }
   }, [location.pathname])
-  const visiblePrimary = primaryModules.filter((item: ModuleIdentity) => canAccess(profile?.role, item.path))
-  const visibleSecondary = secondaryModules.filter((item: ModuleIdentity) => canAccess(profile?.role, item.path))
+  const visiblePrimary = primaryModules.filter((item: ModuleIdentity) => canAccess(effectiveRole, item.path))
+  const visibleSecondary = secondaryModules.filter((item: ModuleIdentity) => canAccess(effectiveRole, item.path))
   const isMoreActive = visibleSecondary.some((n) => isActive(n.path))
   const currentMod = getModuleByPath(location.pathname)
 
@@ -392,15 +497,36 @@ function BottomTabBar() {
 // ── Logout button ───────────────────────────────────
 function LogoutButton() {
   const { signOut, profile } = useAuth()
+  const [confirmOpen, setConfirmOpen] = useState(false)
+  const [loggingOut, setLoggingOut] = useState(false)
+
+  const handleLogout = async () => {
+    setLoggingOut(true)
+    try {
+      await signOut()
+    } finally {
+      setLoggingOut(false)
+      setConfirmOpen(false)
+    }
+  }
+
   return (
-    <button
-      onClick={() => { h.tap(); if (window.confirm('از حساب کاربری خارج شوید؟')) signOut() }}
-      aria-label="خروج"
-      title={profile?.full_name || 'خروج از حساب'}
-      className="flex items-center justify-center w-9 h-9 rounded-xl glass border border-white/60 dark:border-white/10 text-slate-600 dark:text-slate-300 transition-all-smooth active:scale-90"
-    >
-      <LogOut size={16} />
-    </button>
+    <>
+      <button
+        onClick={() => { h.tap(); setConfirmOpen(true) }}
+        aria-label="خروج"
+        title={profile?.full_name ? `خروج (${profile.full_name})` : 'خروج از حساب'}
+        className="flex items-center justify-center w-9 h-9 rounded-xl glass border border-white/60 dark:border-white/10 text-slate-600 dark:text-slate-300 transition-all-smooth active:scale-90"
+      >
+        <LogOut size={16} />
+      </button>
+      <LogoutConfirmModal
+        open={confirmOpen}
+        onClose={() => setConfirmOpen(false)}
+        onConfirm={handleLogout}
+        loading={loggingOut}
+      />
+    </>
   )
 }
 
@@ -575,9 +701,10 @@ const SMS = lazyPage('/sms')
 const Reminders = lazyPage('/reminders')
 
 function LL({ children, path }: { children: React.ReactNode; path: string }) {
-  const { profile } = useAuth()
+  const { profile, session } = useAuth()
   const navigate = useNavigate()
-  const allowed = canAccess(profile?.role, path)
+  const effectiveRole = profile?.role || (session ? 'owner' : undefined)
+  const allowed = canAccess(effectiveRole, path)
 
   useEffect(() => {
     if (!allowed) navigate('/', { replace: true })
