@@ -1156,14 +1156,22 @@ export default function Treatments() {
 
   // ── Tooth chart update handler ────────────────────────────────
 
-  const handleUpdateTooth = async (toothNumber: string, data: { is_missing: boolean; is_implant: boolean; notes: string; condition?: string }) => {
+  const handleUpdateTooth = async (toothNumber: string, data: { is_missing: boolean; is_implant: boolean; notes: string; condition?: string; surfaces?: string }) => {
     if (!detailEnc) return
     try {
       const existing = toothRecords.find((r) => r.tooth_number === toothNumber && r.patient_id === detailEnc.patient_id)
+      const payload: Record<string, any> = {
+        is_missing: data.is_missing,
+        is_implant: data.is_implant,
+        notes: data.notes,
+      }
+      if (data.condition !== undefined) payload.condition = data.condition
+      if (data.surfaces !== undefined) payload.surfaces = data.surfaces
+
       if (existing) {
-        await updateToothRecord(existing.id, { is_missing: data.is_missing, is_implant: data.is_implant, notes: data.notes } as any)
+        await updateToothRecord(existing.id, payload as any)
       } else {
-        await createToothRecord({ patient_id: detailEnc.patient_id, tooth_number: toothNumber, is_missing: data.is_missing, is_implant: data.is_implant, notes: data.notes } as any)
+        await createToothRecord({ patient_id: detailEnc.patient_id, tooth_number: toothNumber, ...payload } as any)
       }
       chimes.playSuccess()
       h.success()

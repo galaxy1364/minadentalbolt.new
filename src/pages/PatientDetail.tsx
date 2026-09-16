@@ -543,9 +543,16 @@ export default function PatientDetail() {
     if (!patient) return
     try {
       const existing = toothRecords.find((r) => r.tooth_number === toothNumber)
-      const payload = { is_missing: data.is_missing, is_implant: data.is_implant, notes: data.notes } as any
+      const payload: Record<string, any> = {
+        is_missing: data.is_missing,
+        is_implant: data.is_implant,
+        notes: data.notes,
+      }
+      if (data.condition !== undefined) payload.condition = data.condition
+      if (data.surfaces !== undefined) payload.surfaces = data.surfaces
+
       if (existing) {
-        await updateToothRecord(existing.id, payload)
+        await updateToothRecord(existing.id, payload as any)
       } else {
         await createToothRecord({ patient_id: patient.id, tooth_number: toothNumber, ...payload } as any)
       }
