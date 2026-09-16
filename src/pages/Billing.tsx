@@ -432,6 +432,14 @@ export default function Billing() {
       // 22.5m billable and 42.5m recorded as paid, never flagged.
       // Warns, does not block — paying ahead is real.
       warning: (() => {
+        const dupes = findDuplicatePayments({
+          patient_id: paymentForm.patient_id,
+          amount: Number(paymentForm.amount) || 0,
+          payment_date: paymentForm.payment_date,
+        }, payments as never)
+        const dupWarn = duplicateWarning(dupes)
+        if (dupWarn) return `⚠ ${dupWarn}`
+
         const over = checkOverpayment(Number(paymentForm.amount) || 0, fin?.balance ?? 0)
         if (!over.message) return undefined
         return `⚠ ${over.message} (${formatCurrency(over.excess)} ت اضافه)`

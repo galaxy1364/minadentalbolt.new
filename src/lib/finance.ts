@@ -1,4 +1,5 @@
 import type { Payment, Treatment, Patient } from '../types'
+import { formatCurrency, toPersianDigits } from './persianDate'
 
 /** Minimal shape needed from an implant case — accepts the full
  * ImplantCase/ImplantCaseWithRelations type too since both satisfy this. */
@@ -190,3 +191,79 @@ export function checkOverpayment(amount: number, remaining: number): Overpayment
     message: 'مبلغ از مانده‌ی بیمار بیشتر است — اضافه‌پرداخت ثبت می‌شود',
   }
 }
+
+export interface DuplicatePaymentCheck {
+  isDuplicate: boolean
+  matchedPayment?: Payment
+  minutesDiff?: number
+  message?: string
+}
+
+/**
+ * MOD-FEAT-047 | گارد هوشمند پرداخت تکراری
+ *
+ * Checks if a payment being recorded appears to duplicate a recent payment
+ * for the same patient with the same amount.
+ *
+ * In busy reception desks, duplicate taps or parallel clicks can easily record
+ * the same card swipe or cash entry twice. This warns the user before creating
+ * a duplicate ledger record.
+ */
+export function checkDuplicatePayment(
+  candidate: { patient_id: string; amount: number; payment_date?: string },
+  existingPayments: Payment[],
+  windowMinutes = 10,
+  referenceNow?: number,
+): DuplicatePaymentCheck {
+  if (!candidate.patient_id || !candidate.amount || candidate.amount <= 0) {
+    return { isDuplicate: false }
+  }
+
+  const candidateAmount = Math.round(candidate.amount)
+  const now = referenceNow ?? Date.now()
+
+  // Filter payments for same patient, not cancelled, and with same amount
+  const matched = existingPayments.find((p) => {
+    if (p.patient_id !== candidate.patient_id) return false
+    if (p.status === 'cancelled') return false
+    if (Math.round(p.amount || 0) !== candidateAmount) return false
+
+    // Check time diff based on created_at timestamp
+    if (p.created_at) {
+      const createdTime = new Date(p.created_at).getTime()
+      if (!isNaN(createdTime)) {
+        const diffMinutes = Math.abs(now - createdTime) / (1000 * 60)
+        return diffMinutes <= windowMinutes
+      }
+    }
+
+    // If candidate has payment_date matching p.payment_date and created within today
+    if (candidate.payment_date && p.payment_date === candidate.payment_date) {
+      return true
+    }
+
+    return false
+  })
+
+  if (!matched) {
+    return { isDuplicate: false }
+  }
+
+  let minutesDiff: number | undefined
+  if (matched.created_at) {
+    const diff = Math.round(Math.abs(now - new Date(matched.created_at).getTime()) / (1000 * 60))
+    minutesDiff = diff
+  }
+
+  const timeText = minutesDiff !== undefined && minutesDiff < 60
+    ? `${toPersianDigits(minutesDiff <= 1 ? 1 : minutesDiff)} دقیقه گذشته`
+    : 'دقایقی قبل'
+
+  return {
+    isDuplicate: true,
+    matchedPayment: matched,
+    minutesDiff,
+    message: `پرداختی با همین مبلغ (${formatCurrency(candidateAmount)} ت) در ${timeText} برای این بیمار ثبت شده است. آیا مطمئنید پرداخت تکراری نیست؟`,
+  }
+}
+

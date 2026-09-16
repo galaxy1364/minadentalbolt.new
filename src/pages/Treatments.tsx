@@ -28,7 +28,7 @@ import { Card, Button, Badge, Spinner, EmptyState, Tabs, Input, Select, Textarea
 import { recordAuditLog } from '../lib/auditLogger'
 import { PersianDateInput } from '../components/PersianDateInput'
 import { ToothArchSelect } from '../components/ToothArchSelect'
-import { deriveToothConditions } from '../lib/toothConditions'
+import { deriveToothConditions, conditionMeta, ToothCondition } from '../lib/toothConditions'
 import { ModuleHeader, ModuleStatCard, ReorderableStatGrid } from '../components/ModuleHeader'
 import { useConfirmAction } from '../components/ConfirmAction'
 import { h } from '../lib/haptics'
@@ -387,18 +387,52 @@ export default function Treatments() {
     }
   }, [location.state, encounters])
 
-  // Load tooth records when detailEnc changes
+  // Load tooth records when detailEnc or treatPatientId changes
   useEffect(() => {
-    if (detailEnc) {
-      fetchToothRecords(detailEnc.patient_id).then(setToothRecords).catch(() => {})
+    const targetPatId = detailEnc?.patient_id || treatPatientId
+    if (targetPatId) {
+      fetchToothRecords(targetPatId).then(setToothRecords).catch(() => {})
     }
-  }, [detailEnc])
+  }, [detailEnc, treatPatientId])
 
   // ── Derived Data ──────────────────────────────────────────────
 
   const archConditions = useMemo(() => {
     return deriveToothConditions(toothRecords, treatments)
   }, [toothRecords, treatments])
+
+  const suggestedTeeth = useMemo(() => {
+    const result: { tooth_number: string; conditionLabel: string; surface?: string }[] = []
+    const seen = new Set<string>()
+
+    for (const r of toothRecords) {
+      const tNum = r.tooth_number ? String(r.tooth_number) : ''
+      if (!tNum || seen.has(tNum)) continue
+      if (r.condition && r.condition !== 'healthy') {
+        seen.add(tNum)
+        const condKey = r.condition as ToothCondition
+        const label = conditionMeta[condKey]?.label || r.condition
+        result.push({
+          tooth_number: tNum,
+          conditionLabel: label,
+          surface: typeof r.surfaces === 'string' ? r.surfaces : undefined,
+        })
+      }
+    }
+    for (const [toothNumStr, data] of Object.entries(archConditions)) {
+      if (!toothNumStr || seen.has(toothNumStr)) continue
+      if (data && data.condition && data.condition !== 'healthy') {
+        seen.add(toothNumStr)
+        const label = conditionMeta[data.condition]?.label || data.condition
+        result.push({
+          tooth_number: toothNumStr,
+          conditionLabel: label,
+        })
+      }
+    }
+
+    return result.sort((a, b) => a.tooth_number.localeCompare(b.tooth_number, undefined, { numeric: true }))
+  }, [toothRecords, archConditions])
 
   const patientMap = useMemo(() => new Map(patients.map((p) => [p.id, p])), [patients])
   const doctorMap = useMemo(() => new Map(doctors.map((d) => [d.id, d])), [doctors])
@@ -1777,7 +1811,44 @@ export default function Treatments() {
                     </button>
                   </div>
                 ) : (
-                  <ToothArchSelect label="دندان *" value={treatForm.tooth_number} onChange={(v) => setTreatForm((p) => ({ ...p, tooth_number: v }))} conditions={archConditions} />
+                  <>
+                    {suggestedTeeth.length > 0 && (
+                      <div className="mb-3 p-3 rounded-2xl bg-amber-50/90 dark:bg-amber-950/20 border border-amber-200/80 dark:border-amber-800/40 space-y-1.5">
+                        <p className="text-xs font-bold text-amber-900 dark:text-amber-200 flex items-center gap-1.5">
+                          <AlertCircle size={14} className="text-amber-600 dark:text-amber-400 shrink-0" />
+                          <span>دندان‌های دارای یافته در پرونده بیمار (پیشنهاد هوشمند):</span>
+                        </p>
+                        <div className="flex flex-wrap gap-1.5">
+                          {suggestedTeeth.map((s) => {
+                            const isSelected = treatForm.tooth_number === s.tooth_number
+                            return (
+                              <button
+                                key={s.tooth_number}
+                                type="button"
+                                onClick={() => {
+                                  h.select()
+                                  setTreatForm((p) => ({
+                                    ...p,
+                                    tooth_number: s.tooth_number,
+                                    ...(s.surface ? { tooth_surface: s.surface } : {}),
+                                  }))
+                                }}
+                                className={`px-2.5 py-1 rounded-xl text-xs font-medium flex items-center gap-1.5 transition-all-smooth ${
+                                  isSelected
+                                    ? 'bg-primary-600 text-white shadow-sm ring-2 ring-primary-300'
+                                    : 'bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-100 border border-slate-200 dark:border-slate-700 hover:border-primary-400 shadow-2xs'
+                                }`}
+                              >
+                                <span className="font-bold">دندان {toothLabel(s.tooth_number)}</span>
+                                <span className="text-[10px] text-amber-700 dark:text-amber-300 font-normal">({s.conditionLabel})</span>
+                              </button>
+                            )
+                          })}
+                        </div>
+                      </div>
+                    )}
+                    <ToothArchSelect label="دندان *" value={treatForm.tooth_number} onChange={(v) => setTreatForm((p) => ({ ...p, tooth_number: v }))} conditions={archConditions} />
+                  </>
                 )}
                 {/* MOD-FEAT-026: a dropdown returns one value, so «MOD» —
                     the commonest restoration there is — could not be
@@ -1821,13 +1892,18 @@ export default function Treatments() {
                   >
                     <option value="">انتخاب از لیست رویه‌ها...</option>
                     {procCategoryFilter ? (
-                      procedures.filter((p) => p.is_active && p.category === procCategoryFilter).map((p) => (
-                        <option key={p.id} value={p.code}>{p.name} ({toPersianDigits(p.code)}){p.default_price ? ` - ${formatCurrency(p.default_price)} ت` : ''}</option>
-                      ))
+                      procedures
+                        .filter((p) => p.is_active && p.category === procCategoryFilter)
+                        .sort((a, b) => a.code.localeCompare(b.code, undefined, { numeric: true }) || a.name.localeCompare(b.name, 'fa'))
+                        .map((p) => (
+                          <option key={p.id} value={p.code}>{p.name} ({toPersianDigits(p.code)}){p.default_price ? ` - ${formatCurrency(p.default_price)} ت` : ''}</option>
+                        ))
                     ) : (
                       (() => {
                         const groups = Object.entries(procedureCategories).map(([catVal, catLabel]) => {
-                          const groupProcs = procedures.filter((p) => p.is_active && p.category === catVal)
+                          const groupProcs = procedures
+                            .filter((p) => p.is_active && p.category === catVal)
+                            .sort((a, b) => a.code.localeCompare(b.code, undefined, { numeric: true }) || a.name.localeCompare(b.name, 'fa'))
                           if (groupProcs.length === 0) return null
                           return (
                             <optgroup key={catVal} label={catLabel}>
@@ -1845,9 +1921,9 @@ export default function Treatments() {
                         // off-list category. Collect the leftovers into a
                         // fallback group so every active procedure is always
                         // reachable.
-                        const uncategorised = procedures.filter(
-                          (p) => p.is_active && !(p.category && p.category in procedureCategories),
-                        )
+                        const uncategorised = procedures
+                          .filter((p) => p.is_active && !(p.category && p.category in procedureCategories))
+                          .sort((a, b) => a.code.localeCompare(b.code, undefined, { numeric: true }) || a.name.localeCompare(b.name, 'fa'))
                         if (uncategorised.length > 0) {
                           groups.push(
                             <optgroup key="__uncat" label="سایر">
@@ -2256,12 +2332,15 @@ export default function Treatments() {
                   label="رویه‌ی درمانی"
                   value={bulkProcedureCode}
                   onChange={setBulkProcedureCode}
-                  options={procedures.filter((p) => p.is_active).map((p) => ({
-                    value: p.code,
-                    label: p.default_price
-                      ? `${p.name} — ${formatCurrency(p.default_price)} ت`
-                      : p.name,
-                  }))}
+                  options={procedures
+                    .filter((p) => p.is_active)
+                    .sort((a, b) => a.code.localeCompare(b.code, undefined, { numeric: true }) || a.name.localeCompare(b.name, 'fa'))
+                    .map((p) => ({
+                      value: p.code,
+                      label: p.default_price
+                        ? `${p.name} — ${formatCurrency(p.default_price)} ت`
+                        : p.name,
+                    }))}
                   placeholder="انتخاب رویه..."
                 />
               </div>
