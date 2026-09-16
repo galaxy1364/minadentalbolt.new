@@ -6,6 +6,7 @@ import { clinicMilestones, nextClinicAction } from '../lib/labClinicMilestones'
 import { PatientDebtBar } from '../components/PatientDebtBar'
 import { implantMilestones, nextImplantAction, implantDeadline, IMPLANT_MILESTONE_COLORS, healingEndDate, implantPhase } from '../lib/implantMilestones'
 import { PatientSelect } from '../components/PatientSelect'
+import { PatientAlerts } from '../components/PatientAlerts'
 import { toothLabel, toothLabelWithWord } from '../lib/toothLabel'
 import { useNavigate, useLocation } from 'react-router-dom'
 import { Smile, Plus, Search, Edit2, Eye, Filter, Package, Calendar, DollarSign, ShieldCheck, AlertTriangle, CheckCircle2, Clock, Activity, Layers, CalendarClock, ScanLine, Archive, Ban, X, ChevronLeft, MessageSquare, Award } from 'lucide-react'
@@ -1170,6 +1171,14 @@ export default function Implants() {
             content: (
               <>
                 <PatientSelect required value={caseForm.patient_id} onChange={(v) => setCaseForm({ ...caseForm, patient_id: v })} patients={patients} />
+                {caseForm.patient_id && (
+                  <div className="my-2">
+                    <PatientAlerts
+                      patient={patients.find((p) => p.id === caseForm.patient_id) || null}
+                      balance={null}
+                    />
+                  </div>
+                )}
                 {doctors.filter((d) => d.is_active).length === 0 ? (
                   <div className="p-4 rounded-2xl bg-warning-50 border border-warning-200 text-center">
                     <p className="text-sm font-bold text-warning-700 mb-1">هنوز پزشکی ثبت نشده است</p>

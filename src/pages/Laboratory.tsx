@@ -6,6 +6,7 @@ import { formatSurfaces } from '../lib/toothSurfaces'
 import { clinicMilestones, nextClinicAction, deadlineState, MILESTONE_COLORS } from '../lib/labClinicMilestones'
 import { LEVEL_COLORS } from '../lib/openWork'
 import { PatientSelect } from '../components/PatientSelect'
+import { PatientAlerts } from '../components/PatientAlerts'
 import { toothLabel, toothLabelWithWord } from '../lib/toothLabel'
 import { FlaskConical, Plus, Search, Clock, CheckCircle2, AlertCircle, Edit2, Phone, Filter, TrendingUp, Package, CalendarClock, ChevronLeft, RotateCcw, Ban, Archive, MessageSquare, Truck } from 'lucide-react'
 import {
@@ -1407,6 +1408,14 @@ export default function Laboratory() {
                   }}
                   patients={patients}
                 />
+                {orderForm.patient_id && (
+                  <div className="my-2">
+                    <PatientAlerts
+                      patient={patientMap.get(orderForm.patient_id) || null}
+                      balance={null}
+                    />
+                  </div>
+                )}
                 <Select label="پزشک" value={orderForm.doctor_id} onChange={(v) => setOrderForm((p) => ({ ...p, doctor_id: v }))} options={doctorOptions} placeholder="انتخاب پزشک" />
               </>
             ),

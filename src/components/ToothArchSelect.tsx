@@ -24,6 +24,7 @@ import type { ToothEntry } from '../lib/palmerArch'
 import type { ToothCondition, ToothSurfaceCondition } from '../lib/toothConditions'
 import { h } from '../lib/haptics'
 import { chimes } from '../lib/chimes'
+import { toPersianDigits } from '../lib/persianDate'
 
 export interface ToothArchSelectProps {
   label?: string
@@ -86,10 +87,15 @@ export function ToothArchSelect({
               h.select()
               onChange(String(t.fdi))
             }}
-            className={`shrink-0 rounded-lg p-0.5 transition-all-smooth press-scale ${
+            className={`shrink-0 flex flex-col items-center rounded-lg p-0.5 transition-all-smooth press-scale ${
               selected === t.fdi ? 'bg-primary-50 ring-2 ring-primary-400' : ''
             }`}
           >
+            {jaw === 'lower' && (
+              <span className="text-[10px] font-bold text-slate-500 dark:text-slate-400 mb-0.5 select-none">
+                {toPersianDigits(t.palmer)}
+              </span>
+            )}
             <ToothGlyph
               number={t.fdi}
               condition={conditions?.[t.fdi]?.condition ?? 'healthy'}
@@ -97,6 +103,11 @@ export function ToothArchSelect({
               size={glyphSize}
               selected={selected === t.fdi}
             />
+            {jaw === 'upper' && (
+              <span className="text-[10px] font-bold text-slate-500 dark:text-slate-400 mt-0.5 select-none">
+                {toPersianDigits(t.palmer)}
+              </span>
+            )}
           </button>
         </div>
       ))}

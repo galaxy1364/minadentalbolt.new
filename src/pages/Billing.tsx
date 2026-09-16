@@ -2,6 +2,7 @@
 import { useState, useEffect, useCallback, useMemo } from 'react'
 import { PatientDebtBar } from '../components/PatientDebtBar'
 import { PatientSelect } from '../components/PatientSelect'
+import { PatientAlerts } from '../components/PatientAlerts'
 import { toothLabel, toothCode } from '../lib/toothLabel'
 import { buildPrintDocument } from '../lib/printDocument'
 import { resolveAttribution, attributableTreatments, treatmentRemaining } from '../lib/paymentAttribution'
@@ -1842,6 +1843,14 @@ export default function Billing() {
           content: (
             <>
               <PatientSelect required value={paymentForm.patient_id} onChange={(v) => setPaymentForm((p) => ({ ...p, patient_id: v, encounter_id: '', implant_case_id: '' }))} patients={patients} balances={patientBalancesMap} />
+              {paymentForm.patient_id && (
+                <div className="my-2">
+                  <PatientAlerts
+                    patient={patients.find((x) => x.id === paymentForm.patient_id) || null}
+                    balance={patientBalancesMap.get(paymentForm.patient_id) ?? null}
+                  />
+                </div>
+              )}
               {paymentForm.patient_id && (() => {
                 const fin = patientBalancesMap.get(paymentForm.patient_id)
                 if (!fin) return null
@@ -2141,6 +2150,14 @@ export default function Billing() {
           content: (
             <>
               <PatientSelect value={chequeForm.patient_id} onChange={(v) => setChequeForm((p) => ({ ...p, patient_id: v }))} patients={patients} balances={patientBalancesMap} />
+              {chequeForm.patient_id && (
+                <div className="my-2">
+                  <PatientAlerts
+                    patient={patients.find((x) => x.id === chequeForm.patient_id) || null}
+                    balance={patientBalancesMap.get(chequeForm.patient_id) ?? null}
+                  />
+                </div>
+              )}
               <CurrencyInput label="مبلغ (تومان)" value={chequeForm.amount} onChange={(v) => setChequeForm((p) => ({ ...p, amount: v }))} />
               <Input label="در وجه" value={chequeForm.payee_name} onChange={(v) => setChequeForm((p) => ({ ...p, payee_name: v }))} />
 

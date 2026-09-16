@@ -10,6 +10,7 @@ import { generateSlots, slotAvailability, defaultEndTime, addMinutes, firstBooka
 import { doctorsForDay, unitAvailability, patientPickerHint } from '../lib/selectionHints'
 import { calcAllPatientBalances } from '../lib/finance'
 import { buildPatientAlerts, alertChips } from '../lib/patientAlerts'
+import { PatientAlerts } from '../components/PatientAlerts'
 import { Appointment, AppointmentWithRelations, Patient, Doctor, Unit, DoctorSchedule } from '../types'
 import { Modal, Card, Button, Input, Select, Textarea, EmptyState, showToast, Badge, Spinner } from '../components/ui'
 import { ModuleHeader } from '../components/ModuleHeader'
@@ -1227,15 +1228,21 @@ export default function Appointments() {
                 {wizardData.patient_id && !showPatientResults && (() => {
                   const p = patients.find((x) => x.id === wizardData.patient_id)
                   return p ? (
-                    <div className="flex items-center gap-3 p-3 rounded-xl bg-primary-50">
-                      <div className="w-10 h-10 rounded-full bg-primary-100 flex items-center justify-center text-primary-700 font-bold text-sm">
-                        {p.first_name[0]}{p.last_name[0]}
+                    <div className="space-y-2">
+                      <div className="flex items-center gap-3 p-3 rounded-xl bg-primary-50">
+                        <div className="w-10 h-10 rounded-full bg-primary-100 flex items-center justify-center text-primary-700 font-bold text-sm">
+                          {p.first_name[0]}{p.last_name[0]}
+                        </div>
+                        <div className="flex-1">
+                          <p className="font-bold text-sm text-slate-800">{p.first_name} {p.last_name}</p>
+                          {p.file_number && <p className="text-xs text-slate-500">پرونده: {p.file_number}</p>}
+                        </div>
+                        <CheckCircle2 size={20} className="text-primary-600" />
                       </div>
-                      <div className="flex-1">
-                        <p className="font-bold text-sm text-slate-800">{p.first_name} {p.last_name}</p>
-                        {p.file_number && <p className="text-xs text-slate-500">پرونده: {p.file_number}</p>}
-                      </div>
-                      <CheckCircle2 size={20} className="text-primary-600" />
+                      <PatientAlerts
+                        patient={p}
+                        balance={patientBalances.get(p.id) ?? null}
+                      />
                     </div>
                   ) : null
                 })()}
