@@ -1,6 +1,7 @@
 // WaitingList.tsx - Persian RTL Dental Clinic Waiting List Management
 import { useState, useEffect, useCallback, useMemo } from 'react'
 import { PatientSelect } from '../components/PatientSelect'
+import { PatientAlerts } from '../components/PatientAlerts'
 import { useNavigate } from 'react-router-dom'
 import { Clock, Search, Plus, Phone, Bell, CheckCircle2, XCircle, Calendar, Smile, AlertCircle, Edit2, Ban, MessageSquare } from 'lucide-react'
 import { BarChart, Bar, XAxis, YAxis, Tooltip as RTooltip, ResponsiveContainer, Cell } from 'recharts'
@@ -653,6 +654,14 @@ export default function WaitingList() {
             content: (
               <>
                 <PatientSelect required value={formData.patient_id} onChange={(v) => setFormData({ ...formData, patient_id: v })} patients={patients} />
+                {formData.patient_id && (
+                  <div className="my-2">
+                    <PatientAlerts
+                      patient={patients.find((p) => p.id === formData.patient_id) || null}
+                      balance={null}
+                    />
+                  </div>
+                )}
                 <Select label="پزشک" value={formData.doctor_id} onChange={(v) => setFormData({ ...formData, doctor_id: v })} options={doctorOptions} placeholder="انتخاب پزشک" />
               </>
             ),

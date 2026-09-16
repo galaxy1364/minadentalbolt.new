@@ -11,6 +11,7 @@ import { RadiologyImage, Patient } from '../types'
 import { Card, Button, Badge, Spinner, EmptyState, Modal, Wizard, Input, Select, Textarea, showToast } from '../components/ui'
 import { PersianDateInput } from '../components/PersianDateInput'
 import { PatientSelect } from '../components/PatientSelect'
+import { PatientAlerts } from '../components/PatientAlerts'
 import { recordAuditLog } from '../lib/auditLogger'
 import { ToothArchSelect } from '../components/ToothArchSelect'
 import { ModuleHeader, ModuleStatCard, ReorderableStatGrid } from '../components/ModuleHeader'
@@ -779,6 +780,14 @@ export default function Radiology() {
             content: (
               <>
                 <PatientSelect required value={uploadForm.patient_id} onChange={(v) => setUploadForm((p) => ({ ...p, patient_id: v }))} patients={patients} />
+                {uploadForm.patient_id && (
+                  <div className="my-2">
+                    <PatientAlerts
+                      patient={patients.find((p) => p.id === uploadForm.patient_id) || null}
+                      balance={null}
+                    />
+                  </div>
+                )}
                 <div className="grid grid-cols-2 gap-3">
                   <Select label="نوع تصویر" value={uploadForm.image_type} onChange={(v) => setUploadForm((p) => ({ ...p, image_type: v }))} options={imageTypes.map((t) => ({ value: t.value, label: t.label }))} />
                   <ToothArchSelect label="دندان" value={uploadForm.tooth_number} onChange={(v) => setUploadForm((p) => ({ ...p, tooth_number: v }))} allowPrimary={false} />
