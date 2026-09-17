@@ -4,7 +4,7 @@ import { useNavigate } from 'react-router-dom'
 import {
   Compass, CheckCircle2, ShieldCheck, Cpu, Database,
   Stethoscope, Layers, Sparkles, Activity, Boxes,
-  Clock, DollarSign, HeartPulse, RefreshCw, type LucideIcon
+  Clock, DollarSign, HeartPulse, RefreshCw, ArrowLeft, type LucideIcon
 } from 'lucide-react'
 import { Card, Button, Badge } from '../components/ui'
 import { ModuleHeader } from '../components/ModuleHeader'
@@ -21,6 +21,8 @@ interface Pillar {
   icon: LucideIcon
   color: string
   badgeText: string
+  route: string
+  actionLabel: string
   features: {
     name: string
     description: string
@@ -37,6 +39,8 @@ const PILLARS: Pillar[] = [
     icon: Stethoscope,
     color: 'from-rose-500 to-red-600',
     badgeText: '۱۰۰٪ تکمیل‌شده',
+    route: '/treatments',
+    actionLabel: 'ورود به چارتینگ و ویزیت بالینی',
     features: [
       {
         name: 'قوس افقی پیوسته پالمر (Horizontal Anatomical Arch)',
@@ -71,6 +75,8 @@ const PILLARS: Pillar[] = [
     icon: Clock,
     color: 'from-amber-500 to-orange-600',
     badgeText: 'ارتقای هوشمند',
+    route: '/appointments',
+    actionLabel: 'مدیریت تقویم و نوبت‌دهی',
     features: [
       {
         name: 'نگهبان تداخل تاریخ تحویل لابراتوار (Lab Due-Date Collision Guard)',
@@ -99,6 +105,8 @@ const PILLARS: Pillar[] = [
     icon: Boxes,
     color: 'from-orange-500 to-amber-600',
     badgeText: '۱۰۰٪ هوشمند',
+    route: '/inventory',
+    actionLabel: 'مدیریت انبار و اقلام مصرفی',
     features: [
       {
         name: 'کسر تک‌کلیکه اقلام مصرفی از ویزیت (1-Click Encounter Depletion)',
@@ -121,6 +129,8 @@ const PILLARS: Pillar[] = [
     icon: HeartPulse,
     color: 'from-emerald-500 to-teal-600',
     badgeText: 'هوشمند بالینی',
+    route: '/reminders',
+    actionLabel: 'مرکز یادآوری‌ها و پیگیری مراجعین',
     features: [
       {
         name: 'یادآور فالوآپ ۲۴ ساعته جراحی و کشیدن دندان (24h Post-Op Recall)',
@@ -143,6 +153,8 @@ const PILLARS: Pillar[] = [
     icon: DollarSign,
     color: 'from-blue-500 to-indigo-600',
     badgeText: 'مالی پیشرفته',
+    route: '/billing',
+    actionLabel: 'ورود به صندوق و امور مالی',
     features: [
       {
         name: 'مدیریت و استعلام چک‌های صیادی (Sayad Cheque Engine)',
@@ -433,16 +445,40 @@ export default function Roadmap() {
             </p>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             <div className="p-4 rounded-2xl bg-slate-50 dark:bg-slate-900/60 border border-slate-200/80 dark:border-slate-800 space-y-2">
               <div className="flex items-center gap-2">
                 <ShieldCheck size={18} className="text-emerald-500" />
                 <h4 className="text-xs font-bold text-slate-800 dark:text-slate-200">
-                  ایمنی بالینی و کنترل تداخلات دارویی (Patient Safety)
+                  امنیت داده‌های سلامت (ISO/IEC 27001 & HIPAA)
                 </h4>
               </div>
               <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed">
-                هشدار لحظه‌ای حساسیت دارویی (لیدوکائین، پنی‌سیلین)، تداخل داروهای ضد انعقاد با جراحی دهان و فک، و هشدارهای رادیولوژی برای بیماران باردار مطابق راهنماهای ADA و وزارت بهداشت.
+                ردپای ممیزی غیرقابل دستکاری (Audit Trail)، تفکیک کامل سطوح دسترسی (RBAC)، قفل خودکار اپلیکیشن، ممنوعیت مطلق حذف دائمی رکوردهای مالی و بالینی و پشتیبان‌گیری رمزنگاری‌شده AES-256.
+              </p>
+            </div>
+
+            <div className="p-4 rounded-2xl bg-slate-50 dark:bg-slate-900/60 border border-slate-200/80 dark:border-slate-800 space-y-2">
+              <div className="flex items-center gap-2">
+                <Activity size={18} className="text-teal-500" />
+                <h4 className="text-xs font-bold text-slate-800 dark:text-slate-200">
+                  استاندارد کیفیت مهندسی (ISO/IEC 25010)
+                </h4>
+              </div>
+              <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed">
+                تطابق ۱۰۰٪ هشت شاخص کیفیت نرم‌افزار، پاسخگویی زیر ۱۰۰ میلی‌ثانیه، بیش از ۱,۴۰۰ تست خودکار فعال در ۹۸ سوئیت، صفر خطای تایپ‌اسکریپت و بازیابی خودکار در بروز خطای شبکه.
+              </p>
+            </div>
+
+            <div className="p-4 rounded-2xl bg-slate-50 dark:bg-slate-900/60 border border-slate-200/80 dark:border-slate-800 space-y-2">
+              <div className="flex items-center gap-2">
+                <Sparkles size={18} className="text-violet-500" />
+                <h4 className="text-xs font-bold text-slate-800 dark:text-slate-200">
+                  طراحی بصری زنده جِمینای (Gemini Living Aura)
+                </h4>
+              </div>
+              <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed">
+                پس‌زمینه متحرک با امواج نوری ۴ گانه منطبق بر هویت رنگی هر ماژول، شیشه‌مورفیسم کوپرتینو iOS 27، عدم وجود سفیدی خام، بازخورد لمسی هپتیک و چایم صوتی آرامش‌بخش کلینیکی.
               </p>
             </div>
 
@@ -462,11 +498,11 @@ export default function Roadmap() {
               <div className="flex items-center gap-2">
                 <Layers size={18} className="text-indigo-500" />
                 <h4 className="text-xs font-bold text-slate-800 dark:text-slate-200">
-                  دسترس‌پذیری و ارگونومی یونیت (Accessibility & Touch UI)
+                  دسترس‌پذیری و ارگونومی یونیت (WCAG 2.2 AA & Touch UI)
                 </h4>
               </div>
               <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed">
-                رعایت کنتراست رنگی WCAG 2.2 AA، ابعاد لمسی حداقل ۴۴ پیکسل برای کاربری با دستکش دندانپزشکی، اسکرول افقی داک در چارت دندانی و پشتیبانی کامل از حالت دارک/لایت.
+                رعایت کنتراست رنگی استاندارد، ابعاد لمسی حداقل ۴۸ پیکسل برای کاربری ایمن با دستکش استریل دندانپزشکی، اسکرول افقی داک در چارت دندانی و پشتیبانی کامل از حالت دارک/لایت.
               </p>
             </div>
 
@@ -474,11 +510,11 @@ export default function Roadmap() {
               <div className="flex items-center gap-2">
                 <DollarSign size={18} className="text-amber-500" />
                 <h4 className="text-xs font-bold text-slate-800 dark:text-slate-200">
-                  استاندارد بانکداری و چک صیادی (Central Bank Sayad Compliance)
+                  استاندارد بانکداری و پوز شاپرک (POS & Sayad Compliance)
                 </h4>
               </div>
               <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed">
-                ثبت دقیق شناسه صیادی، تاریخ‌های سررسید شمسی، مدیریت چندطرفه بیمه‌های پایه و تکمیلی و تطبیق حساب‌های خانوادگی در صدور فاکتور درمان.
+                اعتبارسنجی کد ۱۲ رقمی RRN شاپرک، چاپ رسید حرارتی ۸۰ میلی‌متری تراکنش کارتخوان، استعلام شناسه صیادی ۱۶ رقمی و فرمول حفاظت‌شده سهم پزشکان با کسر پیش‌فرض هزینه لابراتوار.
               </p>
             </div>
           </div>

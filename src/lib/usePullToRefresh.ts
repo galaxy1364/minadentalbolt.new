@@ -44,11 +44,11 @@ export function usePullToRefresh(onRefresh: () => Promise<void>) {
       return
     }
     const delta = e.touches[0].clientY - startYRef.current
-    if (delta <= 0) {
-      setPullDistance(0)
+    if (delta <= 15) {
+      if (pullDistance !== 0) setPullDistance(0)
       return
     }
-    const diminished = Math.min(delta * 0.5, MAX_PULL)
+    const diminished = Math.min((delta - 15) * 0.5, MAX_PULL)
     // Batch via rAF instead of setting state synchronously on every touch
     // event — this is what caused visible jank/stutter on Android.
     if (rafRef.current) cancelAnimationFrame(rafRef.current)

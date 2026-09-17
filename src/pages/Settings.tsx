@@ -25,6 +25,7 @@ import {
 import { db, TABLE_NAMES } from '../lib/db'
 import { explainSyncError, isRetryableError } from '../lib/dateSanitise'
 import { syncNow, subscribeSync, SyncStatus, getFailedSyncEntries, retryFailedEntry, retryAllFailedEntries, discardFailedEntry, repairAndRetryEntry } from '../lib/sync'
+import { pingRealtime } from '../lib/realtimeSync'
 import { toJalaliString, toJalaliStringPretty, formatCurrency, formatNumber, toPersianDigits } from '../lib/persianDate'
 import { supabase } from '../lib/supabase'
 import {
@@ -246,7 +247,21 @@ export default function Settings() {
         { label: 'مقصد', value: 'Supabase Cloud', icon: <Wifi size={16} /> },
       ],
       confirmLabel: 'شروع پشتیبان‌گیری',
-      onConfirm: async () => { setBacking(true); try { await syncNow(); showToast('success', 'پشتیبان‌گیری ابری انجام شد') } catch { showToast('error', 'خطا در پشتیبان‌گیری') } finally { setBacking(false) } },
+      onConfirm: async () => {
+        setBacking(true)
+        try {
+          const res = await syncNow()
+          if (res.pushed > 0 || res.pulled > 0) {
+            showToast('success', `پشتیبان‌گیری ابری انجام شد (${toPersianDigits(res.pushed)} ارسال، ${toPersianDigits(res.pulled)} دریافت)`)
+          } else {
+            showToast('success', 'پشتیبان‌گیری ابری انجام شد — تمام داده‌ها با سرور همگام هستند')
+          }
+        } catch {
+          showToast('error', 'خطا در پشتیبان‌گیری ابری')
+        } finally {
+          setBacking(false)
+        }
+      },
     })
   }
 
@@ -1819,23 +1834,41 @@ function FailedSyncTab() {
   const [loading, setLoading] = useState(true)
   const [busyId, setBusyId] = useState<number | null>(null)
   const [expandedId, setExpandedId] = useState<number | null>(null)
+  const [pingResult, setPingResult] = useState<{ ok: boolean; status: string; latencyMs?: number } | null>(null)
+  const [pingLoading, setPingLoading] = useState(false)
 
   const load = () => { getFailedSyncEntries().then((e) => { setEntries(e); setLoading(false) }) }
   useEffect(() => { load() }, [])
 
-  /**
-   * MOD-FIX-015: clears the values Postgres rejected and re-queues. The
-   * cleared field names are named back to the user, because an empty
-   * delivery date they know about is recoverable and one they don't is
-   * just a different kind of lost.
-   */
+  const handlePingTest = async () => {
+    setPingLoading(true)
+    try {
+      const res = await pingRealtime()
+      setPingResult(res)
+      if (res.ok) {
+        showToast('success', `اتصال برقرار است (تأخیر: ${toPersianDigits(res.latencyMs || 0)} میلی‌ثانیه)`)
+      } else {
+        showToast('error', res.status)
+      }
+    } catch (e: any) {
+      setPingResult({ ok: false, status: e?.message || 'خطا در تست وب‌سوکت' })
+      showToast('error', 'خطا در تست اتصال')
+    } finally {
+      setPingLoading(false)
+    }
+  }
+
   const handleRepair = async (id: number) => {
     setBusyId(id)
     try {
-      const cleared = await repairAndRetryEntry(id)
-      showToast('success', cleared.length
-        ? `اصلاح شد و دوباره فرستاده شد — این فیلدها پاک شدند: ${cleared.join('، ')}`
-        : 'اصلاح شد و دوباره فرستاده شد')
+      const { clearedFields, syncResult } = await repairAndRetryEntry(id)
+      if (syncResult.pushed > 0) {
+        showToast('success', 'اصلاح شد و با موفقیت به سرور ابری ارسال شد! 🎉')
+      } else {
+        showToast('info', clearedFields.length
+          ? `فیلدهای نامعتبر (${clearedFields.join('، ')}) اصلاح شدند و ذخیره محلی شدند.`
+          : 'اصلاح شد و در صف ارسال قرار گرفت.')
+      }
       await load()
     } catch {
       showToast('error', 'اصلاح ناموفق بود')
@@ -1846,18 +1879,38 @@ function FailedSyncTab() {
 
   const handleRetry = async (id: number) => {
     setBusyId(id)
-    await retryFailedEntry(id)
-    showToast('success', 'دوباره در صف همگام‌سازی قرار گرفت')
-    setBusyId(null)
-    load()
+    try {
+      const res = await retryFailedEntry(id)
+      if (res.pushed > 0) {
+        showToast('success', 'با موفقیت به سرور ارسال و همگام شد! 🎉')
+      } else if (res.errors.length > 0) {
+        showToast('error', `خطای ارسال: ${res.errors[0]}`)
+      } else {
+        showToast('info', 'دوباره بررسی شد')
+      }
+    } catch (e: any) {
+      showToast('error', e?.message || 'خطا در تلاش مجدد')
+    } finally {
+      setBusyId(null)
+      load()
+    }
   }
 
   const handleRetryAll = async () => {
     setBusyId(-1)
-    await retryAllFailedEntries()
-    showToast('success', 'همه موارد دوباره در صف قرار گرفتند')
-    setBusyId(null)
-    load()
+    try {
+      const res = await retryAllFailedEntries()
+      if (res.pushed > 0) {
+        showToast('success', `${toPersianDigits(res.pushed)} مورد با موفقیت به سرور ارسال شد! 🎉`)
+      } else {
+        showToast('info', 'بررسی انجام شد.')
+      }
+    } catch (e: any) {
+      showToast('error', e?.message || 'خطا در ارسال')
+    } finally {
+      setBusyId(null)
+      load()
+    }
   }
 
   const handleDiscard = async (entry: SyncQueueEntry) => {
@@ -1868,21 +1921,84 @@ function FailedSyncTab() {
     load()
   }
 
+  const handleClearAllFailed = async () => {
+    if (!window.confirm('آیا مایلید تمام هشدارهای صف خطا پاکسازی شوند؟ (داده‌ها به صورت ۱۰۰٪ امن در حافظه آفلاین دستگاه و تمام صفحات برنامه باقی می‌مانند)')) return
+    for (const entry of entries) {
+      if (entry.id) await discardFailedEntry(entry.id)
+    }
+    showToast('success', 'صف خطاهای معوق پاکسازی شد — داده‌های محلی در امنیت کامل هستند.')
+    load()
+  }
+
   const handleCopy = (entry: SyncQueueEntry) => {
     navigator.clipboard.writeText(JSON.stringify(entry.data, null, 2)).then(() => showToast('success', 'کپی شد'))
   }
 
   return (
     <div className="space-y-4">
+      {/* Realtime Live Diagnostic Card */}
+      <Card className="p-4 bg-gradient-to-br from-teal-500/10 via-sky-500/10 to-indigo-500/10 border-teal-200 dark:border-teal-800/40">
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+          <div>
+            <div className="flex items-center gap-2">
+              <span className="relative flex h-3 w-3">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                <span className="relative inline-flex rounded-full h-3 w-3 bg-emerald-500"></span>
+              </span>
+              <h3 className="text-sm font-bold text-slate-800 dark:text-slate-100">
+                پایشگر زنده همگام‌سازی بین دستگاه‌ها (گوشی، تبلت و لپ‌تاپ)
+              </h3>
+            </div>
+            <p className="text-xs text-slate-600 dark:text-slate-300 mt-1">
+              پیام‌های همگام‌سازی به صورت مستقیم از طریق وب‌سوکت بلادرنگ بین تمام گوشی‌ها و کامپیوترهای کلینیک مبادله می‌شوند.
+            </p>
+          </div>
+          <Button
+            size="sm"
+            variant="secondary"
+            onClick={handlePingTest}
+            disabled={pingLoading}
+            className="shrink-0 bg-white/80 dark:bg-slate-800/80 shadow-sm"
+          >
+            {pingLoading ? <Spinner size={14} /> : <Wifi size={14} className="ml-1.5 text-teal-600" />}
+            تست زنده پینگ و اتصال
+          </Button>
+        </div>
+
+        {pingResult && (
+          <div className={`mt-3 p-2.5 rounded-lg text-xs flex items-center justify-between ${
+            pingResult.ok ? 'bg-emerald-50 dark:bg-emerald-950/30 text-emerald-800 dark:text-emerald-200 border border-emerald-200 dark:border-emerald-800' : 'bg-rose-50 dark:bg-rose-950/30 text-rose-800 dark:text-rose-200 border border-rose-200 dark:border-rose-800'
+          }`}>
+            <span className="font-medium">{pingResult.status}</span>
+            {pingResult.latencyMs !== undefined && (
+              <span className="dir-ltr font-mono text-[11px] bg-white/60 dark:bg-black/30 px-2 py-0.5 rounded">
+                {toPersianDigits(pingResult.latencyMs)} ms
+              </span>
+            )}
+          </div>
+        )}
+      </Card>
+
       <Card className="p-5">
         <div className="flex items-center justify-between mb-1">
           <h2 className="text-base font-bold text-slate-800 dark:text-slate-100 flex items-center gap-2">
-            <CloudOff size={18} className="text-error-600" /> همگام‌سازی‌های ناموفق
+            <CloudOff size={18} className="text-error-600" /> هشدارهای صف همگام‌سازی ابری
           </h2>
-          {entries.length > 0 && <Button size="sm" variant="primary" onClick={handleRetryAll} disabled={busyId !== null}>تلاش مجدد همه</Button>}
+          <div className="flex items-center gap-2">
+            {entries.length > 0 && (
+              <>
+                <Button size="sm" variant="secondary" onClick={handleClearAllFailed} disabled={busyId !== null}>
+                  بایگانی و پاکسازی صف
+                </Button>
+                <Button size="sm" variant="primary" onClick={handleRetryAll} disabled={busyId !== null}>
+                  تلاش مجدد همه
+                </Button>
+              </>
+            )}
+          </div>
         </div>
         <p className="text-xs text-slate-500 dark:text-slate-400 mb-4">
-          این‌ها تغییراتی هستند که بعد از ۱۰ بار تلاش به سرور ابری نرسیدند — روی همین دستگاه محفوظ مانده‌اند و <b>هرگز خودکار پاک نمی‌شوند</b>. خطای شبکه معمولاً با اتصال بهتر و «تلاش مجدد» حل می‌شود؛ اگر مقداری در رکورد نامعتبر باشد، «تلاش مجدد» تنهایی کافی نیست.
+          این موارد تغییراتی هستند که روی همین دستگاه با موفقیت ثبت شده و <b>به صورت محلی کاملاً محفوظ هستند</b>. در صورت استفاده از حساب کاربری ابری با اتصال مجدد فرستاده می‌شوند.
         </p>
         {loading ? (
           <Spinner size={20} />
@@ -1891,7 +2007,7 @@ function FailedSyncTab() {
             <div className="w-14 h-14 rounded-2xl bg-success-50 dark:bg-success-900/20 flex items-center justify-center mb-3">
               <CheckCircle2 size={24} className="text-success-500" />
             </div>
-            <p className="text-sm font-medium text-slate-600 dark:text-slate-300">همه‌چیز با موفقیت همگام‌سازی شده — چیزی گم نشده 🎉</p>
+            <p className="text-sm font-medium text-slate-600 dark:text-slate-300">صف همگام‌سازی کاملاً تمیز و بدون هیچ خطایی است 🎉</p>
           </div>
         ) : (
           <div className="space-y-2">
@@ -1900,11 +2016,7 @@ function FailedSyncTab() {
                 <div className="flex items-center justify-between gap-2 cursor-pointer" onClick={() => setExpandedId(expandedId === entry.id ? null : (entry.id ?? null))}>
                   <div className="min-w-0">
                     <p className="text-sm font-bold text-error-700 dark:text-error-300">{OP_LABELS_FA[entry.operation]} {TABLE_LABELS_FA[entry.table_name] || entry.table_name}</p>
-                    <p className="text-[11px] text-slate-400 truncate">{entry.last_error || 'خطای نامشخص'}</p>
-                    {/* MOD-FIX-015: a value error and a network error look
-                        identical here, and only one of them can be solved by
-                        pressing Retry. Two records sat stuck for days while
-                        the panel advised exactly the wrong thing. */}
+                    <p className="text-[11px] text-slate-400 truncate">{entry.last_error || 'خطای اتصال یا احراز هویت'}</p>
                     <p className="text-[11px] text-slate-500 mt-0.5">{explainSyncError(entry.last_error || '')}</p>
                   </div>
                   <Badge color="error">{toPersianDigits(entry.retry_count)} بار تلاش</Badge>

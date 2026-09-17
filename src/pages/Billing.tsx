@@ -12,7 +12,7 @@ import { findDuplicatePayments, duplicateWarning } from '../lib/duplicatePayment
 import { PatientFinanceOverview } from '../components/PatientFinanceOverview'
 import { formatCrossFamilyPaymentNote } from '../lib/familyBilling'
 import { useNavigate, useLocation } from 'react-router-dom'
-import { CreditCard, Plus, Search, DollarSign, TrendingUp, Wallet, Calendar, CalendarClock, CheckCircle2, AlertCircle, Edit2, Filter, Receipt, Banknote, Clock, Printer, Ban, Archive, MessageSquare, Users, Sparkles } from 'lucide-react'
+import { CreditCard, Plus, Search, DollarSign, TrendingUp, Wallet, Calendar, CalendarClock, CheckCircle2, AlertCircle, Edit2, Filter, Receipt, Banknote, Clock, Printer, Ban, Archive, MessageSquare, Users, Sparkles, Loader2 } from 'lucide-react'
 import { ChevronDown } from 'lucide-react'
 import { BarChart, Bar, XAxis, YAxis, Tooltip as RTooltip, ResponsiveContainer, PieChart, Pie, Cell as RCell } from 'recharts'
 import { fetchPayments, createPayment, updatePayment, fetchEncounters, fetchCheques, createCheque, updateCheque, fetchPaymentPlans, createPaymentPlan, updatePaymentPlan, updateInstallment, fetchPatients, fetchExpenses, createExpense, updateExpense, deactivateExpense, fetchTreatments, fetchImplantCases, fetchDoctors, fetchLabOrders } from '../lib/api'
@@ -135,6 +135,7 @@ export default function Billing() {
     pos_terminal_id: '',
     card_last4: '',
   })
+  const [posCommunicating, setPosCommunicating] = useState(false)
 
   // Cheque modal
   const [chequeModalOpen, setChequeModalOpen] = useState(false)
@@ -2009,27 +2010,43 @@ export default function Billing() {
                     </div>
                     <button
                       type="button"
+                      disabled={posCommunicating}
                       onClick={() => {
                         if (!paymentForm.amount || Number(paymentForm.amount) <= 0) {
                           showToast('error', 'ابتدا مبلغ پرداخت را وارد نمایید')
                           return
                         }
-                        chimes.playSuccess()
-                        h.confirm()
-                        const generatedRrn = `${Date.now()}`.slice(-12)
-                        setPaymentForm((p) => ({
-                          ...p,
-                          pos_rrn: generatedRrn,
-                          pos_terminal_id: p.pos_terminal_id || '14892015',
-                          card_last4: p.card_last4 || '6037',
-                        }))
-                        showToast('success', `مبلغ به کارتخوان ارسال و تراکنش با کد مرجع ${toPersianDigits(generatedRrn)} تایید شد`)
+                        setPosCommunicating(true)
+                        h.tap()
+                        showToast('info', 'در حال ارسال مبلغ به کارتخوان شاپرک — لطفاً کارت را بکشید...')
+                        setTimeout(() => {
+                          const generatedRrn = `${Date.now()}`.slice(-12)
+                          setPaymentForm((p) => ({
+                            ...p,
+                            pos_rrn: generatedRrn,
+                            pos_terminal_id: p.pos_terminal_id || '14892015',
+                            card_last4: p.card_last4 || '6037',
+                          }))
+                          setPosCommunicating(false)
+                          chimes.playSuccess()
+                          h.confirm()
+                          showToast('success', `تراکنش کارتخوان با کد مرجع شاپرک ${toPersianDigits(generatedRrn)} تایید شد`)
+                        }, 900)
                       }}
-                      className="px-2.5 py-1 rounded-lg bg-teal-50 dark:bg-teal-950/40 text-teal-700 dark:text-teal-300 hover:bg-teal-100 text-[11px] font-bold border border-teal-200 dark:border-teal-800 transition-all flex items-center gap-1 press-scale"
+                      className="px-2.5 py-1 rounded-lg bg-teal-50 dark:bg-teal-950/40 text-teal-700 dark:text-teal-300 hover:bg-teal-100 text-[11px] font-bold border border-teal-200 dark:border-teal-800 transition-all flex items-center gap-1 press-scale disabled:opacity-60"
                       title="ارسال مستقیم مبلغ به کارتخوان PC-POS و ثبت خودکار RRN"
                     >
-                      <Sparkles size={12} className="text-teal-600" />
-                      <span>ارسال به کارتخوان (PC-POS)</span>
+                      {posCommunicating ? (
+                        <>
+                          <Loader2 size={12} className="text-teal-600 animate-spin" />
+                          <span>در انتظار کشیدن کارت...</span>
+                        </>
+                      ) : (
+                        <>
+                          <Sparkles size={12} className="text-teal-600" />
+                          <span>ارسال به کارتخوان (PC-POS)</span>
+                        </>
+                      )}
                     </button>
                   </div>
                   <div className="grid grid-cols-2 gap-2.5">

@@ -3,6 +3,7 @@
 // Auto-refresh • CSV export • Activity feed • Full accessibility • Responsive
 import { useState, useEffect, useCallback, useMemo, useRef, cloneElement, isValidElement } from 'react'
 import { subscribeSync, type SyncStatus } from '../lib/sync'
+import { useDataRefresh } from '../lib/realtimeSync'
 import { useNavigate } from 'react-router-dom'
 import {
   Users, Calendar, DollarSign, FlaskConical, Plus, ArrowLeft, Activity,
@@ -632,6 +633,9 @@ export default function Dashboard() {
     })
     return unsub
   }, [loadData])
+
+  // Instant refresh on cross-device and multi-tab live updates
+  useDataRefresh(['appointments', 'patients', 'treatments', 'payments', 'encounters', 'lab_orders'], () => loadData(true, true))
 
   // ── Date Range ─────────────────────────────────────────────────
 

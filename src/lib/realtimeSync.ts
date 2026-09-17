@@ -1,118 +1,234 @@
 /**
- * MOD-FEAT-019 | real-time cross-device sync via Supabase Realtime
+ * MOD-FEAT-019 / REALTIME SYNC ENGINE
  *
- * The existing polling loop in sync.ts fires every 60 seconds — fine
- * for background robustness, but not for a shared-computer clinic
- * where two sessions (front desk + doctor room) must see each other's
- * changes immediately.
+ * Real-time cross-device sync via Supabase Realtime Broadcast & Postgres Changes,
+ * plus local BroadcastChannel for multi-tab instantaneous reactivity (<50ms).
  *
- * This module opens a single multiplexed Supabase Realtime channel that
- * subscribes to postgres_changes for every table in TABLE_NAMES.
- * On INSERT/UPDATE/DELETE from ANY other session, the new row is
- * immediately written into the local Dexie database and the sync loop
- * is notified — no polling, no waiting.
- *
- * Design constraints:
- *  - Must not interfere with the existing push-queue: a row arriving via
- *    Realtime has already been committed on the server, so we only do a
- *    local bulkPut — never re-queue.
- *  - A deleted row removes from Dexie only its id (the full payload is
- *    not always available in postgres_changes DELETE events).
- *  - Tables that do not yet exist server-side (migrated later) are
- *    skipped silently — same pattern as sync.ts pullTable.
- *  - The channel is removed on cleanup (React StrictMode fires effects
- *    twice; guard with a module-level flag).
+ * When a patient, appointment, treatment, or payment is created or updated
+ * on ANY device (doctor's phone, receptionist's PC, manager's tablet, assistant):
+ *  1. Broadcast directly over Supabase Realtime WebSocket to all connected devices.
+ *  2. Multi-cast locally across all browser tabs via BroadcastChannel.
+ *  3. Persist incoming changes into local Dexie IndexedDB.
+ *  4. Dispatch 'minadent:data_changed' event so all React pages re-render instantly
+ *     without requiring manual page refreshes.
  */
 
-import { supabase, CLINIC_ID, hasSupabaseCredentials } from './supabase'
+import { supabase, CLINIC_ID, hasSupabaseCredentials, DEFAULT_SUPABASE_ANON_KEY } from './supabase'
 import { db, TABLE_NAMES, TableName } from './db'
 import { syncNow } from './sync'
 
 let channel: ReturnType<typeof supabase.channel> | null = null
 let isActive = false
+let localBus: BroadcastChannel | null = null
 
-type RealtimePayload = {
-  schema: string
-  table: string
-  eventType: 'INSERT' | 'UPDATE' | 'DELETE'
-  new: Record<string, unknown>
-  old: Record<string, unknown>
-  errors: null | unknown[]
+export type RealtimeAction = 'insert' | 'update' | 'delete'
+
+export interface DataChangePayload {
+  table: TableName | string
+  action: RealtimeAction
+  recordId?: string
+  data?: any
+  senderId?: string
+  timestamp: number
+  clinicId?: string
 }
 
-async function handleChange(payload: RealtimePayload): Promise<void> {
+// Generate an ephemeral device/session ID to filter out echo broadcasts
+export const DEVICE_SESSION_ID = typeof crypto !== 'undefined' && crypto.randomUUID
+  ? crypto.randomUUID()
+  : `dev-${Math.random().toString(36).slice(2, 10)}`
+
+// Core clinical tables where instant cross-device updates are vital
+const CLINICAL_REALTIME_TABLES: TableName[] = [
+  'patients', 'appointments', 'treatments', 'payments', 'encounters',
+  'lab_orders', 'prescriptions', 'staff', 'doctors', 'units',
+  'implant_cases', 'waiting_list', 'tooth_records', 'cash_register_sessions',
+]
+
+/**
+ * Dispatches a data changed event locally in the current window.
+ */
+function dispatchLocalEvent(payload: DataChangePayload): void {
+  if (typeof window !== 'undefined') {
+    window.dispatchEvent(new CustomEvent('minadent:data_changed', { detail: payload }))
+  }
+}
+
+/**
+ * Handles incoming data changes from either Realtime Broadcast or Postgres CDC.
+ */
+async function handleIncomingChange(payload: DataChangePayload): Promise<void> {
+  if (!payload || !payload.table) return
+  if (payload.clinicId && payload.clinicId !== CLINIC_ID) return
+
   const tableName = payload.table as TableName
-  // Only handle tables we manage and that belong to this clinic
   if (!TABLE_NAMES.includes(tableName)) return
 
   const table = (db as any)[tableName]
   if (!table) return
 
   try {
-    if (payload.eventType === 'DELETE') {
-      const id = (payload.old as any)?.id
+    if (payload.action === 'delete') {
+      const id = payload.recordId || payload.data?.id
       if (id) await table.delete(id)
-    } else {
-      // INSERT or UPDATE — write the authoritative server copy locally
-      const row = payload.new as any
-      // Filter out rows from other clinics (should never happen with RLS,
-      // but belt-and-suspenders for safety)
+    } else if (payload.action === 'update') {
+      const id = payload.recordId || payload.data?.id
+      if (id) {
+        const existing = await table.get(id)
+        if (existing) {
+          const merged = { ...existing, ...payload.data, updated_at: payload.data?.updated_at || new Date().toISOString() }
+          await table.put(merged)
+        } else if (payload.data && typeof payload.data === 'object' && payload.data.id) {
+          await table.put(payload.data)
+        }
+      }
+    } else if (payload.data && typeof payload.data === 'object') {
+      const row = payload.data
       if (row?.clinic_id && row.clinic_id !== CLINIC_ID) return
-      await table.put(row)
+      if (row?.id) {
+        await table.put(row)
+      }
     }
   } catch (err) {
-    // A missing table or schema mismatch is non-fatal — just log it
-    console.warn(`[realtime] failed to apply ${payload.eventType} on ${tableName}:`, err)
+    console.warn(`[realtime] failed to apply local update on ${tableName}:`, err)
+  }
+
+  // Notify active React components
+  dispatchLocalEvent(payload)
+}
+
+/**
+ * Broadcast a change across the clinic (all connected devices and tabs).
+ * Called immediately whenever an entity is created, updated, or deleted.
+ */
+export function broadcastDataChange(
+  table: TableName | string,
+  action: RealtimeAction,
+  recordId?: string,
+  data?: any,
+): void {
+  const payload: DataChangePayload = {
+    table,
+    action,
+    recordId,
+    data,
+    senderId: DEVICE_SESSION_ID,
+    timestamp: Date.now(),
+    clinicId: CLINIC_ID,
+  }
+
+  // 1. Dispatch locally in this window immediately
+  dispatchLocalEvent(payload)
+
+  // 2. Broadcast across local browser tabs
+  try {
+    if (localBus) {
+      localBus.postMessage(payload)
+    }
+  } catch (e) {
+    // Ignore BroadcastChannel errors
+  }
+
+  // 3. Broadcast over Supabase Realtime channel to other phones and computers
+  try {
+    if (channel && isActive) {
+      channel.send({
+        type: 'broadcast',
+        event: 'data_changed',
+        payload,
+      })
+    }
+  } catch (e) {
+    console.warn('[realtime] failed to send broadcast:', e)
   }
 }
 
 /**
+ * Alias for broadcastDataChange for convenient import.
+ */
+export const notifyDataChanged = broadcastDataChange
+
+/**
  * Start the realtime subscription.
  * Safe to call multiple times — only one channel is created.
- * Returns a cleanup function (call it in useEffect return / unmount).
+ * Returns a cleanup function.
  */
 export function initRealtimeSync(): () => void {
-  const anonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || ''
-  const isDummyKey = !anonKey || anonKey.includes('placeholder') || anonKey.includes('missing-key')
-  if (!hasSupabaseCredentials || isDummyKey) {
-    // No credentials or running with a dummy/test placeholder key → no server to subscribe to.
-    // The polling loop in sync.ts still handles the offline-first path correctly.
-    return () => {}
+  // Init local browser bus if available
+  if (typeof window !== 'undefined' && 'BroadcastChannel' in window && !localBus) {
+    try {
+      localBus = new BroadcastChannel('minadent_local_bus')
+      localBus.onmessage = (event) => {
+        if (event.data && event.data.senderId !== DEVICE_SESSION_ID) {
+          handleIncomingChange(event.data)
+        }
+      }
+    } catch {
+      localBus = null
+    }
   }
 
-  if (isActive) return () => stopRealtimeSync()
+  const anonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || DEFAULT_SUPABASE_ANON_KEY
+  const isDummyKey = !anonKey || anonKey.includes('placeholder') || anonKey.includes('missing-key')
+  if (!hasSupabaseCredentials || isDummyKey) {
+    return () => stopRealtimeSync()
+  }
+
+  if (isActive && channel) return () => stopRealtimeSync()
 
   isActive = true
 
-  // One channel, all tables — Supabase multiplexes over a single WebSocket
-  channel = supabase.channel('minadent-realtime')
+  // Single multiplexed WebSocket channel for both Broadcasts and Postgres CDC
+  channel = supabase.channel('minadent-realtime', {
+    config: {
+      broadcast: { self: false },
+      presence: { key: DEVICE_SESSION_ID },
+    },
+  })
 
-  for (const tableName of TABLE_NAMES) {
+  // 1. Instant cross-device Broadcast listener (<50ms)
+  channel.on('broadcast', { event: 'data_changed' }, async ({ payload }) => {
+    if (!payload || payload.senderId === DEVICE_SESSION_ID) return
+    await handleIncomingChange(payload as DataChangePayload)
+  })
+
+  // 2. Postgres CDC listener on public clinical tables
+  for (const tableName of CLINICAL_REALTIME_TABLES) {
     channel.on(
       'postgres_changes' as any,
       {
         event: '*',
         schema: 'public',
         table: tableName,
-        filter: `clinic_id=eq.${CLINIC_ID}`,
       },
-      (payload: any) => {
-        handleChange(payload as RealtimePayload)
+      async (payload: any) => {
+        const action: RealtimeAction =
+          payload.eventType === 'DELETE' ? 'delete' : payload.eventType === 'INSERT' ? 'insert' : 'update'
+        const data = payload.new && Object.keys(payload.new).length > 0 ? payload.new : payload.old
+
+        await handleIncomingChange({
+          table: tableName,
+          action,
+          recordId: (data as any)?.id,
+          data,
+          senderId: 'server-cdc',
+          timestamp: Date.now(),
+          clinicId: (data as any)?.clinic_id || CLINIC_ID,
+        })
       },
     )
   }
 
+  // 3. Connect channel
   channel
-    .on('presence', { event: 'sync' }, () => {})
     .subscribe(async (status: string, err?: Error) => {
       if (status === 'SUBSCRIBED') {
-        console.info('[realtime] connected — live sync active')
-        // Pull any changes that happened while we were offline / not subscribed
+        console.info('[realtime] live sync active across all clinic devices')
+        // Sync any pending items or pull server changes
         await syncNow()
       } else if (status === 'CHANNEL_ERROR') {
-        console.warn('[realtime] channel error — will retry via polling', err)
+        console.warn('[realtime] channel error — falling back to polling/local bus', err)
       } else if (status === 'CLOSED') {
-        console.info('[realtime] channel closed')
         isActive = false
       }
     })
@@ -122,8 +238,16 @@ export function initRealtimeSync(): () => void {
 
 export function stopRealtimeSync(): void {
   if (channel) {
-    supabase.removeChannel(channel)
+    try {
+      supabase.removeChannel(channel)
+    } catch {}
     channel = null
+  }
+  if (localBus) {
+    try {
+      localBus.close()
+    } catch {}
+    localBus = null
   }
   isActive = false
 }
@@ -132,3 +256,58 @@ export function stopRealtimeSync(): void {
 export function isRealtimeActive(): boolean {
   return isActive
 }
+
+import { useEffect, useRef } from 'react'
+
+/**
+ * React hook to automatically re-fetch data whenever any of the specified tables
+ * are updated locally, across tabs, or via Supabase Realtime from other devices.
+ */
+export function useDataRefresh(
+  tables: (TableName | string)[],
+  onRefresh: () => void | Promise<void>,
+): void {
+  const refreshRef = useRef(onRefresh)
+  refreshRef.current = onRefresh
+
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const detail = (e as CustomEvent<DataChangePayload>).detail
+      if (!detail || !detail.table || tables.includes(detail.table as TableName)) {
+        refreshRef.current()
+      }
+    }
+
+    window.addEventListener('minadent:data_changed', handler)
+    return () => {
+      window.removeEventListener('minadent:data_changed', handler)
+    }
+  }, [tables.join(',')])
+}
+
+/**
+ * Diagnostic ping test: broadcasts a ping packet over Supabase Realtime channel
+ * and checks if channel is open and ready.
+ */
+export async function pingRealtime(): Promise<{ ok: boolean; status: string; latencyMs?: number }> {
+  if (!channel || !isActive) {
+    initRealtimeSync()
+  }
+  const start = Date.now()
+  try {
+    if (!channel) return { ok: false, status: 'کانال برقرار نیست' }
+    const res = await channel.send({
+      type: 'broadcast',
+      event: 'ping_test',
+      payload: { timestamp: start, senderId: DEVICE_SESSION_ID },
+    })
+    const latencyMs = Date.now() - start
+    if (res === 'ok') {
+      return { ok: true, status: 'متصل و آماده تبادل آنی', latencyMs }
+    }
+    return { ok: false, status: `وضعیت وب‌سوکت: ${res}`, latencyMs }
+  } catch (err: any) {
+    return { ok: false, status: err?.message || 'خطا در ارسال پیام' }
+  }
+}
+

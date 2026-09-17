@@ -37,17 +37,20 @@ export interface SmartReminder {
   urgency?: 'urgent' | 'high' | 'medium' | 'low'
 }
 
-const MS_PER_DAY = 86400000
-
-function daysSince(dateStr: string): number {
-  return Math.floor((Date.now() - new Date(dateStr).getTime()) / MS_PER_DAY)
-}
-
 export function toIsoDate(d: Date | string = new Date()): string {
   if (typeof d === 'string') {
     return d.slice(0, 10)
   }
   return d.toISOString().slice(0, 10)
+}
+
+const MS_PER_DAY = 86400000
+
+function daysSince(dateStr: string, relativeTo: Date | string = new Date()): number {
+  const relStr = toIsoDate(relativeTo)
+  const relTime = new Date(relStr).getTime()
+  const targetTime = new Date(toIsoDate(dateStr)).getTime()
+  return Math.max(0, Math.floor((relTime - targetTime) / MS_PER_DAY))
 }
 
 export function toDateObj(d: Date | string = new Date()): Date {
@@ -151,7 +154,7 @@ export function findDueInstallments(
     if (i.status === 'paid' || i.due_date > todayStr) continue
     const p = patientMap.get(i.patient_id)
     if (!p) continue
-    const overdueDays = daysSince(i.due_date)
+    const overdueDays = daysSince(i.due_date, today)
     result.push({
       id: `installment-${i.id}`,
       category: 'installment_due',
@@ -337,7 +340,7 @@ export function findDueCheques(
 
     if (!isBounced && !isOverdue && !isDueToday) continue
 
-    const overdueDays = isOverdue ? daysSince(c.due_date) : 0
+    const overdueDays = isOverdue ? daysSince(c.due_date, today) : 0
     let detail = ''
     let priority = 0
 

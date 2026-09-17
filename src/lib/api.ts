@@ -123,7 +123,7 @@ export async function updatePatient(id: string, updates: Partial<PatientInput>):
   void file_number; void file_number_manual
   const updated: Patient = { ...existing, ...rest, updated_at: nowISO() }
   await db.patients.put(updated)
-  await queueOperation('patients', 'update', id, rest)
+  await queueOperation('patients', 'update', id, updated)
   return updated
 }
 
@@ -174,7 +174,7 @@ export async function updateAppointment(id: string, updates: Partial<Appointment
   const { clinic_id, ...rest } = updates
   const updated: Appointment = { ...existing, ...rest, updated_at: nowISO() }
   await db.appointments.put(updated)
-  await queueOperation('appointments', 'update', id, rest)
+  await queueOperation('appointments', 'update', id, updated)
   return updated
 }
 
@@ -325,7 +325,7 @@ export async function updateTreatment(id: string, updates: Partial<TreatmentInpu
   }
 
   await db.treatments.put(updated)
-  await queueOperation('treatments', 'update', id, rest)
+  await queueOperation('treatments', 'update', id, updated)
   return updated
 }
 

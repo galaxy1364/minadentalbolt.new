@@ -31,6 +31,7 @@ import {
 } from '../lib/operatoryWorkflow'
 import { chimes } from '../lib/chimes'
 import { MinadentLogo } from '../components/MinadentLogo'
+import { usePrivacyMode } from '../lib/privacyMask'
 
 export default function WaitingRoomDisplay() {
   const [appointments, setAppointments] = useState<AppointmentWithRelations[]>([])
@@ -42,8 +43,8 @@ export default function WaitingRoomDisplay() {
   // Live time ticker
   const [currentTime, setCurrentTime] = useState(new Date())
 
-  // Public Privacy Masking mode (default: true for waiting room TV)
-  const [privacyMode, setPrivacyMode] = useState(false)
+  // Public Privacy Masking — synced to global reception privacy mode via CustomEvent bus
+  const { privacyMode, togglePrivacyMode } = usePrivacyMode()
 
   // Fullscreen state
   const [isFullscreen, setIsFullscreen] = useState(false)
@@ -238,7 +239,7 @@ export default function WaitingRoomDisplay() {
             </button>
 
             <button
-              onClick={() => setPrivacyMode(!privacyMode)}
+              onClick={togglePrivacyMode}
               className={`p-2.5 rounded-xl border transition-all ${
                 privacyMode
                   ? 'bg-teal-500/20 border-teal-500/40 text-teal-300'

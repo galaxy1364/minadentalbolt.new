@@ -19,7 +19,7 @@ function normalizeIranPhone(raw: string): string | null {
 }
 
 export default function Login() {
-  const { signIn, notice } = useAuth()
+  const { signIn, notice, isOffline, signInOffline, profile } = useAuth()
   const [mode, setMode] = useState<Mode>('email')
   const [email, setEmail] = useState('')
   const [phone, setPhone] = useState('')
@@ -197,6 +197,43 @@ export default function Login() {
               <Button type="submit" variant="primary" disabled={loading} className="w-full justify-center !bg-gradient-to-l !from-violet-600 !via-fuchsia-500 !to-sky-500 border-0">
                 {loading ? <Loader2 size={16} className="animate-spin" /> : <>ورود <ArrowRight size={16} /></>}
               </Button>
+
+              {/* بخش ورود محلی و آفلاین */}
+              <div className="pt-3 border-t border-slate-100 dark:border-slate-800 text-center space-y-2">
+                <p className="text-xs text-amber-600 dark:text-amber-400 font-medium">
+                  {isOffline ? 'اتصال اینترنت قطع است — ورود آفلاین به پایگاه‌داده محلی' : 'ورود مستقیم به سیستم محلی (آفلاین)'}
+                </p>
+                <div className="grid grid-cols-2 gap-1.5">
+                  <button
+                    type="button"
+                    onClick={() => { h.confirm(); signInOffline('owner', 'مدیر کلینیک') }}
+                    className="p-2 rounded-xl text-xs font-bold bg-amber-500/10 hover:bg-amber-500/20 text-amber-800 dark:text-amber-300 border border-amber-500/30 transition-all press-scale"
+                  >
+                    👑 ورود مدیر (آفلاین)
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => { h.confirm(); signInOffline('doctor', 'پزشک کلینیک') }}
+                    className="p-2 rounded-xl text-xs font-bold bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-800 dark:text-emerald-300 border border-emerald-500/30 transition-all press-scale"
+                  >
+                    🩺 ورود پزشک (آفلاین)
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => { h.confirm(); signInOffline('receptionist', 'پذیرش و منشی') }}
+                    className="p-2 rounded-xl text-xs font-bold bg-sky-500/10 hover:bg-sky-500/20 text-sky-800 dark:text-sky-300 border border-sky-500/30 transition-all press-scale"
+                  >
+                    📋 ورود منشی (آفلاین)
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => { h.confirm(); signInOffline('assistant', 'دستیار دندانپزشک') }}
+                    className="p-2 rounded-xl text-xs font-bold bg-purple-500/10 hover:bg-purple-500/20 text-purple-800 dark:text-purple-300 border border-purple-500/30 transition-all press-scale"
+                  >
+                    🥼 ورود دستیار (آفلاین)
+                  </button>
+                </div>
+              </div>
             </form>
           </div>
         </div>

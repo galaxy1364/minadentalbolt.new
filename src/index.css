@@ -1,11 +1,9 @@
+@import './styles/accessibility.css';
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
 * { -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; box-sizing: border-box; -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }
-
-/* Import accessibility fixes */
-@import './styles/accessibility.css';
 
 /* ── Living module background ────────────────────────────
    Requested directly: no bare white anywhere, every section tinted with
@@ -38,39 +36,20 @@
 body::before {
   content: '';
   position: fixed;
-  inset: -20%;
+  inset: 0;
   z-index: -1;
   pointer-events: none;
   background:
-    radial-gradient(42% 38% at 18% 12%, color-mix(in srgb, var(--module-color, #0d9488) 34%, transparent) 0%, transparent 62%),
-    radial-gradient(46% 42% at 82% 26%, color-mix(in srgb, var(--module-gradient-from, #14b8a6) 30%, transparent) 0%, transparent 66%),
+    radial-gradient(42% 38% at 18% 12%, color-mix(in srgb, var(--module-color, #0d9488) 18%, transparent) 0%, transparent 62%),
+    radial-gradient(46% 42% at 82% 26%, color-mix(in srgb, var(--module-gradient-from, #14b8a6) 16%, transparent) 0%, transparent 66%),
     radial-gradient(52% 46% at 50% 96%, color-mix(in srgb, var(--module-color-light, #f0fdfa) 90%, transparent) 0%, transparent 70%);
-  animation: module-drift-a 26s ease-in-out infinite;
-  will-change: transform;
-  /* The colour swap on navigation is a fade, not a jump — the module
-     identity should feel like moving room, not like a repaint. */
   transition: background 700ms ease;
+  transform: translateZ(0);
+  -webkit-transform: translateZ(0);
 }
 
 body::after {
-  content: '';
-  position: fixed;
-  inset: -25%;
-  z-index: -1;
-  pointer-events: none;
-  opacity: 0.7;
-  background:
-    radial-gradient(38% 34% at 72% 72%, color-mix(in srgb, var(--module-gradient-to, #0d9488) 26%, transparent) 0%, transparent 64%),
-    radial-gradient(34% 30% at 24% 62%, color-mix(in srgb, var(--module-color, #0d9488) 20%, transparent) 0%, transparent 60%);
-  animation: module-drift-b 34s ease-in-out infinite;
-  will-change: transform;
-}
-
-/* Respecting the motion setting is not optional here: a permanently
-   drifting background is exactly what triggers vestibular symptoms.
-   The colour stays, only the movement stops. */
-@media (prefers-reduced-motion: reduce) {
-  body::before, body::after { animation: none; }
+  display: none;
 }
 
 body {
@@ -967,11 +946,11 @@ input, textarea, select { font-size: 16px !important; }
 
 /* ── iOS 27 Pull-to-Refresh ──────────────────────────────── */
 .pull-indicator {
-  position: absolute;
-  top: 0;
+  position: fixed;
+  top: 18px;
   left: 50%;
   transform: translateX(-50%);
-  z-index: 10;
+  z-index: 9999;
   pointer-events: none;
   transition: opacity 0.2s ease;
 }
@@ -1190,34 +1169,53 @@ input, textarea, select { font-size: 16px !important; }
   z-index: 0;
   overflow: hidden;
   pointer-events: none;
-  /* A persistent tinted wash across the FULL page height (not fading
-     out partway down) — previously faded to transparent at 55%,
-     leaving everything below the first screenful plain white on any
-     page taller than one viewport, which is most of them. */
-  background: linear-gradient(160deg, color-mix(in srgb, var(--module-color, #0d9488) 11%, transparent), color-mix(in srgb, var(--module-color, #0d9488) 5%, transparent) 50%, color-mix(in srgb, var(--module-color, #0d9488) 9%, transparent));
+  transition: background 800ms cubic-bezier(0.4, 0, 0.2, 1);
+  background: linear-gradient(160deg, color-mix(in srgb, var(--module-color, #0d9488) 12%, transparent), color-mix(in srgb, var(--module-gradient-from, #14b8a6) 6%, transparent) 50%, color-mix(in srgb, var(--module-gradient-to, #0d9488) 10%, transparent));
 }
 .dark .module-page-bg {
-  background: linear-gradient(160deg, color-mix(in srgb, var(--module-color, #0d9488) 18%, transparent), color-mix(in srgb, var(--module-color, #0d9488) 9%, transparent) 50%, color-mix(in srgb, var(--module-color, #0d9488) 15%, transparent));
+  background: linear-gradient(160deg, color-mix(in srgb, var(--module-color, #0d9488) 20%, transparent), color-mix(in srgb, var(--module-gradient-from, #14b8a6) 10%, transparent) 50%, color-mix(in srgb, var(--module-gradient-to, #0d9488) 16%, transparent));
 }
 .module-page-blob {
   position: absolute;
   border-radius: 50%;
-  filter: blur(80px);
-  opacity: 0.42;
+  filter: blur(85px);
+  opacity: 0.44;
   will-change: transform;
+  transition: background 800ms cubic-bezier(0.4, 0, 0.2, 1), opacity 800ms ease;
 }
-.dark .module-page-blob { opacity: 0.30; }
+.dark .module-page-blob { opacity: 0.32; filter: blur(95px); }
 .module-page-blob-1 {
-  width: 60vmax; height: 60vmax;
+  width: 65vmax; height: 65vmax;
   top: -25%; right: -20%;
   background: radial-gradient(circle, var(--module-gradient-from, #0d9488), transparent 70%);
   animation: login-float-1 26s ease-in-out infinite;
 }
 .module-page-blob-2 {
-  width: 45vmax; height: 45vmax;
+  width: 50vmax; height: 50vmax;
   bottom: -20%; left: -15%;
   background: radial-gradient(circle, var(--module-gradient-to, #0f766e), transparent 70%);
   animation: login-float-2 30s ease-in-out infinite;
+}
+.module-page-blob-3 {
+  width: 45vmax; height: 45vmax;
+  top: 30%; left: 15%;
+  background: radial-gradient(circle, color-mix(in srgb, var(--module-color, #0d9488) 80%, white), transparent 65%);
+  animation: login-float-3 24s ease-in-out infinite;
+  opacity: 0.28;
+}
+.dark .module-page-blob-3 {
+  background: radial-gradient(circle, color-mix(in srgb, var(--module-color-dark, #134e4a) 85%, #0f172a), transparent 65%);
+  opacity: 0.25;
+}
+.module-page-blob-4 {
+  width: 38vmax; height: 38vmax;
+  top: 10%; left: 45%;
+  background: radial-gradient(circle, var(--module-color, #0d9488), transparent 70%);
+  animation: login-float-4 28s ease-in-out infinite;
+  opacity: 0.22;
+}
+.dark .module-page-blob-4 {
+  opacity: 0.26;
 }
 @media (prefers-reduced-motion: reduce) {
   .module-page-blob { animation: none !important; }

@@ -1,9 +1,10 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react'
 import { HashRouter, Routes, Route, useNavigate, useLocation } from 'react-router-dom'
 import {
-  MoreHorizontal, X, Wifi, WifiOff, RefreshCw, Moon, Sun, LogOut, AlertTriangle, Sparkles, Bell, Compass,
+  MoreHorizontal, X, Wifi, WifiOff, RefreshCw, Moon, Sun, LogOut, AlertTriangle, Sparkles, Bell, Compass, Eye, EyeOff,
 } from 'lucide-react'
-import { Spinner, ToastContainer, Button, Modal } from './ui'
+import { Spinner, ToastContainer, Button, Modal, showToast } from './ui'
+import { usePrivacyMode } from '../lib/privacyMask'
 import AICommandBar from './AICommandBar'
 import { DynamicIsland, pushIslandNotification } from './DynamicIsland'
 import { ErrorBoundary } from './ErrorBoundary'
@@ -57,6 +58,43 @@ function DarkModeToggle() {
     </button>
   )
 }
+
+// ── Reception Privacy Mode toggle (ISO-27001 / HIPAA Counter Protection) ──
+function PrivacyModeToggle() {
+  const { privacyMode, togglePrivacyMode } = usePrivacyMode()
+
+  return (
+    <button
+      onClick={() => {
+        h.tap()
+        const next = togglePrivacyMode()
+        showToast(
+          'info',
+          next
+            ? 'حالت محرمانگی پیشخوان فعال شد — کد ملی و شماره تلفن‌ها در برابر مراجعین ماسک شدند'
+            : 'حالت محرمانگی پیشخوان غیرفعال شد'
+        )
+      }}
+      aria-label={privacyMode ? 'غیرفعال‌سازی حالت محرمانگی پیشخوان' : 'فعال‌سازی حالت محرمانگی پیشخوان'}
+      title={
+        privacyMode
+          ? 'حالت محرمانگی پیشخوان فعال است (کد ملی و تلفن ماسک شده) — جهت نمایش کامل کلیک کنید'
+          : 'حالت محرمانگی پیشخوان (مخفی‌سازی کد ملی و تلفن در برابر مراجعین)'
+      }
+      className={`flex items-center justify-center w-9 h-9 rounded-xl glass border transition-all-smooth active:scale-90 relative ${
+        privacyMode
+          ? 'border-emerald-500/60 bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 ring-2 ring-emerald-500/20'
+          : 'border-white/60 dark:border-white/10 text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white'
+      }`}
+    >
+      {privacyMode ? <EyeOff size={16} /> : <Eye size={16} />}
+      {privacyMode && (
+        <span className="absolute -top-0.5 -right-0.5 w-2 h-2 rounded-full bg-emerald-500 ring-2 ring-white dark:ring-slate-900 animate-pulse" />
+      )}
+    </button>
+  )
+}
+
 
 // ── Sync indicator ──────────────────────────────────────
 // ── Update banner (manual + automatic) ──────────────────────────
@@ -598,6 +636,8 @@ function LayoutInner({ children }: { children: React.ReactNode }) {
       <div className="module-page-bg" aria-hidden="true">
         <div className="module-page-blob module-page-blob-1" />
         <div className="module-page-blob module-page-blob-2" />
+        <div className="module-page-blob module-page-blob-3" />
+        <div className="module-page-blob module-page-blob-4" />
       </div>
       <header className="sticky top-0 z-40 glass dark:glass border-b border-white/60 dark:border-white/10">
         <div className="flex items-center justify-between px-4 h-[56px]">
@@ -625,6 +665,7 @@ function LayoutInner({ children }: { children: React.ReactNode }) {
               <Compass size={17} />
             </button>
             <HeaderAlarmButton onClick={() => setAlarmCenterOpen(true)} />
+            <PrivacyModeToggle />
             <DarkModeToggle />
             <LogoutButton />
             <SyncIndicator />

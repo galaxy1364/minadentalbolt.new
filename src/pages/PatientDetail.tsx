@@ -41,6 +41,7 @@ import { computePatientRetentionProfile } from '../lib/patientRecallChurn'
 import { parseRadiologyTeeth, matchesRadiologyTooth, generateRadiologyPortfolioHtml, generateDicomMetadataJson } from '../lib/radiologyExport'
 import { createPatientRadiologyZip, downloadBlob } from '../lib/zipArchive'
 import { buildPatientMedicationGuideDocument } from '../lib/patientMedicationGuide'
+import { usePrivacyMode } from '../lib/privacyMask'
 
 // ============================================================================
 // Constants
@@ -160,6 +161,7 @@ export default function PatientDetail() {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
   const { confirmAction, ConfirmActionModal } = useConfirmAction()
+  const { maskNationalId, maskPhoneNumber } = usePrivacyMode()
 
   const [patient, setPatient] = useState<Patient | null>(null)
   const [recordHistory, setRecordHistory] = useState<AuditLogEntry[]>([])
@@ -208,6 +210,9 @@ export default function PatientDetail() {
   const [viewingComparison, setViewingComparison] = useState(false)
   const [encounters, setEncounters] = useState<Encounter[]>([])
   const [labOrders, setLabOrders] = useState<LabOrder[]>([])
+  const activeLabOrder = useMemo(() => {
+    return labOrders.find((o) => o.status !== 'delivered' && o.status !== 'cancelled') || null
+  }, [labOrders])
   const [paymentPlans, setPaymentPlans] = useState<PaymentPlan[]>([])
   const [installments, setInstallments] = useState<Installment[]>([])
 
@@ -1683,6 +1688,21 @@ export default function PatientDetail() {
             </button>
             <button
               type="button"
+              onClick={() => {
+                h.tap()
+                navigate('/treatments', {
+                  state: {
+                    quickStartPatientId: patient.id,
+                    mode: 'visit',
+                  },
+                })
+              }}
+              className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs sm:text-sm font-bold bg-gradient-to-r from-violet-600 to-indigo-600 hover:from-violet-700 hover:to-indigo-700 text-white shadow-md shadow-violet-500/20 press-scale transition-all"
+            >
+              <Stethoscope size={16} /> ویزیت و درمان
+            </button>
+            <button
+              type="button"
               onClick={handlePrintFullChart}
               className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs sm:text-sm font-bold bg-indigo-50 dark:bg-indigo-950/40 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800/80 hover:bg-indigo-100 dark:hover:bg-indigo-900/60 shadow-2xs press-scale transition-all"
             >
@@ -1749,6 +1769,37 @@ export default function PatientDetail() {
               familyBalance={familyBalance}
             />
             <PatientChequeRows patientId={patient.id} cheques={cheques as never} />
+
+            {/* Active Lab Order Ribbon */}
+            {activeLabOrder && (
+              <div className="mt-2.5 p-3 rounded-2xl bg-cyan-50/90 dark:bg-cyan-950/40 border border-cyan-200 dark:border-cyan-800 text-cyan-950 dark:text-cyan-200 flex items-center justify-between gap-3 text-xs">
+                <div className="flex items-center gap-2.5 min-w-0">
+                  <div className="w-7 h-7 rounded-xl bg-cyan-600 text-white flex items-center justify-center shrink-0 shadow-xs">
+                    <FlaskConical size={14} />
+                  </div>
+                  <div className="min-w-0">
+                    <p className="font-bold truncate">
+                      سفارش فعال لابراتوار: {activeLabOrder.work_type || 'پروتز/روکش'}
+                      {activeLabOrder.tooth_number ? ` (دندان ${toothLabel(activeLabOrder.tooth_number)})` : ''}
+                    </p>
+                    <p className="text-[11px] text-cyan-700 dark:text-cyan-300">
+                      وضعیت: {activeLabOrder.status === 'in_progress' ? 'در حال ساخت' : activeLabOrder.status === 'sent' ? 'ارسال‌شده به لابراتوار' : activeLabOrder.status}
+                      {activeLabOrder.deadline ? ` — موعد تحویل: ${toJalaliStringPretty(activeLabOrder.deadline)}` : ''}
+                    </p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    h.tap()
+                    setActiveTab('labOrders')
+                  }}
+                  className="px-2.5 py-1 rounded-lg bg-cyan-600 hover:bg-cyan-700 text-white font-bold text-[11px] shrink-0 transition-all-smooth press-scale"
+                >
+                  پیگیری کارتابل
+                </button>
+              </div>
+            )}
           </div>
         </div>
       </Card>
@@ -1825,7 +1876,7 @@ export default function PatientDetail() {
           </h3>
           <div className="space-y-2">
             <InfoRow label="نام کامل" value={`${patient.first_name} ${patient.last_name}`} />
-            <InfoRow label="کد ملی" value={patient.national_id ? toPersianDigits(patient.national_id) : '-'} dir="ltr" />
+            <InfoRow label="کد ملی" value={patient.national_id ? maskNationalId(patient.national_id) : '-'} dir="ltr" />
             <InfoRow label="تاریخ تولد" value={patient.birth_date ? toJalaliStringPretty(patient.birth_date) : '-'} />
             {age !== null && <InfoRow label="سن" value={`${toPersianDigits(age)} سال`} />}
             <InfoRow label="جنسیت" value={patient.gender === 'male' ? 'آقا' : patient.gender === 'female' ? 'خانم' : '-'} />
@@ -1839,8 +1890,8 @@ export default function PatientDetail() {
             <Phone size={16} /> اطلاعات تماس
           </h3>
           <div className="space-y-2">
-            <InfoRow label="تلفن" value={patient.phone ? toPersianDigits(patient.phone) : '-'} dir="ltr" icon={<Phone size={12} />} />
-            <InfoRow label="شماره منزل" value={patient.phone2 ? toPersianDigits(patient.phone2) : '-'} dir="ltr" />
+            <InfoRow label="تلفن" value={patient.phone ? maskPhoneNumber(patient.phone) : '-'} dir="ltr" icon={<Phone size={12} />} />
+            <InfoRow label="شماره منزل" value={patient.phone2 ? maskPhoneNumber(patient.phone2) : '-'} dir="ltr" />
             <InfoRow label="ایمیل" value={patient.email || '-'} dir="ltr" icon={<Mail size={12} />} />
             <InfoRow label="استان" value={patient.province || '-'} />
             <InfoRow label="شهر" value={patient.city || '-'} />

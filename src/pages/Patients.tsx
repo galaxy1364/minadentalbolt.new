@@ -1,12 +1,14 @@
 import { useState, useEffect, useCallback, useMemo } from 'react'
 import { PatientDebtBar } from '../components/PatientDebtBar'
 import { useNavigate } from 'react-router-dom'
-import { Plus, Search, Edit2, Phone, Filter, Users, Award, AlertCircle, Smile, FileText, User, Heart, Shield, MapPin, Archive, Calendar, MessageSquare } from 'lucide-react'
+import { Plus, Search, Edit2, Phone, Filter, Users, Award, AlertCircle, Smile, FileText, User, Heart, Shield, MapPin, Archive, Calendar, MessageSquare, Eye, EyeOff } from 'lucide-react'
 import { fetchPatients, createPatient, updatePatient, fetchDoctors, fetchPayments, fetchTreatments, fetchImplantCases, peekNextFileNumber } from '../lib/api'
+import { useDataRefresh } from '../lib/realtimeSync'
 import { toJalaliStringPretty, formatCurrency, toPersianDigits } from '../lib/persianDate'
 import { Patient, Doctor, Payment, Treatment, ImplantCase } from '../types'
 import { Modal, Card, Button, Input, Select, Textarea, Spinner, EmptyState, showToast, HighlightText, SkeletonList } from '../components/ui'
 import { recordAuditLog } from '../lib/auditLogger'
+import { usePrivacyMode } from '../lib/privacyMask'
 import { PatientPhotoUpload } from '../components/PatientPhotoUpload'
 import { PatientSelect } from '../components/PatientSelect'
 import { PersianDateInput } from '../components/PersianDateInput'
@@ -81,6 +83,7 @@ export default function Patients() {
   const [formData, setFormData] = useState(emptyForm)
 
   const { confirmAction, close, ConfirmActionModal } = useConfirmAction()
+  const { privacyMode, togglePrivacyMode, maskPhoneNumber, maskNationalId } = usePrivacyMode()
 
   const loadData = useCallback(async () => {
     setLoading(true)
@@ -92,6 +95,9 @@ export default function Patients() {
   }, [])
 
   useEffect(() => { loadData() }, [loadData])
+
+  // Real-time automatic synchronization when patients/payments update on any device
+  useDataRefresh(['patients', 'payments', 'treatments', 'implant_cases'], loadData)
 
   const patientFinances = useMemo(() => {
     const map = new Map<string, { balance: number; paid: number; totalCost: number }>()
@@ -421,6 +427,27 @@ export default function Patients() {
             className="w-full pr-10 pl-3 py-2.5 rounded-xl border border-slate-200 bg-white text-sm focus:outline-none focus:ring-2 focus:ring-primary-400"
           />
         </div>
+        <button
+          onClick={() => {
+            h.tap()
+            const next = togglePrivacyMode()
+            showToast(
+              'info',
+              next
+                ? 'حالت محرمانگی پیشخوان فعال شد — اطلاعات هویتی مراجعین ماسک شدند'
+                : 'حالت محرمانگی پیشخوان غیرفعال شد'
+            )
+          }}
+          aria-label={privacyMode ? 'غیرفعال‌سازی حالت محرمانگی پیشخوان' : 'فعال‌سازی حالت محرمانگی پیشخوان'}
+          title={privacyMode ? 'حالت محرمانگی پیشخوان فعال است — کلیک جهت نمایش کامل' : 'حالت محرمانگی پیشخوان (مخفی‌سازی کد ملی و تلفن مراجعین)'}
+          className={`p-2.5 rounded-xl border transition-all-smooth press-scale flex-shrink-0 flex items-center gap-1 ${
+            privacyMode
+              ? 'bg-emerald-50 text-emerald-700 border-emerald-300 dark:bg-emerald-950/40 dark:text-emerald-300 dark:border-emerald-800 ring-2 ring-emerald-500/20'
+              : 'bg-white border-slate-200 text-slate-500 hover:text-slate-700'
+          }`}
+        >
+          {privacyMode ? <EyeOff size={16} className="text-emerald-600" /> : <Eye size={16} />}
+        </button>
         <button onClick={() => { h.tap(); setShowFilters(!showFilters) }} aria-label={showFilters ? 'بستن فیلترها' : 'باز کردن فیلترها'} aria-pressed={showFilters} className="p-2.5 rounded-xl bg-white border border-slate-200 text-slate-500 hover:text-primary-600 transition-all-smooth press-scale flex-shrink-0">
           <Filter size={16} />
         </button>
@@ -535,8 +562,14 @@ export default function Patients() {
                           dir="ltr"
                           title="تماس تلفنی با بیمار"
                         >
-                          <Phone size={10} /> <HighlightText text={toPersianDigits(patient.phone)} query={searchQuery} />
+                          <Phone size={10} /> <HighlightText text={privacyMode ? maskPhoneNumber(patient.phone) : toPersianDigits(patient.phone)} query={searchQuery} />
                         </a>
+                      )}
+                      {patient.national_id && (
+                        <span className="flex items-center gap-0.5 text-slate-500 font-mono text-[10px]" dir="ltr" title="کد ملی بیمار">
+                          <Shield size={10} className="text-slate-400" />
+                          <HighlightText text={privacyMode ? maskNationalId(patient.national_id) : toPersianDigits(patient.national_id)} query={searchQuery} />
+                        </span>
                       )}
                     </div>
                   </div>

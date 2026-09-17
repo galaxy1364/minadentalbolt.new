@@ -46,6 +46,7 @@ function parseCommand(
     { keywords: ['پرسنل', 'کارمند', 'staff'], route: '/staff', label: 'پرسنل' },
     { keywords: ['بیمه', 'insurance'], route: '/insurance', label: 'بیمه' },
     { keywords: ['گزارش', 'آمار', 'report', 'درآمد'], route: '/reports', label: 'گزارش‌ها' },
+    { keywords: ['نقشه راه', 'هوشمندی', 'roadmap', 'استراتژی', 'سلامت سیستم', 'استاندارد', 'طرح توسعه'], route: '/roadmap', label: 'نقشه راه و هوشمندی' },
     { keywords: ['تنظیم', 'setting', 'config'], route: '/settings', label: 'تنظیمات' },
     { keywords: ['داشبورد', 'خانه', 'home', 'dashboard'], route: '/', label: 'داشبورد' },
   ]

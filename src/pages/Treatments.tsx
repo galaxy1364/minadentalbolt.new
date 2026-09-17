@@ -390,12 +390,19 @@ export default function Treatments() {
   // created, so staff can go straight into recording treatments instead
   // of hunting for the patient again in a separate list.
   useEffect(() => {
-    const openId = (location.state as { openEncounterId?: string } | null)?.openEncounterId
-    if (!openId || encounters.length === 0) return
-    const enc = encounters.find((e) => e.id === openId)
-    if (enc) {
-      setDetailEnc(enc)
-      // Clear the state so refreshing/navigating back doesn't reopen it.
+    const locState = location.state as { openEncounterId?: string; quickStartPatientId?: string; mode?: 'treatment' | 'visit' } | null
+    if (!locState) return
+
+    if (locState.openEncounterId && encounters.length > 0) {
+      const enc = encounters.find((e) => e.id === locState.openEncounterId)
+      if (enc) {
+        setDetailEnc(enc)
+        window.history.replaceState({}, '')
+      }
+    } else if (locState.quickStartPatientId) {
+      setQuickTreatPatientId(locState.quickStartPatientId)
+      setQuickModalMode(locState.mode || 'visit')
+      setQuickTreatModalOpen(true)
       window.history.replaceState({}, '')
     }
   }, [location.state, encounters])

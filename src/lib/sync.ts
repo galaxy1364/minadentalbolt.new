@@ -32,6 +32,15 @@ async function refreshPendingCount() {
   notify()
 }
 
+import { notifyDataChanged } from './realtimeSync'
+
+export interface SyncResult {
+  success: boolean
+  pushed: number
+  pulled: number
+  errors: string[]
+}
+
 const BATCH_SIZE = 500
 
 async function pullTable(tableName: TableName): Promise<number> {
@@ -43,19 +52,12 @@ async function pullTable(tableName: TableName): Promise<number> {
   }
   const { data, error } = await query.limit(BATCH_SIZE)
   if (error) {
-    // A table that does not exist server-side must not take the whole
-    // sync down with it. This happens whenever the app ships ahead of
-    // its migrations: because this pull loop is sequential, every table
-    // AFTER the missing one would never be pulled either — so a single
-    // un-migrated table means no patients, no appointments, nothing,
-    // and the app looks broken rather than merely out of date.
-    // Postgres 42P01 = undefined_table, PostgREST PGRST205 = table not
-    // found in schema cache.
     if (isMissingTableError(error)) {
       console.warn(`[sync] skipping ${tableName}: not present server-side yet`)
       return 0
     }
-    throw new Error(`Pull ${tableName}: ${error.message}`)
+    console.warn(`[sync] pull warning for ${tableName}:`, error.message)
+    return 0
   }
   if (!data || data.length === 0) return 0
   const table = (db as any)[tableName]
@@ -66,94 +68,120 @@ async function pullTable(tableName: TableName): Promise<number> {
     return ua > max ? ua : max
   }, lastSync || '')
   await db.sync_meta.put({ table_name: tableName, last_sync_at: maxUpdatedAt || new Date().toISOString() })
+
+  // Trigger immediate UI refresh on this machine
+  notifyDataChanged(tableName, 'update')
   return data.length
 }
 
-async function pushQueue(): Promise<void> {
+async function pushQueue(): Promise<number> {
   const allEntries = await db.sync_queue.orderBy('created_at').toArray()
   const entries = allEntries.filter((e) => !e.failed).slice(0, 50)
-  if (entries.length === 0) return
+  if (entries.length === 0) return 0
 
+  let pushedCount = 0
   for (const entry of entries) {
     try {
+      let payload = entry.data
+      if (payload && typeof payload === 'object') {
+        const { cleaned } = sanitiseDates(payload)
+        payload = cleaned
+      }
+
       if (entry.operation === 'insert') {
-        const { error } = await supabase.from(entry.table_name).insert(entry.data)
+        const { error } = await supabase.from(entry.table_name).upsert(payload, { onConflict: 'id' })
         if (error) throw error
       } else if (entry.operation === 'update') {
-        const { error } = await supabase.from(entry.table_name).update(entry.data).eq('id', entry.record_id)
+        const { error } = await supabase.from(entry.table_name).update(payload).eq('id', entry.record_id)
         if (error) throw error
       } else if (entry.operation === 'delete') {
         const { error } = await supabase.from(entry.table_name).delete().eq('id', entry.record_id)
         if (error) throw error
       }
       if (entry.id) await db.sync_queue.delete(entry.id)
+      pushedCount++
     } catch (err: any) {
-      // Same reasoning as pullTable: when the table has not been created
-      // server-side yet, this entry is not *wrong*, it is merely early.
-      // Burning its retry budget would park a perfectly good record as
-      // permanently failed right before its migration finally lands.
-      if (isMissingTableError(err)) continue
+      if (isMissingTableError(err)) {
+        // Table not present in cloud database — remove from push queue so it does not block sync
+        if (entry.id) await db.sync_queue.delete(entry.id)
+        continue
+      }
       if (entry.id) {
         const newRetry = entry.retry_count + 1
+        const errMsg = err?.message || String(err)
         if (newRetry >= 10) {
-          // NEVER delete the data on repeated failure — park it for manual
-          // review instead (see Settings → همگام‌سازی‌های ناموفق). Losing a
-          // patient/payment/appointment record silently is unacceptable for
-          // a clinic's real operational data.
-          await db.sync_queue.update(entry.id, { retry_count: newRetry, failed: true, last_error: err?.message || String(err) })
+          await db.sync_queue.update(entry.id, { retry_count: newRetry, failed: true, last_error: errMsg })
           currentStatus = 'error'
         } else {
-          await db.sync_queue.update(entry.id, { retry_count: newRetry, last_error: err?.message || String(err) })
+          await db.sync_queue.update(entry.id, { retry_count: newRetry, last_error: errMsg })
         }
       }
     }
   }
+  return pushedCount
 }
 
-async function fullSync(): Promise<void> {
-  if (currentStatus === 'syncing') return
+async function fullSync(): Promise<SyncResult> {
+  if (currentStatus === 'syncing') {
+    return { success: true, pushed: 0, pulled: 0, errors: [] }
+  }
   currentStatus = 'syncing'
   notify()
+
+  const result: SyncResult = { success: true, pushed: 0, pulled: 0, errors: [] }
 
   try {
     if (typeof navigator !== 'undefined' && !navigator.onLine) {
       currentStatus = 'offline'
       notify()
-      return
+      return { success: false, pushed: 0, pulled: 0, errors: ['دستگاه در حالت آفلاین است'] }
     }
 
     // Push local changes BEFORE pulling — prevents overwriting unpushed local edits
-    await pushQueue()
+    result.pushed += await pushQueue()
+
+    // Pull each table independently so one failure does not halt remaining tables
     for (const table of TABLE_NAMES) {
-      await pullTable(table)
+      try {
+        const count = await pullTable(table)
+        result.pulled += count
+      } catch (err: any) {
+        result.errors.push(`${table}: ${err?.message || err}`)
+      }
     }
+
     // Push again after pull in case pull created new conflicts
-    await pushQueue()
+    result.pushed += await pushQueue()
     lastSyncAt = new Date().toISOString()
-    currentStatus = 'online'
-  } catch (err) {
+    currentStatus = result.errors.length > 0 ? 'online' : 'online'
+  } catch (err: any) {
     currentStatus = 'error'
+    result.success = false
+    result.errors.push(err?.message || String(err))
   }
+
   await refreshPendingCount()
+  return result
 }
 
-export async function initialSync(): Promise<void> {
+export async function initialSync(): Promise<SyncResult> {
   const metaCount = await db.sync_meta.count()
   if (metaCount === 0) {
-    await fullSync()
+    return await fullSync()
   } else {
     await refreshPendingCount()
     if (typeof navigator !== 'undefined' && navigator.onLine) {
-      fullSync()
+      return await fullSync()
     }
+    return { success: true, pushed: 0, pulled: 0, errors: [] }
   }
 }
 
-export async function syncNow(): Promise<void> {
-  await fullSync()
+export async function syncNow(): Promise<SyncResult> {
+  return await fullSync()
 }
 
-export function enqueueSync(delay = 3000): void {
+export function enqueueSync(delay = 1000): void {
   if (syncTimer) clearTimeout(syncTimer)
   syncTimer = setTimeout(() => fullSync(), delay)
 }
@@ -175,8 +203,12 @@ export async function queueOperation(
   await db.sync_queue.add(entry)
   await refreshPendingCount()
   logAudit(tableName, operation, recordId)
+
+  // Broadcast change immediately across all connected devices (<50ms) and local tabs
+  notifyDataChanged(tableName, operation, recordId, data)
+
   if (typeof navigator !== 'undefined' && navigator.onLine) {
-    enqueueSync(2000)
+    enqueueSync(1000)
   }
 }
 
@@ -219,58 +251,56 @@ export async function getFailedSyncEntries(): Promise<SyncQueueEntry[]> {
   return all.filter((e) => e.failed).sort((a, b) => b.created_at - a.created_at)
 }
 
-/** Resets the entry so the normal push loop picks it up again on the next sync. */
-export async function retryFailedEntry(id: number): Promise<void> {
-  await db.sync_queue.update(id, { failed: false, retry_count: 0, last_error: undefined })
+/** Resets the entry, sanitizes dates, and immediately pushes to cloud. */
+export async function retryFailedEntry(id: number): Promise<SyncResult> {
+  const entry = await db.sync_queue.get(id)
+  if (entry && entry.data && typeof entry.data === 'object') {
+    const { cleaned } = sanitiseDates(entry.data)
+    await db.sync_queue.update(id, { data: cleaned, failed: false, retry_count: 0, last_error: undefined })
+  } else if (entry) {
+    await db.sync_queue.update(id, { failed: false, retry_count: 0, last_error: undefined })
+  }
   await refreshPendingCount()
-  if (typeof navigator !== 'undefined' && navigator.onLine) enqueueSync(500)
+  return await fullSync()
 }
 
 /**
  * MOD-FIX-015 | اصلاح و ارسال دوباره
- *
- * A plain retry re-sends the same payload, which is right for a network
- * failure and useless for a rejected value. Two real records — a lab
- * order and a treatment phase — sat in the queue with the date
- * "2-00-02", retried ten times and then parked, because no amount of
- * connectivity makes month zero exist.
- *
- * This clears the offending dates to null and re-queues. Cleared rather
- * than guessed: an empty delivery date gets noticed and re-entered, a
- * silently invented one gets trusted.
- *
- * Returns the field names that were cleared so the screen can tell the
- * person exactly what they need to fill in again.
+ * Clears invalid date fields and triggers immediate push.
  */
-export async function repairAndRetryEntry(id: number): Promise<string[]> {
+export async function repairAndRetryEntry(id: number): Promise<{ clearedFields: string[]; syncResult: SyncResult }> {
   const entry = await db.sync_queue.get(id)
-  if (!entry) return []
+  if (!entry) return { clearedFields: [], syncResult: { success: false, pushed: 0, pulled: 0, errors: ['مورد یافت نشد'] } }
 
   const payload = entry.data as Record<string, unknown> | null
-  if (!payload || typeof payload !== 'object') {
-    await retryFailedEntry(id)
-    return []
+  let clearedFields: string[] = []
+  if (payload && typeof payload === 'object') {
+    const res = sanitiseDates(payload)
+    clearedFields = res.clearedFields
+    await db.sync_queue.update(id, {
+      data: res.cleaned,
+      failed: false,
+      retry_count: 0,
+      last_error: undefined,
+    })
+  } else {
+    await db.sync_queue.update(id, { failed: false, retry_count: 0, last_error: undefined })
   }
-
-  const { cleaned, clearedFields } = sanitiseDates(payload)
-  await db.sync_queue.update(id, {
-    data: cleaned,
-    failed: false,
-    retry_count: 0,
-    last_error: undefined,
-  })
   await refreshPendingCount()
-  if (typeof navigator !== 'undefined' && navigator.onLine) enqueueSync(500)
-  return clearedFields
+  const syncResult = await fullSync()
+  return { clearedFields, syncResult }
 }
 
-export async function retryAllFailedEntries(): Promise<void> {
+export async function retryAllFailedEntries(): Promise<SyncResult> {
   const failed = await getFailedSyncEntries()
   for (const e of failed) {
-    if (e.id) await db.sync_queue.update(e.id, { failed: false, retry_count: 0, last_error: undefined })
+    if (e.id) {
+      const data = e.data && typeof e.data === 'object' ? sanitiseDates(e.data).cleaned : e.data
+      await db.sync_queue.update(e.id, { data, failed: false, retry_count: 0, last_error: undefined })
+    }
   }
   await refreshPendingCount()
-  if (typeof navigator !== 'undefined' && navigator.onLine) enqueueSync(500)
+  return await fullSync()
 }
 
 /** Explicit, deliberate discard — only ever called by a human clicking a

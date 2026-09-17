@@ -1,7 +1,8 @@
 import { useState, useEffect, useCallback, useMemo } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
 import { Calendar, Clock, CheckCircle2, User, ChevronRight, ChevronLeft, Plus, Search, AlertCircle, Edit2, Stethoscope, DollarSign, FileText, Activity, List, Grid, X, UserPlus, Globe, Ban, Printer, MessageSquare, UserCheck, Volume2, Armchair, Sparkles, Tv, FlaskConical } from 'lucide-react'
-import { fetchTreatments, fetchPayments, fetchImplantCases, fetchAppointments, createAppointment, updateAppointment, checkConflict, fetchPatients, updatePatient, fetchDoctors, fetchUnits, peekNextFileNumber, createPatient, createEncounter, fetchDoctorSchedules, fetchOnlineBookingRequests, rejectBookingRequest, updateLabOrder, fetchLabOrders, updateImplantCase, fetchWaitingList, updateWaitingEntry } from '../lib/api'
+import { fetchTreatments, fetchPayments, fetchImplantCases, fetchAppointments, createAppointment, updateAppointment, checkConflict, fetchPatients, updatePatient, fetchDoctors, fetchUnits, peekNextFileNumber, createPatient, createEncounter, createPayment, fetchDoctorSchedules, fetchOnlineBookingRequests, rejectBookingRequest, updateLabOrder, fetchLabOrders, updateImplantCase, fetchWaitingList, updateWaitingEntry } from '../lib/api'
+import { useDataRefresh } from '../lib/realtimeSync'
 import { supabase } from '../lib/supabase'
 import { toJalaliString, toJalaliStringPretty, getJalaliDateInfo, formatTime, timeParts, formatCurrency, toPersianDigits, persianWeekdaysShort, getHoliday, jsDateToPersianWeekday } from '../lib/persianDate'
 import { doctorColor } from '../lib/doctorColors'
@@ -95,6 +96,13 @@ export default function Appointments() {
   const [backfillModalOpen, setBackfillModalOpen] = useState(false)
   const [freedSlotInfo, setFreedSlotInfo] = useState<SlotInfo | null>(null)
   const [assigningBackfill, setAssigningBackfill] = useState(false)
+
+  // Quick Checkout Modal state for finished appointments
+  const [checkoutModalAppt, setCheckoutModalAppt] = useState<AppointmentWithRelations | null>(null)
+  const [checkoutAmount, setCheckoutAmount] = useState<string>('0')
+  const [checkoutMethod, setCheckoutMethod] = useState<'pos' | 'cash' | 'card_to_card' | 'cheque'>('pos')
+  const [checkoutRrn, setCheckoutRrn] = useState<string>('')
+  const [checkoutSubmitting, setCheckoutSubmitting] = useState(false)
 
   // Wizard state
   const [wizardOpen, setWizardOpen] = useState(false)
@@ -206,8 +214,17 @@ export default function Appointments() {
 
   useEffect(() => { loadData() }, [loadData])
 
+  // Real-time automatic refresh across devices, tabs, and operatory rooms
+  useDataRefresh(['appointments', 'patients', 'treatments', 'payments', 'encounters', 'doctor_schedules'], loadData)
+
   const todayStr = new Date().toISOString().slice(0, 10)
   const tomorrowStr = new Date(Date.now() + 86400000).toISOString().slice(0, 10)
+
+  /** One pass for every patient, shared with the picker rows below and row 1 priority */
+  const patientBalances = useMemo(
+    () => calcAllPatientBalances(balanceInputs.payments, balanceInputs.treatments, balanceInputs.implants).byPatient,
+    [balanceInputs],
+  )
 
   const filtered = useMemo(() => {
     let list = appointments
@@ -226,8 +243,40 @@ export default function Appointments() {
         return name.toLowerCase().includes(q)
       })
     }
-    return list.sort((a, b) => a.start_time.localeCompare(b.start_time))
-  }, [appointments, activeFilter, searchQuery, todayStr, tomorrowStr])
+
+    return list.sort((a, b) => {
+      // For today's appointments: prioritize finished appointments needing payment to Row 1 (ردیف اول)
+      if (activeFilter === 'today') {
+        const aBal = a.patient_id ? (patientBalances.get(a.patient_id)?.balance || 0) : 0
+        const bBal = b.patient_id ? (patientBalances.get(b.patient_id)?.balance || 0) : 0
+
+        // 1. Finished by doctor today with pending payment -> HIGHEST PRIORITY (ROW 1)
+        const aNeedsCheckout = a.status === 'completed' && aBal > 0
+        const bNeedsCheckout = b.status === 'completed' && bBal > 0
+        if (aNeedsCheckout && !bNeedsCheckout) return -1
+        if (!aNeedsCheckout && bNeedsCheckout) return 1
+
+        // 2. Any other appointment completed today
+        const aCompleted = a.status === 'completed'
+        const bCompleted = b.status === 'completed'
+        if (aCompleted && !bCompleted) return -1
+        if (!aCompleted && bCompleted) return 1
+
+        // 3. Currently on chair
+        const aInChair = a.status === 'in_chair'
+        const bInChair = b.status === 'in_chair'
+        if (aInChair && !bInChair) return -1
+        if (!aInChair && bInChair) return 1
+
+        // 4. Arrived in waiting room
+        const aArrived = a.status === 'arrived'
+        const bArrived = b.status === 'arrived'
+        if (aArrived && !bArrived) return -1
+        if (!aArrived && bArrived) return 1
+      }
+      return a.start_time.localeCompare(b.start_time)
+    })
+  }, [appointments, activeFilter, searchQuery, todayStr, tomorrowStr, patientBalances])
 
   const stats = useMemo(() => {
     const today = appointments.filter((a) => a.date === todayStr)
@@ -244,12 +293,6 @@ export default function Appointments() {
 
     return { total: today.length, completed, inChair, waiting, day }
   }, [appointments, todayStr, schedules])
-
-  /** One pass for every patient, shared with the picker rows below. */
-  const patientBalances = useMemo(
-    () => calcAllPatientBalances(balanceInputs.payments, balanceInputs.treatments, balanceInputs.implants).byPatient,
-    [balanceInputs],
-  )
 
   /**
    * Lab Due-Date Collision Guard:
@@ -625,6 +668,37 @@ export default function Appointments() {
     broadcastPatientCall(options)
     await announcePatientCall(options)
     showToast('info', `فراخوان ${turnNumber ? `نوبت ${toPersianDigits(turnNumber)}` : 'بیمار'}: ${pName} (مانیتور سالن انتظار)`)
+  }
+
+  // ── Quick Checkout for Finished Patient Care (تسویه سریع پایان درمان) ──
+  const handleQuickCheckout = async () => {
+    const parsedAmt = parseInt(checkoutAmount, 10) || 0
+    if (!checkoutModalAppt || parsedAmt <= 0) {
+      showToast('error', 'مبلغ پرداختی نامعتبر است')
+      return
+    }
+    setCheckoutSubmitting(true)
+    try {
+      await createPayment({
+        clinic_id: '',
+        patient_id: checkoutModalAppt.patient_id,
+        amount: parsedAmt,
+        payment_method: checkoutMethod,
+        payment_date: todayStr,
+        status: 'completed',
+        notes: `تسویه نهایی پس از اتمام کار پزشک${checkoutRrn ? ` — شماره پیگیری POS: ${checkoutRrn}` : ''}`,
+        pos_rrn: checkoutRrn || null,
+      } as any)
+      chimes.playSuccess()
+      showToast('success', 'پرداخت با موفقیت ثبت شد و حساب بیمار تسویه گردید')
+      setCheckoutModalAppt(null)
+      await loadData()
+    } catch (err) {
+      chimes.playWarning()
+      showToast('error', 'خطا در ثبت پرداخت')
+    } finally {
+      setCheckoutSubmitting(false)
+    }
   }
 
   // ── Smart Clinical Cancellation with Reason ──
@@ -1124,6 +1198,51 @@ export default function Appointments() {
                       {unitName(appt) && <span>{unitName(appt)}</span>}
                       {appt.estimated_fee != null && <span>{formatCurrency(appt.estimated_fee)} ت</span>}
                     </div>
+
+                    {/* ── بنر و نشانگر اتمام کار پزشک و آمادگی تسویه (ردیف اول) ── */}
+                    {appt.status === 'completed' && (() => {
+                      const pBal = appt.patient_id ? (patientBalances.get(appt.patient_id)?.balance || 0) : 0
+                      return (
+                        <div className="mt-2.5 p-2 rounded-xl bg-amber-500/15 dark:bg-amber-950/40 border border-amber-500/40 flex items-center justify-between gap-2">
+                          <div className="flex items-center gap-2 min-w-0">
+                            <span className="relative flex h-3 w-3 shrink-0">
+                              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75"></span>
+                              <span className="relative inline-flex rounded-full h-3 w-3 bg-amber-500"></span>
+                            </span>
+                            <span className="text-xs font-black text-amber-900 dark:text-amber-100 truncate">
+                              پایان درمان — آماده تسویه در پذیرش
+                            </span>
+                          </div>
+                          <div className="flex items-center gap-2 shrink-0">
+                            {pBal > 0 ? (
+                              <span className="text-xs font-black bg-amber-200/90 dark:bg-amber-900/80 px-2 py-0.5 rounded-lg text-amber-950 dark:text-amber-100">
+                                بدهی: {formatCurrency(pBal)} ت
+                              </span>
+                            ) : (
+                              <span className="text-xs font-bold text-emerald-700 dark:text-emerald-300 bg-emerald-100 dark:bg-emerald-950/60 px-2 py-0.5 rounded-lg flex items-center gap-1">
+                                <CheckCircle2 size={12} /> تسویه شده
+                              </span>
+                            )}
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation()
+                                h.confirm()
+                                setCheckoutModalAppt(appt)
+                                setCheckoutAmount(String(pBal > 0 ? pBal : (appt.estimated_fee || 0)))
+                                setCheckoutMethod('pos')
+                                setCheckoutRrn('')
+                              }}
+                              className="flex items-center gap-1 px-3 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-black shadow-sm transition-all-smooth press-scale"
+                              title="تسویه سریع و ثبت پرداخت"
+                            >
+                              <DollarSign size={13} className="stroke-[3]" />
+                              <span>تسویه و پرداخت</span>
+                            </button>
+                          </div>
+                        </div>
+                      )
+                    })()}
                   </div>
 
                   {/* Quick action + delete */}
@@ -1180,6 +1299,23 @@ export default function Appointments() {
                     {appt.status === 'in_chair' && (
                       <button onClick={() => quickStatus(appt, 'completed')} aria-label="تکمیل نوبت" className="p-1.5 rounded-lg bg-success-50 text-success-600 hover:bg-success-100 transition-all-smooth press-scale" title="تکمیل نوبت و شروع درمان">
                         <CheckCircle2 size={16} />
+                      </button>
+                    )}
+                    {appt.status === 'completed' && (
+                      <button
+                        onClick={() => {
+                          const pBal = appt.patient_id ? (patientBalances.get(appt.patient_id)?.balance || 0) : 0
+                          h.confirm()
+                          setCheckoutModalAppt(appt)
+                          setCheckoutAmount(String(pBal > 0 ? pBal : (appt.estimated_fee || 0)))
+                          setCheckoutMethod('pos')
+                          setCheckoutRrn('')
+                        }}
+                        aria-label="تسویه و پرداخت"
+                        className="p-1.5 rounded-lg bg-emerald-600 text-white hover:bg-emerald-700 transition-all-smooth press-scale shadow-sm"
+                        title="تسویه حساب و ثبت پرداخت"
+                      >
+                        <DollarSign size={16} />
                       </button>
                     )}
                     <button onClick={() => handleDelete(appt)} aria-label="لغو نوبت" className="p-1.5 rounded-lg bg-error-50 text-error-500 hover:bg-error-100 transition-all-smooth press-scale" title="لغو">
@@ -1856,6 +1992,70 @@ export default function Appointments() {
             <div className="flex justify-end pt-2 border-t border-slate-100 dark:border-slate-700">
               <Button variant="secondary" onClick={() => setBackfillModalOpen(false)}>
                 صرف‌نظر (خالی ماندن وقت)
+              </Button>
+            </div>
+          </div>
+        </Modal>
+      )}
+
+      {/* ── مدال تسویه سریع و ثبت پرداخت پایان کار پزشک (ردیف اول) ── */}
+      {checkoutModalAppt && (
+        <Modal
+          open={!!checkoutModalAppt}
+          onClose={() => setCheckoutModalAppt(null)}
+          title={`تسویه حساب و پرداخت — ${patientName(checkoutModalAppt)}`}
+          size="md"
+        >
+          <div className="space-y-4">
+            <div className="p-3.5 rounded-2xl bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-200 dark:border-emerald-800 text-xs text-emerald-900 dark:text-emerald-200 space-y-1.5">
+              <div className="flex items-center justify-between font-bold text-sm">
+                <span>بیمار: {patientName(checkoutModalAppt)}</span>
+                <span className="text-emerald-700 dark:text-emerald-300">{doctorName(checkoutModalAppt)}</span>
+              </div>
+              <p className="text-slate-600 dark:text-slate-300">
+                درمان به اتمام رسیده است و بیمار آماده تسویه حساب در پذیرش می‌باشد.
+              </p>
+            </div>
+
+            <div>
+              <label className="block text-xs font-bold text-slate-700 dark:text-slate-200 mb-1.5">مبلغ پرداختی (تومان) *</label>
+              <CurrencyInput
+                value={checkoutAmount}
+                onChange={setCheckoutAmount}
+                placeholder="مبلغ پرداختی را وارد کنید..."
+              />
+            </div>
+
+            <div>
+              <label className="block text-xs font-bold text-slate-700 dark:text-slate-200 mb-1.5">روش پرداخت</label>
+              <select
+                value={checkoutMethod}
+                onChange={(e) => setCheckoutMethod(e.target.value as any)}
+                className="w-full px-3 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-sm focus:ring-2 focus:ring-primary-500 font-medium"
+              >
+                <option value="pos">کارت‌خوان مطب (POS)</option>
+                <option value="cash">نقدی</option>
+                <option value="card_to_card">کارت به کارت</option>
+                <option value="cheque">چک</option>
+              </select>
+            </div>
+
+            <div>
+              <Input
+                label="شماره پیگیری / ارجاع POS (اختیاری)"
+                value={checkoutRrn}
+                onChange={setCheckoutRrn}
+                placeholder="مثال: ۱۲۳۴۵۶۷۸"
+              />
+            </div>
+
+            <div className="flex gap-2 justify-end pt-2 border-t border-slate-100 dark:border-slate-700">
+              <Button variant="secondary" onClick={() => setCheckoutModalAppt(null)} disabled={checkoutSubmitting}>
+                انصراف
+              </Button>
+              <Button variant="primary" onClick={handleQuickCheckout} disabled={checkoutSubmitting || (parseInt(checkoutAmount, 10) || 0) <= 0}>
+                {checkoutSubmitting ? <Spinner size={15} /> : <CheckCircle2 size={15} />}
+                {checkoutSubmitting ? 'در حال ثبت...' : 'ثبت پرداخت و تسویه نهایی'}
               </Button>
             </div>
           </div>

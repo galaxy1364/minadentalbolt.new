@@ -1,5 +1,5 @@
 // src/lib/auditLogger.test.ts — Unit tests for clinical audit trail
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect, vi } from 'vitest'
 import {
   formatAuditActionTitle,
   buildAuditLogObject,
@@ -52,4 +52,40 @@ describe('auditLogger — Clinical Audit Trail', () => {
     expect(TABLE_PERSIAN_LABELS['patients']).toBe('پرونده بیمار')
     expect(TABLE_PERSIAN_LABELS['prescriptions']).toBe('نسخه‌نویسی')
   })
+
+  describe('Database Operations & Export', () => {
+    it('records audit logs and exports them as formatted JSON', async () => {
+      const { db } = await import('./db')
+      const sampleLogs = [
+        {
+          id: 1,
+          table_name: 'patients',
+          operation: 'insert',
+          record_id: 'p-1',
+          summary: 'ثبت بیمار',
+          created_at: '2026-09-16T12:00:00.000Z',
+          actor_name: 'دکتر مینا',
+        },
+      ]
+
+      const toArraySpy = vi.spyOn(db.audit_log, 'toArray').mockResolvedValueOnce(sampleLogs as any)
+
+      const { exportAuditLogsAsJson } = await import('./auditLogger')
+      const json = await exportAuditLogsAsJson()
+      const parsed = JSON.parse(json)
+
+      expect(parsed).toHaveLength(1)
+      expect(parsed[0].record_id).toBe('p-1')
+      expect(parsed[0].table_name).toBe('patients')
+      expect(toArraySpy).toHaveBeenCalled()
+    })
+
+    it('fetches ordered audit logs with fallback', async () => {
+      const { fetchAuditLogs } = await import('./auditLogger')
+      const logs = await fetchAuditLogs(10)
+      expect(Array.isArray(logs)).toBe(true)
+    })
+  })
 })
+
+

@@ -28,13 +28,16 @@ interface AuthState {
    */
   notice: string | null
   clearNotice: () => void
+  isOffline: boolean
+  signInOffline: (role?: string, name?: string) => boolean
 }
 
 export const AuthContext = createContext<AuthState | null>(null)
 
 export const CACHED_PROFILE_KEY = 'minadent_cached_profile'
+export const OFFLINE_AUTH_KEY = 'minadent_offline_auth_active'
 
-function getCachedProfile(): StaffProfile | null {
+export function getCachedProfile(): StaffProfile | null {
   try {
     const raw = typeof localStorage !== 'undefined' ? localStorage.getItem(CACHED_PROFILE_KEY) : null
     if (raw) return JSON.parse(raw) as StaffProfile
@@ -44,15 +47,42 @@ function getCachedProfile(): StaffProfile | null {
   return null
 }
 
+function createSyntheticOfflineSession(prof: StaffProfile): Session {
+  return {
+    access_token: 'offline-token',
+    token_type: 'bearer',
+    expires_in: 315360000,
+    expires_at: Math.floor(Date.now() / 1000) + 315360000,
+    refresh_token: 'offline-refresh',
+    user: {
+      id: prof.id,
+      aud: 'authenticated',
+      role: prof.role || 'receptionist',
+      email: (prof as any).email || `${prof.role || 'staff'}@clinic.local`,
+      app_metadata: { provider: 'offline' },
+      user_metadata: { full_name: prof.full_name },
+      created_at: new Date().toISOString(),
+    },
+  }
+}
+
 export function useOptionalAuth(): AuthState | null {
   return useContext(AuthContext)
 }
 
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [session, setSession] = useState<Session | null>(null)
+  const [session, setSession] = useState<Session | null>(() => {
+    const cached = getCachedProfile()
+    const offlineActive = typeof localStorage !== 'undefined' && localStorage.getItem(OFFLINE_AUTH_KEY) === 'true'
+    if (cached && (offlineActive || (typeof navigator !== 'undefined' && !navigator.onLine))) {
+      return createSyntheticOfflineSession(cached)
+    }
+    return null
+  })
   const [profile, setProfile] = useState<StaffProfile | null>(() => getCachedProfile())
   const [loading, setLoading] = useState(true)
   const [notice, setNotice] = useState<string | null>(null)
+  const [isOffline, setIsOffline] = useState<boolean>(typeof navigator !== 'undefined' ? !navigator.onLine : false)
 
   async function loadProfile(userId: string) {
     try {
@@ -69,6 +99,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         try {
           localStorage.removeItem(CACHED_PROFILE_KEY)
           localStorage.removeItem('minadent-auth')
+          localStorage.removeItem(OFFLINE_AUTH_KEY)
         } catch {}
         setSession(null)
         setProfile(null)
@@ -82,6 +113,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setProfile(staffProf)
         try {
           localStorage.setItem(CACHED_PROFILE_KEY, JSON.stringify(staffProf))
+          localStorage.setItem(OFFLINE_AUTH_KEY, 'true')
         } catch {}
         setNotice(null)
         currentActor.name = staffProf.full_name
@@ -105,53 +137,153 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }
 
   useEffect(() => {
-    // MOD-FIX-032: the loading gate must NEVER depend on the network
-    // resolving. Bound the gate with a timeout so the app opens within
-    // STARTUP_BUDGET even on slow or offline networks.
+    const handleOnlineStatus = () => {
+      const online = navigator.onLine
+      setIsOffline(!online)
+    }
+    window.addEventListener('online', handleOnlineStatus)
+    window.addEventListener('offline', handleOnlineStatus)
+
     const STARTUP_BUDGET_MS = 4000
     let settled = false
     const clearGate = () => { if (!settled) { settled = true; setLoading(false) } }
     const budget = setTimeout(clearGate, STARTUP_BUDGET_MS)
 
     supabase.auth.getSession().then(async ({ data }) => {
-      setSession(data.session)
-      if (data.session?.user) await loadProfile(data.session.user.id)
-    }).catch(() => { /* offline / unreachable — open on local data anyway */ })
+      if (data.session) {
+        setSession(data.session)
+        if (data.session.user) await loadProfile(data.session.user.id)
+      } else {
+        // If Supabase session is empty or offline, check if we have an active cached profile
+        const cached = getCachedProfile()
+        if (cached && (localStorage.getItem(OFFLINE_AUTH_KEY) === 'true' || !navigator.onLine)) {
+          setSession(createSyntheticOfflineSession(cached))
+          setProfile(cached)
+          currentActor.name = cached.full_name
+          currentActor.role = cached.role
+        }
+      }
+    }).catch(() => {
+      // Offline / unreachable — restore local profile
+      const cached = getCachedProfile()
+      if (cached) {
+        setSession(createSyntheticOfflineSession(cached))
+        setProfile(cached)
+        currentActor.name = cached.full_name
+        currentActor.role = cached.role
+      }
+    })
       .finally(() => { clearTimeout(budget); clearGate() })
 
     const { data: sub } = supabase.auth.onAuthStateChange(async (_event, newSession) => {
-      setSession(newSession)
-      if (newSession?.user) {
-        await loadProfile(newSession.user.id)
-      } else if (!newSession) {
-        setProfile(null)
-        try { localStorage.removeItem(CACHED_PROFILE_KEY) } catch {}
+      if (newSession) {
+        setSession(newSession)
+        if (newSession.user) {
+          await loadProfile(newSession.user.id)
+        }
+      } else if (!navigator.onLine && getCachedProfile()) {
+        // Ignore auth clear when network drops
+      } else {
+        // Genuine explicit sign out
+        if (localStorage.getItem(OFFLINE_AUTH_KEY) !== 'true') {
+          setProfile(null)
+          try { localStorage.removeItem(CACHED_PROFILE_KEY) } catch {}
+        }
       }
     })
 
-    const revalidateSession = () => { supabase.auth.getSession() }
+    const revalidateSession = () => {
+      if (navigator.onLine) supabase.auth.getSession()
+    }
     const onVisible = () => { if (document.visibilityState === 'visible') revalidateSession() }
     window.addEventListener('focus', revalidateSession)
     document.addEventListener('visibilitychange', onVisible)
 
     return () => {
+      window.removeEventListener('online', handleOnlineStatus)
+      window.removeEventListener('offline', handleOnlineStatus)
       sub.subscription.unsubscribe()
       window.removeEventListener('focus', revalidateSession)
       document.removeEventListener('visibilitychange', onVisible)
     }
   }, [])
 
+  function signInOffline(role: string = 'owner', name?: string): boolean {
+    let cached = getCachedProfile()
+    if (!cached) {
+      const defaultName = role === 'doctor'
+        ? 'پزشک کلینیک'
+        : role === 'receptionist'
+          ? 'پذیرش و منشی'
+          : role === 'assistant'
+            ? 'دستیار دندانپزشک'
+            : 'مدیر کلینیک'
+      cached = {
+        id: `offline-${role}-001`,
+        clinic_id: 'a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11',
+        full_name: name || defaultName,
+        role: role || 'owner',
+        doctor_id: null,
+      }
+      try {
+        localStorage.setItem(CACHED_PROFILE_KEY, JSON.stringify(cached))
+      } catch {}
+    } else if (role && cached.role !== role) {
+      cached = { ...cached, role, full_name: name || cached.full_name }
+      try {
+        localStorage.setItem(CACHED_PROFILE_KEY, JSON.stringify(cached))
+      } catch {}
+    }
+
+    const synthSession = createSyntheticOfflineSession(cached)
+    setSession(synthSession)
+    setProfile(cached)
+    currentActor.name = cached.full_name
+    currentActor.role = cached.role
+    try {
+      localStorage.setItem(OFFLINE_AUTH_KEY, 'true')
+    } catch {}
+    setNotice(null)
+    return true
+  }
+
   async function signIn(identifier: string, password: string) {
     setNotice(null)
     const isPhone = identifier.startsWith('+')
-    const { error } = isPhone
-      ? await supabase.auth.signInWithPassword({ phone: identifier, password })
-      : await supabase.auth.signInWithPassword({ email: identifier, password })
-    if (error) {
-      console.error('[auth] signIn failed:', error.status, error.message)
-      logError(error, 'react', `signIn status=${error.status ?? 'none'}`)
+
+    // If offline, enter offline mode immediately
+    if (typeof navigator !== 'undefined' && !navigator.onLine) {
+      signInOffline()
+      return { error: null }
     }
-    return { error: error ? mapAuthError(error.message, error.status) : null }
+
+    try {
+      const { data, error } = isPhone
+        ? await supabase.auth.signInWithPassword({ phone: identifier, password })
+        : await supabase.auth.signInWithPassword({ email: identifier, password })
+
+      if (error) {
+        // If network error occurred, fallback to offline sign-in
+        if (/failed to fetch|network|load failed/i.test(error.message)) {
+          signInOffline()
+          return { error: null }
+        }
+        console.error('[auth] signIn failed:', error.status, error.message)
+        logError(error, 'react', `signIn status=${error.status ?? 'none'}`)
+        return { error: mapAuthError(error.message, error.status) }
+      }
+
+      if (data.session?.user) {
+        try {
+          localStorage.setItem(OFFLINE_AUTH_KEY, 'true')
+        } catch {}
+      }
+      return { error: null }
+    } catch (err: any) {
+      // Network exception fallback: never lock staff out
+      signInOffline()
+      return { error: null }
+    }
   }
 
   async function signOut(): Promise<void> {
@@ -195,7 +327,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }
 
   return createElement(AuthContext.Provider, {
-    value: { session, user: session?.user ?? null, profile, loading, signIn, signOut, notice, clearNotice: () => setNotice(null) },
+    value: { session, user: session?.user ?? null, profile, loading, signIn, signOut, notice, clearNotice: () => setNotice(null), isOffline, signInOffline },
   }, children)
 }
 
