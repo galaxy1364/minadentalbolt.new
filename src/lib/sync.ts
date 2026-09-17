@@ -32,7 +32,7 @@ async function refreshPendingCount() {
   notify()
 }
 
-import { notifyDataChanged } from './realtimeSync'
+import { notifyDataChanged, broadcastMeshSyncRequest } from './realtimeSync'
 
 export interface SyncResult {
   success: boolean
@@ -104,6 +104,12 @@ async function pushQueue(): Promise<number> {
       if (isMissingTableError(err)) {
         // Table not present in cloud database — remove from push queue so it does not block sync
         if (entry.id) await db.sync_queue.delete(entry.id)
+        continue
+      }
+      if (err?.code === '42501' || err?.message?.includes('row-level security')) {
+        // Cloud database table requires authenticated user session.
+        // Mesh real-time broadcast already handles instant cross-device updates.
+        // Retain in queue for when cloud auth credentials are authenticated.
         continue
       }
       if (entry.id) {
@@ -178,6 +184,9 @@ export async function initialSync(): Promise<SyncResult> {
 }
 
 export async function syncNow(): Promise<SyncResult> {
+  try {
+    broadcastMeshSyncRequest(true)
+  } catch {}
   return await fullSync()
 }
 
@@ -222,8 +231,17 @@ export function initSyncEngine(): () => void {
     currentStatus = 'offline'
     notify()
   }
+  const handleVisibility = () => {
+    if (typeof document !== 'undefined' && document.visibilityState === 'visible' && navigator.onLine) {
+      currentStatus = 'online'
+      notify()
+      fullSync()
+    }
+  }
   window.addEventListener('online', handleOnline)
   window.addEventListener('offline', handleOffline)
+  window.addEventListener('focus', handleVisibility)
+  document.addEventListener('visibilitychange', handleVisibility)
 
   const interval = setInterval(() => {
     // Sync periodically regardless of pending count — pulls server-side changes too
@@ -235,6 +253,8 @@ export function initSyncEngine(): () => void {
   return () => {
     window.removeEventListener('online', handleOnline)
     window.removeEventListener('offline', handleOffline)
+    window.removeEventListener('focus', handleVisibility)
+    document.removeEventListener('visibilitychange', handleVisibility)
     clearInterval(interval)
     if (syncTimer) clearTimeout(syncTimer)
   }

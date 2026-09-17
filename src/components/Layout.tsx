@@ -675,7 +675,7 @@ function LayoutInner({ children }: { children: React.ReactNode }) {
 
       <UpdateBanner />
 
-      <main className="relative z-[1] flex-1 min-w-0 overflow-x-hidden px-3 pt-3 pb-48">
+      <main className="relative z-[1] flex-1 min-w-0 max-w-full px-3 pt-3 pb-48">
         <div key={location.pathname} className="slide-in-right">
           {children}
         </div>

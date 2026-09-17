@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useMemo } from 'react'
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
 import { Calendar, Clock, CheckCircle2, User, ChevronRight, ChevronLeft, Plus, Search, AlertCircle, Edit2, Stethoscope, DollarSign, FileText, Activity, List, Grid, X, UserPlus, Globe, Ban, Printer, MessageSquare, UserCheck, Volume2, Armchair, Sparkles, Tv, FlaskConical } from 'lucide-react'
 import { fetchTreatments, fetchPayments, fetchImplantCases, fetchAppointments, createAppointment, updateAppointment, checkConflict, fetchPatients, updatePatient, fetchDoctors, fetchUnits, peekNextFileNumber, createPatient, createEncounter, createPayment, fetchDoctorSchedules, fetchOnlineBookingRequests, rejectBookingRequest, updateLabOrder, fetchLabOrders, updateImplantCase, fetchWaitingList, updateWaitingEntry } from '../lib/api'
@@ -195,8 +195,11 @@ export default function Appointments() {
   // with no sign that they owe the clinic money.
   const [balanceInputs, setBalanceInputs] = useState<{ treatments: any[]; payments: any[]; implants: any[] }>({ treatments: [], payments: [], implants: [] })
 
-  const loadData = useCallback(async () => {
-    setLoading(true)
+  const hasLoadedApptsRef = useRef(false)
+  const loadData = useCallback(async (silent = false) => {
+    if (!hasLoadedApptsRef.current && !silent) {
+      setLoading(true)
+    }
     try {
       const [a, p, d, u, br, sch, tr, pay, imp, labs] = await Promise.all([
         fetchAppointments(), fetchPatients(), fetchDoctors(), fetchUnits(),
@@ -208,14 +211,15 @@ export default function Appointments() {
       setLabOrders(labs as any[])
       setBalanceInputs({ treatments: tr as any[], payments: pay as any[], implants: imp as any[] })
       setBookingRequests(br.filter((r: any) => r.status === 'pending'))
+      hasLoadedApptsRef.current = true
     } catch { showToast('error', 'خطا در بارگذاری نوبت‌ها') }
     finally { setLoading(false) }
   }, [])
 
   useEffect(() => { loadData() }, [loadData])
 
-  // Real-time automatic refresh across devices, tabs, and operatory rooms
-  useDataRefresh(['appointments', 'patients', 'treatments', 'payments', 'encounters', 'doctor_schedules'], loadData)
+  // Real-time automatic refresh across devices, tabs, and operatory rooms (silent update)
+  useDataRefresh(['appointments', 'patients', 'treatments', 'payments', 'encounters', 'doctor_schedules'], () => loadData(true))
 
   const todayStr = new Date().toISOString().slice(0, 10)
   const tomorrowStr = new Date(Date.now() + 86400000).toISOString().slice(0, 10)
@@ -785,7 +789,7 @@ export default function Appointments() {
     }
   }
 
-  const ptr = usePullToRefresh(async () => { await loadData() })
+  const ptr = usePullToRefresh(async () => { await loadData(true) })
 
   if (loading) {
     return (

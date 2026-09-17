@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useMemo } from 'react'
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import { PatientDebtBar } from '../components/PatientDebtBar'
 import { useNavigate } from 'react-router-dom'
 import { Plus, Search, Edit2, Phone, Filter, Users, Award, AlertCircle, Smile, FileText, User, Heart, Shield, MapPin, Archive, Calendar, MessageSquare, Eye, EyeOff } from 'lucide-react'
@@ -85,19 +85,23 @@ export default function Patients() {
   const { confirmAction, close, ConfirmActionModal } = useConfirmAction()
   const { privacyMode, togglePrivacyMode, maskPhoneNumber, maskNationalId } = usePrivacyMode()
 
-  const loadData = useCallback(async () => {
-    setLoading(true)
+  const hasLoadedRef = useRef(false)
+  const loadData = useCallback(async (silent = false) => {
+    if (!hasLoadedRef.current && !silent) {
+      setLoading(true)
+    }
     try {
       const [pats, docs, pays, trts, implCases] = await Promise.all([fetchPatients(), fetchDoctors(), fetchPayments(), fetchTreatments(), fetchImplantCases()])
       setPatients(pats); setDoctors(docs); setPayments(pays); setTreatments(trts); setImplantCases(implCases)
+      hasLoadedRef.current = true
     } catch { showToast('error', 'خطا در بارگذاری بیماران') }
     finally { setLoading(false) }
   }, [])
 
   useEffect(() => { loadData() }, [loadData])
 
-  // Real-time automatic synchronization when patients/payments update on any device
-  useDataRefresh(['patients', 'payments', 'treatments', 'implant_cases'], loadData)
+  // Real-time automatic synchronization when patients/payments update on any device (silent update)
+  useDataRefresh(['patients', 'payments', 'treatments', 'implant_cases'], () => loadData(true))
 
   const patientFinances = useMemo(() => {
     const map = new Map<string, { balance: number; paid: number; totalCost: number }>()
@@ -356,7 +360,7 @@ export default function Patients() {
     })
   }
 
-  const ptr = usePullToRefresh(async () => { await loadData() })
+  const ptr = usePullToRefresh(async () => { await loadData(true) })
 
   if (loading) {
     return (
