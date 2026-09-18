@@ -351,9 +351,12 @@ input, textarea, select { font-size: 16px !important; }
   .slot-rail { scroll-behavior: auto; }
 }
 
-/* ── Safe area bottom padding ───────────────────────── */
-.pb-safe { padding-bottom: env(safe-area-inset-bottom, 0px); }
+/* ── Safe area padding & insets (iOS 27 & Notch resilience) ── */
+.pt-safe { padding-top: max(0.5rem, env(safe-area-inset-top, 0px)); }
+.pb-safe { padding-bottom: max(0.5rem, env(safe-area-inset-bottom, 0px)); }
+.mt-safe { margin-top: env(safe-area-inset-top, 0px); }
 .mb-safe { margin-bottom: env(safe-area-inset-bottom, 0px); }
+.top-safe { top: env(safe-area-inset-top, 0px); }
 
 /* ── MOD-UI-004 Focus visibility (WCAG 2.2 SC 2.4.11) ────
    The audit found the app had NO focus styles at all, which is a
@@ -1228,14 +1231,35 @@ input, textarea, select { font-size: 16px !important; }
 }
 
 @media (max-width: 768px) {
-  /* Mobile GPU rasterization safeguard: prevents white flash, layer drops and scroll lag */
+  /* Mobile GPU rasterization safeguard: prevents white flash and layer drops during fast scrolling.
+     85px blur × 4 blobs × animation = GPU VRAM exhaustion on mid-range phones.
+     28px blur is visually identical at arm's length but uses ~90% less GPU memory. */
   .module-page-blob {
-    animation: none !important;
-    filter: blur(18px) !important;
+    filter: blur(28px) !important;
     opacity: 0.22 !important;
+    animation-duration: 60s !important;
+    /* Remove will-change on mobile: it forces the browser to promote each blob
+       to its OWN GPU layer. With 4 blobs that creates 4 extra compositing layers
+       that need to be merged every frame — counterproductive on phones with 2-4GB RAM. */
     will-change: auto !important;
-    transform: none !important;
-    -webkit-transform: none !important;
+  }
+  /* Reduce blob sizes on mobile to use even less GPU fill-rate */
+  .module-page-blob-1 { width: 90vw !important; height: 90vw !important; }
+  .module-page-blob-2 { width: 80vw !important; height: 80vw !important; }
+  .module-page-blob-3 { width: 70vw !important; height: 70vw !important; }
+  .module-page-blob-4 { width: 60vw !important; height: 60vw !important; }
+
+  /* geminiCardAura animates background-color and box-shadow every 8 seconds.
+     Both properties trigger GPU rasterization of the card surface on every
+     keyframe — on a page with 10+ cards that is 10+ simultaneous paint jobs.
+     Disable on mobile; a static card surface is perfectly readable and fast. */
+  .gemini-ambient-card {
+    animation: none !important;
+    background-color: color-mix(in srgb, var(--module-color, #0d9488) 6%, #ffffff) !important;
+  }
+  .dark .gemini-ambient-card {
+    animation: none !important;
+    background-color: color-mix(in srgb, var(--module-color, #0d9488) 12%, #1e293b) !important;
   }
 }
 

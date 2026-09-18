@@ -918,15 +918,17 @@ export default function Laboratory() {
               </p>
             </div>
           </div>
-          <Badge color={statusMeta.color}>{statusMeta.label}</Badge>
-          {/* Shelf address on the card itself: the whole point is that
-              staff can find the physical case without opening it. */}
-          {formatShelfLocation(order) && (
-            <Badge color="primary">قفسه {toPersianDigits(formatShelfLocation(order)!)}</Badge>
-          )}
-          {alarmInfo(order, today).state === 'overdue' && (
-            <Badge color="error">یادآور {alarmInfo(order, today).label}</Badge>
-          )}
+          <div className="flex items-center gap-1.5 flex-wrap shrink-0">
+            <Badge color={statusMeta.color}>{statusMeta.label}</Badge>
+            {/* Shelf address on the card itself: the whole point is that
+                staff can find the physical case without opening it. */}
+            {formatShelfLocation(order) && (
+              <Badge color="primary">قفسه {toPersianDigits(formatShelfLocation(order)!)}</Badge>
+            )}
+            {alarmInfo(order, today).state === 'overdue' && (
+              <Badge color="error">یادآور {alarmInfo(order, today).label}</Badge>
+            )}
+          </div>
         </div>
 
         {/* Details */}

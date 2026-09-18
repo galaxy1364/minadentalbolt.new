@@ -32,7 +32,7 @@ async function refreshPendingCount() {
   notify()
 }
 
-import { notifyDataChanged, broadcastMeshSyncRequest } from './realtimeSync'
+import { notifyDataChanged } from './realtimeSync'
 
 export interface SyncResult {
   success: boolean
@@ -110,6 +110,8 @@ async function pushQueue(): Promise<number> {
         // Cloud database table requires authenticated user session.
         // Mesh real-time broadcast already handles instant cross-device updates.
         // Retain in queue for when cloud auth credentials are authenticated.
+        // Log so developers can diagnose cross-device sync issues.
+        console.warn(`[sync] RLS blocked push for ${entry.table_name} (${entry.operation}) — user is not authenticated with Supabase. Data will sync via mesh broadcast when another authenticated device is online.`)
         continue
       }
       if (entry.id) {
@@ -170,7 +172,42 @@ async function fullSync(): Promise<SyncResult> {
   return result
 }
 
+export async function autoRepairPoisonedSyncQueue(): Promise<number> {
+  try {
+    const all = await db.sync_queue.toArray()
+    let repaired = 0
+    for (const entry of all) {
+      const err = entry.last_error || ''
+      const dataStr = JSON.stringify(entry.data || {})
+      const isPoisoned = err.includes('2-00-02') || err.includes('out of range') || dataStr.includes('2-00-02')
+      if (isPoisoned && entry.id) {
+        if (entry.data && typeof entry.data === 'object') {
+          const { cleaned } = sanitiseDates(entry.data)
+          await db.sync_queue.update(entry.id, {
+            data: cleaned,
+            failed: false,
+            retry_count: 0,
+            last_error: undefined,
+          })
+          repaired++
+        } else {
+          await db.sync_queue.delete(entry.id)
+          repaired++
+        }
+      }
+    }
+    if (repaired > 0) {
+      await refreshPendingCount()
+    }
+    return repaired
+  } catch (e) {
+    console.warn('[sync] autoRepairPoisonedSyncQueue error:', e)
+    return 0
+  }
+}
+
 export async function initialSync(): Promise<SyncResult> {
+  await autoRepairPoisonedSyncQueue()
   const metaCount = await db.sync_meta.count()
   if (metaCount === 0) {
     return await fullSync()
@@ -184,9 +221,6 @@ export async function initialSync(): Promise<SyncResult> {
 }
 
 export async function syncNow(): Promise<SyncResult> {
-  try {
-    broadcastMeshSyncRequest(true)
-  } catch {}
   return await fullSync()
 }
 
@@ -244,11 +278,13 @@ export function initSyncEngine(): () => void {
   document.addEventListener('visibilitychange', handleVisibility)
 
   const interval = setInterval(() => {
-    // Sync periodically regardless of pending count — pulls server-side changes too
+    // Sync every 15 seconds — critical for cross-device data visibility.
+    // 60 seconds was too long: a patient registered on iPhone took up to
+    // 1 minute to appear on the laptop, which felt like sync was broken.
     if (typeof navigator !== 'undefined' && navigator.onLine) {
       fullSync()
     }
-  }, 60000)
+  }, 15000)
 
   return () => {
     window.removeEventListener('online', handleOnline)

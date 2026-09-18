@@ -86,7 +86,7 @@ BEGIN
 END
 $policies$;
 
--- سیاست برای جداول اختیاری
+-- سیاست برای جداول اختیاری (فقط اگر ستون clinic_id داشته باشند)
 DO $opt$ DECLARE
   tbl TEXT;
 BEGIN
@@ -95,10 +95,14 @@ BEGIN
     'role_permissions','custom_roles','notification_logs',
     'otp_codes','sms_logs'
   ]) LOOP
+    -- Only add policy if: table exists AND has a clinic_id column
     IF EXISTS (
-      SELECT 1 FROM information_schema.tables
-      WHERE table_schema = 'public' AND table_name = tbl
+      SELECT 1 FROM information_schema.columns
+      WHERE table_schema = 'public'
+        AND table_name  = tbl
+        AND column_name = 'clinic_id'
     ) THEN
+      EXECUTE format('ALTER TABLE %I ENABLE ROW LEVEL SECURITY', tbl);
       EXECUTE format('DROP POLICY IF EXISTS clinic_all ON %I', tbl);
       EXECUTE format(
         $pol$

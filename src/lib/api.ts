@@ -86,11 +86,7 @@ export async function fetchPatients(search?: string): Promise<Patient[]> {
       p.file_number?.toLowerCase().includes(s)
     )
   }
-  return items.sort((a, b) => {
-    const timeA = a.updated_at || a.created_at || ''
-    const timeB = b.updated_at || b.created_at || ''
-    return timeB.localeCompare(timeA)
-  })
+  return items.sort((a, b) => (b.created_at || '').localeCompare(a.created_at || ''))
 }
 
 export async function fetchPatient(id: string): Promise<Patient | null> {

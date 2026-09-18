@@ -49,10 +49,16 @@ const today = new Date().toISOString().split('T')[0]
 const buildTimestamp = Date.now()
 
 // 1. Update public/version.json
+let existingVersionJson = {}
+if (existsSync(versionPath)) {
+  try { existingVersionJson = JSON.parse(readFileSync(versionPath, 'utf8')) } catch {}
+}
 const versionJson = {
   version,
   buildDate: today,
   buildTimestamp,
+  releaseTitle: existingVersionJson.releaseTitle || 'داشبورد عملیاتی کلینیک با کپسول‌های دائمی و پاپ‌آپ‌های تفصیلی',
+  changelog: existingVersionJson.changelog || 'طراحی مجدد داشبورد اجرایی، کپسول‌های دائمی پایش عملیاتی (چک‌ها، ایمپلنت، بدهی، سفارش‌های لابراتوار و اقساط) همراه با مودال تفصیلی لیست بیماران',
 }
 writeFileSync(versionPath, JSON.stringify(versionJson, null, 2) + '\n', 'utf8')
 console.log(`✓ Synchronized ${versionPath} (v${version})`)
@@ -65,6 +71,7 @@ const appVersionContent = `/**
  */
 export const APP_VERSION = '${version}'
 export const BUILD_DATE = '${today}'
+export const RELEASE_TITLE = '${versionJson.releaseTitle}'
 `
 writeFileSync(appVersionPath, appVersionContent, 'utf8')
 console.log(`✓ Synchronized ${appVersionPath} (v${version})`)

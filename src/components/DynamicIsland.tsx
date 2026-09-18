@@ -61,7 +61,7 @@ export function DynamicIsland() {
 
   return createPortal(
     <div
-      className="fixed top-2 left-1/2 -translate-x-1/2 z-[70] flex justify-center"
+      className="fixed left-1/2 -translate-x-1/2 z-[70] flex justify-center top-safe mt-1.5"
       style={{ pointerEvents: isExpanded ? 'auto' : 'none' }}
     >
       <div

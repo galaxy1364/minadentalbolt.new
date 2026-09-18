@@ -8,7 +8,7 @@ import { useNavigate } from 'react-router-dom'
 import {
   Users, Calendar, DollarSign, FlaskConical, Plus, ArrowLeft, Activity,
   Clock, TrendingUp, TrendingDown, Smile, AlertTriangle, Package,
-  ClipboardList, Wallet, Zap, ChevronLeft, ChevronDown, Timer, Moon, Sun, Target, Settings2,
+  ClipboardList, Wallet, Zap, ChevronLeft, Timer, Moon, Sun, Target, Settings2,
   CheckCircle2, ArrowUpRight, ArrowDownRight, Sparkles, Building2,
   RefreshCw, Download, FileText, Bell, AlertCircle, Banknote, CalendarClock, MessageSquare,
 } from 'lucide-react'
@@ -44,8 +44,7 @@ import {
 } from '../lib/smartReminders'
 import { findPostOpCheckups, findSutureRemovalReminders, findHygieneRecalls } from '../lib/patientRecallChurn'
 import { calcAllPatientBalances } from '../lib/finance'
-import { readyForDelivery, formatShelfLocation } from '../lib/labShelf'
-import { toothLabel } from '../lib/toothLabel'
+import { readyForDelivery } from '../lib/labShelf'
 import { supabase } from '../lib/supabase'
 import { getClinicSetting, setClinicSetting } from '../lib/clinicSettings'
 import { useAuth } from '../lib/auth'
@@ -540,11 +539,9 @@ export default function Dashboard() {
   useEffect(() => { localStorage.setItem('minadent-dash-range', timeRange) }, [timeRange])
   useEffect(() => { localStorage.setItem('minadent-dash-doctor', doctorFilter) }, [doctorFilter])
 
-  // Auto-refresh & view collapses
+  // Auto-refresh
   const [autoRefresh, setAutoRefresh] = useState(true)
   const [chartsExpanded, setChartsExpanded] = useState(false)
-  const [todayApptsExpanded, setTodayApptsExpanded] = useState(true)
-  const [remindersExpanded, setRemindersExpanded] = useState(false)
   const [hubTab, setHubTab] = useState<'alerts' | 'analytics' | 'activity'>('alerts')
 
   const [labOrdersState, setLabOrdersState] = useState<LabOrder[]>([])
@@ -895,33 +892,15 @@ export default function Dashboard() {
     return `عمدتاً از ${methodLabel} (${toPersianDigits(pct)}٪)`
   }, [filteredPayments, currentRevenue])
 
-  // ── Drill-down panel (tap a stat tile or operational capsule → quick detail list instead of
+  // ── Drill-down panel (tap a stat tile → quick detail list instead of
   // a full navigation away from the dashboard) ──────────────────────
-  type DrillDownType =
-    | 'patients'
-    | 'appointments'
-    | 'revenue'
-    | 'lab'
-    | 'cheques'
-    | 'implants'
-    | 'debtors'
-    | 'ready_lab'
-    | 'overdue_lab'
-    | 'installments'
-    | null
-
-  const [drillDown, setDrillDown] = useState<DrillDownType>(null)
+  const [drillDown, setDrillDown] = useState<'patients' | 'appointments' | 'revenue' | 'lab' | null>(null)
   const recentPaymentsForDrill = useMemo(
     () => [...filteredPayments].sort((a, b) => (b.payment_date || '').localeCompare(a.payment_date || '')).slice(0, 6),
     [filteredPayments],
   )
   const recentPatientsForDrill = useMemo(() => [...filteredPatients].slice(0, 6), [filteredPatients])
   const upcomingApptsForDrill = useMemo(() => [...filteredAppointments].sort((a, b) => a.start_time.localeCompare(b.start_time)).slice(0, 6), [filteredAppointments])
-  const readyLabOrdersForDrill = useMemo(() => readyForDelivery(labOrdersState), [labOrdersState])
-  const overdueLabOrdersForDrill = useMemo(
-    () => labOrdersState.filter((o) => o.status !== 'delivered' && o.status !== 'cancelled' && o.deadline && o.deadline < todayStr),
-    [labOrdersState, todayStr],
-  )
 
   // ── Notification center (aggregates every alert into one bell icon) ──
   const [notifCenterOpen, setNotifCenterOpen] = useState(false)
@@ -1072,22 +1051,22 @@ export default function Dashboard() {
   const allQuickActions: { key: string; label: string; icon: React.ReactNode; color: TileColor; path: string }[] = [
     { key: 'appt',   label: 'نوبت جدید',   icon: <GlyphAppointments size={20} />, color: 'amber', path: '/appointments' },
     { key: 'patient',label: 'بیمار جدید',  icon: <GlyphPatients size={20} />,    color: 'violet', path: '/patients' },
-    { key: 'cash',   label: 'صندوق',        icon: <GlyphBilling size={20} />,   color: 'pink',  path: '/billing' },
-    { key: 'lab',    label: 'لابراتوار',    icon: <GlyphLaboratory size={20} />, color: 'violet', path: '/laboratory' },
+    { key: 'roadmap',label: 'نقشه راه',     icon: <GlyphRoadmap size={20} />,     color: 'violet', path: '/roadmap' },
     { key: 'implant',label: 'ایمپلنت',      icon: <GlyphImplants size={20} />,    color: 'sky',   path: '/implants' },
     { key: 'wait',   label: 'لیست انتظار', icon: <GlyphWaitingList size={20} />,    color: 'lime',  path: '/waiting-list' },
+    { key: 'cash',   label: 'صندوق',        icon: <GlyphBilling size={20} />,   color: 'pink',  path: '/billing' },
     { key: 'inv',    label: 'موجودی',       icon: <GlyphInventory size={20} />,  color: 'rose',  path: '/inventory' },
   ]
 
   // Role-aware ordering: each role's most-used actions float to the front
   // (all stay available — this only changes priority, never hides).
   const roleActionPriority: Record<string, string[]> = {
-    doctor: ['appt', 'patient', 'lab', 'wait', 'implant', 'cash', 'inv'],
-    receptionist: ['patient', 'appt', 'wait', 'cash', 'lab', 'implant', 'inv'],
-    assistant: ['appt', 'wait', 'patient', 'lab', 'implant', 'cash', 'inv'],
-    lab: ['lab', 'implant', 'appt', 'patient', 'wait', 'cash', 'inv'],
-    accountant: ['cash', 'inv', 'appt', 'patient', 'wait', 'lab', 'implant'],
-    owner: ['appt', 'patient', 'cash', 'lab', 'implant', 'wait', 'inv'],
+    doctor: ['appt', 'patient', 'roadmap', 'wait', 'implant', 'cash', 'inv'],
+    receptionist: ['patient', 'appt', 'wait', 'cash', 'roadmap', 'implant', 'inv'],
+    assistant: ['appt', 'wait', 'patient', 'roadmap', 'implant', 'cash', 'inv'],
+    lab: ['implant', 'appt', 'patient', 'wait', 'roadmap', 'cash', 'inv'],
+    accountant: ['cash', 'inv', 'appt', 'patient', 'wait', 'roadmap', 'implant'],
+    owner: ['roadmap', 'appt', 'patient', 'implant', 'wait', 'cash', 'inv'],
   }
   const priority = roleActionPriority[role] || roleActionPriority.owner
   const [customOrder, setCustomOrder] = useState<string[] | null>(() => {
@@ -1148,34 +1127,35 @@ export default function Dashboard() {
           </div>
         </div>
       )}
-      {/* ═══ Clean 1-Row Executive Header ══════════════ */}
-      <div className="tile-in flex items-center justify-between gap-2 p-3 rounded-2xl bg-white/90 dark:bg-slate-800/90 backdrop-blur-md border border-slate-200/60 dark:border-slate-700/60 shadow-xs" style={{ animationDelay: '0ms' }}>
-        {/* Right: Clinic Title + Jalali Date Badge */}
-        <div className="flex items-center gap-2 min-w-0">
-          <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-primary-500 to-violet-600 flex items-center justify-center text-white shadow-xs shrink-0">
-            <Building2 size={16} />
-          </div>
-          <div className="min-w-0">
-            <div className="flex items-center gap-1.5">
-              <span className="text-xs font-extrabold text-slate-800 dark:text-slate-100 truncate">کلینیک دندانپزشکی مینا</span>
-              <span className="text-[10px] font-bold text-primary-600 dark:text-primary-400 bg-primary-50 dark:bg-primary-950/40 border border-primary-200/50 dark:border-primary-800/50 rounded-full px-2 py-0.5 shrink-0">
-                {roleGreeting[role] || roleGreeting.owner}
-              </span>
-            </div>
-            <p className="text-[11px] font-medium text-slate-500 dark:text-slate-400 truncate">
-              {toJalaliStringPretty(todayStr)}
-            </p>
-          </div>
+      {/* ═══ Toolbar: Filters + Dark Mode + Refresh ══════════════ */}
+      <div className="tile-in flex items-center justify-between flex-wrap gap-3" style={{ animationDelay: '0ms' }}>
+        {/* Time Range Filter */}
+        <div className="flex items-center gap-1 p-1 rounded-2xl bg-slate-100 dark:bg-slate-800">
+          {(Object.keys(timeRangeLabels) as TimeRange[]).map((r) => (
+            <button
+              key={r}
+              onClick={() => { h.tap(); setTimeRange(r) }}
+              aria-label={`فیلتر: ${timeRangeLabels[r]}`}
+              aria-pressed={timeRange === r}
+              className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all-smooth focus:outline-none focus:ring-2 focus:ring-primary-400 ${
+                timeRange === r
+                  ? 'bg-white dark:bg-slate-700 text-primary-600 dark:text-primary-400 shadow-sm'
+                  : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200'
+              }`}
+            >
+              {timeRangeLabels[r]}
+            </button>
+          ))}
         </div>
 
-        {/* Center / Left: Inline Doctor Filter + Actions */}
         <div className="flex items-center gap-1.5 shrink-0">
+          {/* Doctor Filter */}
           {doctors.length > 0 && (
             <select
               value={doctorFilter}
               onChange={(e) => { h.tap(); setDoctorFilter(e.target.value) }}
-              aria-label="فیلتر پزشک"
-              className="min-h-[44px] px-2.5 py-2 rounded-xl text-[11px] font-bold bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-200 border-0 focus:ring-2 focus:ring-primary-400 cursor-pointer max-w-[110px]"
+              aria-label="فیلتر بر اساس پزشک"
+              className="px-2 py-1.5 rounded-xl text-[11px] font-bold bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-slate-700 focus:outline-none focus:ring-2 focus:ring-primary-400 cursor-pointer max-w-[92px]"
             >
               <option value="all">همه پزشکان</option>
               {doctors.map((d) => (
@@ -1184,48 +1164,82 @@ export default function Dashboard() {
             </select>
           )}
 
-          {/* Refresh */}
+          {/* Auto-refresh toggle — icon only so it fits next to the time tabs on mobile */}
+          <button
+            onClick={() => { h.tap(); setAutoRefresh(!autoRefresh) }}
+            aria-label={autoRefresh ? 'به‌روزرسانی خودکار فعال' : 'به‌روزرسانی خودکار غیرفعال'}
+            aria-pressed={autoRefresh}
+            title="به‌روزرسانی خودکار"
+            className={`flex items-center justify-center w-9 h-9 rounded-xl border transition-all-smooth ${
+              autoRefresh
+                ? 'bg-success-50 dark:bg-success-900/20 text-success-600 dark:text-success-400 border-success-200 dark:border-success-700'
+                : 'bg-white dark:bg-slate-800 text-slate-400 dark:text-slate-500 border-slate-200 dark:border-slate-700'
+            }`}
+          >
+            <Zap size={15} className={autoRefresh ? 'animate-pulse' : ''} />
+          </button>
+
+          {/* Manual Refresh */}
           <button
             onClick={handleRefresh}
-            aria-label="به‌روزرسانی"
-            title="به‌روزرسانی"
+            aria-label="به‌روزرسانی دستی"
+            title="به‌روزرسانی دستی"
             disabled={refreshing}
-            className="flex items-center justify-center min-w-[44px] min-h-[44px] rounded-xl bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-600 transition-all press-scale disabled:opacity-50"
+            className="flex items-center justify-center w-9 h-9 rounded-xl bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700 transition-all-smooth disabled:opacity-50"
           >
             <RefreshCw size={15} className={refreshing ? 'animate-spin' : ''} />
-          </button>
-
-          {/* Notifications */}
-          <button
-            onClick={() => { h.tap(); setNotifCenterOpen(true) }}
-            aria-label={`مرکز اعلان‌ها${totalNotifCount > 0 ? `، ${totalNotifCount} مورد` : ''}`}
-            className="relative flex items-center justify-center min-w-[44px] min-h-[44px] rounded-xl bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-600 transition-all press-scale"
-          >
-            <Bell size={16} />
-            {totalNotifCount > 0 && (
-              <span className="absolute -top-1 -left-1 min-w-[18px] h-[18px] px-1 rounded-full bg-error-500 text-white text-[10px] font-bold flex items-center justify-center">
-                {toPersianDigits(Math.min(totalNotifCount, 99))}
-              </span>
-            )}
-          </button>
-
-          {/* New Appointment CTA */}
-          <button
-            onClick={() => { h.confirm(); navigate('/appointments') }}
-            aria-label="نوبت جدید"
-            className="flex items-center gap-1.5 min-h-[44px] px-3.5 py-2 rounded-xl bg-gradient-to-l from-primary-600 to-violet-600 text-white text-xs font-bold shadow-xs hover:opacity-95 active:scale-95 transition-all"
-          >
-            <Plus size={15} />
-            <span>نوبت جدید</span>
           </button>
         </div>
       </div>
 
-      {/* ═══ Compact 4-Tile Stat Bento Grid ═══════════════ */}
+      {/* ═══ Compact Hero + Stats — single Bento block ═══════════════ */}
       <div
-        className="tile-in relative overflow-hidden rounded-3xl bg-white/80 dark:bg-slate-800/80 border border-slate-200/60 dark:border-slate-700/60 shadow-xs p-3"
-        style={{ animationDelay: '40ms' }}
+        className="tile-in relative overflow-hidden rounded-3xl bg-white dark:bg-slate-800 border border-slate-100 dark:border-slate-700 shadow-sm p-4"
+        style={{ animationDelay: '50ms' }}
       >
+        <div className="absolute -top-16 -left-10 w-56 h-56 rounded-full bg-gradient-to-br from-violet-200/60 dark:from-violet-500/15 to-transparent blur-3xl pointer-events-none" />
+        <div className="absolute -bottom-16 -right-10 w-48 h-48 rounded-full bg-gradient-to-br from-sky-200/50 dark:from-sky-500/15 to-transparent blur-3xl pointer-events-none" />
+
+        <div className="relative flex items-center justify-between gap-3 mb-4">
+          <div className="min-w-0">
+            <div className="flex items-center gap-1.5 mb-0.5">
+              <Building2 size={13} className="text-primary-500 shrink-0" />
+              <span className="text-[11px] font-bold text-primary-600 dark:text-primary-400 truncate">کلینیک دندانپزشکی مینا</span>
+              <span className="text-[10px] font-bold text-slate-400 dark:text-slate-500 bg-slate-100 dark:bg-slate-700 rounded-full px-2 py-0.5 shrink-0">{roleGreeting[role] || roleGreeting.owner}</span>
+            </div>
+            <h1 className="text-lg font-extrabold text-slate-800 dark:text-slate-100 truncate">
+              {toJalaliStringPretty(todayStr)}
+              {doctorFilter !== 'all' && (
+                <span className="text-primary-500 text-sm font-medium mr-1.5">— {doctors.find((d) => d.id === doctorFilter)?.name || 'پزشک'}</span>
+              )}
+            </h1>
+          </div>
+          <div className="flex items-center gap-2 shrink-0">
+            <span className="text-sm font-bold text-slate-500 dark:text-slate-400 tabular-nums hidden sm:inline">
+              {toPersianDigits(currentTime.toLocaleTimeString('fa-IR', { hour: '2-digit', minute: '2-digit' }))}
+            </span>
+            <button
+              onClick={() => { h.tap(); setNotifCenterOpen(true) }}
+              aria-label={`مرکز اعلان‌ها${totalNotifCount > 0 ? `، ${totalNotifCount} مورد` : ''}`}
+              className="relative flex items-center justify-center w-9 h-9 rounded-xl bg-white dark:bg-slate-700 border border-slate-200 dark:border-slate-600 text-slate-500 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-600 transition-all-smooth"
+            >
+              <Bell size={16} />
+              {totalNotifCount > 0 && (
+                <span className="absolute -top-1.5 -left-1.5 min-w-[18px] h-[18px] px-1 rounded-full bg-error-500 text-white text-[10px] font-bold flex items-center justify-center">
+                  {toPersianDigits(Math.min(totalNotifCount, 99))}
+                </span>
+              )}
+            </button>
+            <button
+              onClick={() => { h.confirm(); navigate('/appointments') }}
+              aria-label="نوبت جدید"
+              className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-gradient-to-l from-violet-600 to-sky-500 hover:opacity-90 text-white text-sm font-bold shadow-md transition-all-smooth press-scale focus:outline-none focus:ring-4 focus:ring-violet-300/40"
+            >
+              <Plus size={16} />
+              نوبت جدید
+            </button>
+          </div>
+        </div>
 
         {/* Stat tiles — compact 2x2/4x1 bento grid, part of the same block */}
         <div className="relative grid grid-cols-2 lg:grid-cols-4 gap-2.5">
@@ -1307,89 +1321,58 @@ export default function Dashboard() {
         )}
       </div>
 
-      {/* ═══ Today's Appointments (Interactive Collapsible Card) ═════════════ */}
-      <Card className="p-3.5 sm:p-4 tile-in relative overflow-hidden bg-white/95 dark:bg-slate-800/95 shadow-xs border border-slate-200/60 dark:border-slate-700/60">
-        <div
-          onClick={() => { h.tap(); setTodayApptsExpanded(!todayApptsExpanded) }}
-          className="flex items-center justify-between cursor-pointer select-none"
-        >
-          <div className="flex items-center gap-2 min-w-0">
-            <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-primary-500 to-sky-600 flex items-center justify-center text-white shadow-xs shrink-0">
+      {/* ═══ Today's Appointments (Mobile First Hero Card) ═════════════ */}
+      <Card className="p-4 sm:p-5 tile-in relative overflow-hidden bg-gradient-to-br from-white to-slate-50/50 dark:from-slate-800 dark:to-slate-800/80 shadow-sm border border-slate-100 dark:border-slate-700/60">
+        <div className="absolute -top-24 -left-24 w-64 h-64 rounded-full bg-gradient-to-br from-primary-400/20 to-transparent blur-3xl pointer-events-none breathe-slow" />
+        <div className="relative z-10 flex items-center justify-between mb-3.5">
+          <h2 className="text-base font-bold text-slate-800 dark:text-slate-100 flex items-center gap-2">
+            <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-primary-400 to-primary-600 flex items-center justify-center text-white shadow-xs">
               <Calendar size={16} />
             </div>
-            <div>
-              <div className="flex items-center gap-1.5">
-                <h2 className="text-sm font-extrabold text-slate-800 dark:text-slate-100">نوبت‌های امروز</h2>
-                <span className="text-xs font-bold text-primary-700 dark:text-primary-300 bg-primary-50 dark:bg-primary-950/40 border border-primary-200 dark:border-primary-800 rounded-full px-2 py-0.5">
-                  {toPersianDigits(todayAppointments.length)} نوبت
-                </span>
-              </div>
-              <p className="text-[11px] text-slate-500 dark:text-slate-400">
-                {todayAppointments.filter(a => a.status === 'in_chair').length > 0 && (
-                  <span className="text-amber-600 dark:text-amber-400 font-bold ml-1.5">
-                    {toPersianDigits(todayAppointments.filter(a => a.status === 'in_chair').length)} روی صندلی
-                  </span>
-                )}
-                {todayAppointments.filter(a => a.status === 'scheduled' || a.status === 'confirmed').length > 0 && (
-                  <span className="text-sky-600 dark:text-sky-400 font-bold ml-1.5">
-                    {toPersianDigits(todayAppointments.filter(a => a.status === 'scheduled' || a.status === 'confirmed').length)} در انتظار
-                  </span>
-                )}
-                {todayAppointments.filter(a => a.status === 'completed').length > 0 && (
-                  <span className="text-emerald-600 dark:text-emerald-400 font-bold">
-                    {toPersianDigits(todayAppointments.filter(a => a.status === 'completed').length)} تکمیل شده
-                  </span>
-                )}
-              </p>
-            </div>
-          </div>
-
-          <div className="flex items-center gap-2 shrink-0">
+            نوبت‌های امروز
+            {todayAppointments.length > 0 && (
+              <span className="text-xs font-bold text-primary-600 dark:text-primary-400 bg-primary-100 dark:bg-primary-900/30 rounded-full px-2 py-0.5">
+                {toPersianDigits(todayAppointments.length)}
+              </span>
+            )}
+          </h2>
+          <div className="flex items-center gap-2">
             <button
-              type="button"
-              onClick={(e) => { e.stopPropagation(); handleExportAppointments() }}
-              aria-label="خروجی CSV"
-              className="text-xs text-slate-400 hover:text-primary-500 font-medium hidden sm:flex items-center gap-1"
+              onClick={handleExportAppointments}
+              aria-label="خروجی CSV نوبت‌ها"
+              className="flex items-center gap-1 text-xs text-slate-500 dark:text-slate-400 hover:text-primary-600 dark:hover:text-primary-400 font-medium"
             >
-              <Download size={13} />
+              <Download size={14} />
               CSV
             </button>
             <button
-              type="button"
-              onClick={(e) => { e.stopPropagation(); navigate('/appointments') }}
-              className="text-xs text-primary-600 dark:text-primary-400 hover:text-primary-700 font-bold flex items-center gap-0.5 px-2 py-1 rounded-lg bg-primary-50 dark:bg-primary-950/40"
+              onClick={() => { h.tap(); navigate('/appointments') }}
+              className="text-xs text-primary-600 dark:text-primary-400 hover:text-primary-700 flex items-center gap-1 font-medium"
             >
-              <span>تقویم</span>
-              <ArrowLeft size={13} />
+              مشاهده همه
+              <ArrowLeft size={14} />
             </button>
-            <div className={`w-7 h-7 rounded-lg bg-slate-100 dark:bg-slate-700 flex items-center justify-center text-slate-500 dark:text-slate-400 transition-transform duration-200 ${todayApptsExpanded ? 'rotate-180' : ''}`}>
-              <ChevronDown size={16} />
-            </div>
           </div>
         </div>
 
-        {todayApptsExpanded && (
-          <div className="mt-3 pt-3 border-t border-slate-100 dark:border-slate-700/60 animate-in fade-in duration-200">
-            {todayAppointments.length === 0 ? (
-              <EmptyState
-                icon={<Calendar size={28} />}
-                title="نوبتی برای امروز ثبت نشده است"
-                description="می‌توانید نوبت جدید ایجاد کنید"
+        {todayAppointments.length === 0 ? (
+          <EmptyState
+            icon={<Calendar size={28} />}
+            title="نوبتی برای امروز ثبت نشده است"
+            description="می‌توانید نوبت جدید ایجاد کنید"
+          />
+        ) : (
+          <div className="space-y-2 max-h-[380px] overflow-y-auto pr-1 -mr-1">
+            {todayAppointments.map((a, i) => (
+              <AppointmentRow
+                key={a.id}
+                apt={a}
+                index={i}
+                patientName={patientName}
+                doctorName={doctorName}
+                onClick={() => navigate(`/patients/${a.patient_id}`)}
               />
-            ) : (
-              <div className="space-y-1.5 max-h-[280px] overflow-y-auto pr-1 -mr-1">
-                {todayAppointments.map((a, i) => (
-                  <AppointmentRow
-                    key={a.id}
-                    apt={a}
-                    index={i}
-                    patientName={patientName}
-                    doctorName={doctorName}
-                    onClick={() => navigate(`/patients/${a.patient_id}`)}
-                  />
-                ))}
-              </div>
-            )}
+            ))}
           </div>
         )}
       </Card>
@@ -1491,105 +1474,114 @@ export default function Dashboard() {
       {/* ═══ Tab 1: هشدارهای کلینیک و یادآوری‌ها ══════════════════════════ */}
       {hubTab === 'alerts' && (
         <div className="space-y-3.5 animate-in fade-in duration-200">
-          {/* Operational Action Rail (Permanently Visible) */}
-          <div>
-            <div className="flex items-center justify-between mb-1.5">
-              <span className="text-[11px] font-bold text-slate-400 dark:text-slate-500">کپسول‌های اقدام و پایش عملیاتی</span>
+          {/* Alert Widgets */}
+          {(outstandingBalance > 0 ||
+            lowInventoryCount > 0 ||
+            expiredInventoryCount > 0 ||
+            overdueLabCount > 0 ||
+            readyLabCount > 0 ||
+            waitingListCount > 0 ||
+            smartReminders.cheque_due.length > 0 ||
+            smartReminders.installment_due.length > 0 ||
+            smartReminders.implant_stage_due.length > 0) && (
+            <div>
+              <div className="flex items-center justify-between mb-1.5">
+                <span className="text-[11px] font-bold text-slate-400 dark:text-slate-500">کپسول‌های اقدام سریع</span>
+              </div>
+              <div className="flex items-center gap-2.5 overflow-x-auto pb-1.5 no-scrollbar -mx-4 px-4 sm:mx-0 sm:px-0 sm:grid sm:grid-cols-3 lg:grid-cols-4">
+                {smartReminders.cheque_due.length > 0 && (
+                  <AlertWidget
+                    icon={<div className="w-full h-full rounded-xl bg-orange-100 dark:bg-orange-900/40 flex items-center justify-center text-orange-600 dark:text-orange-400"><Banknote size={20} /></div>}
+                    label="چک‌های سررسید و برگشتی"
+                    value={`${toPersianDigits(smartReminders.cheque_due.length)} فقره`}
+                    color="border-orange-200 dark:border-orange-700 bg-orange-50 dark:bg-orange-900/20 text-orange-800 dark:text-orange-300"
+                    onClick={() => navigate('/billing')}
+                    delay={440}
+                  />
+                )}
+                {smartReminders.installment_due.length > 0 && (
+                  <AlertWidget
+                    icon={<div className="w-full h-full rounded-xl bg-violet-100 dark:bg-violet-900/40 flex items-center justify-center text-violet-600 dark:text-violet-400"><CalendarClock size={20} /></div>}
+                    label="اقساط سررسید شده"
+                    value={`${toPersianDigits(smartReminders.installment_due.length)} قسط`}
+                    color="border-violet-200 dark:border-violet-700 bg-violet-50 dark:bg-violet-900/20 text-violet-800 dark:text-violet-300"
+                    onClick={() => navigate('/billing')}
+                    delay={480}
+                  />
+                )}
+                {smartReminders.implant_stage_due.length > 0 && (
+                  <AlertWidget
+                    icon={<div className="w-full h-full rounded-xl bg-sky-100 dark:bg-sky-900/40 flex items-center justify-center text-sky-600 dark:text-sky-400"><Activity size={20} /></div>}
+                    label="ایمپلنت‌های آماده اقدام"
+                    value={`${toPersianDigits(smartReminders.implant_stage_due.length)} مورد`}
+                    color="border-sky-200 dark:border-sky-700 bg-sky-50 dark:bg-sky-900/20 text-sky-800 dark:text-sky-300"
+                    onClick={() => navigate('/implants')}
+                    delay={520}
+                  />
+                )}
+                {outstandingBalance > 0 && (
+                  <AlertWidget
+                    icon={<div className="w-full h-full rounded-xl bg-warning-100 dark:bg-warning-900/40 flex items-center justify-center text-warning-600 dark:text-warning-400"><Wallet size={20} /></div>}
+                    label="مانده بدهی بیماران"
+                    value={`${formatCurrency(outstandingBalance)} ت`}
+                    color="border-warning-200 dark:border-warning-700 bg-warning-50 dark:bg-warning-900/20 text-warning-800 dark:text-warning-300"
+                    onClick={() => navigate('/billing')}
+                    delay={560}
+                  />
+                )}
+                {lowInventoryCount > 0 && (
+                  <AlertWidget
+                    icon={<div className="w-full h-full rounded-xl bg-error-100 dark:bg-error-900/40 flex items-center justify-center text-error-600 dark:text-error-400"><Package size={20} /></div>}
+                    label="موجودی رو به اتمام"
+                    value={`${toPersianDigits(lowInventoryCount)} مورد`}
+                    color="border-error-200 dark:border-error-700 bg-error-50 dark:bg-error-900/20 text-error-800 dark:text-error-300"
+                    onClick={() => navigate('/inventory')}
+                    delay={600}
+                  />
+                )}
+                {expiredInventoryCount > 0 && (
+                  <AlertWidget
+                    icon={<div className="w-full h-full rounded-xl bg-rose-100 dark:bg-rose-900/40 flex items-center justify-center text-rose-600 dark:text-rose-400"><Clock size={20} /></div>}
+                    label="کالای تاریخ‌گذشته"
+                    value={`${toPersianDigits(expiredInventoryCount)} مورد`}
+                    color="border-rose-200 dark:border-rose-700 bg-rose-50 dark:bg-rose-900/20 text-rose-800 dark:text-rose-300"
+                    onClick={() => navigate('/inventory')}
+                    delay={620}
+                  />
+                )}
+                {overdueLabCount > 0 && (
+                  <AlertWidget
+                    icon={<div className="w-full h-full rounded-xl bg-error-100 dark:bg-error-900/40 flex items-center justify-center text-error-600 dark:text-error-400"><AlertTriangle size={20} /></div>}
+                    label="سفارش تأخیر یافته"
+                    value={`${toPersianDigits(overdueLabCount)} مورد`}
+                    color="border-error-200 dark:border-error-700 bg-error-50 dark:bg-error-900/20 text-error-800 dark:text-error-300"
+                    onClick={() => navigate('/laboratory')}
+                    delay={640}
+                  />
+                )}
+                {readyLabCount > 0 && (
+                  <AlertWidget
+                    icon={<div className="w-full h-full rounded-xl bg-emerald-100 dark:bg-emerald-900/40 flex items-center justify-center text-emerald-600 dark:text-emerald-400"><FlaskConical size={20} /></div>}
+                    label="لابراتوار آماده تحویل"
+                    value={`${toPersianDigits(readyLabCount)} مورد`}
+                    color="border-emerald-200 dark:border-emerald-700 bg-emerald-50 dark:bg-emerald-900/20 text-emerald-800 dark:text-emerald-300"
+                    onClick={() => navigate('/laboratory')}
+                    delay={660}
+                  />
+                )}
+                {waitingListCount > 0 && (
+                  <AlertWidget
+                    icon={<div className="w-full h-full rounded-xl bg-primary-100 dark:bg-primary-900/40 flex items-center justify-center text-primary-600 dark:text-primary-400"><ClipboardList size={20} /></div>}
+                    label="لیست انتظار"
+                    value={`${toPersianDigits(waitingListCount)} نفر`}
+                    color="border-primary-200 dark:border-primary-700 bg-primary-50 dark:bg-primary-900/20 text-primary-800 dark:text-primary-300"
+                    onClick={() => navigate('/waiting-list')}
+                    delay={680}
+                  />
+                )}
+              </div>
             </div>
-            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2">
-              {/* 1. چک‌های سررسید و برگشتی */}
-              <AlertWidget
-                icon={<div className="w-full h-full rounded-xl bg-orange-100 dark:bg-orange-900/40 flex items-center justify-center text-orange-600 dark:text-orange-400"><Banknote size={20} /></div>}
-                label="چک‌های سررسید و برگشتی"
-                value={smartReminders.cheque_due.length > 0 ? `${toPersianDigits(smartReminders.cheque_due.length)} فقره` : '۰ فقره'}
-                color={smartReminders.cheque_due.length > 0 ? "border-orange-200 dark:border-orange-700 bg-orange-50 dark:bg-orange-900/20 text-orange-800 dark:text-orange-300" : "border-slate-200 dark:border-slate-700/60 bg-white/70 dark:bg-slate-800/40 text-slate-600 dark:text-slate-400"}
-                onClick={() => setDrillDown('cheques')}
-                delay={440}
-              />
-
-              {/* 2. ایمپلنت‌های آماده اقدام */}
-              <AlertWidget
-                icon={<div className="w-full h-full rounded-xl bg-sky-100 dark:bg-sky-900/40 flex items-center justify-center text-sky-600 dark:text-sky-400"><Activity size={20} /></div>}
-                label="ایمپلنت‌های آماده اقدام"
-                value={smartReminders.implant_stage_due.length > 0 ? `${toPersianDigits(smartReminders.implant_stage_due.length)} مورد` : '۰ مورد'}
-                color={smartReminders.implant_stage_due.length > 0 ? "border-sky-200 dark:border-sky-700 bg-sky-50 dark:bg-sky-900/20 text-sky-800 dark:text-sky-300" : "border-slate-200 dark:border-slate-700/60 bg-white/70 dark:bg-slate-800/40 text-slate-600 dark:text-slate-400"}
-                onClick={() => setDrillDown('implants')}
-                delay={480}
-              />
-
-              {/* 3. مانده بدهی بیماران */}
-              <AlertWidget
-                icon={<div className="w-full h-full rounded-xl bg-warning-100 dark:bg-warning-900/40 flex items-center justify-center text-warning-600 dark:text-warning-400"><Wallet size={20} /></div>}
-                label="مانده بدهی بیماران"
-                value={outstandingBalance > 0 ? `${formatCurrency(outstandingBalance)} ت` : 'تسویه کامل'}
-                color={outstandingBalance > 0 ? "border-warning-200 dark:border-warning-700 bg-warning-50 dark:bg-warning-900/20 text-warning-800 dark:text-warning-300" : "border-slate-200 dark:border-slate-700/60 bg-white/70 dark:bg-slate-800/40 text-slate-600 dark:text-slate-400"}
-                onClick={() => setDrillDown('debtors')}
-                delay={520}
-              />
-
-              {/* 4. سفارش تأخیر یافته */}
-              <AlertWidget
-                icon={<div className="w-full h-full rounded-xl bg-error-100 dark:bg-error-900/40 flex items-center justify-center text-error-600 dark:text-error-400"><AlertTriangle size={20} /></div>}
-                label="سفارش تأخیر یافته"
-                value={overdueLabCount > 0 ? `${toPersianDigits(overdueLabCount)} مورد` : 'بدون تأخیر'}
-                color={overdueLabCount > 0 ? "border-error-200 dark:border-error-700 bg-error-50 dark:bg-error-900/20 text-error-800 dark:text-error-300" : "border-slate-200 dark:border-slate-700/60 bg-white/70 dark:bg-slate-800/40 text-slate-600 dark:text-slate-400"}
-                onClick={() => setDrillDown('overdue_lab')}
-                delay={560}
-              />
-
-              {/* 5. لابراتوار آماده تحویل */}
-              <AlertWidget
-                icon={<div className="w-full h-full rounded-xl bg-emerald-100 dark:bg-emerald-900/40 flex items-center justify-center text-emerald-600 dark:text-emerald-400"><FlaskConical size={20} /></div>}
-                label="لابراتوار آماده تحویل"
-                value={readyLabCount > 0 ? `${toPersianDigits(readyLabCount)} مورد` : '۰ مورد'}
-                color={readyLabCount > 0 ? "border-emerald-200 dark:border-emerald-700 bg-emerald-50 dark:bg-emerald-900/20 text-emerald-800 dark:text-emerald-300" : "border-slate-200 dark:border-slate-700/60 bg-white/70 dark:bg-slate-800/40 text-slate-600 dark:text-slate-400"}
-                onClick={() => setDrillDown('ready_lab')}
-                delay={600}
-              />
-
-              {/* 6. اقساط سررسید شده */}
-              <AlertWidget
-                icon={<div className="w-full h-full rounded-xl bg-violet-100 dark:bg-violet-900/40 flex items-center justify-center text-violet-600 dark:text-violet-400"><CalendarClock size={20} /></div>}
-                label="اقساط سررسید شده"
-                value={smartReminders.installment_due.length > 0 ? `${toPersianDigits(smartReminders.installment_due.length)} قسط` : '۰ قسط'}
-                color={smartReminders.installment_due.length > 0 ? "border-violet-200 dark:border-violet-700 bg-violet-50 dark:bg-violet-900/20 text-violet-800 dark:text-violet-300" : "border-slate-200 dark:border-slate-700/60 bg-white/70 dark:bg-slate-800/40 text-slate-600 dark:text-slate-400"}
-                onClick={() => setDrillDown('installments')}
-                delay={640}
-              />
-
-              {/* Secondary alerts if active */}
-              {lowInventoryCount > 0 && (
-                <AlertWidget
-                  icon={<div className="w-full h-full rounded-xl bg-amber-100 dark:bg-amber-900/40 flex items-center justify-center text-amber-600 dark:text-amber-400"><Package size={20} /></div>}
-                  label="موجودی رو به اتمام"
-                  value={`${toPersianDigits(lowInventoryCount)} مورد`}
-                  color="border-amber-200 dark:border-amber-700 bg-amber-50 dark:bg-amber-900/20 text-amber-800 dark:text-amber-300"
-                  onClick={() => navigate('/inventory')}
-                  delay={680}
-                />
-              )}
-              {expiredInventoryCount > 0 && (
-                <AlertWidget
-                  icon={<div className="w-full h-full rounded-xl bg-rose-100 dark:bg-rose-900/40 flex items-center justify-center text-rose-600 dark:text-rose-400"><Clock size={20} /></div>}
-                  label="کالای تاریخ‌گذشته"
-                  value={`${toPersianDigits(expiredInventoryCount)} مورد`}
-                  color="border-rose-200 dark:border-rose-700 bg-rose-50 dark:bg-rose-900/20 text-rose-800 dark:text-rose-300"
-                  onClick={() => navigate('/inventory')}
-                  delay={700}
-                />
-              )}
-              {waitingListCount > 0 && (
-                <AlertWidget
-                  icon={<div className="w-full h-full rounded-xl bg-primary-100 dark:bg-primary-900/40 flex items-center justify-center text-primary-600 dark:text-primary-400"><ClipboardList size={20} /></div>}
-                  label="لیست انتظار"
-                  value={`${toPersianDigits(waitingListCount)} نفر`}
-                  color="border-primary-200 dark:border-primary-700 bg-primary-50 dark:bg-primary-900/20 text-primary-800 dark:text-primary-300"
-                  onClick={() => navigate('/waiting-list')}
-                  delay={720}
-                />
-              )}
-            </div>
-          </div>
+          )}
 
           {/* Clinical follow-ups */}
           {clinicalFollowUps.visible.length > 0 && (
@@ -1649,109 +1641,83 @@ export default function Dashboard() {
             smartReminders.no_show.length +
             smartReminders.unfinished_treatment.length +
             smartReminders.unresolved_appointment.length) > 0 && (
-            <Card className="p-3.5 sm:p-4 tile-in relative overflow-hidden bg-white/95 dark:bg-slate-800/95 shadow-xs border border-slate-200/60 dark:border-slate-700/60">
-              <div
-                onClick={() => { h.tap(); setRemindersExpanded(!remindersExpanded) }}
-                className="flex items-center justify-between cursor-pointer select-none"
-              >
-                <div className="flex items-center gap-2 min-w-0">
-                  <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-amber-400 to-orange-500 flex items-center justify-center text-white shadow-xs shrink-0">
+            <Card className="p-4 tile-in">
+              <div className="flex items-center justify-between mb-3">
+                <h2 className="text-base font-bold text-slate-800 dark:text-slate-100 flex items-center gap-2">
+                  <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-amber-400 to-orange-500 flex items-center justify-center text-white">
                     <Bell size={16} />
                   </div>
-                  <div>
-                    <h2 className="text-sm font-extrabold text-slate-800 dark:text-slate-100 flex items-center gap-1.5">
-                      یادآوری‌ها و پیگیری بیماران
-                      <Badge color="warning">{toPersianDigits(
-                        smartReminders.birthday.length +
-                        smartReminders.debtor.length +
-                        smartReminders.lapsed.length +
-                        smartReminders.installment_due.length +
-                        smartReminders.cheque_due.length +
-                        smartReminders.implant_stage_due.length +
-                        smartReminders.lab_overdue.length +
-                        smartReminders.no_show.length +
-                        smartReminders.unfinished_treatment.length +
-                        smartReminders.unresolved_appointment.length
-                      )}</Badge>
-                    </h2>
-                    <p className="text-[11px] text-slate-500 dark:text-slate-400">ارسال پیامک و واتس‌اپ یادآوری نوبت و وضعیت (کلیک برای باز شدن)</p>
-                  </div>
-                </div>
-                <div className={`w-7 h-7 rounded-lg bg-slate-100 dark:bg-slate-700 flex items-center justify-center text-slate-500 dark:text-slate-400 transition-transform duration-200 ${remindersExpanded ? 'rotate-180' : ''}`}>
-                  <ChevronDown size={16} />
-                </div>
+                  یادآوری‌ها و پیگیری بیماران
+                </h2>
               </div>
-
-              {remindersExpanded && (
-                <div className="space-y-4 mt-3 pt-3 border-t border-slate-100 dark:border-slate-700 animate-in fade-in duration-200">
-                  {(Object.keys(REMINDER_CATEGORY_META) as (keyof typeof REMINDER_CATEGORY_META)[]).map((cat) => {
-                    const items = smartReminders[cat] as SmartReminder[] | undefined
-                    if (!items || items.length === 0) return null
-                    const meta = REMINDER_CATEGORY_META[cat]
-                    return (
-                      <div key={cat}>
-                        <div className="flex items-center gap-2 mb-2">
-                          <span className="text-base">{meta.icon}</span>
-                          <h3 className="text-xs font-bold text-slate-600 dark:text-slate-300">{meta.label}</h3>
-                          <Badge color="slate">{toPersianDigits(items.length)}</Badge>
-                        </div>
-                        <div className="space-y-1.5 max-h-[220px] overflow-y-auto pr-1 -mr-1">
-                          {items.slice(0, 10).map((r: SmartReminder) => {
-                            const key = r.id || r.patient.id + r.category
-                            return (
-                              <div
-                                key={key}
-                                className="flex items-center gap-2.5 p-2.5 rounded-xl bg-slate-50 dark:bg-slate-800/60 hover:bg-slate-100 dark:hover:bg-slate-800 transition-all-smooth cursor-pointer"
-                                onClick={() => {
-                                  if (r.actionPath) navigate(r.actionPath)
-                                  else if (cat === 'unresolved_appointment') navigate('/appointments')
-                                  else navigate(`/patients/${r.patient.id}`)
-                                }}
-                              >
-                                <div className="w-8 h-8 rounded-full flex items-center justify-center text-white text-xs font-bold shrink-0" style={{ background: meta.color }}>
-                                  {r.patient.first_name[0]}
-                                </div>
-                                <div className="flex-1 min-w-0">
-                                  <p className="text-sm font-semibold text-slate-800 dark:text-slate-100 truncate">{r.title}</p>
-                                  <p className="text-[11px] text-slate-500 dark:text-slate-400 truncate">{r.detail}</p>
-                                </div>
-                                <div className="flex items-center gap-1.5 shrink-0">
-                                  {r.patient.phone && (
-                                    <a
-                                      href={`https://wa.me/${r.patient.phone.replace(/\D/g, '').replace(/^0/, '98')}?text=${encodeURIComponent(r.smsMessage || `سلام ${r.patient.first_name} عزیز، یادآوری از کلینیک دندانپزشکی مینا: ${r.detail}`)}`}
-                                      target="_blank"
-                                      rel="noopener noreferrer"
-                                      onClick={(e) => e.stopPropagation()}
-                                      className="px-2 py-1.5 rounded-lg bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-400 text-[11px] font-semibold hover:bg-emerald-100 dark:hover:bg-emerald-900/60 transition-all-smooth press-scale flex items-center gap-1"
-                                      title="ارسال پیام واتس‌اپ"
-                                    >
-                                      <MessageSquare size={11} />
-                                      <span>واتس‌اپ</span>
-                                    </a>
-                                  )}
-                                  {r.smsMessage ? (
-                                    <button
-                                      onClick={(e) => { e.stopPropagation(); handleSendReminderSms(r) }}
-                                      disabled={sendingReminderId === key}
-                                      className="px-2.5 py-1.5 rounded-lg bg-primary-50 dark:bg-primary-900/30 text-primary-700 dark:text-primary-400 text-[11px] font-semibold hover:bg-primary-100 dark:hover:bg-primary-900/50 transition-all-smooth press-scale disabled:opacity-50"
-                                    >
-                                      {sendingReminderId === key ? '...' : 'ارسال پیامک'}
-                                    </button>
-                                  ) : (
-                                    <span className="px-2.5 py-1.5 rounded-lg bg-slate-100 dark:bg-slate-700 text-slate-500 dark:text-slate-400 text-[11px] font-semibold">
-                                      بستن وضعیت
-                                    </span>
-                                  )}
-                                </div>
-                              </div>
-                            )
-                          })}
-                        </div>
+              <div className="space-y-4">
+                {(Object.keys(REMINDER_CATEGORY_META) as (keyof typeof REMINDER_CATEGORY_META)[]).map((cat) => {
+                  const items = smartReminders[cat] as SmartReminder[] | undefined
+                  if (!items || items.length === 0) return null
+                  const meta = REMINDER_CATEGORY_META[cat]
+                  return (
+                    <div key={cat}>
+                      <div className="flex items-center gap-2 mb-2">
+                        <span className="text-base">{meta.icon}</span>
+                        <h3 className="text-xs font-bold text-slate-600 dark:text-slate-300">{meta.label}</h3>
+                        <Badge color="slate">{toPersianDigits(items.length)}</Badge>
                       </div>
-                    )
-                  })}
-                </div>
-              )}
+                      <div className="space-y-1.5 max-h-[220px] overflow-y-auto pr-1 -mr-1">
+                        {items.slice(0, 10).map((r: SmartReminder) => {
+                          const key = r.id || r.patient.id + r.category
+                          return (
+                            <div
+                              key={key}
+                              className="flex items-center gap-2.5 p-2.5 rounded-xl bg-slate-50 dark:bg-slate-800/60 hover:bg-slate-100 dark:hover:bg-slate-800 transition-all-smooth cursor-pointer"
+                              onClick={() => {
+                                if (r.actionPath) navigate(r.actionPath)
+                                else if (cat === 'unresolved_appointment') navigate('/appointments')
+                                else navigate(`/patients/${r.patient.id}`)
+                              }}
+                            >
+                              <div className="w-8 h-8 rounded-full flex items-center justify-center text-white text-xs font-bold shrink-0" style={{ background: meta.color }}>
+                                {r.patient.first_name[0]}
+                              </div>
+                              <div className="flex-1 min-w-0">
+                                <p className="text-sm font-semibold text-slate-800 dark:text-slate-100 truncate">{r.title}</p>
+                                <p className="text-[11px] text-slate-500 dark:text-slate-400 truncate">{r.detail}</p>
+                              </div>
+                              <div className="flex items-center gap-1.5 shrink-0">
+                                {r.patient.phone && (
+                                  <a
+                                    href={`https://wa.me/${r.patient.phone.replace(/\D/g, '').replace(/^0/, '98')}?text=${encodeURIComponent(r.smsMessage || `سلام ${r.patient.first_name} عزیز، یادآوری از کلینیک دندانپزشکی مینا: ${r.detail}`)}`}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    onClick={(e) => e.stopPropagation()}
+                                    className="px-2 py-1.5 rounded-lg bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-400 text-[11px] font-semibold hover:bg-emerald-100 dark:hover:bg-emerald-900/60 transition-all-smooth press-scale flex items-center gap-1"
+                                    title="ارسال پیام واتس‌اپ"
+                                  >
+                                    <MessageSquare size={11} />
+                                    <span>واتس‌اپ</span>
+                                  </a>
+                                )}
+                                {r.smsMessage ? (
+                                  <button
+                                    onClick={(e) => { e.stopPropagation(); handleSendReminderSms(r) }}
+                                    disabled={sendingReminderId === key}
+                                    className="px-2.5 py-1.5 rounded-lg bg-primary-50 dark:bg-primary-900/30 text-primary-700 dark:text-primary-400 text-[11px] font-semibold hover:bg-primary-100 dark:hover:bg-primary-900/50 transition-all-smooth press-scale disabled:opacity-50"
+                                  >
+                                    {sendingReminderId === key ? '...' : 'ارسال پیامک'}
+                                  </button>
+                                ) : (
+                                  <span className="px-2.5 py-1.5 rounded-lg bg-slate-100 dark:bg-slate-700 text-slate-500 dark:text-slate-400 text-[11px] font-semibold">
+                                    بستن وضعیت
+                                  </span>
+                                )}
+                              </div>
+                            </div>
+                          )
+                        })}
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
             </Card>
           )}
 
@@ -2009,17 +1975,11 @@ export default function Dashboard() {
       <Modal
         open={drillDown !== null}
         onClose={() => setDrillDown(null)}
-        size="lg"
+        size="md"
         title={
           drillDown === 'patients' ? 'بیماران این دوره' :
           drillDown === 'appointments' ? 'نوبت‌های این دوره' :
           drillDown === 'revenue' ? 'پرداخت‌های اخیر' :
-          drillDown === 'cheques' ? 'چک‌های سررسید و برگشتی' :
-          drillDown === 'implants' ? 'ایمپلنت‌های آماده اقدام بعدی' :
-          drillDown === 'debtors' ? 'مانده بدهی بیماران' :
-          drillDown === 'ready_lab' ? 'سفارش‌های لابراتوار آماده تحویل' :
-          drillDown === 'overdue_lab' ? 'سفارش‌های تأخیر یافته لابراتوار' :
-          drillDown === 'installments' ? 'اقساط سررسید شده' :
           'سفارش‌های لابراتوار فعال'
         }
       >
@@ -2074,265 +2034,15 @@ export default function Dashboard() {
             </div>
           )
         )}
-
-        {/* ═══ Drill-down: چک‌های سررسید و برگشتی ═══ */}
-        {drillDown === 'cheques' && (
-          smartReminders.cheque_due.length === 0 ? (
-            <div className="text-center py-8">
-              <CheckCircle2 size={36} className="text-emerald-500 mx-auto mb-2" />
-              <p className="text-sm font-bold text-slate-700 dark:text-slate-200">وضعیت چک‌ها به‌روز است</p>
-              <p className="text-xs text-slate-400 mt-1">هیچ چک سررسید شده یا برگشتی معوقی در سیستم ثبت نشده است.</p>
-            </div>
-          ) : (
-            <div className="space-y-2 max-h-[60vh] overflow-y-auto pr-0.5">
-              {smartReminders.cheque_due.map((r, idx) => (
-                <div
-                  key={r.id || idx}
-                  onClick={() => { setDrillDown(null); navigate(r.actionPath || '/billing') }}
-                  className="p-3 rounded-2xl bg-slate-50 dark:bg-slate-800/70 border border-slate-100 dark:border-slate-700/60 hover:bg-slate-100 dark:hover:bg-slate-800 transition-all cursor-pointer flex items-center justify-between gap-3"
-                >
-                  <div className="flex items-center gap-3 min-w-0">
-                    <div className="w-10 h-10 rounded-xl bg-orange-100 dark:bg-orange-900/40 text-orange-600 dark:text-orange-400 flex items-center justify-center shrink-0">
-                      <Banknote size={20} />
-                    </div>
-                    <div className="min-w-0">
-                      <p className="text-sm font-bold text-slate-800 dark:text-slate-100 truncate">{r.patient.first_name} {r.patient.last_name}</p>
-                      <p className="text-xs text-slate-500 dark:text-slate-400 truncate">{r.extraInfo || r.detail}</p>
-                      {r.dueDate && <p className="text-[11px] text-orange-600 dark:text-orange-400 font-medium mt-0.5">سررسید: {toJalaliStringPretty(r.dueDate)}</p>}
-                    </div>
-                  </div>
-                  <div className="text-left shrink-0">
-                    <span className="inline-block px-2.5 py-1 rounded-lg text-xs font-extrabold bg-orange-100 dark:bg-orange-900/30 text-orange-700 dark:text-orange-300">
-                      اقدام مالی
-                    </span>
-                  </div>
-                </div>
-              ))}
-            </div>
-          )
-        )}
-
-        {/* ═══ Drill-down: ایمپلنت‌های آماده اقدام بعدی ═══ */}
-        {drillDown === 'implants' && (
-          smartReminders.implant_stage_due.length === 0 ? (
-            <div className="text-center py-8">
-              <CheckCircle2 size={36} className="text-sky-500 mx-auto mb-2" />
-              <p className="text-sm font-bold text-slate-700 dark:text-slate-200">وضعیت ایمپلنت‌ها پایدار است</p>
-              <p className="text-xs text-slate-400 mt-1">هیچ ایمپلنتی در وضعیت معوق یا منتظر اقدام فوری قرار ندارد.</p>
-            </div>
-          ) : (
-            <div className="space-y-2 max-h-[60vh] overflow-y-auto pr-0.5">
-              {smartReminders.implant_stage_due.map((r, idx) => (
-                <div
-                  key={r.id || idx}
-                  onClick={() => { setDrillDown(null); navigate(r.actionPath || '/implants') }}
-                  className="p-3 rounded-2xl bg-slate-50 dark:bg-slate-800/70 border border-slate-100 dark:border-slate-700/60 hover:bg-slate-100 dark:hover:bg-slate-800 transition-all cursor-pointer flex items-center justify-between gap-3"
-                >
-                  <div className="flex items-center gap-3 min-w-0">
-                    <div className="w-10 h-10 rounded-xl bg-sky-100 dark:bg-sky-900/40 text-sky-600 dark:text-sky-400 flex items-center justify-center shrink-0">
-                      <Activity size={20} />
-                    </div>
-                    <div className="min-w-0">
-                      <p className="text-sm font-bold text-slate-800 dark:text-slate-100 truncate">{r.patient.first_name} {r.patient.last_name}</p>
-                      <p className="text-xs text-slate-600 dark:text-slate-300 font-medium truncate">{r.detail}</p>
-                      {r.extraInfo && <p className="text-[11px] text-slate-400 mt-0.5">{r.extraInfo}</p>}
-                    </div>
-                  </div>
-                  <div className="text-left shrink-0">
-                    <span className="inline-block px-2.5 py-1 rounded-lg text-xs font-bold bg-sky-100 dark:bg-sky-900/30 text-sky-700 dark:text-sky-300">
-                      پرونده
-                    </span>
-                  </div>
-                </div>
-              ))}
-            </div>
-          )
-        )}
-
-        {/* ═══ Drill-down: مانده بدهی بیماران ═══ */}
-        {drillDown === 'debtors' && (
-          smartReminders.debtor.length === 0 ? (
-            <div className="text-center py-8">
-              <CheckCircle2 size={36} className="text-emerald-500 mx-auto mb-2" />
-              <p className="text-sm font-bold text-slate-700 dark:text-slate-200">حساب‌ها تسویه است</p>
-              <p className="text-xs text-slate-400 mt-1">هیچ بیماری دارای مانده بدهی معوق بالای سقف تعیین‌شده نیست.</p>
-            </div>
-          ) : (
-            <div className="space-y-2 max-h-[60vh] overflow-y-auto pr-0.5">
-              {smartReminders.debtor.map((r, idx) => (
-                <div
-                  key={idx}
-                  onClick={() => { setDrillDown(null); navigate(`/patients/${r.patient.id}`) }}
-                  className="p-3 rounded-2xl bg-slate-50 dark:bg-slate-800/70 border border-slate-100 dark:border-slate-700/60 hover:bg-slate-100 dark:hover:bg-slate-800 transition-all cursor-pointer flex items-center justify-between gap-3"
-                >
-                  <div className="flex items-center gap-3 min-w-0">
-                    <div className="w-10 h-10 rounded-full bg-gradient-to-br from-amber-500 to-orange-600 text-white flex items-center justify-center font-bold text-sm shrink-0">
-                      {r.patient.first_name[0]}
-                    </div>
-                    <div className="min-w-0">
-                      <p className="text-sm font-bold text-slate-800 dark:text-slate-100 truncate">{r.patient.first_name} {r.patient.last_name}</p>
-                      <p className="text-xs text-slate-400 truncate">{r.patient.phone || 'بدون شماره'}</p>
-                    </div>
-                  </div>
-                  <div className="text-left shrink-0">
-                    <p className="text-sm font-extrabold text-amber-700 dark:text-amber-400">{formatCurrency(r.priority)} ت</p>
-                    <span className="text-[10px] text-slate-400">مشاهده پرونده</span>
-                  </div>
-                </div>
-              ))}
-            </div>
-          )
-        )}
-
-        {/* ═══ Drill-down: سفارش‌های آماده تحویل لابراتوار ═══ */}
-        {drillDown === 'ready_lab' && (
-          readyLabOrdersForDrill.length === 0 ? (
-            <div className="text-center py-8">
-              <CheckCircle2 size={36} className="text-emerald-500 mx-auto mb-2" />
-              <p className="text-sm font-bold text-slate-700 dark:text-slate-200">سفارش معطل‌مانده‌ای نیست</p>
-              <p className="text-xs text-slate-400 mt-1">تمامی کارهای لابراتوار به بیماران تحویل شده است.</p>
-            </div>
-          ) : (
-            <div className="space-y-2 max-h-[60vh] overflow-y-auto pr-0.5">
-              {readyLabOrdersForDrill.map((o) => {
-                const patient = patients.find((p) => p.id === o.patient_id)
-                const shelf = formatShelfLocation(o)
-                return (
-                  <div
-                    key={o.id}
-                    onClick={() => { setDrillDown(null); navigate('/laboratory') }}
-                    className="p-3 rounded-2xl bg-slate-50 dark:bg-slate-800/70 border border-slate-100 dark:border-slate-700/60 hover:bg-slate-100 dark:hover:bg-slate-800 transition-all cursor-pointer flex items-center justify-between gap-3"
-                  >
-                    <div className="flex items-center gap-3 min-w-0">
-                      <div className="w-10 h-10 rounded-xl bg-emerald-100 dark:bg-emerald-900/40 text-emerald-600 dark:text-emerald-400 flex items-center justify-center shrink-0">
-                        <FlaskConical size={20} />
-                      </div>
-                      <div className="min-w-0">
-                        <p className="text-sm font-bold text-slate-800 dark:text-slate-100 truncate">
-                          {patient ? `${patient.first_name} ${patient.last_name}` : 'بیمار'}
-                        </p>
-                        <p className="text-xs text-slate-600 dark:text-slate-300 truncate">
-                          {o.work_type || 'کار لابراتوار'}{o.tooth_number ? ` — دندان ${toothLabel(o.tooth_number)}` : ''}
-                        </p>
-                        {shelf && <p className="text-[11px] text-emerald-600 dark:text-emerald-400 font-medium mt-0.5">مکان قفسه: {shelf}</p>}
-                      </div>
-                    </div>
-                    <div className="text-left shrink-0">
-                      <span className="inline-block px-2.5 py-1 rounded-lg text-xs font-bold bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-300">
-                        آماده تحویل
-                      </span>
-                    </div>
-                  </div>
-                )
-              })}
-            </div>
-          )
-        )}
-
-        {/* ═══ Drill-down: سفارش‌های تأخیر یافته لابراتوار ═══ */}
-        {drillDown === 'overdue_lab' && (
-          overdueLabOrdersForDrill.length === 0 ? (
-            <div className="text-center py-8">
-              <CheckCircle2 size={36} className="text-emerald-500 mx-auto mb-2" />
-              <p className="text-sm font-bold text-slate-700 dark:text-slate-200">هیچ سفارش تأخیری وجود ندارد</p>
-              <p className="text-xs text-slate-400 mt-1">تمام سفارش‌های لابراتوار در موعد مقرر پیگیری شده‌اند.</p>
-            </div>
-          ) : (
-            <div className="space-y-2 max-h-[60vh] overflow-y-auto pr-0.5">
-              {overdueLabOrdersForDrill.map((o) => {
-                const patient = patients.find((p) => p.id === o.patient_id)
-                return (
-                  <div
-                    key={o.id}
-                    onClick={() => { setDrillDown(null); navigate('/laboratory') }}
-                    className="p-3 rounded-2xl bg-slate-50 dark:bg-slate-800/70 border border-slate-100 dark:border-slate-700/60 hover:bg-slate-100 dark:hover:bg-slate-800 transition-all cursor-pointer flex items-center justify-between gap-3"
-                  >
-                    <div className="flex items-center gap-3 min-w-0">
-                      <div className="w-10 h-10 rounded-xl bg-rose-100 dark:bg-rose-900/40 text-rose-600 dark:text-rose-400 flex items-center justify-center shrink-0">
-                        <AlertTriangle size={20} />
-                      </div>
-                      <div className="min-w-0">
-                        <p className="text-sm font-bold text-slate-800 dark:text-slate-100 truncate">
-                          {patient ? `${patient.first_name} ${patient.last_name}` : 'بیمار'}
-                        </p>
-                        <p className="text-xs text-slate-600 dark:text-slate-300 truncate">
-                          {o.work_type || 'کار لابراتوار'}{o.tooth_number ? ` — دندان ${toothLabel(o.tooth_number)}` : ''}
-                        </p>
-                        {o.deadline && <p className="text-[11px] text-rose-600 dark:text-rose-400 font-medium mt-0.5">موعد تحویل: {toJalaliStringPretty(o.deadline)}</p>}
-                      </div>
-                    </div>
-                    <div className="text-left shrink-0">
-                      <span className="inline-block px-2.5 py-1 rounded-lg text-xs font-bold bg-rose-100 dark:bg-rose-900/30 text-rose-700 dark:text-rose-300">
-                        تأخیر موعد
-                      </span>
-                    </div>
-                  </div>
-                )
-              })}
-            </div>
-          )
-        )}
-
-        {/* ═══ Drill-down: اقساط سررسید شده ═══ */}
-        {drillDown === 'installments' && (
-          smartReminders.installment_due.length === 0 ? (
-            <div className="text-center py-8">
-              <CheckCircle2 size={36} className="text-violet-500 mx-auto mb-2" />
-              <p className="text-sm font-bold text-slate-700 dark:text-slate-200">اقساط به‌روز هستند</p>
-              <p className="text-xs text-slate-400 mt-1">هیچ قسط سررسید شده پرداخت‌نشده‌ای در سیستم وجود ندارد.</p>
-            </div>
-          ) : (
-            <div className="space-y-2 max-h-[60vh] overflow-y-auto pr-0.5">
-              {smartReminders.installment_due.map((r, idx) => (
-                <div
-                  key={r.id || idx}
-                  onClick={() => { setDrillDown(null); navigate(r.actionPath || '/billing') }}
-                  className="p-3 rounded-2xl bg-slate-50 dark:bg-slate-800/70 border border-slate-100 dark:border-slate-700/60 hover:bg-slate-100 dark:hover:bg-slate-800 transition-all cursor-pointer flex items-center justify-between gap-3"
-                >
-                  <div className="flex items-center gap-3 min-w-0">
-                    <div className="w-10 h-10 rounded-xl bg-violet-100 dark:bg-violet-900/40 text-violet-600 dark:text-violet-400 flex items-center justify-center shrink-0">
-                      <CalendarClock size={20} />
-                    </div>
-                    <div className="min-w-0">
-                      <p className="text-sm font-bold text-slate-800 dark:text-slate-100 truncate">{r.patient.first_name} {r.patient.last_name}</p>
-                      <p className="text-xs text-slate-600 dark:text-slate-300 font-medium truncate">{r.detail}</p>
-                      {r.dueDate && <p className="text-[11px] text-violet-600 dark:text-violet-400 font-medium mt-0.5">سررسید: {toJalaliStringPretty(r.dueDate)}</p>}
-                    </div>
-                  </div>
-                  <div className="text-left shrink-0">
-                    <span className="inline-block px-2.5 py-1 rounded-lg text-xs font-bold bg-violet-100 dark:bg-violet-900/30 text-violet-700 dark:text-violet-300">
-                      تسویه قسط
-                    </span>
-                  </div>
-                </div>
-              ))}
-            </div>
-          )
-        )}
-
         <button
           onClick={() => {
-            const path =
-              drillDown === 'patients' ? '/patients' :
-              drillDown === 'appointments' ? '/appointments' :
-              drillDown === 'revenue' || drillDown === 'cheques' || drillDown === 'debtors' || drillDown === 'installments' ? '/billing' :
-              drillDown === 'implants' ? '/implants' :
-              '/laboratory'
+            const path = drillDown === 'patients' ? '/patients' : drillDown === 'appointments' ? '/appointments' : drillDown === 'revenue' ? '/billing' : '/laboratory'
             setDrillDown(null)
             navigate(path)
           }}
-          className="w-full mt-4 py-3 rounded-2xl bg-primary-700 hover:bg-primary-800 text-white text-sm font-bold shadow-sm transition-all-smooth press-scale"
+          className="w-full mt-3 py-2.5 rounded-xl bg-primary-50 dark:bg-primary-900/20 text-primary-700 dark:text-primary-400 text-sm font-bold hover:bg-primary-100 dark:hover:bg-primary-900/40 transition-all-smooth"
         >
-          {drillDown === 'patients' ? 'مشاهده همه‌ی بیماران' :
-           drillDown === 'appointments' ? 'مشاهده تقویم نوبت‌ها' :
-           drillDown === 'revenue' ? 'مشاهده تراکنش‌ها در امور مالی' :
-           drillDown === 'cheques' ? 'مدیریت چک‌ها در امور مالی' :
-           drillDown === 'implants' ? 'مشاهده کارتابل ایمپلنت' :
-           drillDown === 'debtors' ? 'مدیریت مطالبات در امور مالی' :
-           drillDown === 'installments' ? 'مدیریت اقساط در امور مالی' :
-           drillDown === 'ready_lab' ? 'مشاهده کارهای آماده در لابراتوار' :
-           drillDown === 'overdue_lab' ? 'پیگیری سفارش‌های تأخیری لابراتوار' :
-           'مشاهده کارتابل کامل لابراتوار'}
+          مشاهده همه
         </button>
       </Modal>
 

@@ -614,6 +614,36 @@ function LayoutInner({ children }: { children: React.ReactNode }) {
     }
   }, [])
 
+  // Immediate cloud pull on app foreground / screen unlock.
+  // This is the MOST IMPORTANT sync trigger for mobile:
+  // WebSocket may still be reconnecting when the user returns,
+  // but an HTTP pull from Supabase works immediately regardless.
+  // Result: staff unlock their phone and see the latest appointments
+  // from the laptop within 1-2 seconds, not after 15s polling.
+  useEffect(() => {
+    const onReturn = () => {
+      if (
+        typeof document !== 'undefined' &&
+        document.visibilityState === 'visible' &&
+        typeof navigator !== 'undefined' &&
+        navigator.onLine
+      ) {
+        syncNow().catch(() => {})
+      }
+    }
+    const onFocus = () => {
+      if (typeof navigator !== 'undefined' && navigator.onLine) {
+        syncNow().catch(() => {})
+      }
+    }
+    document.addEventListener('visibilitychange', onReturn)
+    window.addEventListener('focus', onFocus)
+    return () => {
+      document.removeEventListener('visibilitychange', onReturn)
+      window.removeEventListener('focus', onFocus)
+    }
+  }, [])
+
   // Load DB-backed RBAC overrides once on mount so canAccess() (used just
   // below, and in the nav-item filtering above) reflects any admin edits
   // instead of only the hardcoded ROLE_ACCESS fallback. Safe even before
@@ -639,31 +669,38 @@ function LayoutInner({ children }: { children: React.ReactNode }) {
         <div className="module-page-blob module-page-blob-3" />
         <div className="module-page-blob module-page-blob-4" />
       </div>
-      <header className="sticky top-0 z-40 glass dark:glass border-b border-white/60 dark:border-white/10">
-        <div className="flex items-center justify-between px-4 h-[56px]">
+      <header className="sticky top-0 z-40 glass dark:glass border-b border-white/60 dark:border-white/10 pt-safe transition-all-smooth">
+        <div className="flex items-center justify-between px-3.5 h-[56px] max-w-7xl mx-auto w-full">
           <button
             onClick={() => { h.tap(); navigate('/') }}
-            className="flex items-center gap-2.5 active:opacity-80 transition-opacity press-scale"
+            className="flex items-center gap-2 active:opacity-80 transition-opacity press-scale shrink-0"
           >
-            <MinadentLogo size={42} className="shrink-0" />
-            <div>
-              <p className="text-[15px] font-extrabold text-slate-800 dark:text-slate-100 leading-none">مینادنت <span className="text-[9px] font-normal text-slate-300 dark:text-slate-600 align-middle">v{APP_VERSION}</span></p>
+            <MinadentLogo size={38} className="shrink-0" />
+            <div className="text-right">
+              <p className="text-[14px] font-extrabold text-slate-800 dark:text-slate-100 leading-none">
+                مینادنت <span className="text-[9px] font-mono text-slate-400 dark:text-slate-500">v{APP_VERSION}</span>
+              </p>
               {currentItem && (
-                <p className="text-[10px] font-medium leading-none mt-0.5" style={{ color: currentItem.color }}>
+                <p className="text-[10px] font-semibold leading-none mt-1" style={{ color: currentItem.color }}>
                   {currentItem.label}
                 </p>
               )}
             </div>
           </button>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1.5 shrink-0">
+            {/* AI Assistant Button — Apple Intelligence Sparkle Trigger */}
             <button
-              onClick={() => { h.tap(); navigate('/roadmap') }}
-              aria-label="نقشه راه و مرکز هوشمندی"
-              title="نقشه راه و مرکز هوشمندی مینادنت"
-              className="flex items-center justify-center w-9 h-9 rounded-xl glass border border-white/60 dark:border-white/10 text-violet-600 dark:text-violet-400 hover:text-violet-800 dark:hover:text-violet-300 transition-all-smooth active:scale-90"
+              onClick={() => {
+                h.pop()
+                window.dispatchEvent(new CustomEvent('minadent-open-clinic-ai'))
+              }}
+              aria-label="دستیار هوشمند بالینی مینادنت"
+              title="دستیار هوشمند صوتی و متنی مینادنت"
+              className="relative flex items-center justify-center w-9 h-9 rounded-xl glass border border-sky-400/40 dark:border-sky-500/30 bg-sky-50/50 dark:bg-sky-950/30 text-sky-600 dark:text-sky-400 transition-all-smooth active:scale-90"
             >
-              <Compass size={17} />
+              <Sparkles size={17} className="animate-pulse text-sky-500" />
             </button>
+
             <HeaderAlarmButton onClick={() => setAlarmCenterOpen(true)} />
             <PrivacyModeToggle />
             <DarkModeToggle />

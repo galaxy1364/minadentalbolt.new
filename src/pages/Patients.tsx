@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
+import { useState, useEffect, useCallback, useMemo } from 'react'
 import { PatientDebtBar } from '../components/PatientDebtBar'
 import { useNavigate } from 'react-router-dom'
 import { Plus, Search, Edit2, Phone, Filter, Users, Award, AlertCircle, Smile, FileText, User, Heart, Shield, MapPin, Archive, Calendar, MessageSquare, Eye, EyeOff } from 'lucide-react'
@@ -85,23 +85,19 @@ export default function Patients() {
   const { confirmAction, close, ConfirmActionModal } = useConfirmAction()
   const { privacyMode, togglePrivacyMode, maskPhoneNumber, maskNationalId } = usePrivacyMode()
 
-  const hasLoadedRef = useRef(false)
-  const loadData = useCallback(async (silent = false) => {
-    if (!hasLoadedRef.current && !silent) {
-      setLoading(true)
-    }
+  const loadData = useCallback(async () => {
+    setLoading(true)
     try {
       const [pats, docs, pays, trts, implCases] = await Promise.all([fetchPatients(), fetchDoctors(), fetchPayments(), fetchTreatments(), fetchImplantCases()])
       setPatients(pats); setDoctors(docs); setPayments(pays); setTreatments(trts); setImplantCases(implCases)
-      hasLoadedRef.current = true
     } catch { showToast('error', 'خطا در بارگذاری بیماران') }
     finally { setLoading(false) }
   }, [])
 
   useEffect(() => { loadData() }, [loadData])
 
-  // Real-time automatic synchronization when patients/payments update on any device (silent update)
-  useDataRefresh(['patients', 'payments', 'treatments', 'implant_cases'], () => loadData(true))
+  // Real-time automatic synchronization when patients/payments update on any device
+  useDataRefresh(['patients', 'payments', 'treatments', 'implant_cases'], loadData)
 
   const patientFinances = useMemo(() => {
     const map = new Map<string, { balance: number; paid: number; totalCost: number }>()
@@ -360,7 +356,7 @@ export default function Patients() {
     })
   }
 
-  const ptr = usePullToRefresh(async () => { await loadData(true) })
+  const ptr = usePullToRefresh(async () => { await loadData() })
 
   if (loading) {
     return (
@@ -536,50 +532,69 @@ export default function Patients() {
               >
                 <div className={`absolute -top-6 -right-6 w-24 h-24 rounded-full bg-gradient-to-br ${theme.blob} to-transparent blur-xl pointer-events-none breathe-slow opacity-50 group-hover:opacity-80 transition-opacity duration-700`} />
                 
-                <div className="flex items-center gap-3 relative z-10">
-                  {/* Avatar */}
-                  <div className={`w-11 h-11 rounded-2xl overflow-hidden ${theme.iconBg} flex items-center justify-center text-white font-bold text-sm flex-shrink-0 shadow-ios`}>
-                    {patient.avatar_url ? <img src={patient.avatar_url} alt="" className="w-full h-full object-cover" /> : getInitials(patient)}
+                <div className="flex items-start justify-between gap-3 relative z-10">
+                  <div className="flex items-center gap-3 min-w-0 flex-1">
+                    {/* Avatar */}
+                    <div className={`w-12 h-12 rounded-2xl overflow-hidden ${theme.iconBg} flex items-center justify-center text-white font-bold text-sm flex-shrink-0 shadow-ios`}>
+                      {patient.avatar_url ? <img src={patient.avatar_url} alt="" className="w-full h-full object-cover" /> : getInitials(patient)}
+                    </div>
+
+                    {/* Content */}
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center gap-2 mb-1">
+                        <h3 className={`font-bold text-sm sm:text-base break-words leading-tight ${fin.balance > 0 ? 'text-error-600' : 'text-slate-800 dark:text-slate-100'}`}>
+                          <HighlightText text={`${patient.first_name} ${patient.last_name}`} query={searchQuery} />
+                        </h3>
+                        {vipMeta.value > 0 && <span className="text-[11px] shrink-0">{vipMeta.icon}</span>}
+                      </div>
+
+                      <div className="flex items-center gap-x-2.5 gap-y-1 flex-wrap text-[11px] text-slate-500 dark:text-slate-400">
+                        {patient.file_number && (
+                          <span className={`inline-flex items-center gap-1 font-mono font-bold px-1.5 py-0.5 rounded-md bg-slate-100 dark:bg-slate-700/60 ${fin.balance > 0 ? 'text-error-600 dark:text-error-400' : 'text-slate-700 dark:text-slate-200'}`}>
+                            <FileText size={11} className="shrink-0" />
+                            <HighlightText text={patient.file_number} query={searchQuery} />
+                          </span>
+                        )}
+                        {age !== null && <span>{toPersianDigits(age)} سال</span>}
+                        {patient.gender && <span>{patient.gender === 'male' ? 'آقا' : 'خانم'}</span>}
+                        {patient.phone && (
+                          <a
+                            href={`tel:${patient.phone}`}
+                            onClick={(e) => e.stopPropagation()}
+                            className="flex items-center gap-0.5 hover:text-primary-600 transition-colors font-mono"
+                            dir="ltr"
+                            title="تماس تلفنی با بیمار"
+                          >
+                            <Phone size={10} /> <HighlightText text={privacyMode ? maskPhoneNumber(patient.phone) : toPersianDigits(patient.phone)} query={searchQuery} />
+                          </a>
+                        )}
+                        {patient.national_id && (
+                          <span className="flex items-center gap-0.5 text-slate-500 font-mono text-[10px]" dir="ltr" title="کد ملی بیمار">
+                            <Shield size={10} className="text-slate-400" />
+                            <HighlightText text={privacyMode ? maskNationalId(patient.national_id) : toPersianDigits(patient.national_id)} query={searchQuery} />
+                          </span>
+                        )}
+                      </div>
+                    </div>
                   </div>
 
-                  {/* Content */}
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 mb-0.5">
-                      <h3 className={`font-bold text-sm truncate ${fin.balance > 0 ? 'text-error-600' : 'text-slate-800'}`}>
-                        <HighlightText text={`${patient.first_name} ${patient.last_name}`} query={searchQuery} />
-                      </h3>
-                      {vipMeta.value > 0 && <span className="text-[10px]">{vipMeta.icon}</span>}
-                    </div>
-                    <div className="flex items-center gap-2 flex-wrap text-[11px] text-slate-500">
-                      {patient.file_number && (
-                        <span className={`flex items-center gap-0.5 font-mono ${fin.balance > 0 ? 'text-error-500 font-bold' : ''}`}>
-                          <FileText size={10} /> <HighlightText text={patient.file_number} query={searchQuery} />
-                        </span>
-                      )}
-                      {age !== null && <span>{toPersianDigits(age)} سال</span>}
-                      {patient.gender && <span>{patient.gender === 'male' ? 'آقا' : 'خانم'}</span>}
-                      {patient.phone && (
-                        <a
-                          href={`tel:${patient.phone}`}
-                          onClick={(e) => e.stopPropagation()}
-                          className="flex items-center gap-0.5 hover:text-primary-600 transition-colors"
-                          dir="ltr"
-                          title="تماس تلفنی با بیمار"
-                        >
-                          <Phone size={10} /> <HighlightText text={privacyMode ? maskPhoneNumber(patient.phone) : toPersianDigits(patient.phone)} query={searchQuery} />
-                        </a>
-                      )}
-                      {patient.national_id && (
-                        <span className="flex items-center gap-0.5 text-slate-500 font-mono text-[10px]" dir="ltr" title="کد ملی بیمار">
-                          <Shield size={10} className="text-slate-400" />
-                          <HighlightText text={privacyMode ? maskNationalId(patient.national_id) : toPersianDigits(patient.national_id)} query={searchQuery} />
-                        </span>
-                      )}
-                    </div>
+                  {/* Financial Status Pill */}
+                  <div className="shrink-0" onClick={(e) => e.stopPropagation()}>
+                    {fin.totalCost > 0 ? (
+                      fin.balance <= 0 ? (
+                        <span className="status-pill bg-success-100 text-success-700 dark:bg-success-900/30 dark:text-success-400 font-bold text-xs">تسویه</span>
+                      ) : (
+                        <PatientDebtBar patientId={patient.id} balance={fin} variant="compact" />
+                      )
+                    ) : (
+                      <span className="status-pill bg-slate-100 text-slate-500 dark:bg-slate-700 dark:text-slate-300 text-xs">بدون تراکنش</span>
+                    )}
                   </div>
+                </div>
 
-                  {/* Financial + edit + delete */}
-                  <div className="flex items-center gap-1.5 flex-shrink-0" onClick={(e) => e.stopPropagation()}>
+                {/* Sterile-Glove Friendly Actions Bar */}
+                <div className="flex items-center justify-between pt-2 border-t border-slate-100/70 dark:border-slate-700/60 relative z-10" onClick={(e) => e.stopPropagation()}>
+                  <div className="flex items-center gap-2">
                     <button
                       onClick={() => {
                         h.tap()
@@ -593,9 +608,10 @@ export default function Patients() {
                       }}
                       aria-label={`رزرو نوبت برای ${patient.first_name} ${patient.last_name}`}
                       title="رزرو نوبت برای این بیمار"
-                      className="p-1.5 rounded-lg text-primary-600 hover:bg-primary-50 hover:text-primary-700 transition-all-smooth press-scale"
+                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-primary-50 hover:bg-primary-100 text-primary-700 dark:bg-primary-900/30 dark:text-primary-300 text-xs font-bold transition-all-smooth press-scale"
                     >
-                      <Calendar size={14} />
+                      <Calendar size={13} />
+                      <span>رزرو نوبت</span>
                     </button>
                     {(() => {
                       const cleanPhone = patient.phone ? patient.phone.replace(/\D/g, '').replace(/^0/, '98') : null
@@ -606,43 +622,34 @@ export default function Patients() {
                           href={`https://wa.me/${cleanPhone}?text=${encodeURIComponent(waText)}`}
                           target="_blank"
                           rel="noopener noreferrer"
-                          className="p-1.5 rounded-lg text-emerald-600 hover:bg-emerald-50 hover:text-emerald-700 transition-all-smooth press-scale"
+                          className="flex items-center gap-1 px-2.5 py-1.5 rounded-xl bg-emerald-50 hover:bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300 text-xs font-medium transition-all-smooth press-scale"
                           title="ارسال پیام در واتساپ به بیمار"
                           onClick={() => chimes.playPop()}
                         >
-                          <MessageSquare size={14} />
+                          <MessageSquare size={13} />
+                          <span>واتساپ</span>
                         </a>
                       )
                     })()}
+                  </div>
+
+                  <div className="flex items-center gap-1">
                     <button
                       onClick={() => openEditModal(patient)}
                       aria-label={`ویرایش ${patient.first_name} ${patient.last_name}`}
                       title="ویرایش پرونده"
-                      className="p-1.5 rounded-lg text-slate-400 hover:bg-slate-100 hover:text-slate-600 transition-all-smooth press-scale"
+                      className="p-2 rounded-xl text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-700/60 transition-all-smooth press-scale"
                     >
-                      <Edit2 size={14} />
+                      <Edit2 size={15} />
                     </button>
                     <button
                       onClick={() => handleDelete(patient)}
                       aria-label={`غیرفعال کردن ${patient.first_name} ${patient.last_name}`}
                       title="غیرفعال کردن"
-                      className="p-1.5 rounded-lg text-error-400 hover:bg-error-50 hover:text-error-600 transition-all-smooth press-scale"
+                      className="p-2 rounded-xl text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-900/20 transition-all-smooth press-scale"
                     >
-                      <Archive size={14} />
+                      <Archive size={15} />
                     </button>
-                    {/* MOD-FEAT-027: the amount, not just the word. «بدهکار»
-                        alone made the row say someone owes money without
-                        saying how much — and gave no way to act on it. The
-                        chip is now the shortcut. */}
-                    {fin.totalCost > 0 ? (
-                      fin.balance <= 0 ? (
-                        <span className="status-pill bg-success-100 text-success-700">تسویه</span>
-                      ) : (
-                        <PatientDebtBar patientId={patient.id} balance={fin} variant="compact" />
-                      )
-                    ) : (
-                      <span className="status-pill bg-slate-100 text-slate-500">بدون تراکنش</span>
-                    )}
                   </div>
                 </div>
 

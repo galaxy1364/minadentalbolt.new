@@ -43,6 +43,7 @@ import { createPatientRadiologyZip, downloadBlob } from '../lib/zipArchive'
 import { buildPatientMedicationGuideDocument } from '../lib/patientMedicationGuide'
 import { usePrivacyMode } from '../lib/privacyMask'
 import { getClinicSetting } from '../lib/clinicSettings'
+import { buildChartHandoff } from '../lib/chartHandoff'
 
 // ============================================================================
 // Constants
@@ -1511,12 +1512,12 @@ export default function PatientDetail() {
     const hasMedications = patient.medications && patient.medications.trim().length > 0
 
     return (
-      <Card className="p-4 md:p-6">
+      <div className="rounded-3xl bg-white/95 dark:bg-slate-900/95 backdrop-blur-xl border border-slate-200/80 dark:border-slate-800 p-3.5 sm:p-4 shadow-sm transition-all space-y-2.5">
         {!patient.is_active && (
-          <div className="mb-4 p-3 rounded-xl bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 flex items-center justify-between gap-3 flex-wrap">
-            <div className="flex items-center gap-2 text-xs text-amber-800 dark:text-amber-200">
-              <ArchiveIcon size={16} className="shrink-0 text-amber-600" />
-              <span>این پرونده در وضعیت <strong>بایگانی‌شده (راکد)</strong> قرار دارد و در جستجوها و نوبت‌دهی‌های عادی نمایش داده نمی‌شود.</span>
+          <div className="p-2.5 rounded-xl bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 flex items-center justify-between gap-2 flex-wrap text-xs">
+            <div className="flex items-center gap-2 text-amber-800 dark:text-amber-200">
+              <ArchiveIcon size={14} className="shrink-0 text-amber-600" />
+              <span>این پرونده در وضعیت <strong>بایگانی‌شده (راکد)</strong> قرار دارد و در جستجوهای عادی نمایش داده نمی‌شود.</span>
             </div>
             <Button
               size="sm"
@@ -1533,144 +1534,212 @@ export default function PatientDetail() {
                   showToast('error', 'خطا در فعال‌سازی پرونده')
                 }
               }}
-              className="text-xs flex items-center gap-1.5 bg-white dark:bg-slate-800 border-amber-300 hover:bg-amber-100 dark:hover:bg-slate-700"
+              className="text-xs flex items-center gap-1 bg-white dark:bg-slate-800 border-amber-300 hover:bg-amber-100 py-1 px-2.5"
             >
-              <RotateCcw size={13} /> بازگردانی پرونده به فعال
+              <RotateCcw size={12} /> بازگردانی به فعال
             </Button>
           </div>
         )}
-        <div className="flex items-start gap-4 flex-wrap">
-          {/* Back button */}
-          <button
-            onClick={() => navigate('/patients')}
-            className="p-2 rounded-lg hover:bg-slate-100 text-slate-500 transition-all-smooth"
-          >
-            <ArrowRight size={20} />
-          </button>
 
-          {/* Avatar */}
-          <div
-            className={`w-16 h-16 md:w-20 md:h-20 rounded-2xl overflow-hidden bg-gradient-to-br ${getAvatarColor(patient.id)} flex items-center justify-center text-white font-bold text-xl md:text-2xl flex-shrink-0`}
-          >
-            {patient.avatar_url ? <img src={patient.avatar_url} alt="" className="w-full h-full object-cover" /> : getInitials(patient)}
-          </div>
-
-          {/* Info */}
-          <div className="flex-1 min-w-[200px]">
-            <div className="flex items-center gap-2 flex-wrap mb-1">
-              <h1 className="text-lg md:text-xl font-bold text-slate-800">
-                {patient.first_name} {patient.last_name}
-              </h1>
-              <Badge color={vipMeta.color}>{vipMeta.label}</Badge>
-              {retentionProfile && (
-                <span title={`شاخص وفاداری و تعامل: ${toPersianDigits(retentionProfile.score)} از ۱۰۰ — اقدام پیشنهادی: ${retentionProfile.recommendedAction}`}>
+        {/* ═══ Tier 1: Identity & Financial Bento Row ═══ */}
+        <div className="flex items-start justify-between gap-3 flex-wrap sm:flex-nowrap">
+          {/* Patient Profile & Demographics */}
+          <div className="flex items-center gap-3 min-w-0 flex-1">
+            <button
+              onClick={() => navigate('/patients')}
+              className="p-2 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-500 transition-colors shrink-0"
+              title="بازگشت به فهرست بیماران"
+            >
+              <ArrowRight size={20} />
+            </button>
+            <div
+              className={`w-12 h-12 sm:w-14 sm:h-14 rounded-2xl overflow-hidden bg-gradient-to-br ${getAvatarColor(patient.id)} flex items-center justify-center text-white font-black text-lg sm:text-xl shrink-0 shadow-xs`}
+            >
+              {patient.avatar_url ? <img src={patient.avatar_url} alt="" className="w-full h-full object-cover" /> : getInitials(patient)}
+            </div>
+            <div className="min-w-0 flex-1">
+              {/* Full Patient Name (Never Truncated) */}
+              <div className="flex items-center gap-2 flex-wrap">
+                <h1 className="text-base sm:text-lg font-black text-slate-900 dark:text-white tracking-tight leading-snug break-words">
+                  {patient.first_name} {patient.last_name}
+                </h1>
+                <span className="font-mono text-[11px] font-extrabold px-2 py-0.5 rounded-lg bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-200/80 dark:border-slate-700">
+                  {patient.file_number ? `MD-${patient.file_number}` : `MD-${patient.id.slice(0, 5)}`}
+                </span>
+                {vipMeta.label !== 'عادی' && (
+                  <Badge color={vipMeta.color}>{vipMeta.label}</Badge>
+                )}
+                {retentionProfile && (
                   <Badge color={retentionProfile.tierColor}>{retentionProfile.tierLabel}</Badge>
-                </span>
-              )}
-              {!patient.is_active && <Badge color="error">غیرفعال</Badge>}
-              {headerChips.map((chip) => (
-                <Badge key={chip} color="error">{chip}</Badge>
-              ))}
-            </div>
-            {patient.notes && (
-              <div className="mb-2 text-xs text-amber-900 dark:text-amber-200 bg-amber-50 dark:bg-amber-950/40 border-r-4 border-amber-500 px-3 py-1.5 rounded-lg font-medium inline-flex items-center gap-1.5">
-                <FileText size={13} className="text-amber-600 shrink-0" />
-                <span>«{patient.notes}»</span>
+                )}
+                {!patient.is_active && <Badge color="error">بایگانی</Badge>}
+                {headerChips.map((chip) => (
+                  <Badge key={chip} color="error">{chip}</Badge>
+                ))}
               </div>
-            )}
-            <div className="flex items-center gap-3 flex-wrap text-sm text-slate-500">
-              {patient.file_number && (
-                <span className="font-mono text-xs">پرونده: {patient.file_number}</span>
-              )}
-              {patient.phone && (
-                <div className="flex items-center gap-1.5">
-                  <a
-                    href={`tel:${patient.phone}`}
-                    className="flex items-center gap-1 text-primary-600 hover:text-primary-700 hover:underline transition-colors"
-                    title="تماس تلفنی با بیمار"
-                  >
-                    <Phone size={12} /> <span dir="ltr">{toPersianDigits(patient.phone)}</span>
-                  </a>
-                  <a
-                    href={`https://wa.me/${patient.phone.replace(/^0/, '98')}`}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="text-[10px] px-1.5 py-0.5 rounded bg-success-50 text-success-700 hover:bg-success-100 transition-colors font-medium"
-                    title="ارسال پیام واتس‌اپ"
-                  >
-                    واتس‌اپ
-                  </a>
-                </div>
-              )}
-              {age !== null && <span>{toPersianDigits(age)} سال</span>}
-              {patient.gender && <span>{patient.gender === 'male' ? 'آقا' : 'خانم'}</span>}
-              {patient.blood_type && (
-                <span className="flex items-center gap-1">
-                  <span className="w-2.5 h-2.5 rounded-full bg-error-400" />
-                  {patient.blood_type}
-                </span>
-              )}
+
+              {/* Demographics & Direct Contacts */}
+              <div className="flex items-center gap-2 flex-wrap text-xs text-slate-500 dark:text-slate-400 mt-1">
+                {age !== null && <span>{toPersianDigits(age)} سال</span>}
+                {patient.gender && <span>{patient.gender === 'male' ? '• آقا' : '• خانم'}</span>}
+                {patient.blood_type && (
+                  <span className="inline-flex items-center gap-1">
+                    <span className="w-2 h-2 rounded-full bg-rose-500" />
+                    {patient.blood_type}
+                  </span>
+                )}
+                {patient.national_id && (
+                  <span className="font-mono text-[11px]" dir="ltr">
+                    کد ملی: {maskNationalId(patient.national_id)}
+                  </span>
+                )}
+                {patient.phone && (
+                  <div className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-lg bg-slate-100 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 text-[11px]">
+                    <a href={`tel:${patient.phone}`} className="text-primary-600 dark:text-primary-400 font-mono hover:underline flex items-center gap-1">
+                      <Phone size={10} /> <span dir="ltr">{toPersianDigits(patient.phone)}</span>
+                    </a>
+                    <a
+                      href={`https://wa.me/${patient.phone.replace(/^0/, '98')}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-emerald-600 dark:text-emerald-400 font-bold hover:underline text-[10px]"
+                    >
+                      واتس‌اپ
+                    </a>
+                  </div>
+                )}
+              </div>
             </div>
-            {/* Medical alerts */}
-            {(hasAllergies || hasConditions || hasMedications || patient.anticoagulant_use || patient.bisphosphonate_use || patient.endocarditis_prophylaxis || (patient.bp_systolic != null && patient.bp_systolic >= 140) || (patient.diabetes_hba1c != null && patient.diabetes_hba1c >= 7) || (patient.pregnancy_trimester != null && patient.pregnancy_trimester > 0)) && (
-              <div className="flex items-center gap-2 flex-wrap mt-2">
-                {hasAllergies && (
-                  <div className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-error-50 text-error-700 border border-error-200 text-xs font-medium">
-                    <AlertCircle size={12} className="shrink-0" /> حساسیت: {patient.allergies}
-                  </div>
-                )}
-                {hasConditions && (
-                  <div className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-warning-50 text-warning-700 border border-warning-200 text-xs font-medium">
-                    <AlertCircle size={12} className="shrink-0" /> بیماری: {patient.medical_conditions}
-                  </div>
-                )}
-                {hasMedications && (
-                  <div className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-primary-50 text-primary-700 border border-primary-200 text-xs font-medium">
-                    <Pill size={12} className="shrink-0" /> دارو: {patient.medications}
-                  </div>
-                )}
-                {patient.anticoagulant_use && (
-                  <div className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-error-100/80 text-error-800 border border-error-300 text-xs font-semibold">
-                    <AlertTriangle size={12} className="shrink-0 text-error-600" />
-                    ضد انعقاد {patient.inr_value ? `(INR: ${toPersianDigits(patient.inr_value)})` : ''}
-                  </div>
-                )}
-                {patient.bisphosphonate_use && (
-                  <div className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-error-100/80 text-error-800 border border-error-300 text-xs font-semibold">
-                    <AlertTriangle size={12} className="shrink-0 text-error-600" />
-                    مصرف بیس‌فسفونات (خطر ONJ)
-                  </div>
-                )}
-                {patient.endocarditis_prophylaxis && (
-                  <div className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-warning-100/80 text-warning-800 border border-warning-300 text-xs font-semibold">
-                    <HeartPulse size={12} className="shrink-0 text-warning-600" />
-                    ریسک اندوکاردیت (پروفیلاکسی)
-                  </div>
-                )}
-                {patient.bp_systolic != null && patient.bp_systolic >= 140 && (
-                  <div className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-amber-100/80 text-amber-800 border border-amber-300 text-xs font-semibold">
-                    <Activity size={12} className="shrink-0 text-amber-600" />
-                    فشار خون: {toPersianDigits(patient.bp_systolic)}/{toPersianDigits(patient.bp_diastolic || 90)}
-                  </div>
-                )}
-                {patient.diabetes_hba1c != null && patient.diabetes_hba1c >= 7 && (
-                  <div className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-amber-100/80 text-amber-800 border border-amber-300 text-xs font-semibold">
-                    <Activity size={12} className="shrink-0 text-amber-600" />
-                    دیابت (HbA1c: {toPersianDigits(patient.diabetes_hba1c)}٪)
-                  </div>
-                )}
-                {patient.pregnancy_trimester != null && patient.pregnancy_trimester > 0 && (
-                  <div className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-pink-100/80 text-pink-800 border border-pink-300 text-xs font-semibold">
-                    <AlertCircle size={12} className="shrink-0 text-pink-600" />
-                    بارداری (سه‌ماهه {toPersianDigits(patient.pregnancy_trimester)})
-                  </div>
-                )}
+          </div>
+
+          {/* Quick Financial Bento Pod (RTL Left) */}
+          <div className="flex items-center gap-2 shrink-0 self-start sm:self-center flex-wrap">
+            {cheques.length > 0 && (
+              <button
+                type="button"
+                onClick={() => {
+                  h.tap()
+                  setActiveTab('payments')
+                }}
+                className="flex items-center gap-1 px-2.5 py-1.5 rounded-xl bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800 text-amber-800 dark:text-amber-300 text-xs font-bold hover:bg-amber-100 transition-colors press-scale"
+                title="مشاهده چک‌ها"
+              >
+                <FileSignature size={13} className="text-amber-600" />
+                <span>{toPersianDigits(cheques.length)} چک</span>
+              </button>
+            )}
+
+            {patientBalance.balance > 0 ? (
+              <div className="flex items-center gap-2 px-3 py-1.5 rounded-2xl bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-800 text-rose-900 dark:text-rose-200 text-xs">
+                <CreditCard size={14} className="text-rose-600 dark:text-rose-400 shrink-0" />
+                <div>
+                  <span className="text-[10px] text-rose-500 block leading-none">بدهی بیمار</span>
+                  <span className="font-extrabold">{formatCurrency(patientBalance.balance)} ت</span>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    h.tap()
+                    handleOpenPaymentModal()
+                  }}
+                  className="px-2.5 py-1 rounded-xl bg-rose-600 hover:bg-rose-700 text-white font-bold text-[11px] transition-colors press-scale shadow-xs"
+                >
+                  تسویه
+                </button>
+              </div>
+            ) : (
+              <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-2xl bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800 text-emerald-800 dark:text-emerald-300 text-xs font-bold">
+                <CheckCircle2 size={14} className="text-emerald-600" />
+                <span>تسویه حساب</span>
               </div>
             )}
           </div>
+        </div>
 
-          {/* Action buttons */}
-          <div className="flex gap-2 flex-wrap items-center">
+        {/* ═══ Tier 2: Quick Clinical Notes & Medical Warnings Rail ═══ */}
+        {patient.notes && (
+          <div className="text-xs text-amber-900 dark:text-amber-200 bg-amber-50 dark:bg-amber-950/40 border-r-4 border-amber-500 px-3 py-1 rounded-xl font-medium inline-flex items-center gap-1.5 max-w-full">
+            <FileText size={12} className="text-amber-600 shrink-0" />
+            <span className="truncate">«{patient.notes}»</span>
+          </div>
+        )}
+
+        {(hasAllergies || hasConditions || hasMedications || patient.anticoagulant_use || patient.bisphosphonate_use || patient.endocarditis_prophylaxis || (patient.bp_systolic != null && patient.bp_systolic >= 140) || (patient.diabetes_hba1c != null && patient.diabetes_hba1c >= 7) || (patient.pregnancy_trimester != null && patient.pregnancy_trimester > 0)) && (
+          <div className="flex items-center gap-1.5 overflow-x-auto py-1 scrollbar-none text-[11px]">
+            {hasAllergies && (
+              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg bg-rose-50 dark:bg-rose-950/50 text-rose-700 dark:text-rose-300 border border-rose-200 dark:border-rose-800 shrink-0 font-medium">
+                <AlertCircle size={11} className="text-rose-600" /> حساسیت: {patient.allergies}
+              </span>
+            )}
+            {hasConditions && (
+              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg bg-amber-50 dark:bg-amber-950/50 text-amber-700 dark:text-amber-300 border border-amber-200 dark:border-amber-800 shrink-0 font-medium">
+                <AlertCircle size={11} className="text-amber-600" /> بیماری: {patient.medical_conditions}
+              </span>
+            )}
+            {hasMedications && (
+              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg bg-sky-50 dark:bg-sky-950/50 text-sky-700 dark:text-sky-300 border border-sky-200 dark:border-sky-800 shrink-0 font-medium">
+                <Pill size={11} className="text-sky-600" /> دارو: {patient.medications}
+              </span>
+            )}
+            {patient.anticoagulant_use && (
+              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg bg-red-100 dark:bg-red-950/60 text-red-800 dark:text-red-200 border border-red-300 shrink-0 font-bold">
+                <AlertTriangle size={11} className="text-red-600" /> ضد انعقاد {patient.inr_value ? `(INR: ${toPersianDigits(patient.inr_value)})` : ''}
+              </span>
+            )}
+            {patient.bisphosphonate_use && (
+              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg bg-red-100 dark:bg-red-950/60 text-red-800 dark:text-red-200 border border-red-300 shrink-0 font-bold">
+                <AlertTriangle size={11} className="text-red-600" /> مصرف بیس‌فسفونات (خطر ONJ)
+              </span>
+            )}
+            {patient.endocarditis_prophylaxis && (
+              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg bg-amber-100 dark:bg-amber-950/60 text-amber-800 dark:text-amber-200 border border-amber-300 shrink-0 font-bold">
+                <HeartPulse size={11} className="text-amber-600" /> اندوکاردیت (پروفیلاکسی)
+              </span>
+            )}
+            {patient.bp_systolic != null && patient.bp_systolic >= 140 && (
+              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg bg-amber-50 dark:bg-amber-950/50 text-amber-800 dark:text-amber-300 border border-amber-300 shrink-0 font-medium">
+                <Activity size={11} className="text-amber-600" /> فشار خون: {toPersianDigits(patient.bp_systolic)}/{toPersianDigits(patient.bp_diastolic || 90)}
+              </span>
+            )}
+            {patient.diabetes_hba1c != null && patient.diabetes_hba1c >= 7 && (
+              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg bg-amber-50 dark:bg-amber-950/50 text-amber-800 dark:text-amber-300 border border-amber-300 shrink-0 font-medium">
+                <Activity size={11} className="text-amber-600" /> دیابت (HbA1c: {toPersianDigits(patient.diabetes_hba1c)}٪)
+              </span>
+            )}
+          </div>
+        )}
+
+        {/* Active Lab Order Ribbon */}
+        {activeLabOrder && (
+          <div className="p-2 rounded-xl bg-cyan-50/90 dark:bg-cyan-950/40 border border-cyan-200 dark:border-cyan-800 text-cyan-950 dark:text-cyan-200 flex items-center justify-between gap-2 text-xs">
+            <div className="flex items-center gap-2 min-w-0">
+              <FlaskConical size={14} className="text-cyan-600 shrink-0" />
+              <span className="font-bold truncate">
+                سفارش فعال لابراتوار: {activeLabOrder.work_type || 'پروتز/روکش'}
+                {activeLabOrder.tooth_number ? ` (دندان ${toothLabel(activeLabOrder.tooth_number)})` : ''}
+              </span>
+              <span className="text-[11px] text-cyan-700 dark:text-cyan-300 hidden sm:inline">
+                وضعیت: {activeLabOrder.status === 'in_progress' ? 'در حال ساخت' : activeLabOrder.status === 'sent' ? 'ارسال‌شده به لابراتوار' : activeLabOrder.status}
+                {activeLabOrder.deadline ? ` — موعد: ${toJalaliStringPretty(activeLabOrder.deadline)}` : ''}
+              </span>
+            </div>
+            <button
+              type="button"
+              onClick={() => {
+                h.tap()
+                setActiveTab('labOrders')
+              }}
+              className="px-2.5 py-1 rounded-lg bg-cyan-600 hover:bg-cyan-700 text-white font-bold text-[10px] shrink-0 transition-colors press-scale"
+            >
+              پیگیری کارتابل
+            </button>
+          </div>
+        )}
+
+        {/* ═══ Tier 3: One-Stop All Clinical & Administrative Actions ═══ */}
+        <div className="pt-2 border-t border-slate-100 dark:border-slate-800">
+          <div className="flex items-center gap-1.5 overflow-x-auto pb-1 scrollbar-none">
+            {/* 1. New Appointment */}
             <button
               type="button"
               onClick={() => {
@@ -1683,32 +1752,111 @@ export default function PatientDetail() {
                   },
                 })
               }}
-              className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs sm:text-sm font-bold bg-gradient-to-r from-teal-600 to-emerald-600 hover:from-teal-700 hover:to-emerald-700 text-white shadow-md shadow-teal-500/20 press-scale transition-all"
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold bg-gradient-to-r from-teal-600 to-emerald-600 hover:from-teal-700 hover:to-emerald-700 text-white shadow-xs press-scale shrink-0"
             >
-              <Calendar size={16} /> نوبت جدید
+              <Calendar size={14} /> نوبت جدید
             </button>
+
+            {/* 2. Visit / Treatment */}
             <button
               type="button"
               onClick={() => {
                 h.tap()
-                navigate('/treatments', {
+                setActiveTab('treatments')
+              }}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold bg-gradient-to-r from-violet-600 to-indigo-600 hover:from-violet-700 hover:to-indigo-700 text-white shadow-xs press-scale shrink-0"
+            >
+              <Stethoscope size={14} /> ثبت درمان
+            </button>
+
+            {/* 3. Dental Chart (FDI) */}
+            <button
+              type="button"
+              onClick={() => {
+                h.tap()
+                setActiveTab('teeth')
+              }}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold bg-teal-50 dark:bg-teal-950/40 text-teal-700 dark:text-teal-300 border border-teal-200 dark:border-teal-800 hover:bg-teal-100 dark:hover:bg-teal-900/60 press-scale shrink-0"
+            >
+              <Smile size={14} /> چارت دندان
+            </button>
+
+            {/* 4. Payment */}
+            <button
+              type="button"
+              onClick={() => {
+                h.tap()
+                handleOpenPaymentModal()
+              }}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800 hover:bg-emerald-100 dark:hover:bg-emerald-900/60 press-scale shrink-0"
+            >
+              <CreditCard size={14} /> دریافت وجه
+            </button>
+
+            {/* 5. Sayad Cheque */}
+            <button
+              type="button"
+              onClick={() => {
+                h.tap()
+                handleOpenChequeModal()
+              }}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-300 border border-amber-200 dark:border-amber-800 hover:bg-amber-100 dark:hover:bg-amber-900/60 press-scale shrink-0"
+            >
+              <FileSignature size={14} /> ثبت چک صیادی
+            </button>
+
+            {/* 6. Prescription */}
+            <button
+              type="button"
+              onClick={() => {
+                h.tap()
+                navigate('/prescriptions', {
                   state: {
                     quickStartPatientId: patient.id,
-                    mode: 'visit',
+                    quickStartDoctorId: patient.primary_doctor_id,
+                    quickStartToothNumber: 'general',
                   },
                 })
               }}
-              className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs sm:text-sm font-bold bg-gradient-to-r from-violet-600 to-indigo-600 hover:from-violet-700 hover:to-indigo-700 text-white shadow-md shadow-violet-500/20 press-scale transition-all"
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold bg-purple-50 dark:bg-purple-950/40 text-purple-700 dark:text-purple-300 border border-purple-200 dark:border-purple-800 hover:bg-purple-100 dark:hover:bg-purple-900/60 press-scale shrink-0"
             >
-              <Stethoscope size={16} /> ویزیت و درمان
+              <Pill size={14} /> صدور نسخه
             </button>
+
+            {/* 7. Lab Order */}
+            <button
+              type="button"
+              onClick={() => {
+                h.tap()
+                setActiveTab('labOrders')
+              }}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold bg-cyan-50 dark:bg-cyan-950/40 text-cyan-700 dark:text-cyan-300 border border-cyan-200 dark:border-cyan-800 hover:bg-cyan-100 dark:hover:bg-cyan-900/60 press-scale shrink-0"
+            >
+              <FlaskConical size={14} /> سفارش لابراتوار
+            </button>
+
+            {/* 8. Implant Case */}
+            <button
+              type="button"
+              onClick={() => {
+                h.tap()
+                setActiveTab('implants')
+              }}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold bg-blue-50 dark:bg-blue-950/40 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-800 hover:bg-blue-100 dark:hover:bg-blue-900/60 press-scale shrink-0"
+            >
+              <Bone size={14} /> پرونده ایمپلنت
+            </button>
+
+            {/* 9. Print Record */}
             <button
               type="button"
               onClick={handlePrintFullChart}
-              className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs sm:text-sm font-bold bg-indigo-50 dark:bg-indigo-950/40 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800/80 hover:bg-indigo-100 dark:hover:bg-indigo-900/60 shadow-2xs press-scale transition-all"
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold bg-indigo-50 dark:bg-indigo-950/40 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800 hover:bg-indigo-100 dark:hover:bg-indigo-900/60 press-scale shrink-0"
             >
-              <Printer size={16} className="text-indigo-600 dark:text-indigo-400" /> چاپ پرونده
+              <Printer size={14} /> چاپ پرونده
             </button>
+
+            {/* 10. Edit File */}
             <button
               type="button"
               onClick={() => {
@@ -1754,56 +1902,13 @@ export default function PatientDetail() {
                 }
                 setEditModalOpen(true)
               }}
-              className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs sm:text-sm font-bold bg-sky-50 dark:bg-sky-950/40 text-sky-700 dark:text-sky-300 border border-sky-200 dark:border-sky-800/80 hover:bg-sky-100 dark:hover:bg-sky-900/60 shadow-2xs press-scale transition-all"
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold bg-sky-50 dark:bg-sky-950/40 text-sky-700 dark:text-sky-300 border border-sky-200 dark:border-sky-800 hover:bg-sky-100 dark:hover:bg-sky-900/60 press-scale shrink-0"
             >
-              <Edit2 size={16} className="text-sky-600 dark:text-sky-400" /> ویرایش پرونده
+              <Edit2 size={14} /> ویرایش پرونده
             </button>
           </div>
-          {/* MOD-FEAT-027: the balance was already computed on this page and
-              shown only inside the printed record. Putting it in the header
-              with a route to payment means the number a receptionist acts on
-              is the same one they are looking at. */}
-          <div className="mt-3">
-            <PatientDebtBar
-              patientId={patient.id}
-              balance={patientBalance}
-              familyBalance={familyBalance}
-            />
-            <PatientChequeRows patientId={patient.id} cheques={cheques as never} />
-
-            {/* Active Lab Order Ribbon */}
-            {activeLabOrder && (
-              <div className="mt-2.5 p-3 rounded-2xl bg-cyan-50/90 dark:bg-cyan-950/40 border border-cyan-200 dark:border-cyan-800 text-cyan-950 dark:text-cyan-200 flex items-center justify-between gap-3 text-xs">
-                <div className="flex items-center gap-2.5 min-w-0">
-                  <div className="w-7 h-7 rounded-xl bg-cyan-600 text-white flex items-center justify-center shrink-0 shadow-xs">
-                    <FlaskConical size={14} />
-                  </div>
-                  <div className="min-w-0">
-                    <p className="font-bold truncate">
-                      سفارش فعال لابراتوار: {activeLabOrder.work_type || 'پروتز/روکش'}
-                      {activeLabOrder.tooth_number ? ` (دندان ${toothLabel(activeLabOrder.tooth_number)})` : ''}
-                    </p>
-                    <p className="text-[11px] text-cyan-700 dark:text-cyan-300">
-                      وضعیت: {activeLabOrder.status === 'in_progress' ? 'در حال ساخت' : activeLabOrder.status === 'sent' ? 'ارسال‌شده به لابراتوار' : activeLabOrder.status}
-                      {activeLabOrder.deadline ? ` — موعد تحویل: ${toJalaliStringPretty(activeLabOrder.deadline)}` : ''}
-                    </p>
-                  </div>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => {
-                    h.tap()
-                    setActiveTab('labOrders')
-                  }}
-                  className="px-2.5 py-1 rounded-lg bg-cyan-600 hover:bg-cyan-700 text-white font-bold text-[11px] shrink-0 transition-all-smooth press-scale"
-                >
-                  پیگیری کارتابل
-                </button>
-              </div>
-            )}
-          </div>
         </div>
-      </Card>
+      </div>
     )
   }
 
@@ -2200,7 +2305,23 @@ export default function PatientDetail() {
     if (treatments.length === 0) {
       return (
         <Card className="p-6">
-          <EmptyState icon={<Activity size={32} />} title="درمانی ثبت نشده" description="هنوز درمانی برای این بیمار ثبت نشده است" />
+          <EmptyState
+            icon={<Activity size={32} />}
+            title="درمانی ثبت نشده"
+            description="هنوز درمانی برای این بیمار ثبت نشده است"
+            action={
+              <Button
+                size="sm"
+                onClick={() => {
+                  h.tap()
+                  navigate('/treatments', { state: { quickStartPatientId: patient?.id, mode: 'visit' } })
+                }}
+                className="flex items-center gap-1"
+              >
+                <Plus size={14} /> ثبت درمان / ویزیت جدید
+              </Button>
+            }
+          />
         </Card>
       )
     }
@@ -2236,10 +2357,22 @@ export default function PatientDetail() {
       <div className="space-y-4">
         <Card className="p-5">
           <div className="flex items-center justify-between mb-3 flex-wrap gap-2">
-            <h3 className="text-sm font-bold text-slate-800">پیشرفت طرح درمان</h3>
-            <span className="text-sm font-bold text-primary-700">
-              {toPersianDigits(progress.completed)} از {toPersianDigits(progress.total)} کار
-            </span>
+            <div className="flex items-center gap-2">
+              <h3 className="text-sm font-bold text-slate-800 dark:text-slate-100">پیشرفت طرح درمان</h3>
+              <span className="text-sm font-bold text-primary-700 dark:text-primary-400">
+                ({toPersianDigits(progress.completed)} از {toPersianDigits(progress.total)} کار انجام‌شده)
+              </span>
+            </div>
+            <Button
+              size="sm"
+              onClick={() => {
+                h.tap()
+                navigate('/treatments', { state: { quickStartPatientId: patient?.id, mode: 'visit' } })
+              }}
+              className="flex items-center gap-1 text-xs"
+            >
+              <Plus size={14} /> ثبت درمان جدید
+            </Button>
           </div>
 
           <div
@@ -2346,12 +2479,41 @@ export default function PatientDetail() {
     if (implantCases.length === 0) {
       return (
         <Card className="p-6">
-          <EmptyState icon={<Bone size={32} />} title="موردی ثبت نشده" description="هنوز پرونده‌ی ایمپلنتی برای این بیمار ثبت نشده است" />
+          <EmptyState
+            icon={<Bone size={32} />}
+            title="موردی ثبت نشده"
+            description="هنوز پرونده‌ی ایمپلنتی برای این بیمار ثبت نشده است"
+            action={
+              <Button
+                size="sm"
+                onClick={() => {
+                  h.tap()
+                  navigate('/implants', { state: { quickStartPatientId: patient?.id } })
+                }}
+                className="flex items-center gap-1"
+              >
+                <Plus size={14} /> تشکیل پرونده ایمپلنت جدید
+              </Button>
+            }
+          />
         </Card>
       )
     }
     return (
-      <div className="space-y-2">
+      <div className="space-y-3">
+        <div className="flex items-center justify-between gap-2 flex-wrap">
+          <h3 className="text-sm font-bold text-slate-800 dark:text-slate-100">پرونده‌های ایمپلنت</h3>
+          <Button
+            size="sm"
+            onClick={() => {
+              h.tap()
+              navigate('/implants', { state: { quickStartPatientId: patient?.id } })
+            }}
+            className="flex items-center gap-1 text-xs"
+          >
+            <Plus size={14} /> پرونده ایمپلنت جدید
+          </Button>
+        </div>
         {[...implantCases].sort((a, b) => (b.created_at || '').localeCompare(a.created_at || '')).map((c) => (
           <Card key={c.id} className="p-4">
             <div className="flex items-start justify-between gap-3 flex-wrap">
@@ -2397,12 +2559,41 @@ export default function PatientDetail() {
     if (labOrders.length === 0) {
       return (
         <Card className="p-6">
-          <EmptyState icon={<FlaskConical size={32} />} title="سفارشی ثبت نشده" description="هنوز سفارش لابراتوار برای این بیمار ثبت نشده است" />
+          <EmptyState
+            icon={<FlaskConical size={32} />}
+            title="سفارشی ثبت نشده"
+            description="هنوز سفارش لابراتوار برای این بیمار ثبت نشده است"
+            action={
+              <Button
+                size="sm"
+                onClick={() => {
+                  h.tap()
+                  navigate('/laboratory', { state: { quickStartPatientId: patient?.id } })
+                }}
+                className="flex items-center gap-1"
+              >
+                <Plus size={14} /> ثبت سفارش جدید لابراتوار
+              </Button>
+            }
+          />
         </Card>
       )
     }
     return (
-      <div className="space-y-2">
+      <div className="space-y-3">
+        <div className="flex items-center justify-between gap-2 flex-wrap">
+          <h3 className="text-sm font-bold text-slate-800 dark:text-slate-100">سفارش‌های لابراتوار</h3>
+          <Button
+            size="sm"
+            onClick={() => {
+              h.tap()
+              navigate('/laboratory', { state: { quickStartPatientId: patient?.id } })
+            }}
+            className="flex items-center gap-1 text-xs"
+          >
+            <Plus size={14} /> سفارش جدید لابراتوار
+          </Button>
+        </div>
         {[...labOrders].sort((a, b) => (b.created_at || '').localeCompare(a.created_at || '')).map((o) => (
           <Card key={o.id} className="p-4">
             <div className="flex items-start justify-between gap-3 flex-wrap">
@@ -3053,13 +3244,30 @@ export default function PatientDetail() {
       radiologyImages={radiologyImages}
       onUpdateTooth={handleUpdateTooth}
       onAddTreatment={(toothNumber, surface, condition) => {
-        // Links the tooth chart directly into the treatment-phases
-        // workflow: starting a plan for a specific tooth from the chart
-        // itself, instead of the chart being a dead-end visualization
-        // disconnected from how treatment actually gets planned.
-        // surface and condition are now also passed through for better context.
         setActiveTab('phases')
         openCreatePhase(toothNumber, surface, condition)
+      }}
+      onAddLabOrder={(toothNumber, surface, condition) => {
+        if (!patient) return
+        const handoff = buildChartHandoff('lab', {
+          toothNumber,
+          surface,
+          condition,
+          patientId: patient.id,
+          doctorId: patient.primary_doctor_id,
+        })
+        if (handoff) navigate(handoff.path, { state: handoff.state })
+      }}
+      onAddImplantCase={(toothNumber, surface, condition) => {
+        if (!patient) return
+        const handoff = buildChartHandoff('implant', {
+          toothNumber,
+          surface,
+          condition,
+          patientId: patient.id,
+          doctorId: patient.primary_doctor_id,
+        })
+        if (handoff) navigate(handoff.path, { state: handoff.state })
       }}
       onViewRadiology={(toothNumber) => {
         setRadToothFilter(toothNumber)

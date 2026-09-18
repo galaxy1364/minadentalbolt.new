@@ -84,6 +84,27 @@ export function PersianClinicAiAssistant() {
   const inputRef = useRef<HTMLInputElement>(null)
   const triggerRef = useRef<HTMLDivElement>(null)
 
+  // Default floating orb to false so it does not obstruct cards and buttons
+  const [showFloatingOrb, setShowFloatingOrb] = useState<boolean>(() => {
+    try {
+      return localStorage.getItem('minadent_show_floating_orb') === 'true'
+    } catch {
+      return false
+    }
+  })
+
+  // Listen for global open event from header or search bar
+  useEffect(() => {
+    const handleOpenEvent = () => {
+      h.select()
+      chimes.playPop()
+      setIsOpen(true)
+      setTimeout(() => inputRef.current?.focus(), 150)
+    }
+    window.addEventListener('minadent-open-clinic-ai', handleOpenEvent)
+    return () => window.removeEventListener('minadent-open-clinic-ai', handleOpenEvent)
+  }, [])
+
   // Floating trigger draggable position with persistent localStorage
   const [pos, setPos] = useState<{ x: number; y: number }>(() => {
     try {
@@ -454,68 +475,70 @@ export function PersianClinicAiAssistant() {
 
   return (
     <>
-      {/* Floating Draggable 3D Living AI Sphere (Apple Intelligence Aesthetic) */}
-      <div
-        ref={triggerRef}
-        style={{
-          position: 'fixed',
-          left: `${pos.x}px`,
-          top: `${pos.y}px`,
-          zIndex: 45,
-          touchAction: 'none',
-        }}
-        className={`select-none transition-transform duration-75 ${
-          isDragging ? 'cursor-grabbing scale-110' : 'cursor-grab'
-        }`}
-        onPointerDown={handlePointerDown}
-        onPointerMove={handlePointerMove}
-        onPointerUp={handlePointerUp}
-        onPointerCancel={() => {
-          setIsDragging(false)
-          dragRef.current = null
-        }}
-      >
+      {/* Floating Draggable 3D Living AI Sphere (Optional, off by default to never obstruct clinical cards) */}
+      {showFloatingOrb && (
         <div
-          className="group relative w-12 h-12 sm:w-13 sm:h-13 rounded-full flex items-center justify-center transition-all-smooth hover:scale-110 active:scale-95"
-          title="دستیار هوشمند مینا (برای جابجایی بکشید / برای گفتگو لمس کنید)"
+          ref={triggerRef}
+          style={{
+            position: 'fixed',
+            left: `${pos.x}px`,
+            top: `${pos.y}px`,
+            zIndex: 45,
+            touchAction: 'none',
+          }}
+          className={`select-none transition-transform duration-75 ${
+            isDragging ? 'cursor-grabbing scale-110' : 'cursor-grab'
+          }`}
+          onPointerDown={handlePointerDown}
+          onPointerMove={handlePointerMove}
+          onPointerUp={handlePointerUp}
+          onPointerCancel={() => {
+            setIsDragging(false)
+            dragRef.current = null
+          }}
         >
-          {/* 1. Living Breathing Ambient Glow */}
-          <div className="absolute -inset-1 rounded-full bg-gradient-to-tr from-sky-500/50 via-indigo-500/50 to-purple-500/50 blur-md opacity-75 group-hover:opacity-100 animate-pulse pointer-events-none" />
-
-          {/* 2. Rotating Holographic Spectrum Ring */}
-          <div className="absolute -inset-0.5 rounded-full p-[1.5px] bg-gradient-to-r from-teal-400 via-sky-400 via-indigo-500 to-fuchsia-500 animate-spin-slow opacity-85 pointer-events-none" />
-
-          {/* 3. 3D Crystal Core Sphere */}
           <div
-            className="relative w-full h-full rounded-full overflow-hidden flex items-center justify-center shadow-2xl ring-1 ring-white/40 dark:ring-white/20"
-            style={{
-              background: 'radial-gradient(circle at 35% 30%, #38bdf8 0%, #6366f1 45%, #8b5cf6 75%, #0f172a 100%)',
-              boxShadow: 'inset 0 2px 4px rgba(255,255,255,0.6), inset 0 -3px 6px rgba(0,0,0,0.5), 0 8px 20px -2px rgba(99,102,241,0.5)',
-            }}
+            className="group relative w-12 h-12 sm:w-13 sm:h-13 rounded-full flex items-center justify-center transition-all-smooth hover:scale-110 active:scale-95"
+            title="دستیار هوشمند مینا (برای جابجایی بکشید / برای گفتگو لمس کنید)"
           >
-            {/* 4. Top 3D Specular Glass Reflection */}
+            {/* 1. Living Breathing Ambient Glow */}
+            <div className="absolute -inset-1 rounded-full bg-gradient-to-tr from-sky-500/50 via-indigo-500/50 to-purple-500/50 blur-md opacity-75 group-hover:opacity-100 animate-pulse pointer-events-none" />
+
+            {/* 2. Rotating Holographic Spectrum Ring */}
+            <div className="absolute -inset-0.5 rounded-full p-[1.5px] bg-gradient-to-r from-teal-400 via-sky-400 via-indigo-500 to-fuchsia-500 animate-spin-slow opacity-85 pointer-events-none" />
+
+            {/* 3. 3D Crystal Core Sphere */}
             <div
-              className="absolute top-1 left-1.5 w-6 h-2.5 rounded-full opacity-65 pointer-events-none"
+              className="relative w-full h-full rounded-full overflow-hidden flex items-center justify-center shadow-2xl ring-1 ring-white/40 dark:ring-white/20"
               style={{
-                background: 'radial-gradient(ellipse at center, rgba(255,255,255,0.85) 0%, rgba(255,255,255,0) 80%)',
-                transform: 'rotate(-20deg)',
+                background: 'radial-gradient(circle at 35% 30%, #38bdf8 0%, #6366f1 45%, #8b5cf6 75%, #0f172a 100%)',
+                boxShadow: 'inset 0 2px 4px rgba(255,255,255,0.6), inset 0 -3px 6px rgba(0,0,0,0.5), 0 8px 20px -2px rgba(99,102,241,0.5)',
               }}
-            />
+            >
+              {/* 4. Top 3D Specular Glass Reflection */}
+              <div
+                className="absolute top-1 left-1.5 w-6 h-2.5 rounded-full opacity-65 pointer-events-none"
+                style={{
+                  background: 'radial-gradient(ellipse at center, rgba(255,255,255,0.85) 0%, rgba(255,255,255,0) 80%)',
+                  transform: 'rotate(-20deg)',
+                }}
+              />
 
-            {/* 5. Central AI Star / Sparkles Icon with Glow */}
-            <div className="relative flex items-center justify-center text-white drop-shadow-[0_0_8px_rgba(255,255,255,0.9)] pointer-events-none">
-              <Sparkles size={21} className="animate-spin-slow" />
-            </div>
+              {/* 5. Central AI Star / Sparkles Icon with Glow */}
+              <div className="relative flex items-center justify-center text-white drop-shadow-[0_0_8px_rgba(255,255,255,0.9)] pointer-events-none">
+                <Sparkles size={21} className="animate-spin-slow" />
+              </div>
 
-            {/* 6. Discreet Micro-Grip Dots on bottom edge */}
-            <div className="absolute bottom-1 flex gap-0.5 opacity-40 pointer-events-none">
-              <span className="w-0.5 h-0.5 rounded-full bg-white/70" />
-              <span className="w-0.5 h-0.5 rounded-full bg-white/70" />
-              <span className="w-0.5 h-0.5 rounded-full bg-white/70" />
+              {/* 6. Discreet Micro-Grip Dots on bottom edge */}
+              <div className="absolute bottom-1 flex gap-0.5 opacity-40 pointer-events-none">
+                <span className="w-0.5 h-0.5 rounded-full bg-white/70" />
+                <span className="w-0.5 h-0.5 rounded-full bg-white/70" />
+                <span className="w-0.5 h-0.5 rounded-full bg-white/70" />
+              </div>
             </div>
           </div>
         </div>
-      </div>
+      )}
 
       {/* iOS 27 Ultra-Modern AI Modal */}
       {isOpen && (

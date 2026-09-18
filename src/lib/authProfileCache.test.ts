@@ -52,4 +52,22 @@ describe('پروفایل کاربری و پایداری دسترسی به ماژ
     expect(canAccess(effectiveRole, '/billing')).toBe(true)
     expect(canAccess(effectiveRole, '/laboratory')).toBe(true)
   })
+
+  it('حساب مدیریت مصطفی حسن‌وند با ایمیل جیمیل به درستی با نقش owner و دسترسی کامل کش می‌شود', () => {
+    const ownerProfile = {
+      id: 'owner-mostafa-001',
+      clinic_id: 'a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11',
+      full_name: 'مصطفی حسن‌وند',
+      role: 'owner',
+      doctor_id: null,
+      email: 'mostafa.hasanvand@gmail.com',
+    }
+    localStorage.setItem(CACHED_PROFILE_KEY, JSON.stringify(ownerProfile))
+    const loaded = JSON.parse(localStorage.getItem(CACHED_PROFILE_KEY)!)
+    expect(loaded.full_name).toBe('مصطفی حسن‌وند')
+    expect(loaded.email).toBe('mostafa.hasanvand@gmail.com')
+    expect(loaded.role).toBe('owner')
+    expect(canAccess(loaded.role, '/settings')).toBe(true)
+    expect(canAccess(loaded.role, '/reports')).toBe(true)
+  })
 })

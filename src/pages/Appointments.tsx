@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
+import { useState, useEffect, useCallback, useMemo } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
 import { Calendar, Clock, CheckCircle2, User, ChevronRight, ChevronLeft, Plus, Search, AlertCircle, Edit2, Stethoscope, DollarSign, FileText, Activity, List, Grid, X, UserPlus, Globe, Ban, Printer, MessageSquare, UserCheck, Volume2, Armchair, Sparkles, Tv, FlaskConical } from 'lucide-react'
 import { fetchTreatments, fetchPayments, fetchImplantCases, fetchAppointments, createAppointment, updateAppointment, checkConflict, fetchPatients, updatePatient, fetchDoctors, fetchUnits, peekNextFileNumber, createPatient, createEncounter, createPayment, fetchDoctorSchedules, fetchOnlineBookingRequests, rejectBookingRequest, updateLabOrder, fetchLabOrders, updateImplantCase, fetchWaitingList, updateWaitingEntry } from '../lib/api'
@@ -195,11 +195,8 @@ export default function Appointments() {
   // with no sign that they owe the clinic money.
   const [balanceInputs, setBalanceInputs] = useState<{ treatments: any[]; payments: any[]; implants: any[] }>({ treatments: [], payments: [], implants: [] })
 
-  const hasLoadedApptsRef = useRef(false)
-  const loadData = useCallback(async (silent = false) => {
-    if (!hasLoadedApptsRef.current && !silent) {
-      setLoading(true)
-    }
+  const loadData = useCallback(async () => {
+    setLoading(true)
     try {
       const [a, p, d, u, br, sch, tr, pay, imp, labs] = await Promise.all([
         fetchAppointments(), fetchPatients(), fetchDoctors(), fetchUnits(),
@@ -211,15 +208,14 @@ export default function Appointments() {
       setLabOrders(labs as any[])
       setBalanceInputs({ treatments: tr as any[], payments: pay as any[], implants: imp as any[] })
       setBookingRequests(br.filter((r: any) => r.status === 'pending'))
-      hasLoadedApptsRef.current = true
     } catch { showToast('error', 'خطا در بارگذاری نوبت‌ها') }
     finally { setLoading(false) }
   }, [])
 
   useEffect(() => { loadData() }, [loadData])
 
-  // Real-time automatic refresh across devices, tabs, and operatory rooms (silent update)
-  useDataRefresh(['appointments', 'patients', 'treatments', 'payments', 'encounters', 'doctor_schedules'], () => loadData(true))
+  // Real-time automatic refresh across devices, tabs, and operatory rooms
+  useDataRefresh(['appointments', 'patients', 'treatments', 'payments', 'encounters', 'doctor_schedules'], loadData)
 
   const todayStr = new Date().toISOString().slice(0, 10)
   const tomorrowStr = new Date(Date.now() + 86400000).toISOString().slice(0, 10)
@@ -789,7 +785,7 @@ export default function Appointments() {
     }
   }
 
-  const ptr = usePullToRefresh(async () => { await loadData(true) })
+  const ptr = usePullToRefresh(async () => { await loadData() })
 
   if (loading) {
     return (
@@ -841,7 +837,7 @@ export default function Appointments() {
             {bookingRequests.map((req) => (
               <div key={req.id} className="flex items-center gap-2 p-2.5 rounded-xl bg-white dark:bg-slate-800">
                 <div className="flex-1 min-w-0">
-                  <p className="text-sm font-bold text-slate-800 dark:text-slate-100 truncate">{req.full_name}</p>
+                  <p className="text-sm font-bold text-slate-800 dark:text-slate-100 break-words leading-tight">{req.full_name}</p>
                   <p className="text-[11px] text-slate-400">
                     {toPersianDigits(req.phone)}
                     {req.preferred_date && ` — ${toJalaliStringPretty(req.preferred_date)}`}
@@ -1096,7 +1092,7 @@ export default function Appointments() {
                         {toPersianDigits(appt.start_time)}
                       </div>
                       <div className="flex-1 min-w-0">
-                        <h3 className="font-bold text-sm text-slate-800 truncate">{patientName(appt)}</h3>
+                        <h3 className="font-bold text-sm text-slate-800 dark:text-slate-100 break-words leading-tight">{patientName(appt)}</h3>
                         <div className="flex items-center gap-2 mt-1">
                           <span className={`status-pill ${tm.bg} ${tm.color}`}>{tm.label}</span>
                           <span className={`status-pill ${sm.bg} ${sm.color}`}>{sm.label}</span>
@@ -1180,7 +1176,7 @@ export default function Appointments() {
                   {/* Content */}
                   <div className="flex-1 min-w-0" onClick={(e) => e.stopPropagation()}>
                     <div className="flex items-center gap-2 mb-1">
-                      <h3 className="font-bold text-sm text-slate-800 truncate">{patientName(appt)}</h3>
+                      <h3 className="font-bold text-sm text-slate-800 dark:text-slate-100 break-words leading-tight">{patientName(appt)}</h3>
                     </div>
                     <div className="flex items-center gap-1.5 flex-wrap mb-2">
                       <span className={`status-pill ${tm.bg} ${tm.color}`}>

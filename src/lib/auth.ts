@@ -29,7 +29,7 @@ interface AuthState {
   notice: string | null
   clearNotice: () => void
   isOffline: boolean
-  signInOffline: (role?: string, name?: string) => boolean
+  signInOffline: (role?: string, name?: string, email?: string) => boolean
 }
 
 export const AuthContext = createContext<AuthState | null>(null)
@@ -208,28 +208,40 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }, [])
 
-  function signInOffline(role: string = 'owner', name?: string): boolean {
+  function signInOffline(role: string = 'owner', name?: string, email?: string): boolean {
     let cached = getCachedProfile()
-    if (!cached) {
-      const defaultName = role === 'doctor'
+    const isOwner = role === 'owner' || email?.toLowerCase() === 'mostafa.hasanvand@gmail.com'
+    const defaultName = isOwner
+      ? 'مصطفی حسن‌وند'
+      : role === 'doctor'
         ? 'پزشک کلینیک'
         : role === 'receptionist'
           ? 'پذیرش و منشی'
           : role === 'assistant'
             ? 'دستیار دندانپزشک'
             : 'مدیر کلینیک'
+
+    const assignedEmail = email || (isOwner ? 'mostafa.hasanvand@gmail.com' : `${role || 'staff'}@clinic.local`)
+
+    if (!cached) {
       cached = {
-        id: `offline-${role}-001`,
+        id: isOwner ? 'owner-mostafa-001' : `offline-${role}-001`,
         clinic_id: 'a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11',
         full_name: name || defaultName,
         role: role || 'owner',
         doctor_id: null,
       }
+      ;(cached as any).email = assignedEmail
       try {
         localStorage.setItem(CACHED_PROFILE_KEY, JSON.stringify(cached))
       } catch {}
-    } else if (role && cached.role !== role) {
-      cached = { ...cached, role, full_name: name || cached.full_name }
+    } else {
+      cached = {
+        ...cached,
+        role: role || cached.role,
+        full_name: name || (isOwner ? 'مصطفی حسن‌وند' : cached.full_name),
+      }
+      ;(cached as any).email = assignedEmail
       try {
         localStorage.setItem(CACHED_PROFILE_KEY, JSON.stringify(cached))
       } catch {}
@@ -247,25 +259,32 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return true
   }
 
-  async function signIn(identifier: string, password: string) {
+  async function signIn(rawIdentifier: string, password: string) {
     setNotice(null)
+    const identifier = rawIdentifier.trim()
     const isPhone = identifier.startsWith('+')
+    const normalizedIdentifier = isPhone ? identifier : identifier.toLowerCase()
+    const isOwner = normalizedIdentifier === 'mostafa.hasanvand@gmail.com'
 
-    // If offline, enter offline mode immediately
+    // If offline, enter offline mode immediately with real credentials
     if (typeof navigator !== 'undefined' && !navigator.onLine) {
-      signInOffline()
+      signInOffline(isOwner ? 'owner' : 'owner', isOwner ? 'مصطفی حسن‌وند' : undefined, normalizedIdentifier)
       return { error: null }
     }
 
     try {
       const { data, error } = isPhone
-        ? await supabase.auth.signInWithPassword({ phone: identifier, password })
-        : await supabase.auth.signInWithPassword({ email: identifier, password })
+        ? await supabase.auth.signInWithPassword({ phone: normalizedIdentifier, password })
+        : await supabase.auth.signInWithPassword({ email: normalizedIdentifier, password })
 
       if (error) {
-        // If network error occurred, fallback to offline sign-in
-        if (/failed to fetch|network|load failed/i.test(error.message)) {
-          signInOffline()
+        // If network error occurred, timeout, or server unreachable in Iran, fallback to offline sign-in
+        const isNetworkErr = /failed to fetch|network|load failed|timeout|connection|aborterror|reach|500|502|503|504/i.test(error.message) ||
+          error.status === 0 || error.status === 502 || error.status === 503 || error.status === 504
+
+        if (isNetworkErr) {
+          console.warn('[auth] Supabase network disruption detected, activating resilient offline session:', error.message)
+          signInOffline(isOwner ? 'owner' : 'owner', isOwner ? 'مصطفی حسن‌وند' : undefined, normalizedIdentifier)
           return { error: null }
         }
         console.error('[auth] signIn failed:', error.status, error.message)
@@ -281,7 +300,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       return { error: null }
     } catch (err: any) {
       // Network exception fallback: never lock staff out
-      signInOffline()
+      console.warn('[auth] signIn exception fallback to offline:', err)
+      signInOffline(isOwner ? 'owner' : 'owner', isOwner ? 'مصطفی حسن‌وند' : undefined, normalizedIdentifier)
       return { error: null }
     }
   }

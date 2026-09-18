@@ -63,6 +63,13 @@ export const CLINICAL_REALTIME_TABLES: TableName[] = [
   'perio_exams', 'ortho_exams', 'manual_reminders', 'patient_policies',
 ]
 
+// Tables that MUST trigger a full cloud pull when a change arrives,
+// because broadcast events can be stale/partial (e.g. sent while the
+// receiving device was briefly offline and missed the full record).
+const PULL_ON_CHANGE_TABLES: readonly string[] = [
+  'patients', 'appointments', 'payments', 'treatments', 'encounters',
+]
+
 let channel: ReturnType<typeof supabase.channel> | null = null
 let isActive = false
 let isSubscribed = false
@@ -115,6 +122,15 @@ async function handleIncomingChange(payload: DataChangePayload): Promise<void> {
       }
     }
     lastKnownSyncTime = Math.max(lastKnownSyncTime, payload.timestamp || Date.now())
+
+    // For high-value tables, trigger a background cloud pull to make sure
+    // we have the authoritative record — broadcast alone is fire-and-forget
+    // and can be missed when a device was briefly asleep or reconnecting.
+    // Only pull when the event came from ANOTHER device — no need to pull
+    // from cloud for our own writes (they are already in local Dexie).
+    if (PULL_ON_CHANGE_TABLES.includes(tableName) && payload.senderId !== DEVICE_SESSION_ID && payload.senderId !== 'server-cdc') {
+      setTimeout(() => syncNow().catch(() => {}), 500)
+    }
   } catch (err) {
     console.warn(`[realtime] failed to apply local update on ${tableName}:`, err)
   }
@@ -123,42 +139,35 @@ async function handleIncomingChange(payload: DataChangePayload): Promise<void> {
   dispatchLocalEvent(payload)
 }
 
-async function sendTableRecordsChunked(targetId: string, tableName: TableName, rows: any[]): Promise<void> {
-  if (!channel || !isSubscribed || rows.length === 0) return
-  const CHUNK_SIZE = 40
-  for (let i = 0; i < rows.length; i += CHUNK_SIZE) {
-    const chunk = rows.slice(i, i + CHUNK_SIZE)
-    await channel.send({
-      type: 'broadcast',
-      event: 'mesh_sync_response',
-      payload: {
-        targetId,
-        senderId: DEVICE_SESSION_ID,
-        timestamp: Date.now(),
-        clinicId: CLINIC_ID,
-        table: tableName,
-        records: chunk,
-      },
-    }).catch((err) => {
-      console.warn(`[realtime] error sending chunk for ${tableName}:`, err)
-    })
-  }
-}
-
 /**
- * Responds to an incoming mesh sync request by packaging local records
- * and broadcasting back to the requesting device in chunks.
+ * Responds to an incoming mesh sync request by packaging recent local records
+ * and broadcasting back to the requesting device.
  */
 async function handleMeshSyncRequest(req: MeshSyncRequest): Promise<void> {
   if (!req || req.requesterId === DEVICE_SESSION_ID) return
   if (req.clinicId !== CLINIC_ID) return
 
   try {
+    const recordsByTable: Record<string, any[]> = {}
     const cutoff = req.sinceTimestamp || 0
+    let totalFound = 0
+
     for (const tableName of CLINICAL_REALTIME_TABLES) {
       const table = (db as any)[tableName]
       if (!table) continue
       try {
+        const all = await table.where('clinic_id').equals(CLINIC_ID).toArray()
+        const recent = all.filter((r: any) => {
+          if (!cutoff) return true
+          const t = new Date(r.updated_at || r.created_at || 0).getTime()
+          return t >= cutoff
+        })
+        if (recent.length > 0) {
+          recordsByTable[tableName] = recent
+          totalFound += recent.length
+        }
+      } catch {
+        // Fallback without clinic_id index if needed
         const all = await table.toArray()
         const recent = all.filter((r: any) => {
           if (r.clinic_id && r.clinic_id !== CLINIC_ID) return false
@@ -167,11 +176,25 @@ async function handleMeshSyncRequest(req: MeshSyncRequest): Promise<void> {
           return t >= cutoff
         })
         if (recent.length > 0) {
-          await sendTableRecordsChunked(req.requesterId, tableName, recent)
+          recordsByTable[tableName] = recent
+          totalFound += recent.length
         }
-      } catch (err) {
-        console.warn(`[realtime] error querying ${tableName} for mesh sync:`, err)
       }
+    }
+
+    if (totalFound > 0 && channel && isSubscribed) {
+      const resp: MeshSyncResponse = {
+        targetId: req.requesterId,
+        senderId: DEVICE_SESSION_ID,
+        timestamp: Date.now(),
+        clinicId: CLINIC_ID,
+        payload: recordsByTable,
+      }
+      channel.send({
+        type: 'broadcast',
+        event: 'mesh_sync_response',
+        payload: resp,
+      })
     }
   } catch (err) {
     console.warn('[realtime] error handling mesh sync request:', err)
@@ -181,34 +204,20 @@ async function handleMeshSyncRequest(req: MeshSyncRequest): Promise<void> {
 /**
  * Merges batch response from a peer into local Dexie database.
  */
-async function handleMeshSyncResponse(resp: any): Promise<void> {
+async function handleMeshSyncResponse(resp: MeshSyncResponse): Promise<void> {
   if (!resp || resp.targetId !== DEVICE_SESSION_ID) return
   if (resp.clinicId !== CLINIC_ID) return
+  if (!resp.payload) return
 
   try {
-    const touchedTables = new Set<string>()
+    let touchedTables: string[] = []
+    for (const [tableName, rows] of Object.entries(resp.payload)) {
+      if (!TABLE_NAMES.includes(tableName as TableName)) continue
+      const table = (db as any)[tableName]
+      if (!table || !Array.isArray(rows) || rows.length === 0) continue
 
-    // Chunked format: { table: 'patients', records: [...] }
-    if (resp.table && Array.isArray(resp.records) && resp.records.length > 0) {
-      const tableName = resp.table as TableName
-      if (TABLE_NAMES.includes(tableName)) {
-        const table = (db as any)[tableName]
-        if (table) {
-          await table.bulkPut(resp.records)
-          touchedTables.add(tableName)
-        }
-      }
-    }
-
-    // Legacy bulk payload format: { payload: { [table]: rows } }
-    if (resp.payload && typeof resp.payload === 'object') {
-      for (const [tableName, rows] of Object.entries(resp.payload)) {
-        if (!TABLE_NAMES.includes(tableName as TableName)) continue
-        const table = (db as any)[tableName]
-        if (!table || !Array.isArray(rows) || rows.length === 0) continue
-        await table.bulkPut(rows)
-        touchedTables.add(tableName)
-      }
+      await table.bulkPut(rows)
+      touchedTables.push(tableName)
     }
 
     lastKnownSyncTime = Math.max(lastKnownSyncTime, resp.timestamp || Date.now())
@@ -221,6 +230,13 @@ async function handleMeshSyncResponse(resp: any): Promise<void> {
         clinicId: CLINIC_ID,
       })
     }
+
+    // After receiving peer data, also pull from cloud to get any records
+    // that the peer itself might not have had yet (e.g. records added from
+    // a third device while this device was sleeping).
+    if (touchedTables.length > 0) {
+      setTimeout(() => syncNow().catch(() => {}), 800)
+    }
   } catch (err) {
     console.warn('[realtime] error applying mesh sync response:', err)
   }
@@ -228,21 +244,18 @@ async function handleMeshSyncResponse(resp: any): Promise<void> {
 
 /**
  * Requests catch-up data from peers across the clinic.
- * Defaults to full initial sync (sinceTimestamp: 0) to ensure zero missing records.
  */
-export function broadcastMeshSyncRequest(fullCatchUp = true): void {
+export function broadcastMeshSyncRequest(): void {
   if (!channel || !isSubscribed) return
   const req: MeshSyncRequest = {
     requesterId: DEVICE_SESSION_ID,
-    sinceTimestamp: fullCatchUp ? 0 : lastKnownSyncTime,
+    sinceTimestamp: lastKnownSyncTime,
     clinicId: CLINIC_ID,
   }
   channel.send({
     type: 'broadcast',
     event: 'mesh_sync_request',
     payload: req,
-  }).catch((err) => {
-    console.warn('[realtime] error broadcasting mesh_sync_request:', err)
   })
 }
 
@@ -455,14 +468,23 @@ export function initRealtimeSync(): () => void {
     document.addEventListener('visibilitychange', handleVisibilityOrFocus)
   }
 
-  // Heartbeat check every 15 seconds to detect silent socket drops
+  // Heartbeat check every 10 seconds to detect silent socket drops faster.
+  // iOS/Android kill WebSockets within seconds of backgrounding — a 10s
+  // heartbeat catches a dead socket and reconnects before the user notices.
   if (heartbeatTimer) clearInterval(heartbeatTimer)
   heartbeatTimer = setInterval(() => {
     if (typeof navigator !== 'undefined' && !navigator.onLine) return
     if (!isSubscribed || !channel) {
       setupChannel()
+    } else {
+      // Also check if channel is truly alive by sending a ping — if it
+      // fails, scheduleReconnect will be called by the channel error handler.
+      channel.send({ type: 'broadcast', event: 'heartbeat', payload: { ts: Date.now() } }).catch(() => {
+        isSubscribed = false
+        setupChannel()
+      })
     }
-  }, 15000)
+  }, 10000)
 
   return () => stopRealtimeSync()
 }

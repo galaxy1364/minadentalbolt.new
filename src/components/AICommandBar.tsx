@@ -174,6 +174,16 @@ export default function AICommandBar() {
   const [activeIndex, setActiveIndex] = useState(0)
 
   useEffect(() => {
+    const handleCustomOpen = () => {
+      h.select()
+      chimes.playPop()
+      setOpen(true)
+    }
+    window.addEventListener('minadent-open-ai-command', handleCustomOpen)
+    return () => window.removeEventListener('minadent-open-ai-command', handleCustomOpen)
+  }, [])
+
+  useEffect(() => {
     if (open && inputRef.current) {
       setTimeout(() => inputRef.current?.focus(), 100)
     }
@@ -397,7 +407,7 @@ export default function AICommandBar() {
            rather than gone. `pointer-events` is dropped with it so a tap
            in that corner reaches the row, not the hidden button.
            It never hides on desktop, where nothing is that cramped. */
-        className={`fixed bottom-24 left-4 z-40 flex items-center gap-2 px-4 py-2.5 rounded-full bg-gradient-to-r from-sky-500 to-teal-600 text-white text-sm font-medium shadow-lg hover:shadow-xl transition-all-smooth press-scale ${
+        className={`hidden md:flex fixed bottom-24 left-4 z-40 items-center gap-2 px-4 py-2.5 rounded-full bg-gradient-to-r from-sky-500 to-teal-600 text-white text-sm font-medium shadow-lg hover:shadow-xl transition-all-smooth press-scale ${
           hidden ? 'opacity-0 translate-y-24 pointer-events-none' : 'opacity-100 translate-y-0'
         }`}
         aria-hidden={hidden}
