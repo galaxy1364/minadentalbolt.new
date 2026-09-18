@@ -42,7 +42,13 @@ export function setAutoApplyEnabled(enabled: boolean): void {
  */
 export async function checkForUpdate(): Promise<UpdateCheckResult> {
   try {
-    const res = await fetch(`/version.json?t=${Date.now()}`, { cache: 'no-store' })
+    const res = await fetch(`/version.json?t=${Date.now()}`, {
+      cache: 'no-store',
+      headers: {
+        'Cache-Control': 'no-cache, no-store, must-revalidate',
+        Pragma: 'no-cache',
+      },
+    })
     if (!res.ok) throw new Error('version.json fetch failed')
     const data = await res.json()
     const remoteVersion = data.version as string
@@ -61,13 +67,26 @@ export async function checkForUpdate(): Promise<UpdateCheckResult> {
 export async function applyUpdate(): Promise<void> {
   try {
     if ('serviceWorker' in navigator) {
-      const reg = await navigator.serviceWorker.getRegistration()
-      if (reg) await reg.update()
+      const registrations = await navigator.serviceWorker.getRegistrations()
+      for (const reg of registrations) {
+        await reg.update().catch(() => {})
+        if (reg.waiting) {
+          reg.waiting.postMessage({ type: 'SKIP_WAITING' })
+        }
+      }
+    }
+    if (typeof window !== 'undefined' && 'caches' in window) {
+      const keys = await caches.keys()
+      await Promise.all(keys.map((k) => caches.delete(k)))
     }
   } catch {
     // fall through to reload regardless
   } finally {
-    window.location.reload()
+    if (typeof window !== 'undefined') {
+      const cleanUrl = window.location.href.split('?')[0].split('#')[0]
+      const hash = window.location.hash || ''
+      window.location.href = `${cleanUrl}?v=${Date.now()}${hash}`
+    }
   }
 }
 

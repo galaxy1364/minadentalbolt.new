@@ -5,7 +5,7 @@
 // means users keep getting an old JS bundle after a deploy, which can
 // leave the app failing to load entirely when the cached HTML and the
 // new assets no longer match.
-const CACHE_NAME = 'minadent-v1.235.16'
+const CACHE_NAME = 'minadent-v1.235.17'
 const STATIC_ASSETS = [
   '/',
   '/index.html',
@@ -38,6 +38,12 @@ self.addEventListener('activate', (event) => {
     )
   )
   self.clients.claim()
+})
+
+self.addEventListener('message', (event) => {
+  if (event.data && event.data.type === 'SKIP_WAITING') {
+    self.skipWaiting()
+  }
 })
 
 // Push notifications handling for clinical alerts, reminders, and bounced cheques
