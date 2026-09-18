@@ -52,9 +52,10 @@ function DarkModeToggle() {
     <button
       onClick={() => { h.tap(); const n = !dark; setDark(n); document.documentElement.classList.toggle('dark', n); localStorage.setItem('minadent-dark', String(n)) }}
       aria-label={dark ? 'حالت روشن' : 'حالت تاریک'}
-      className="flex items-center justify-center w-9 h-9 rounded-xl glass border border-white/60 dark:border-white/10 text-slate-600 dark:text-amber-400 transition-all-smooth active:scale-90"
+      title={dark ? 'تغییر به حالت روشن' : 'تغییر به حالت شب / تاریک'}
+      className="flex items-center justify-center w-9 h-9 rounded-xl glass border-t border-t-white/90 dark:border-t-white/20 border border-slate-200/60 dark:border-slate-700/60 shadow-md shadow-slate-900/10 text-slate-700 dark:text-amber-400 hover:-translate-y-0.5 active:translate-y-0.5 transition-all press-scale"
     >
-      {dark ? <Sun size={16} /> : <Moon size={16} />}
+      {dark ? <Sun size={17} className="drop-shadow-xs" /> : <Moon size={17} className="drop-shadow-xs" />}
     </button>
   )
 }
@@ -81,15 +82,15 @@ function PrivacyModeToggle() {
           ? 'حالت محرمانگی پیشخوان فعال است (کد ملی و تلفن ماسک شده) — جهت نمایش کامل کلیک کنید'
           : 'حالت محرمانگی پیشخوان (مخفی‌سازی کد ملی و تلفن در برابر مراجعین)'
       }
-      className={`flex items-center justify-center w-9 h-9 rounded-xl glass border transition-all-smooth active:scale-90 relative ${
+      className={`flex items-center justify-center w-9 h-9 rounded-xl glass border-t border-t-white/90 dark:border-t-white/20 border transition-all press-scale relative shadow-md shadow-slate-900/10 hover:-translate-y-0.5 active:translate-y-0.5 ${
         privacyMode
           ? 'border-emerald-500/60 bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 ring-2 ring-emerald-500/20'
-          : 'border-white/60 dark:border-white/10 text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white'
+          : 'border-slate-200/60 dark:border-slate-700/60 text-slate-700 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white'
       }`}
     >
-      {privacyMode ? <EyeOff size={16} /> : <Eye size={16} />}
+      {privacyMode ? <EyeOff size={17} className="drop-shadow-xs" /> : <Eye size={17} className="drop-shadow-xs" />}
       {privacyMode && (
-        <span className="absolute -top-0.5 -right-0.5 w-2 h-2 rounded-full bg-emerald-500 ring-2 ring-white dark:ring-slate-900 animate-pulse" />
+        <span className="absolute -top-0.5 -right-0.5 w-2.5 h-2.5 rounded-full bg-emerald-500 ring-2 ring-white dark:ring-slate-900 animate-pulse" />
       )}
     </button>
   )
@@ -207,20 +208,11 @@ function SyncIndicator() {
   useEffect(() => {
     const unsub = subscribeSync((s, p, _lastSync, f) => {
       setStatus(s); setPending(p); setSpinning(s === 'syncing'); setFailed(f)
-      // Only notify on an actual transition (e.g. offline -> online, or a
-      // sync that just finished pushing real changes) — not on every
-      // background poll tick, which would otherwise pop up a toast every
-      // ~30s even when nothing changed.
-      const changed = prevStatus.current !== s
-      if (s === 'online' && p === 0 && changed) {
-        pushIslandNotification({ id: 'sync-done', title: 'همگام‌سازی کامل', message: 'داده‌ها به‌روزرسانی شد', icon: <CheckCircle2 size={16} />, color: '#0d9488', duration: 3000 })
-      } else if ((s === 'offline') && changed) {
-        pushIslandNotification({ id: 'sync-off', title: 'حالت آفلاین', message: 'تغییرات بعداً همگام می‌شوند', icon: <CloudOff size={16} />, color: '#f59e0b', duration: 3000 })
-      }
-      // Failed items need a persistent, hard-to-miss alert — this is real
-      // data that couldn't reach the server after repeated attempts.
+      // Routine background sync is visible via the header sync indicator.
+      // Do NOT spam island notifications or sounds on routine sync cycles.
+      // Only notify when there is an actual critical sync failure.
       if (f > prevFailed.current) {
-        pushIslandNotification({ id: 'sync-failed', title: 'نیاز به بررسی', message: `${f} مورد همگام‌سازی نشد — تنظیمات را ببینید`, icon: <AlertTriangle size={16} />, color: '#dc2626', duration: 6000 })
+        pushIslandNotification({ id: 'sync-failed', title: 'نیاز به بررسی همگام‌سازی', message: `${f} مورد همگام‌سازی نشد — تنظیمات را ببینید`, icon: <AlertTriangle size={16} />, color: '#dc2626', duration: 6000 })
       }
       prevStatus.current = s
       prevFailed.current = f
@@ -554,9 +546,9 @@ function LogoutButton() {
         onClick={() => { h.tap(); setConfirmOpen(true) }}
         aria-label="خروج"
         title={profile?.full_name ? `خروج (${profile.full_name})` : 'خروج از حساب'}
-        className="flex items-center justify-center w-9 h-9 rounded-xl glass border border-white/60 dark:border-white/10 text-slate-600 dark:text-slate-300 transition-all-smooth active:scale-90"
+        className="flex items-center justify-center w-9 h-9 rounded-xl glass border-t border-t-white/90 dark:border-t-white/20 border border-slate-200/60 dark:border-slate-700/60 shadow-md shadow-slate-900/10 text-slate-700 dark:text-slate-300 hover:-translate-y-0.5 active:translate-y-0.5 transition-all press-scale"
       >
-        <LogOut size={16} />
+        <LogOut size={16} className="drop-shadow-xs" />
       </button>
       <LogoutConfirmModal
         open={confirmOpen}
@@ -580,9 +572,9 @@ function HeaderAlarmButton({ onClick }: { onClick: () => void }) {
       }}
       aria-label="مرکز آلارم و هشدارهای بالینی"
       title={hasUrgent ? `${toPersianDigits(bundle.total)} هشدار فعال بالینی و مالی` : 'مرکز آلارم و هشدارها'}
-      className="relative flex items-center justify-center w-9 h-9 rounded-xl glass border border-white/60 dark:border-white/10 text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white transition-all-smooth active:scale-90"
+      className="relative flex items-center justify-center w-9 h-9 rounded-xl glass border-t border-t-white/90 dark:border-t-white/20 border border-slate-200/60 dark:border-slate-700/60 shadow-md shadow-slate-900/10 text-slate-700 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white hover:-translate-y-0.5 active:translate-y-0.5 transition-all press-scale"
     >
-      <Bell size={17} className={hasUrgent ? 'text-amber-500 animate-pulse' : ''} />
+      <Bell size={17} className={`drop-shadow-xs ${hasUrgent ? 'text-amber-500 animate-pulse' : ''}`} />
       {hasUrgent && (
         <span
           className="absolute -top-1 -right-1 min-w-[17px] h-[17px] px-1 rounded-full bg-red-500 text-white text-[10px] font-bold flex items-center justify-center border-2 border-white dark:border-slate-900 shadow-sm"
@@ -678,7 +670,7 @@ function LayoutInner({ children }: { children: React.ReactNode }) {
             <MinadentLogo size={38} className="shrink-0" />
             <div className="text-right">
               <p className="text-[14px] font-extrabold text-slate-800 dark:text-slate-100 leading-none">
-                مینادنت <span className="text-[9px] font-mono text-slate-400 dark:text-slate-500">v{APP_VERSION}</span>
+                مینادنتال <span className="text-[9px] font-mono text-slate-400 dark:text-slate-500">v{APP_VERSION}</span>
               </p>
               {currentItem && (
                 <p className="text-[10px] font-semibold leading-none mt-1" style={{ color: currentItem.color }}>
@@ -696,9 +688,9 @@ function LayoutInner({ children }: { children: React.ReactNode }) {
               }}
               aria-label="دستیار هوشمند بالینی مینادنت"
               title="دستیار هوشمند صوتی و متنی مینادنت"
-              className="relative flex items-center justify-center w-9 h-9 rounded-xl glass border border-sky-400/40 dark:border-sky-500/30 bg-sky-50/50 dark:bg-sky-950/30 text-sky-600 dark:text-sky-400 transition-all-smooth active:scale-90"
+              className="relative flex items-center justify-center w-9 h-9 rounded-xl glass border-t border-t-white/90 dark:border-t-white/20 border border-sky-400/50 dark:border-sky-500/40 bg-sky-50/70 dark:bg-sky-950/40 text-sky-600 dark:text-sky-400 shadow-md shadow-sky-500/15 hover:-translate-y-0.5 active:translate-y-0.5 transition-all press-scale"
             >
-              <Sparkles size={17} className="animate-pulse text-sky-500" />
+              <Sparkles size={17} className="animate-pulse text-sky-500 drop-shadow-xs" />
             </button>
 
             <HeaderAlarmButton onClick={() => setAlarmCenterOpen(true)} />

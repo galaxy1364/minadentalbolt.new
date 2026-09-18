@@ -270,15 +270,15 @@ function QuickAction({ icon, label, color, onClick, delay }: { icon: React.React
       onClick={() => { h.select(); onClick() }}
       aria-label={label}
       style={{ animationDelay: `${delay}ms` }}
-      className={`tile-in card-lift relative overflow-hidden flex flex-col items-center justify-center gap-1 p-2 rounded-2xl bg-gradient-to-br ${theme.bg} border border-slate-100 dark:border-slate-700 shadow-xs min-h-[56px] flex-1 focus:outline-none focus:ring-4 ${theme.ring} press-scale`}
+      className={`tile-in card-lift relative overflow-hidden flex flex-col items-center justify-center gap-1.5 p-2 rounded-2xl bg-gradient-to-br ${theme.bg} border-t border-t-white/80 dark:border-t-white/10 border border-slate-200/60 dark:border-slate-700 shadow-md shadow-slate-900/5 min-h-[66px] flex-1 focus:outline-none focus:ring-4 ${theme.ring} press-scale hover:-translate-y-0.5 active:translate-y-0.5 transition-all`}
     >
       <div className={`absolute -bottom-6 -left-6 w-16 h-16 rounded-full bg-gradient-to-br ${theme.blob} to-transparent blur-lg pointer-events-none opacity-40`} />
-      <ModuleIconBadge color={theme.solidColor} size={22}>
+      <ModuleIconBadge color={theme.solidColor} size={28}>
         <div className="float-bounce">
-          {isValidElement(icon) ? cloneElement(icon as React.ReactElement<any>, { size: 18 }) : icon}
+          {isValidElement(icon) ? cloneElement(icon as React.ReactElement<any>, { size: 22 }) : icon}
         </div>
       </ModuleIconBadge>
-      <span className={`relative text-[10px] font-extrabold ${theme.text} truncate max-w-full`}>{label}</span>
+      <span className={`relative text-[11px] font-extrabold ${theme.text} truncate max-w-full drop-shadow-xs`}>{label}</span>
     </button>
   )
 }
@@ -293,16 +293,16 @@ function AlertWidget({ icon, label, value, color, onClick, delay }: { icon: Reac
       onClick={() => { h.warning(); onClick() }}
       aria-label={label}
       style={{ animationDelay: `${delay}ms` }}
-      className={`tile-in card-lift group flex items-center gap-2 p-2.5 rounded-2xl border ${color} text-right focus:outline-none focus:ring-4 focus:ring-primary-400/20 w-full min-h-[52px] press-scale shadow-xs hover:shadow-sm transition-all-smooth`}
+      className={`tile-in card-lift group flex items-center gap-2.5 p-3 rounded-2xl border-t border-t-white/80 dark:border-t-white/10 border ${color} text-right focus:outline-none focus:ring-4 focus:ring-primary-400/20 w-full min-h-[58px] press-scale shadow-md shadow-slate-900/5 hover:shadow-lg hover:-translate-y-0.5 active:translate-y-0.5 transition-all-smooth`}
     >
-      <div className="w-8 h-8 rounded-xl flex items-center justify-center shrink-0">
+      <div className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0 drop-shadow-sm">
         {icon}
       </div>
       <div className="min-w-0 flex-1">
         <p className="text-[10px] font-bold opacity-80 truncate">{label}</p>
         <p className="text-sm font-extrabold truncate tabular-nums">{value}</p>
       </div>
-      <ChevronLeft size={14} className="opacity-30 group-hover:opacity-90 group-hover:-translate-x-0.5 transition-all shrink-0 mr-auto text-current" />
+      <ChevronLeft size={15} className="opacity-40 group-hover:opacity-100 group-hover:-translate-x-0.5 transition-all shrink-0 mr-auto text-current" />
     </button>
   )
 }
@@ -1157,22 +1157,25 @@ export default function Dashboard() {
         </div>
       )}
       {/* ═══ Clean 1-Row Executive Header ══════════════ */}
-      <div className="tile-in flex items-center justify-between gap-2 p-3 rounded-2xl bg-white/90 dark:bg-slate-800/90 backdrop-blur-md border border-slate-200/60 dark:border-slate-700/60 shadow-xs" style={{ animationDelay: '0ms' }}>
+      <div className="tile-in flex items-center justify-between gap-2 p-3 rounded-2xl bg-white/90 dark:bg-slate-800/90 backdrop-blur-md border border-slate-200/60 dark:border-slate-700/60 shadow-md shadow-slate-900/5" style={{ animationDelay: '0ms' }}>
         {/* Right: Clinic Title + Jalali Date Badge */}
-        <div className="flex items-center gap-2 min-w-0">
-          <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-primary-500 to-violet-600 flex items-center justify-center text-white shadow-xs shrink-0">
-            <Building2 size={16} />
+        <div className="flex items-center gap-2.5 min-w-0">
+          <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-violet-500 via-purple-600 to-indigo-700 flex items-center justify-center text-white shadow-md shadow-purple-500/25 border-t border-white/40 shrink-0">
+            <Building2 size={18} />
           </div>
           <div className="min-w-0">
             <div className="flex items-center gap-1.5">
-              <span className="text-xs font-extrabold text-slate-800 dark:text-slate-100 truncate">کلینیک دندانپزشکی مینا</span>
-              <span className="text-[10px] font-bold text-primary-600 dark:text-primary-400 bg-primary-50 dark:bg-primary-950/40 border border-primary-200/50 dark:border-primary-800/50 rounded-full px-2 py-0.5 shrink-0">
+              <span className="text-xs sm:text-sm font-extrabold text-slate-800 dark:text-slate-100 truncate">کلینیک دندانپزشکی مینادنتال</span>
+              <span className="text-[10px] font-bold text-violet-700 dark:text-violet-300 bg-violet-50 dark:bg-violet-950/40 border border-violet-200/60 dark:border-violet-800/50 rounded-full px-2 py-0.5 shrink-0">
                 {roleGreeting[role] || roleGreeting.owner}
               </span>
             </div>
-            <p className="text-[11px] font-medium text-slate-500 dark:text-slate-400 truncate">
-              {toJalaliStringPretty(todayStr)}
-            </p>
+            <div className="flex items-center gap-1.5 mt-0.5">
+              <span className="inline-flex items-center gap-1 text-[11px] font-bold text-violet-700 dark:text-violet-300 bg-violet-50/80 dark:bg-violet-950/40 border border-violet-200/60 dark:border-violet-800/50 rounded-lg px-2 py-0.5 shadow-2xs">
+                <Calendar size={11} className="text-violet-500 shrink-0" />
+                {toJalaliStringPretty(todayStr)}
+              </span>
+            </div>
           </div>
         </div>
 
@@ -1183,7 +1186,7 @@ export default function Dashboard() {
               value={doctorFilter}
               onChange={(e) => { h.tap(); setDoctorFilter(e.target.value) }}
               aria-label="فیلتر پزشک"
-              className="hidden sm:block min-h-[44px] px-2.5 py-2 rounded-xl text-[11px] font-bold bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-200 border-0 focus:ring-2 focus:ring-primary-400 cursor-pointer max-w-[110px]"
+              className="hidden sm:block min-h-[44px] px-2.5 py-2 rounded-xl text-[11px] font-bold bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-200 border border-slate-200/60 dark:border-slate-600 shadow-sm focus:ring-2 focus:ring-primary-400 cursor-pointer max-w-[110px]"
             >
               <option value="all">همه پزشکان</option>
               {doctors.map((d) => (
@@ -1192,26 +1195,26 @@ export default function Dashboard() {
             </select>
           )}
 
-          {/* Refresh */}
+          {/* Refresh Button - Vibrant Emerald / Teal 3D Gradient */}
           <button
             onClick={handleRefresh}
             aria-label="به‌روزرسانی"
-            title="به‌روزرسانی"
+            title="به‌روزرسانی داده‌ها"
             disabled={refreshing}
-            className="flex items-center justify-center min-w-[44px] min-h-[44px] rounded-xl bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-600 transition-all press-scale disabled:opacity-50"
+            className="flex items-center justify-center min-w-[44px] min-h-[44px] rounded-xl bg-gradient-to-br from-teal-500 to-emerald-600 text-white shadow-md shadow-emerald-500/25 border-t border-t-white/40 border border-emerald-400/30 hover:brightness-110 active:scale-95 transition-all press-scale disabled:opacity-50"
           >
-            <RefreshCw size={15} className={refreshing ? 'animate-spin' : ''} />
+            <RefreshCw size={17} className={`drop-shadow-xs ${refreshing ? 'animate-spin' : ''}`} />
           </button>
 
-          {/* Notifications */}
+          {/* Notifications Bell - Vibrant Amber / Orange 3D Gradient */}
           <button
             onClick={() => { h.tap(); setNotifCenterOpen(true) }}
             aria-label={`مرکز اعلان‌ها${totalNotifCount > 0 ? `، ${totalNotifCount} مورد` : ''}`}
-            className="relative flex items-center justify-center min-w-[44px] min-h-[44px] rounded-xl bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-600 transition-all press-scale"
+            className="relative flex items-center justify-center min-w-[44px] min-h-[44px] rounded-xl bg-gradient-to-br from-amber-500 to-orange-500 text-white shadow-md shadow-orange-500/25 border-t border-t-white/40 border border-amber-400/30 hover:brightness-110 active:scale-95 transition-all press-scale"
           >
-            <Bell size={16} />
+            <Bell size={18} className="drop-shadow-xs" />
             {totalNotifCount > 0 && (
-              <span className="absolute -top-1 -left-1 min-w-[18px] h-[18px] px-1 rounded-full bg-error-500 text-white text-[10px] font-bold flex items-center justify-center">
+              <span className="absolute -top-1.5 -left-1.5 min-w-[20px] h-[20px] px-1 rounded-full bg-rose-600 text-white text-[10px] font-extrabold flex items-center justify-center border-2 border-white dark:border-slate-800 shadow-sm animate-pulse">
                 {toPersianDigits(Math.min(totalNotifCount, 99))}
               </span>
             )}
@@ -1221,7 +1224,7 @@ export default function Dashboard() {
           <button
             onClick={() => { h.confirm(); navigate('/appointments') }}
             aria-label="نوبت جدید"
-            className="flex items-center justify-center gap-1.5 min-h-[44px] min-w-[44px] px-3 sm:px-3.5 py-2 rounded-xl bg-gradient-to-l from-primary-600 to-violet-600 text-white text-xs font-bold shadow-xs hover:opacity-95 active:scale-95 transition-all shrink-0"
+            className="flex items-center justify-center gap-1.5 min-h-[44px] min-w-[44px] px-3 sm:px-3.5 py-2 rounded-xl bg-gradient-to-l from-primary-600 to-violet-600 text-white text-xs font-bold shadow-md shadow-primary-600/25 border-t border-white/30 hover:opacity-95 active:scale-95 transition-all shrink-0"
           >
             <Plus size={16} />
             <span className="hidden sm:inline">نوبت جدید</span>
@@ -1321,9 +1324,9 @@ export default function Dashboard() {
           onClick={() => { h.tap(); setTodayApptsExpanded(!todayApptsExpanded) }}
           className="flex items-center justify-between cursor-pointer select-none"
         >
-          <div className="flex items-center gap-2 min-w-0">
-            <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-primary-500 to-sky-600 flex items-center justify-center text-white shadow-xs shrink-0">
-              <Calendar size={16} />
+          <div className="flex items-center gap-3 min-w-0">
+            <div className="shrink-0 text-primary-600 dark:text-primary-400 drop-shadow-md transform hover:scale-105 transition-transform">
+              <GlyphAppointments size={34} />
             </div>
             <div>
               <div className="flex items-center gap-1.5">
@@ -1449,49 +1452,56 @@ export default function Dashboard() {
         </div>
       </div>
 
-      {/* ═══ Smart Hub Segmented Controls (Zero-Scroll Pocket Banking Ergonomics) ═══ */}
-      <div className="tile-in flex items-center gap-1.5 p-1 rounded-2xl bg-slate-100 dark:bg-slate-800 border border-slate-200/50 dark:border-slate-700/50 shadow-xs my-1">
+      {/* ═══ Smart Hub Segmented Controls (3 Distinct Visual Color Themes) ═══ */}
+      <div className="tile-in grid grid-cols-3 gap-1.5 p-1 rounded-2xl bg-slate-100 dark:bg-slate-800 border border-slate-200/60 dark:border-slate-700/60 shadow-xs my-1">
+        {/* Tab 1: هشدارهای کلینیک — Vibrant Amber / Orange */}
         <button
           type="button"
           onClick={() => { h.tap(); chimes.playPop(); setHubTab('alerts') }}
-          className={`flex-1 flex items-center justify-center gap-1.5 min-h-[40px] py-1.5 px-2 rounded-xl text-xs font-bold transition-all press-scale ${
+          className={`flex items-center justify-center gap-1.5 min-h-[42px] py-1.5 px-2 rounded-xl text-xs font-extrabold transition-all press-scale ${
             hubTab === 'alerts'
-              ? 'bg-white dark:bg-slate-700 text-amber-600 dark:text-amber-400 shadow-sm'
-              : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200'
+              ? 'bg-gradient-to-r from-amber-500 to-orange-500 text-white shadow-md shadow-orange-500/25 border-t border-white/30'
+              : 'bg-amber-500/10 text-amber-800 dark:text-amber-300 hover:bg-amber-500/20 border border-amber-500/20'
           }`}
         >
-          <Bell size={14} />
+          <Bell size={15} />
           <span>هشدارهای کلینیک</span>
           {totalNotifCount > 0 && (
-            <span className="px-1.5 py-0.5 rounded-full text-[10px] font-bold font-mono bg-amber-500/15 text-amber-700 dark:text-amber-300">
+            <span className={`px-1.5 py-0.5 rounded-full text-[10px] font-bold font-mono ${
+              hubTab === 'alerts'
+                ? 'bg-white/25 text-white'
+                : 'bg-amber-500/20 text-amber-800 dark:text-amber-200'
+            }`}>
               {toPersianDigits(totalNotifCount)}
             </span>
           )}
         </button>
 
+        {/* Tab 2: نمودارها و مالی — Vibrant Emerald / Green */}
         <button
           type="button"
           onClick={() => { h.tap(); chimes.playPop(); setHubTab('analytics') }}
-          className={`flex-1 flex items-center justify-center gap-1.5 min-h-[40px] py-1.5 px-2 rounded-xl text-xs font-bold transition-all press-scale ${
+          className={`flex items-center justify-center gap-1.5 min-h-[42px] py-1.5 px-2 rounded-xl text-xs font-extrabold transition-all press-scale ${
             hubTab === 'analytics'
-              ? 'bg-white dark:bg-slate-700 text-emerald-600 dark:text-emerald-400 shadow-sm'
-              : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200'
+              ? 'bg-gradient-to-r from-emerald-500 to-teal-600 text-white shadow-md shadow-emerald-500/25 border-t border-white/30'
+              : 'bg-emerald-500/10 text-emerald-800 dark:text-emerald-300 hover:bg-emerald-500/20 border border-emerald-500/20'
           }`}
         >
-          <TrendingUp size={14} />
+          <TrendingUp size={15} />
           <span>نمودارها و مالی</span>
         </button>
 
+        {/* Tab 3: مراجعات و لاگ — Vibrant Sky / Indigo */}
         <button
           type="button"
           onClick={() => { h.tap(); chimes.playPop(); setHubTab('activity') }}
-          className={`flex-1 flex items-center justify-center gap-1.5 min-h-[40px] py-1.5 px-2 rounded-xl text-xs font-bold transition-all press-scale ${
+          className={`flex items-center justify-center gap-1.5 min-h-[42px] py-1.5 px-2 rounded-xl text-xs font-extrabold transition-all press-scale ${
             hubTab === 'activity'
-              ? 'bg-white dark:bg-slate-700 text-sky-600 dark:text-sky-400 shadow-sm'
-              : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200'
+              ? 'bg-gradient-to-r from-sky-500 to-indigo-600 text-white shadow-md shadow-sky-500/25 border-t border-white/30'
+              : 'bg-sky-500/10 text-sky-800 dark:text-sky-300 hover:bg-sky-500/20 border border-sky-500/20'
           }`}
         >
-          <Activity size={14} />
+          <Activity size={15} />
           <span>مراجعات و لاگ</span>
         </button>
       </div>
@@ -1507,7 +1517,7 @@ export default function Dashboard() {
             <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2">
               {/* 1. چک‌های سررسید و برگشتی */}
               <AlertWidget
-                icon={<div className="w-full h-full rounded-xl bg-orange-100 dark:bg-orange-900/40 flex items-center justify-center text-orange-600 dark:text-orange-400"><Banknote size={20} /></div>}
+                icon={<div className="w-full h-full rounded-xl bg-orange-100 dark:bg-orange-900/40 flex items-center justify-center text-orange-600 dark:text-orange-400 shadow-2xs"><Banknote size={22} /></div>}
                 label="چک‌های سررسید و برگشتی"
                 value={smartReminders.cheque_due.length > 0 ? `${toPersianDigits(smartReminders.cheque_due.length)} فقره` : '۰ فقره'}
                 color={smartReminders.cheque_due.length > 0 ? "border-orange-200 dark:border-orange-700 bg-orange-50 dark:bg-orange-900/20 text-orange-800 dark:text-orange-300" : "border-slate-200 dark:border-slate-700/60 bg-white/70 dark:bg-slate-800/40 text-slate-600 dark:text-slate-400"}
@@ -1517,37 +1527,37 @@ export default function Dashboard() {
 
               {/* 2. ایمپلنت‌های آماده اقدام */}
               <AlertWidget
-                icon={<div className="w-full h-full rounded-xl bg-sky-100 dark:bg-sky-900/40 flex items-center justify-center text-sky-600 dark:text-sky-400"><Activity size={20} /></div>}
+                icon={<div className="w-full h-full rounded-xl bg-cyan-100 dark:bg-cyan-900/40 flex items-center justify-center text-cyan-600 dark:text-cyan-400 shadow-2xs"><GlyphImplants size={22} /></div>}
                 label="ایمپلنت‌های آماده اقدام"
                 value={smartReminders.implant_stage_due.length > 0 ? `${toPersianDigits(smartReminders.implant_stage_due.length)} مورد` : '۰ مورد'}
-                color={smartReminders.implant_stage_due.length > 0 ? "border-sky-200 dark:border-sky-700 bg-sky-50 dark:bg-sky-900/20 text-sky-800 dark:text-sky-300" : "border-slate-200 dark:border-slate-700/60 bg-white/70 dark:bg-slate-800/40 text-slate-600 dark:text-slate-400"}
+                color={smartReminders.implant_stage_due.length > 0 ? "border-cyan-200 dark:border-cyan-700 bg-cyan-50 dark:bg-cyan-900/20 text-cyan-800 dark:text-cyan-300" : "border-slate-200 dark:border-slate-700/60 bg-white/70 dark:bg-slate-800/40 text-slate-600 dark:text-slate-400"}
                 onClick={() => setDrillDown('implants')}
                 delay={480}
               />
 
               {/* 3. مانده بدهی بیماران */}
               <AlertWidget
-                icon={<div className="w-full h-full rounded-xl bg-warning-100 dark:bg-warning-900/40 flex items-center justify-center text-warning-600 dark:text-warning-400"><Wallet size={20} /></div>}
+                icon={<div className="w-full h-full rounded-xl bg-amber-100 dark:bg-amber-900/40 flex items-center justify-center text-amber-600 dark:text-amber-400 shadow-2xs"><Wallet size={22} /></div>}
                 label="مانده بدهی بیماران"
                 value={outstandingBalance > 0 ? `${formatCurrency(outstandingBalance)} ت` : 'تسویه کامل'}
-                color={outstandingBalance > 0 ? "border-warning-200 dark:border-warning-700 bg-warning-50 dark:bg-warning-900/20 text-warning-800 dark:text-warning-300" : "border-slate-200 dark:border-slate-700/60 bg-white/70 dark:bg-slate-800/40 text-slate-600 dark:text-slate-400"}
+                color={outstandingBalance > 0 ? "border-amber-200 dark:border-amber-700 bg-amber-50 dark:bg-amber-900/20 text-amber-800 dark:text-amber-300" : "border-slate-200 dark:border-slate-700/60 bg-white/70 dark:bg-slate-800/40 text-slate-600 dark:text-slate-400"}
                 onClick={() => setDrillDown('debtors')}
                 delay={520}
               />
 
               {/* 4. سفارش تأخیر یافته */}
               <AlertWidget
-                icon={<div className="w-full h-full rounded-xl bg-error-100 dark:bg-error-900/40 flex items-center justify-center text-error-600 dark:text-error-400"><AlertTriangle size={20} /></div>}
+                icon={<div className="w-full h-full rounded-xl bg-rose-100 dark:bg-rose-900/40 flex items-center justify-center text-rose-600 dark:text-rose-400 shadow-2xs"><AlertTriangle size={22} /></div>}
                 label="سفارش تأخیر یافته"
                 value={overdueLabCount > 0 ? `${toPersianDigits(overdueLabCount)} مورد` : 'بدون تأخیر'}
-                color={overdueLabCount > 0 ? "border-error-200 dark:border-error-700 bg-error-50 dark:bg-error-900/20 text-error-800 dark:text-error-300" : "border-slate-200 dark:border-slate-700/60 bg-white/70 dark:bg-slate-800/40 text-slate-600 dark:text-slate-400"}
+                color={overdueLabCount > 0 ? "border-rose-200 dark:border-rose-700 bg-rose-50 dark:bg-rose-900/20 text-rose-800 dark:text-rose-300" : "border-slate-200 dark:border-slate-700/60 bg-white/70 dark:bg-slate-800/40 text-slate-600 dark:text-slate-400"}
                 onClick={() => setDrillDown('overdue_lab')}
                 delay={560}
               />
 
               {/* 5. لابراتوار آماده تحویل */}
               <AlertWidget
-                icon={<div className="w-full h-full rounded-xl bg-emerald-100 dark:bg-emerald-900/40 flex items-center justify-center text-emerald-600 dark:text-emerald-400"><FlaskConical size={20} /></div>}
+                icon={<div className="w-full h-full rounded-xl bg-emerald-100 dark:bg-emerald-900/40 flex items-center justify-center text-emerald-600 dark:text-emerald-400 shadow-2xs"><GlyphLaboratory size={22} /></div>}
                 label="لابراتوار آماده تحویل"
                 value={readyLabCount > 0 ? `${toPersianDigits(readyLabCount)} مورد` : '۰ مورد'}
                 color={readyLabCount > 0 ? "border-emerald-200 dark:border-emerald-700 bg-emerald-50 dark:bg-emerald-900/20 text-emerald-800 dark:text-emerald-300" : "border-slate-200 dark:border-slate-700/60 bg-white/70 dark:bg-slate-800/40 text-slate-600 dark:text-slate-400"}
@@ -1557,7 +1567,7 @@ export default function Dashboard() {
 
               {/* 6. اقساط سررسید شده */}
               <AlertWidget
-                icon={<div className="w-full h-full rounded-xl bg-violet-100 dark:bg-violet-900/40 flex items-center justify-center text-violet-600 dark:text-violet-400"><CalendarClock size={20} /></div>}
+                icon={<div className="w-full h-full rounded-xl bg-violet-100 dark:bg-violet-900/40 flex items-center justify-center text-violet-600 dark:text-violet-400 shadow-2xs"><CalendarClock size={22} /></div>}
                 label="اقساط سررسید شده"
                 value={smartReminders.installment_due.length > 0 ? `${toPersianDigits(smartReminders.installment_due.length)} قسط` : '۰ قسط'}
                 color={smartReminders.installment_due.length > 0 ? "border-violet-200 dark:border-violet-700 bg-violet-50 dark:bg-violet-900/20 text-violet-800 dark:text-violet-300" : "border-slate-200 dark:border-slate-700/60 bg-white/70 dark:bg-slate-800/40 text-slate-600 dark:text-slate-400"}
