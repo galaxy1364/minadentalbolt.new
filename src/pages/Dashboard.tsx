@@ -46,6 +46,7 @@ import { findPostOpCheckups, findSutureRemovalReminders, findHygieneRecalls } fr
 import { calcAllPatientBalances } from '../lib/finance'
 import { readyForDelivery } from '../lib/labShelf'
 import { supabase } from '../lib/supabase'
+import { getClinicSetting, setClinicSetting } from '../lib/clinicSettings'
 import { useAuth } from '../lib/auth'
 import DoctorDashboard from './DoctorDashboard'
 import { ErrorBoundary } from '../components/ErrorBoundary'
@@ -841,18 +842,26 @@ export default function Dashboard() {
   }, [appointments, inPrevRange, doctorFilter])
   const apptChange = prevApptCount > 0 ? Math.round(((currentApptCount - prevApptCount) / prevApptCount) * 100) : 0
 
-  // ── KPI goal (daily appointment target) — simple localStorage-backed
-  // target, editable inline. Only meaningful for the 'today' range.
-  const [apptGoal, setApptGoal] = useState<number>(() => {
-    const stored = localStorage.getItem('minadent-appt-goal')
-    return stored ? Number(stored) : 15
-  })
+  // ── KPI goal (daily appointment target) ──
+  // Clinic-wide setting — synced across devices via Supabase.
+  // Falls back to localStorage / default of 15 while loading.
+  const [apptGoal, setApptGoalState] = useState<number>(15)
   const [editingGoal, setEditingGoal] = useState(false)
-  const [goalDraft, setGoalDraft] = useState(String(apptGoal))
+  const [goalDraft, setGoalDraft] = useState('15')
+
+  // Load from Supabase on mount
+  useEffect(() => {
+    getClinicSetting<{ value: number }>('appt_goal').then((stored) => {
+      const n = stored?.value ?? 15
+      setApptGoalState(n)
+      setGoalDraft(String(n))
+    })
+  }, [])
+
   const saveGoal = () => {
     const n = Math.max(1, Number(goalDraft) || apptGoal)
-    setApptGoal(n)
-    localStorage.setItem('minadent-appt-goal', String(n))
+    setApptGoalState(n)
+    setClinicSetting('appt_goal', { value: n })
     setEditingGoal(false)
   }
 

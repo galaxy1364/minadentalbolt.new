@@ -28,6 +28,7 @@ import { syncNow, subscribeSync, SyncStatus, getFailedSyncEntries, retryFailedEn
 import { pingRealtime } from '../lib/realtimeSync'
 import { toJalaliString, toJalaliStringPretty, formatCurrency, formatNumber, toPersianDigits } from '../lib/persianDate'
 import { supabase } from '../lib/supabase'
+import { getClinicSetting, setClinicSetting, loadAllClinicSettings } from '../lib/clinicSettings'
 import {
   SmsTemplate, TreatmentPackage, Doctor, Unit, Procedure, InventoryCategory, DoctorSchedule,
   DoctorInput, UnitInput, ProcedureInput, TreatmentPackageInput, InventoryCategoryInput, Patient,
@@ -195,35 +196,37 @@ export default function Settings() {
 
   const totalRecords = useMemo(() => Object.values(recordCounts).reduce((a, b) => a + b, 0), [recordCounts])
 
-  // ── Persist general/fileNumber to localStorage ──
+  // ── Persist clinic-wide settings to Supabase (cross-device sync) ──
+  // Per-device preferences (haptics, sound) stay in localStorage.
   const handleSaveGeneral = () => {
     h.confirm()
     chimes.playSuccess()
-    try { localStorage.setItem('minadent_general', JSON.stringify(generalForm)) } catch {}
+    setClinicSetting('general', generalForm)
     showToast('success', 'تنظیمات عمومی ذخیره شد')
   }
   const handleSaveFileNumber = () => {
     h.confirm()
     chimes.playSuccess()
-    try { localStorage.setItem('minadent_fileNumber', JSON.stringify(fileNumberForm)) } catch {}
+    setClinicSetting('fileNumber', fileNumberForm)
     showToast('success', 'تنظیمات شماره پرونده ذخیره شد')
   }
   const handleSavePos = () => {
     h.confirm()
     chimes.playSuccess()
-    try { localStorage.setItem('minadent_pos', JSON.stringify(posForm)) } catch {}
+    setClinicSetting('pos', posForm)
     showToast('success', 'تنظیمات دستگاه کارتخوان ذخیره شد')
   }
 
   useEffect(() => {
-    try {
-      const g = localStorage.getItem('minadent_general')
-      if (g) setGeneralForm(JSON.parse(g))
-      const f = localStorage.getItem('minadent_fileNumber')
-      if (f) setFileNumberForm(JSON.parse(f))
-      const p = localStorage.getItem('minadent_pos')
-      if (p) setPosForm(JSON.parse(p))
-    } catch {}
+    // Load clinic-wide settings from Supabase (with localStorage offline fallback)
+    loadAllClinicSettings().then((settings) => {
+      if (settings.general && Object.keys(settings.general as object).length > 0)
+        setGeneralForm(settings.general as typeof generalForm)
+      if (settings.fileNumber && Object.keys(settings.fileNumber as object).length > 0)
+        setFileNumberForm(settings.fileNumber as typeof fileNumberForm)
+      if (settings.pos && Object.keys(settings.pos as object).length > 0)
+        setPosForm(settings.pos as typeof posForm)
+    })
   }, [])
 
   const toggleHaptics = () => {

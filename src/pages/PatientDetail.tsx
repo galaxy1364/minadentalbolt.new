@@ -42,6 +42,7 @@ import { parseRadiologyTeeth, matchesRadiologyTooth, generateRadiologyPortfolioH
 import { createPatientRadiologyZip, downloadBlob } from '../lib/zipArchive'
 import { buildPatientMedicationGuideDocument } from '../lib/patientMedicationGuide'
 import { usePrivacyMode } from '../lib/privacyMask'
+import { getClinicSetting } from '../lib/clinicSettings'
 
 // ============================================================================
 // Constants
@@ -436,10 +437,10 @@ export default function PatientDetail() {
   }, [id])
 
   useEffect(() => {
-    try {
-      const p = localStorage.getItem('minadent_pos')
-      if (p) setPosConfig(JSON.parse(p))
-    } catch {}
+    // Load POS config from Supabase (cross-device) with localStorage fallback
+    getClinicSetting<{ ip: string; port: string; enabled: boolean }>('pos').then((cfg) => {
+      if (cfg && Object.keys(cfg).length > 0) setPosConfig(cfg)
+    })
   }, [])
 
   useEffect(() => {
