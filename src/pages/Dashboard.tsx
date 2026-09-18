@@ -216,7 +216,7 @@ function StatTile({
       onClick={() => { h.tap(); onClick?.() }}
       aria-label={ariaLabel || label}
       style={{ animationDelay: `${delay}ms` }}
-      className={`tile-in card-lift relative overflow-hidden rounded-2xl bg-gradient-to-br ${theme.bg} border border-slate-100 dark:border-slate-700 shadow-sm p-3 text-right group focus:outline-none focus:ring-4 ${theme.ring}`}
+      className={`tile-in card-lift relative overflow-hidden rounded-2xl bg-gradient-to-br ${theme.bg} border border-slate-100 dark:border-slate-700 shadow-sm p-3 text-right group focus:outline-none focus:ring-4 ${theme.ring} press-scale`}
     >
       <div className={`absolute -top-6 -left-6 w-24 h-24 rounded-full bg-gradient-to-br ${theme.blob} to-transparent blur-xl pointer-events-none breathe-slow`} />
       <div className="relative flex items-center gap-2 mb-1.5">
@@ -237,6 +237,13 @@ function StatTile({
           </span>
         )}
       </div>
+      {sparkData && sparkData.length > 1 && (
+        <div className="relative mt-1.5 flex items-center justify-between pointer-events-none">
+          <div className="opacity-70 group-hover:opacity-100 transition-opacity">
+            <Sparkline data={sparkData} color={theme.solidColor} width={56} height={18} />
+          </div>
+        </div>
+      )}
       {goalPct !== null && (
         <div className="relative mt-1.5">
           <div className="h-1 rounded-full bg-black/5 dark:bg-white/10 overflow-hidden">
@@ -286,15 +293,16 @@ function AlertWidget({ icon, label, value, color, onClick, delay }: { icon: Reac
       onClick={() => { h.warning(); onClick() }}
       aria-label={label}
       style={{ animationDelay: `${delay}ms` }}
-      className={`tile-in card-lift flex items-center gap-2 p-2.5 rounded-xl border ${color} text-right focus:outline-none focus:ring-4 focus:ring-error/20 flex-shrink-0 min-w-[155px] sm:min-w-0`}
+      className={`tile-in card-lift group flex items-center gap-2 p-2.5 rounded-2xl border ${color} text-right focus:outline-none focus:ring-4 focus:ring-primary-400/20 w-full min-h-[52px] press-scale shadow-xs hover:shadow-sm transition-all-smooth`}
     >
-      <div className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0">
+      <div className="w-8 h-8 rounded-xl flex items-center justify-center shrink-0">
         {icon}
       </div>
       <div className="min-w-0 flex-1">
         <p className="text-[10px] font-bold opacity-80 truncate">{label}</p>
-        <p className="text-sm font-extrabold truncate">{value}</p>
+        <p className="text-sm font-extrabold truncate tabular-nums">{value}</p>
       </div>
+      <ChevronLeft size={14} className="opacity-30 group-hover:opacity-90 group-hover:-translate-x-0.5 transition-all shrink-0 mr-auto text-current" />
     </button>
   )
 }
@@ -1175,7 +1183,7 @@ export default function Dashboard() {
               value={doctorFilter}
               onChange={(e) => { h.tap(); setDoctorFilter(e.target.value) }}
               aria-label="فیلتر پزشک"
-              className="min-h-[44px] px-2.5 py-2 rounded-xl text-[11px] font-bold bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-200 border-0 focus:ring-2 focus:ring-primary-400 cursor-pointer max-w-[110px]"
+              className="hidden sm:block min-h-[44px] px-2.5 py-2 rounded-xl text-[11px] font-bold bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-200 border-0 focus:ring-2 focus:ring-primary-400 cursor-pointer max-w-[110px]"
             >
               <option value="all">همه پزشکان</option>
               {doctors.map((d) => (
@@ -1213,10 +1221,10 @@ export default function Dashboard() {
           <button
             onClick={() => { h.confirm(); navigate('/appointments') }}
             aria-label="نوبت جدید"
-            className="flex items-center gap-1.5 min-h-[44px] px-3.5 py-2 rounded-xl bg-gradient-to-l from-primary-600 to-violet-600 text-white text-xs font-bold shadow-xs hover:opacity-95 active:scale-95 transition-all"
+            className="flex items-center justify-center gap-1.5 min-h-[44px] min-w-[44px] px-3 sm:px-3.5 py-2 rounded-xl bg-gradient-to-l from-primary-600 to-violet-600 text-white text-xs font-bold shadow-xs hover:opacity-95 active:scale-95 transition-all shrink-0"
           >
-            <Plus size={15} />
-            <span>نوبت جدید</span>
+            <Plus size={16} />
+            <span className="hidden sm:inline">نوبت جدید</span>
           </button>
         </div>
       </div>
