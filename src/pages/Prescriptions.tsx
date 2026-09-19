@@ -564,7 +564,38 @@ export default function Prescriptions() {
                       <Pill size={20} />
                     </div>
                     <div>
-                      <h3 className="font-bold text-slate-800">{patientName(p)}</h3>
+                      <div className="flex items-center gap-1.5 flex-wrap">
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            h.tap()
+                            if (p.patient_id) navigate(`/patients/${p.patient_id}`, { state: { initialTab: 'treatments' } })
+                          }}
+                          className="font-bold text-slate-800 dark:text-slate-100 hover:text-primary-600 dark:hover:text-primary-400 hover:underline cursor-pointer"
+                          title="مشاهده پرونده کامل بیمار"
+                        >
+                          {patientName(p)}
+                        </button>
+                        {(() => {
+                          const pat = patients.find((pt) => pt.id === p.patient_id)
+                          return pat?.file_number ? (
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation()
+                                h.tap()
+                                if (p.patient_id) navigate(`/patients/${p.patient_id}`)
+                              }}
+                              title="شماره پرونده بیمار"
+                              className="inline-flex items-center gap-1 px-1.5 py-0.2 rounded bg-slate-900 dark:bg-primary-950 text-white dark:text-primary-300 text-[10px] font-mono font-bold hover:scale-105 active:scale-95 transition-all cursor-pointer"
+                              dir="ltr"
+                            >
+                              <span>{toPersianDigits(pat.file_number)}</span>
+                            </button>
+                          ) : null
+                        })()}
+                      </div>
                       <p className="text-xs text-slate-500">پزشک: {doctorName(p)}</p>
                     </div>
                   </div>

@@ -501,8 +501,34 @@ export default function WaitingList() {
                             <Clock size={20} />
                           </div>
                           <div className="min-w-0 flex-1">
-                            <div className="flex items-center gap-2 flex-wrap">
-                              <h3 className="font-bold text-slate-800 dark:text-slate-100 truncate">{patientName(e)}</h3>
+                            <div className="flex items-center gap-1.5 flex-wrap">
+                              <button
+                                type="button"
+                                onClick={(ev) => {
+                                  ev.stopPropagation()
+                                  h.tap()
+                                  if (e.patient_id) navigate(`/patients/${e.patient_id}`)
+                                }}
+                                className="font-bold text-slate-800 dark:text-slate-100 hover:text-primary-600 dark:hover:text-primary-400 hover:underline cursor-pointer text-right"
+                                title="مشاهده پرونده کامل بیمار"
+                              >
+                                {patientName(e)}
+                              </button>
+                              {e.patient?.file_number && (
+                                <button
+                                  type="button"
+                                  onClick={(ev) => {
+                                    ev.stopPropagation()
+                                    h.tap()
+                                    if (e.patient_id) navigate(`/patients/${e.patient_id}`)
+                                  }}
+                                  title="شماره پرونده بیمار"
+                                  className="inline-flex items-center gap-1 px-1.5 py-0.2 rounded bg-slate-900 dark:bg-primary-950 text-white dark:text-primary-300 text-[10px] font-mono font-bold hover:scale-105 active:scale-95 transition-all cursor-pointer"
+                                  dir="ltr"
+                                >
+                                  <span>{toPersianDigits(e.patient.file_number)}</span>
+                                </button>
+                              )}
                               <Badge color={pColor}>{pLabel}</Badge>
                               <Badge color={meta.color}>{meta.label}</Badge>
                             </div>

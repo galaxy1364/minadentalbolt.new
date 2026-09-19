@@ -327,6 +327,7 @@ function AppointmentRow({ apt, index, patientName, doctorName, onClick }: {
   doctorName: (a: AppointmentWithRelations) => string
   onClick: () => void
 }) {
+  const navigate = useNavigate()
   const statusColor = appointmentStatusColors[apt.status] || 'slate'
   const statusLabel = appointmentStatusLabels[apt.status] || apt.status
   const isCancelled = apt.status === 'cancelled' || apt.status === 'no_show'
@@ -350,8 +351,34 @@ function AppointmentRow({ apt, index, patientName, doctorName, onClick }: {
         <span className="text-xs font-bold">{formatTime(apt.start_time)}</span>
         {isInChair && <Timer size={12} className="text-white mt-0.5 animate-pulse" />}
       </div>
-      <div className="min-w-0 flex-1 relative z-10">
-        <p className="text-sm font-bold text-slate-800 dark:text-slate-100 break-words leading-tight">{pName}</p>
+      <div className="min-w-0 flex-1 relative z-10" onClick={(e) => e.stopPropagation()}>
+        <div className="flex items-center gap-1.5 flex-wrap">
+          <button
+            type="button"
+            onClick={() => {
+              h.tap()
+              if (apt.patient_id) navigate(`/patients/${apt.patient_id}`)
+            }}
+            title="مشاهده پرونده کامل بیمار"
+            className="text-sm font-bold text-slate-800 dark:text-slate-100 hover:text-primary-600 dark:hover:text-primary-400 hover:underline text-right cursor-pointer"
+          >
+            {pName}
+          </button>
+          {apt.patient?.file_number && (
+            <button
+              type="button"
+              onClick={() => {
+                h.tap()
+                if (apt.patient_id) navigate(`/patients/${apt.patient_id}`)
+              }}
+              title="شماره پرونده بیمار"
+              className="inline-flex items-center gap-1 px-1.5 py-0.2 rounded bg-slate-900 dark:bg-primary-950 text-white dark:text-primary-300 text-[10px] font-mono font-bold hover:scale-105 active:scale-95 transition-all cursor-pointer"
+              dir="ltr"
+            >
+              <span>{toPersianDigits(apt.patient.file_number)}</span>
+            </button>
+          )}
+        </div>
         <p className="text-xs text-slate-500 dark:text-slate-400 truncate">{doctorName(apt)}</p>
       </div>
       <div className="relative z-10">
@@ -383,7 +410,15 @@ function PatientRow({ patient, index, onClick }: { patient: Patient; index: numb
         {initials}
       </div>
       <div className="min-w-0 flex-1 relative z-10">
-        <p className="text-sm font-medium text-slate-800 dark:text-slate-100 truncate">{patient.first_name} {patient.last_name}</p>
+        <div className="flex items-center gap-1.5 flex-wrap">
+          <p className="text-sm font-medium text-slate-800 dark:text-slate-100 truncate">{patient.first_name} {patient.last_name}</p>
+          {patient.file_number && (
+            <span className="inline-flex items-center gap-1 px-1.5 py-0.2 rounded bg-slate-900 dark:bg-primary-950 text-white dark:text-primary-300 text-[10px] font-mono font-bold" dir="ltr">
+              <FileText size={9} className="text-primary-400" />
+              <span>{toPersianDigits(patient.file_number)}</span>
+            </span>
+          )}
+        </div>
         <p className="text-xs text-slate-500 dark:text-slate-400">{patient.phone ? toPersianDigits(patient.phone) : 'بدون تلفن'}</p>
       </div>
       {patient.vip_level && patient.vip_level > 0 && (
@@ -1734,7 +1769,14 @@ export default function Dashboard() {
                                   {r.patient.first_name[0]}
                                 </div>
                                 <div className="flex-1 min-w-0">
-                                  <p className="text-sm font-semibold text-slate-800 dark:text-slate-100 truncate">{r.title}</p>
+                                  <div className="flex items-center gap-1.5 flex-wrap">
+                                    <p className="text-sm font-semibold text-slate-800 dark:text-slate-100 truncate">{r.title}</p>
+                                    {r.patient.file_number && (
+                                      <span className="text-[9px] font-mono px-1 py-0.2 bg-slate-900 dark:bg-primary-950 text-white dark:text-primary-300 rounded font-bold" dir="ltr">
+                                        {toPersianDigits(r.patient.file_number)}
+                                      </span>
+                                    )}
+                                  </div>
                                   <p className="text-[11px] text-slate-500 dark:text-slate-400 truncate">{r.detail}</p>
                                 </div>
                                 <div className="flex items-center gap-1.5 shrink-0">

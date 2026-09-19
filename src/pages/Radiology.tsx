@@ -583,11 +583,52 @@ export default function Radiology() {
                         <Badge color={meta.color}>{meta.label}</Badge>
                       </div>
                     </div>
-                    <div className="p-3">
-                      <p className="text-sm font-medium text-slate-800 truncate">{patientName(img)}</p>
+                    <div className="p-3" onClick={(e) => e.stopPropagation()}>
+                      <div className="flex items-center gap-1.5 flex-wrap">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            h.tap()
+                            if (img.patient_id) navigate(`/patients/${img.patient_id}`)
+                          }}
+                          className="text-sm font-bold text-slate-800 dark:text-slate-100 hover:text-primary-600 dark:hover:text-primary-400 hover:underline text-right cursor-pointer"
+                          title="مشاهده پرونده کامل بیمار"
+                        >
+                          {patientName(img)}
+                        </button>
+                        {(() => {
+                          const pat = patients.find((p) => p.id === img.patient_id)
+                          return pat?.file_number ? (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                h.tap()
+                                if (img.patient_id) navigate(`/patients/${img.patient_id}`)
+                              }}
+                              title="شماره پرونده بیمار"
+                              className="inline-flex items-center gap-1 px-1.5 py-0.2 rounded bg-slate-900 dark:bg-primary-950 text-white dark:text-primary-300 text-[10px] font-mono font-bold hover:scale-105 active:scale-95 transition-all cursor-pointer"
+                              dir="ltr"
+                            >
+                              <span>{toPersianDigits(pat.file_number)}</span>
+                            </button>
+                          ) : null
+                        })()}
+                      </div>
                       <div className="flex items-center justify-between mt-1">
                         <span className="text-xs text-slate-500">
-                          {img.tooth_number ? `دندان ${toothLabel(img.tooth_number)}` : '-'}
+                          {img.tooth_number ? (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                h.tap()
+                                if (img.patient_id) navigate(`/patients/${img.patient_id}`, { state: { initialTab: 'teeth' } })
+                              }}
+                              className="text-primary-600 dark:text-primary-400 hover:underline font-medium cursor-pointer"
+                              title="مشاهده چارت دندانی"
+                            >
+                              دندان {toothLabel(img.tooth_number)}
+                            </button>
+                          ) : '-'}
                         </span>
                         <span className="text-xs text-slate-400">
                           {img.taken_at ? toJalaliDisplay(img.taken_at) : toJalaliDisplay(img.created_at)}
@@ -681,17 +722,41 @@ export default function Radiology() {
 
               {/* Info grid */}
               <div className="grid grid-cols-2 gap-3">
-                <div className="bg-slate-50 rounded-xl p-3">
+                <div className="bg-slate-50 dark:bg-slate-800 rounded-xl p-3">
                   <p className="text-xs text-slate-400 flex items-center gap-1 mb-1"><User size={12} /> بیمار</p>
-                  <p className="text-sm font-medium text-slate-800">{patientName(selectedImage)}</p>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      h.tap()
+                      if (selectedImage.patient_id) navigate(`/patients/${selectedImage.patient_id}`)
+                    }}
+                    className="text-sm font-bold text-slate-800 dark:text-slate-100 hover:text-primary-600 dark:hover:text-primary-400 hover:underline cursor-pointer text-right"
+                    title="مشاهده پرونده کامل بیمار"
+                  >
+                    {patientName(selectedImage)}
+                  </button>
                 </div>
-                <div className="bg-slate-50 rounded-xl p-3">
+                <div className="bg-slate-50 dark:bg-slate-800 rounded-xl p-3">
                   <p className="text-xs text-slate-400 flex items-center gap-1 mb-1"><Image size={12} /> نوع تصویر</p>
                   <Badge color={getTypeMeta(selectedImage.image_type).color}>{getTypeMeta(selectedImage.image_type).label}</Badge>
                 </div>
-                <div className="bg-slate-50 rounded-xl p-3">
+                <div className="bg-slate-50 dark:bg-slate-800 rounded-xl p-3">
                   <p className="text-xs text-slate-400 flex items-center gap-1 mb-1"><Smile size={12} /> دندان</p>
-                  <p className="text-sm font-medium text-slate-800">{selectedImage.tooth_number ? toothLabel(selectedImage.tooth_number) : '-'}</p>
+                  {selectedImage.tooth_number ? (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        h.tap()
+                        if (selectedImage.patient_id) navigate(`/patients/${selectedImage.patient_id}`, { state: { initialTab: 'teeth' } })
+                      }}
+                      className="text-sm font-bold text-primary-600 dark:text-primary-400 hover:underline cursor-pointer text-right"
+                      title="مشاهده چارت دندانی در پرونده"
+                    >
+                      {toothLabel(selectedImage.tooth_number)}
+                    </button>
+                  ) : (
+                    <p className="text-sm font-medium text-slate-800 dark:text-slate-200">-</p>
+                  )}
                 </div>
                 <div className="bg-slate-50 rounded-xl p-3">
                   <p className="text-xs text-slate-400 flex items-center gap-1 mb-1"><Calendar size={12} /> تاریخ</p>
