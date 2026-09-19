@@ -5,10 +5,10 @@
 > اولویت، و کارهایی که فقط مهدی می‌تواند انجام دهد.
 
 > **این اولین فایلی است که باید خوانده شود.**
-> پس از خواندن این سند، `ENGINEERING-STANDARD.md` و
-> `COMPETITOR-AUDIT-minadent.md` را هم بخوان، بعد شروع کن.
+> پس از خواندن این سند، حتماً سند حافظه دائمی پروژه [PERMANENT_MEMORY.md](file:///c:/Users/mosta/Desktop/minadentalbolt.new-main/minadentalbolt.new-main/PERMANENT_MEMORY.md)، `ENGINEERING-STANDARD.md` و
+> `AUDIT-MASTER-0-100.md` را هم بخوان، بعد شروع کن.
 >
-> **آخرین به‌روزرسانی:** ۱۴۰۵/۰۶/۰۹ | **نسخه:** v1.171.0 | **۵۴۷ تست**
+> **آخرین به‌روزرسانی:** ۱۴۰۵/۰۶/۲۹ | **نسخه:** v1.235.20 | **۱,۵۳۲ تست پاس‌شده (۱۰۵ سوئیت آزمون)**
 
 ---
 

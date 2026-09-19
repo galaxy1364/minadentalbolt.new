@@ -216,7 +216,7 @@ function StatTile({
       onClick={() => { h.tap(); onClick?.() }}
       aria-label={ariaLabel || label}
       style={{ animationDelay: `${delay}ms` }}
-      className={`tile-in card-lift relative overflow-hidden rounded-2xl bg-gradient-to-br ${theme.bg} border border-slate-100 dark:border-slate-700 shadow-sm p-3 text-right group focus:outline-none focus:ring-4 ${theme.ring} press-scale`}
+      className={`tile-in card-lift card-tactile-3d relative overflow-hidden rounded-2xl bg-gradient-to-br ${theme.bg} border border-slate-100 dark:border-slate-700 shadow-sm p-3 text-right group focus:outline-none focus:ring-4 ${theme.ring} press-scale`}
     >
       <div className={`absolute -top-6 -left-6 w-24 h-24 rounded-full bg-gradient-to-br ${theme.blob} to-transparent blur-xl pointer-events-none breathe-slow`} />
       <div className="relative flex items-center gap-2 mb-1.5">
@@ -249,11 +249,14 @@ function StatTile({
           <div className="h-1 rounded-full bg-black/5 dark:bg-white/10 overflow-hidden">
             <div className={`h-full rounded-full ${theme.iconBg} transition-all duration-700`} style={{ width: `${goalPct}%` }} />
           </div>
-          <p className="text-[9px] text-slate-400 mt-0.5">{toPersianDigits(goalPct)}٪ از هدف {toPersianDigits(goal!)}</p>
+          <div className="flex items-center justify-between mt-0.5 text-[9px] text-slate-400">
+            <span>پیشرفت روزانه</span>
+            <span>{toPersianDigits(goalPct)}٪</span>
+          </div>
         </div>
       )}
       {narrative && (
-        <p className="relative text-[9px] text-slate-400 dark:text-slate-500 mt-1 truncate">{narrative}</p>
+        <p className="relative mt-1 text-[10px] text-slate-400 dark:text-slate-500 truncate">{narrative}</p>
       )}
     </button>
   )
@@ -270,7 +273,7 @@ function QuickAction({ icon, label, color, onClick, delay }: { icon: React.React
       onClick={() => { h.select(); onClick() }}
       aria-label={label}
       style={{ animationDelay: `${delay}ms` }}
-      className={`tile-in card-lift relative overflow-hidden flex flex-col items-center justify-center gap-1.5 p-2 rounded-2xl bg-gradient-to-br ${theme.bg} border-t border-t-white/80 dark:border-t-white/10 border border-slate-200/60 dark:border-slate-700 shadow-md shadow-slate-900/5 min-h-[66px] flex-1 focus:outline-none focus:ring-4 ${theme.ring} press-scale hover:-translate-y-0.5 active:translate-y-0.5 transition-all`}
+      className={`tile-in card-lift card-tactile-3d relative overflow-hidden flex flex-col items-center justify-center gap-1.5 p-2 rounded-2xl bg-gradient-to-br ${theme.bg} border-t border-t-white/80 dark:border-t-white/10 border border-slate-200/60 dark:border-slate-700 shadow-md shadow-slate-900/5 min-h-[66px] flex-1 focus:outline-none focus:ring-4 ${theme.ring} press-scale hover:-translate-y-0.5 active:translate-y-0.5 transition-all`}
     >
       <div className={`absolute -bottom-6 -left-6 w-16 h-16 rounded-full bg-gradient-to-br ${theme.blob} to-transparent blur-lg pointer-events-none opacity-40`} />
       <ModuleIconBadge color={theme.solidColor} size={28}>
@@ -293,7 +296,7 @@ function AlertWidget({ icon, label, value, color, onClick, delay }: { icon: Reac
       onClick={() => { h.warning(); onClick() }}
       aria-label={label}
       style={{ animationDelay: `${delay}ms` }}
-      className={`tile-in card-lift group flex items-center gap-2.5 p-3 rounded-2xl border-t border-t-white/80 dark:border-t-white/10 border ${color} text-right focus:outline-none focus:ring-4 focus:ring-primary-400/20 w-full min-h-[58px] press-scale shadow-md shadow-slate-900/5 hover:shadow-lg hover:-translate-y-0.5 active:translate-y-0.5 transition-all-smooth`}
+      className={`tile-in card-lift card-tactile-3d group flex items-center gap-2.5 p-3 rounded-2xl border-t border-t-white/80 dark:border-t-white/10 border ${color} text-right focus:outline-none focus:ring-4 focus:ring-primary-400/20 w-full min-h-[58px] press-scale shadow-md shadow-slate-900/5 hover:shadow-lg hover:-translate-y-0.5 active:translate-y-0.5 transition-all-smooth`}
     >
       <div className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0 drop-shadow-sm">
         {icon}
@@ -919,6 +922,7 @@ export default function Dashboard() {
     | null
 
   const [drillDown, setDrillDown] = useState<DrillDownType>(null)
+  const patientMap = useMemo(() => new Map(patients.map((p) => [p.id, p])), [patients])
   const recentPaymentsForDrill = useMemo(
     () => [...filteredPayments].sort((a, b) => (b.payment_date || '').localeCompare(a.payment_date || '')).slice(0, 6),
     [filteredPayments],
@@ -1224,7 +1228,7 @@ export default function Dashboard() {
           <button
             onClick={() => { h.confirm(); navigate('/appointments') }}
             aria-label="نوبت جدید"
-            className="flex items-center justify-center gap-1.5 min-h-[44px] min-w-[44px] px-3 sm:px-3.5 py-2 rounded-xl bg-gradient-to-l from-primary-600 to-violet-600 text-white text-xs font-bold shadow-md shadow-primary-600/25 border-t border-white/30 hover:opacity-95 active:scale-95 transition-all shrink-0"
+            className="flex items-center justify-center gap-1.5 min-h-[48px] min-w-[48px] px-3.5 sm:px-4 py-2.5 rounded-xl bg-gradient-to-l from-primary-600 to-violet-600 text-white text-xs font-bold btn-tactile-3d shadow-md shadow-primary-600/25 border-t border-white/40 hover:opacity-95 active:scale-95 transition-all shrink-0"
           >
             <Plus size={16} />
             <span className="hidden sm:inline">نوبت جدید</span>
@@ -1234,7 +1238,7 @@ export default function Dashboard() {
 
       {/* ═══ Compact 4-Tile Stat Bento Grid ═══════════════ */}
       <div
-        className="tile-in relative overflow-hidden rounded-3xl bg-white/80 dark:bg-slate-800/80 border border-slate-200/60 dark:border-slate-700/60 shadow-xs p-3"
+        className="tile-in card-tactile-3d relative overflow-hidden rounded-3xl bg-white/85 dark:bg-slate-800/85 backdrop-blur-md border border-slate-200/60 dark:border-slate-700/60 shadow-xs p-3"
         style={{ animationDelay: '40ms' }}
       >
 
@@ -1319,7 +1323,7 @@ export default function Dashboard() {
       </div>
 
       {/* ═══ Today's Appointments (Interactive Collapsible Card) ═════════════ */}
-      <Card className="p-3.5 sm:p-4 tile-in relative overflow-hidden bg-white/95 dark:bg-slate-800/95 shadow-xs border border-slate-200/60 dark:border-slate-700/60">
+      <Card className="p-3.5 sm:p-4 tile-in card-tactile-3d relative overflow-hidden bg-white/95 dark:bg-slate-800/95 backdrop-blur-md shadow-xs border border-slate-200/60 dark:border-slate-700/60">
         <div
           onClick={() => { h.tap(); setTodayApptsExpanded(!todayApptsExpanded) }}
           className="flex items-center justify-between cursor-pointer select-none"
@@ -2042,53 +2046,174 @@ export default function Dashboard() {
         }
       >
         {drillDown === 'patients' && (
-          recentPatientsForDrill.length === 0 ? <p className="text-sm text-slate-400 text-center py-6">بیماری در این بازه ثبت نشده</p> : (
-            <div className="space-y-1.5">
+          recentPatientsForDrill.length === 0 ? (
+            <p className="text-sm text-slate-400 text-center py-8">بیماری در این بازه ثبت نشده است</p>
+          ) : (
+            <div className="space-y-2 max-h-[60vh] overflow-y-auto pr-0.5">
               {recentPatientsForDrill.map((p) => (
-                <div key={p.id} className="flex items-center gap-2.5 p-2.5 rounded-xl bg-slate-50 dark:bg-slate-800/60 cursor-pointer hover:bg-slate-100 dark:hover:bg-slate-800" onClick={() => { setDrillDown(null); navigate(`/patients/${p.id}`) }}>
-                  <div className="w-8 h-8 rounded-full bg-gradient-to-br from-violet-500 to-purple-600 flex items-center justify-center text-white text-xs font-bold shrink-0">{p.first_name[0]}</div>
-                  <p className="text-sm font-semibold text-slate-800 dark:text-slate-100 truncate">{p.first_name} {p.last_name}</p>
+                <div
+                  key={p.id}
+                  onClick={() => {
+                    h.tap()
+                    setDrillDown(null)
+                    navigate(`/patients/${p.id}`)
+                  }}
+                  className="p-3.5 rounded-2xl bg-slate-50/90 dark:bg-slate-800/70 border border-slate-100 dark:border-slate-700/60 hover:bg-slate-100/90 dark:hover:bg-slate-800 transition-all cursor-pointer flex items-center justify-between gap-3 card-tactile-3d min-h-[52px]"
+                >
+                  <div className="flex items-center gap-3 min-w-0">
+                    <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-violet-500 to-purple-600 flex items-center justify-center text-white text-sm font-bold shrink-0 shadow-xs">
+                      {p.first_name[0] || 'ب'}
+                    </div>
+                    <div className="min-w-0">
+                      <p className="text-sm font-bold text-slate-800 dark:text-slate-100 truncate">{p.first_name} {p.last_name}</p>
+                      <p className="text-xs text-slate-500 dark:text-slate-400 truncate">
+                        {p.phone ? toPersianDigits(p.phone) : 'بدون شماره تماس'}
+                        {p.national_id ? ` · کد ملی: ${toPersianDigits(p.national_id)}` : ''}
+                      </p>
+                    </div>
+                  </div>
+                  <div className="text-left shrink-0">
+                    <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-bold bg-violet-100 dark:bg-violet-900/30 text-violet-700 dark:text-violet-300">
+                      پرونده
+                      <ArrowLeft size={12} />
+                    </span>
+                  </div>
                 </div>
               ))}
             </div>
           )
         )}
         {drillDown === 'appointments' && (
-          upcomingApptsForDrill.length === 0 ? <p className="text-sm text-slate-400 text-center py-6">نوبتی در این بازه نیست</p> : (
-            <div className="space-y-1.5">
+          upcomingApptsForDrill.length === 0 ? (
+            <p className="text-sm text-slate-400 text-center py-8">نوبتی در این بازه ثبت نشده است</p>
+          ) : (
+            <div className="space-y-2 max-h-[60vh] overflow-y-auto pr-0.5">
               {upcomingApptsForDrill.map((a) => (
-                <div key={a.id} className="flex items-center gap-2.5 p-2.5 rounded-xl bg-slate-50 dark:bg-slate-800/60 cursor-pointer hover:bg-slate-100 dark:hover:bg-slate-800" onClick={() => { setDrillDown(null); navigate('/appointments') }}>
-                  <div className="w-8 h-8 rounded-full bg-gradient-to-br from-lime-500 to-green-600 flex items-center justify-center text-white text-[11px] font-bold shrink-0 tabular-nums">{toPersianDigits(a.start_time.slice(0, 5))}</div>
-                  <p className="text-sm font-semibold text-slate-800 dark:text-slate-100 truncate">{a.patient?.first_name} {a.patient?.last_name}</p>
+                <div
+                  key={a.id}
+                  onClick={() => {
+                    h.tap()
+                    setDrillDown(null)
+                    navigate('/appointments')
+                  }}
+                  className="p-3.5 rounded-2xl bg-slate-50/90 dark:bg-slate-800/70 border border-slate-100 dark:border-slate-700/60 hover:bg-slate-100/90 dark:hover:bg-slate-800 transition-all cursor-pointer flex items-center justify-between gap-3 card-tactile-3d min-h-[52px]"
+                >
+                  <div className="flex items-center gap-3 min-w-0">
+                    <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-lime-500 to-green-600 flex items-center justify-center text-white text-xs font-bold shrink-0 tabular-nums shadow-xs">
+                      {toPersianDigits(a.start_time.slice(0, 5))}
+                    </div>
+                    <div className="min-w-0">
+                      <p className="text-sm font-bold text-slate-800 dark:text-slate-100 truncate">
+                        {a.patient?.first_name} {a.patient?.last_name}
+                      </p>
+                      <p className="text-xs text-slate-500 dark:text-slate-400 truncate">
+                        {a.doctor?.name ? `پزشک: ${a.doctor.name}` : ''}
+                        {a.type ? ` · ${a.type}` : ''}
+                      </p>
+                    </div>
+                  </div>
+                  <div className="text-left shrink-0">
+                    <span className="inline-block px-2.5 py-1 rounded-lg text-xs font-bold bg-lime-100 dark:bg-lime-900/30 text-lime-700 dark:text-lime-300">
+                      {appointmentStatusLabels[a.status] || a.status}
+                    </span>
+                  </div>
                 </div>
               ))}
             </div>
           )
         )}
         {drillDown === 'revenue' && (
-          recentPaymentsForDrill.length === 0 ? <p className="text-sm text-slate-400 text-center py-6">پرداختی در این بازه نیست</p> : (
-            <div className="space-y-1.5">
-              {recentPaymentsForDrill.map((p) => (
-                <div key={p.id} className="flex items-center justify-between gap-2.5 p-2.5 rounded-xl bg-slate-50 dark:bg-slate-800/60">
-                  <span className="text-sm font-bold text-sky-700 dark:text-sky-400">{formatCurrency(p.amount)} ت</span>
-                  <span className="text-xs text-slate-400">{p.payment_date ? toJalaliStringPretty(p.payment_date) : '-'}</span>
-                </div>
-              ))}
+          recentPaymentsForDrill.length === 0 ? (
+            <p className="text-sm text-slate-400 text-center py-8">تراکنش پرداختی در این بازه ثبت نشده است</p>
+          ) : (
+            <div className="space-y-2 max-h-[60vh] overflow-y-auto pr-0.5">
+              {recentPaymentsForDrill.map((p) => {
+                const pt = patientMap.get(p.patient_id)
+                const methodLabel =
+                  p.payment_method === 'pos' ? 'کارتخوان POS' :
+                  p.payment_method === 'cash' ? 'نقدی' :
+                  p.payment_method === 'cheque' ? 'چک صیادی' :
+                  p.payment_method === 'card_to_card' ? 'کارت به کارت' :
+                  p.payment_method || 'پرداخت'
+                return (
+                  <div
+                    key={p.id}
+                    onClick={() => {
+                      h.tap()
+                      setDrillDown(null)
+                      navigate('/billing')
+                    }}
+                    className="p-3.5 rounded-2xl bg-slate-50/90 dark:bg-slate-800/70 border border-slate-100 dark:border-slate-700/60 hover:bg-slate-100/90 dark:hover:bg-slate-800 transition-all cursor-pointer flex items-center justify-between gap-3 card-tactile-3d min-h-[52px]"
+                  >
+                    <div className="flex items-center gap-3 min-w-0">
+                      <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-sky-500 to-blue-600 text-white flex items-center justify-center shrink-0 shadow-xs">
+                        <Wallet size={18} />
+                      </div>
+                      <div className="min-w-0">
+                        <p className="text-sm font-bold text-slate-800 dark:text-slate-100 truncate">
+                          {pt ? `${pt.first_name} ${pt.last_name}` : 'بیمار درمانگاه'}
+                        </p>
+                        <p className="text-xs text-slate-500 dark:text-slate-400 truncate">
+                          {p.payment_date ? toJalaliStringPretty(p.payment_date) : '-'} · {methodLabel}
+                        </p>
+                      </div>
+                    </div>
+                    <div className="text-left shrink-0">
+                      <p className="text-sm font-extrabold text-sky-700 dark:text-sky-400">
+                        {formatCurrency(p.amount)} ت
+                      </p>
+                      <span className="text-[10px] text-slate-400">ثبت در صندوق</span>
+                    </div>
+                  </div>
+                )
+              })}
             </div>
           )
         )}
         {drillDown === 'lab' && (
-          labOrdersState.filter((o) => o.status !== 'delivered' && o.status !== 'cancelled').length === 0 ? <p className="text-sm text-slate-400 text-center py-6">سفارش فعالی نیست</p> : (
-            <div className="space-y-1.5">
-              {labOrdersState.filter((o) => o.status !== 'delivered' && o.status !== 'cancelled').slice(0, 6).map((o) => (
-                <div key={o.id} className="flex items-center gap-2.5 p-2.5 rounded-xl bg-slate-50 dark:bg-slate-800/60 cursor-pointer hover:bg-slate-100 dark:hover:bg-slate-800" onClick={() => { setDrillDown(null); navigate('/laboratory') }}>
-                  <div className="w-8 h-8 rounded-full bg-gradient-to-br from-pink-500 to-fuchsia-600 flex items-center justify-center text-white shrink-0"><FlaskConical size={14} /></div>
-                  <div className="min-w-0 flex-1">
-                    <p className="text-sm font-semibold text-slate-800 dark:text-slate-100 truncate">{o.work_type || 'کار لابراتوار'}</p>
-                    <p className="text-[11px] text-slate-400">{o.deadline ? toJalaliStringPretty(o.deadline) : 'بدون موعد'}</p>
+          labOrdersState.filter((o) => o.status !== 'delivered' && o.status !== 'cancelled').length === 0 ? (
+            <p className="text-sm text-slate-400 text-center py-8">هیچ سفارش فعال یا معوقی در لابراتوار نیست</p>
+          ) : (
+            <div className="space-y-2 max-h-[60vh] overflow-y-auto pr-0.5">
+              {labOrdersState.filter((o) => o.status !== 'delivered' && o.status !== 'cancelled').slice(0, 8).map((o) => {
+                const pt = patientMap.get(o.patient_id)
+                const isOverdue = o.deadline && o.deadline < todayStr
+                return (
+                  <div
+                    key={o.id}
+                    onClick={() => {
+                      h.tap()
+                      setDrillDown(null)
+                      navigate('/laboratory')
+                    }}
+                    className="p-3.5 rounded-2xl bg-slate-50/90 dark:bg-slate-800/70 border border-slate-100 dark:border-slate-700/60 hover:bg-slate-100/90 dark:hover:bg-slate-800 transition-all cursor-pointer flex items-center justify-between gap-3 card-tactile-3d min-h-[52px]"
+                  >
+                    <div className="flex items-center gap-3 min-w-0">
+                      <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-pink-500 to-fuchsia-600 text-white flex items-center justify-center shrink-0 shadow-xs">
+                        <FlaskConical size={18} />
+                      </div>
+                      <div className="min-w-0">
+                        <p className="text-sm font-bold text-slate-800 dark:text-slate-100 truncate">{o.work_type || 'کار لابراتوار'}</p>
+                        <p className="text-xs text-slate-500 dark:text-slate-400 truncate">
+                          {pt ? `بیمار: ${pt.first_name} ${pt.last_name}` : ''}
+                          {o.shade ? ` · رنگ: ${o.shade}` : ''}
+                        </p>
+                      </div>
+                    </div>
+                    <div className="text-left shrink-0">
+                      {isOverdue ? (
+                        <span className="inline-block px-2.5 py-1 rounded-lg text-xs font-bold bg-rose-100 dark:bg-rose-900/40 text-rose-700 dark:text-rose-300">
+                          تأخیر تحویل
+                        </span>
+                      ) : (
+                        <span className="inline-block px-2.5 py-1 rounded-lg text-xs font-bold bg-pink-100 dark:bg-pink-900/30 text-pink-700 dark:text-pink-300">
+                          {o.deadline ? toJalaliStringPretty(o.deadline) : 'در حال ساخت'}
+                        </span>
+                      )}
+                    </div>
                   </div>
-                </div>
-              ))}
+                )
+              })}
             </div>
           )
         )}
@@ -2330,6 +2455,7 @@ export default function Dashboard() {
 
         <button
           onClick={() => {
+            h.tap()
             const path =
               drillDown === 'patients' ? '/patients' :
               drillDown === 'appointments' ? '/appointments' :
@@ -2339,7 +2465,7 @@ export default function Dashboard() {
             setDrillDown(null)
             navigate(path)
           }}
-          className="w-full mt-4 py-3 rounded-2xl bg-primary-700 hover:bg-primary-800 text-white text-sm font-bold shadow-sm transition-all-smooth press-scale"
+          className="btn-tactile-3d w-full mt-4 py-3 min-h-[48px] rounded-2xl bg-gradient-to-r from-primary-600 to-primary-700 hover:from-primary-700 hover:to-primary-800 text-white text-sm font-bold shadow-md transition-all-smooth press-scale flex items-center justify-center gap-2"
         >
           {drillDown === 'patients' ? 'مشاهده همه‌ی بیماران' :
            drillDown === 'appointments' ? 'مشاهده تقویم نوبت‌ها' :
@@ -2351,6 +2477,7 @@ export default function Dashboard() {
            drillDown === 'ready_lab' ? 'مشاهده کارهای آماده در لابراتوار' :
            drillDown === 'overdue_lab' ? 'پیگیری سفارش‌های تأخیری لابراتوار' :
            'مشاهده کارتابل کامل لابراتوار'}
+          <ArrowLeft size={16} />
         </button>
       </Modal>
 

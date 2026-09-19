@@ -1,7 +1,7 @@
 {
   "name": "minadent",
   "private": true,
-  "version": "1.235.19",
+  "version": "1.235.22",
   "type": "module",
   "engines": {
     "node": ">=22"
