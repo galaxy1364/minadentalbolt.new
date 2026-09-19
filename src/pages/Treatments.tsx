@@ -1334,20 +1334,68 @@ export default function Treatments() {
                   <div className={`absolute -right-16 -top-16 w-32 h-32 rounded-full blur-3xl opacity-20 breathe-slow pointer-events-none ${theme.text}`} />
                   <div className="relative z-10">
                   {/* File header — tap to open the patient's visit history */}
-                  <button
+                  <div
                     onClick={() => { h.tap(); togglePatient(g.patientId) }}
-                    className="w-full flex items-center gap-3 p-3.5 text-right hover:bg-slate-50/50 dark:hover:bg-slate-700/40 transition-all-smooth"
+                    className="w-full flex items-center gap-3 p-3.5 text-right hover:bg-slate-50/50 dark:hover:bg-slate-700/40 transition-all-smooth cursor-pointer"
+                    role="button"
+                    tabIndex={0}
                     aria-expanded={open}
                   >
-                    <div className="w-11 h-11 rounded-2xl bg-gradient-to-br from-violet-500 to-sky-500 text-white flex items-center justify-center font-bold text-sm shrink-0">{initials}</div>
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        h.tap()
+                        navigate(`/patients/${g.patientId}`)
+                      }}
+                      title="مشاهده پرونده کامل بیمار"
+                      className="w-11 h-11 rounded-2xl bg-gradient-to-br from-violet-500 to-sky-500 text-white flex items-center justify-center font-bold text-sm shrink-0 hover:scale-105 active:scale-95 transition-all shadow-sm"
+                    >
+                      {initials}
+                    </button>
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2">
-                        <h3 className="font-bold text-slate-800 dark:text-slate-100 truncate">{name}</h3>
-                        {p?.file_number && <span className="text-[10px] text-slate-400 font-mono shrink-0">{p.file_number}</span>}
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            h.tap()
+                            navigate(`/patients/${g.patientId}`)
+                          }}
+                          title="مشاهده پرونده کامل بیمار"
+                          className="font-bold text-slate-800 dark:text-slate-100 truncate hover:text-primary-600 dark:hover:text-primary-400 hover:underline text-right"
+                        >
+                          {name}
+                        </button>
+                        {p?.file_number && (
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              h.tap()
+                              navigate(`/patients/${g.patientId}`)
+                            }}
+                            title="مشاهده پرونده با این شماره"
+                            className="text-[10px] text-slate-400 font-mono shrink-0 hover:text-primary-600 dark:hover:text-primary-400"
+                          >
+                            {p.file_number}
+                          </button>
+                        )}
                       </div>
                       <div className="flex items-center gap-1.5 flex-wrap mt-1">
                         <span className="text-[11px] px-1.5 py-0.5 rounded-md bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300">{toPersianDigits(g.encounters.length)} ویزیت</span>
-                        <span className="text-[11px] px-1.5 py-0.5 rounded-md bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300">{toPersianDigits(g.treatmentCount)} درمان</span>
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            h.tap()
+                            navigate(`/patients/${g.patientId}`, { state: { initialTab: 'treatments' } })
+                          }}
+                          title="مشاهده درمان‌ها در پرونده"
+                          className="text-[11px] px-1.5 py-0.5 rounded-md bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 hover:bg-primary-50 hover:text-primary-700 transition-colors"
+                        >
+                          {toPersianDigits(g.treatmentCount)} درمان
+                        </button>
                         {g.doctorChanged && (
                           <span className="text-[11px] px-1.5 py-0.5 rounded-md bg-amber-100 text-amber-800 font-medium flex items-center gap-1" title={`${toPersianDigits(g.doctorIds.length)} پزشک روی این پرونده کار کرده‌اند`}>
                             <Users size={11} /> {toPersianDigits(g.doctorIds.length)} پزشک
@@ -1356,38 +1404,96 @@ export default function Treatments() {
                         {g.lastVisitDate && <span className="text-[11px] text-slate-400">آخرین ویزیت: {toJalaliDisplay(g.lastVisitDate)}</span>}
                       </div>
                     </div>
-                    <div className="text-left shrink-0">
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        h.tap()
+                        navigate(`/patients/${g.patientId}`, { state: { initialTab: 'payments', openPaymentModal: owes } })
+                      }}
+                      title={owes ? 'ثبت تسویه و دریافت بدهی بیمار' : 'مشاهده صورتحساب و پرداخت‌ها'}
+                      className="text-left shrink-0 p-1.5 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-700 transition-all hover:scale-105 active:scale-95"
+                    >
                       <p className={`font-extrabold text-sm ${owes ? 'text-error-600' : 'text-success-600'}`}>{formatCurrency(Math.abs(g.finance.balance))} ت</p>
                       <p className="text-[10px] text-slate-400">{owes ? 'بدهکار' : settled ? 'تسویه' : 'بدون هزینه'}</p>
-                    </div>
+                    </button>
                     {open ? <ChevronDown size={18} className="text-slate-400 shrink-0" /> : <ChevronRight size={18} className="text-slate-400 shrink-0 rotate-180" />}
-                  </button>
+                  </div>
 
                   {open && (
                     <div className="border-t border-slate-100 dark:border-slate-700">
                       {/* Money picture — cost / paid / balance, plus cheque
                           and instalment standing when they exist. */}
                       <div className="grid grid-cols-3 gap-px bg-slate-100 dark:bg-slate-700">
-                        <div className="bg-white dark:bg-slate-800 p-2.5 text-center">
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            h.tap()
+                            navigate(`/patients/${g.patientId}`, { state: { initialTab: 'treatments' } })
+                          }}
+                          title="مشاهده فهرست درمان‌ها و هزینه‌ها در پرونده"
+                          className="bg-white dark:bg-slate-800 p-2.5 text-center hover:bg-slate-50 dark:hover:bg-slate-750 transition-colors cursor-pointer"
+                        >
                           <p className="text-[10px] text-slate-400">کل هزینه</p>
                           <p className="text-xs font-bold text-slate-700 dark:text-slate-200 mt-0.5">{formatCurrency(g.finance.totalCost)}</p>
-                        </div>
-                        <div className="bg-white dark:bg-slate-800 p-2.5 text-center">
+                        </button>
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            h.tap()
+                            navigate(`/patients/${g.patientId}`, { state: { initialTab: 'payments', focusSection: 'section-payments-ledger' } })
+                          }}
+                          title="مشاهده تاریخچه پرداخت‌ها"
+                          className="bg-white dark:bg-slate-800 p-2.5 text-center hover:bg-slate-50 dark:hover:bg-slate-750 transition-colors cursor-pointer"
+                        >
                           <p className="text-[10px] text-slate-400">پرداختی</p>
                           <p className="text-xs font-bold text-success-600 mt-0.5">{formatCurrency(g.finance.paid)}</p>
-                        </div>
-                        <div className="bg-white dark:bg-slate-800 p-2.5 text-center">
+                        </button>
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            h.tap()
+                            navigate(`/patients/${g.patientId}`, { state: { initialTab: 'payments', openPaymentModal: owes } })
+                          }}
+                          title={owes ? 'ثبت تسویه بدهی' : 'مشاهده تسویه حساب کامل'}
+                          className="bg-white dark:bg-slate-800 p-2.5 text-center hover:bg-slate-50 dark:hover:bg-slate-750 transition-colors cursor-pointer"
+                        >
                           <p className="text-[10px] text-slate-400">مانده</p>
                           <p className={`text-xs font-bold mt-0.5 ${owes ? 'text-error-600' : 'text-success-600'}`}>{formatCurrency(Math.abs(g.finance.balance))}</p>
-                        </div>
+                        </button>
                       </div>
                       {(g.finance.pendingChequeCount > 0 || g.finance.remainingInstallmentCount > 0) && (
                         <div className="flex items-center gap-2 flex-wrap px-3.5 py-2 bg-slate-50/60 dark:bg-slate-700/30">
                           {g.finance.pendingChequeCount > 0 && (
-                            <span className="text-[11px] px-2 py-1 rounded-lg bg-sky-50 text-sky-700 font-medium flex items-center gap-1"><Receipt size={12} /> {toPersianDigits(g.finance.pendingChequeCount)} چک در انتظار — {formatCurrency(g.finance.pendingChequeAmount)} ت</span>
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation()
+                                h.tap()
+                                navigate(`/patients/${g.patientId}`, { state: { initialTab: 'payments', focusSection: 'section-cheques' } })
+                              }}
+                              title="مشاهده چک‌های صیادی بیمار"
+                              className="text-[11px] px-2 py-1 rounded-lg bg-sky-50 text-sky-700 font-medium flex items-center gap-1 hover:scale-105 active:scale-95 transition-all cursor-pointer shadow-xs"
+                            >
+                              <Receipt size={12} /> {toPersianDigits(g.finance.pendingChequeCount)} چک در انتظار — {formatCurrency(g.finance.pendingChequeAmount)} ت
+                            </button>
                           )}
                           {g.finance.remainingInstallmentCount > 0 && (
-                            <span className="text-[11px] px-2 py-1 rounded-lg bg-violet-50 text-violet-700 font-medium flex items-center gap-1"><CalendarClock size={12} /> {toPersianDigits(g.finance.remainingInstallmentCount)} قسط باقی — {formatCurrency(g.finance.remainingInstallmentAmount)} ت</span>
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation()
+                                h.tap()
+                                navigate(`/patients/${g.patientId}`, { state: { initialTab: 'payments', focusSection: 'section-payment-plans' } })
+                              }}
+                              title="مشاهده اقساط فعال بیمار"
+                              className="text-[11px] px-2 py-1 rounded-lg bg-violet-50 text-violet-700 font-medium flex items-center gap-1 hover:scale-105 active:scale-95 transition-all cursor-pointer shadow-xs"
+                            >
+                              <CalendarClock size={12} /> {toPersianDigits(g.finance.remainingInstallmentCount)} قسط باقی — {formatCurrency(g.finance.remainingInstallmentAmount)} ت
+                            </button>
                           )}
                         </div>
                       )}
@@ -1762,8 +1868,34 @@ export default function Treatments() {
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2">
                           <p className="font-medium text-sm text-slate-800 truncate">{t.procedure_name || 'رویه'}</p>
-                          {t.tooth_number && <Badge color="slate">دندان {toothLabel(t.tooth_number)}</Badge>}
-                          {t.lab_id && <Badge color="accent"><FlaskConical size={10} /> لابراتوار</Badge>}
+                          {t.tooth_number && (
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation()
+                                h.tap()
+                                navigate(`/patients/${detailEnc.patient_id}`, { state: { initialTab: 'teeth' } })
+                              }}
+                              title="مشاهده چارت دندانی در پرونده بیمار"
+                              className="hover:scale-105 active:scale-95 transition-all cursor-pointer"
+                            >
+                              <Badge color="slate">دندان {toothLabel(t.tooth_number)}</Badge>
+                            </button>
+                          )}
+                          {t.lab_id && (
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation()
+                                h.tap()
+                                navigate(`/patients/${detailEnc.patient_id}`, { state: { initialTab: 'labOrders' } })
+                              }}
+                              title="مشاهده سفارشات لابراتوار در پرونده بیمار"
+                              className="hover:scale-105 active:scale-95 transition-all cursor-pointer"
+                            >
+                              <Badge color="accent"><FlaskConical size={10} /> لابراتوار</Badge>
+                            </button>
+                          )}
                         </div>
                         <p className="text-xs text-slate-500 mt-0.5">
                           {t.total_price ? `${formatCurrency(t.total_price)} ت` : 'بدون هزینه'}

@@ -278,13 +278,13 @@ export function initSyncEngine(): () => void {
   document.addEventListener('visibilitychange', handleVisibility)
 
   const interval = setInterval(() => {
-    // Sync every 15 seconds — critical for cross-device data visibility.
-    // 60 seconds was too long: a patient registered on iPhone took up to
-    // 1 minute to appear on the laptop, which felt like sync was broken.
+    // Prevent mobile battery drain & overheating: pause periodic polling when app is in the background.
+    // When foregrounded, visibilitychange/focus instantly triggers fullSync().
+    if (typeof document !== 'undefined' && document.hidden) return
     if (typeof navigator !== 'undefined' && navigator.onLine) {
       fullSync()
     }
-  }, 15000)
+  }, 30000)
 
   return () => {
     window.removeEventListener('online', handleOnline)

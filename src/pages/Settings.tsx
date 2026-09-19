@@ -47,7 +47,7 @@ import { allModules } from '../theme/modules'
 import { canAccess, ROLES, getAllModulePaths, canOpenSettingsSection, SettingsSection, allowedSettingsSections } from '../lib/permissions'
 import { listBackupSnapshots, restoreFromSnapshot } from '../lib/autoBackup'
 import { exportToGoogleDriveFile } from '../lib/backupService'
-import { checkForUpdate, applyUpdate, isAutoCheckEnabled, setAutoCheckEnabled, isAutoApplyEnabled, setAutoApplyEnabled } from '../lib/updateCheck'
+import { checkForUpdate, applyUpdate, isAutoCheckEnabled, setAutoCheckEnabled, isAutoApplyEnabled, setAutoApplyEnabled, type UpdateCheckResult } from '../lib/updateCheck'
 import { APP_VERSION, BUILD_DATE } from '../lib/appVersion'
 import type { AuditLogEntry, BackupSnapshot } from '../lib/db'
 import type { SyncQueueEntry } from '../lib/db'
@@ -2057,7 +2057,7 @@ const AUTO_CHECK_STORAGE_KEY = 'minadent-auto-update-check'
 function UpdatesTab() {
   const [checking, setChecking] = useState(false)
   const [lastChecked, setLastChecked] = useState<Date | null>(null)
-  const [result, setResult] = useState<{ updateAvailable: boolean; remoteVersion: string | null; remoteBuildDate: string | null } | null>(null)
+  const [result, setResult] = useState<UpdateCheckResult | null>(null)
   const [autoCheck, setAutoCheck] = useState(() => isAutoCheckEnabled())
   const [autoApply, setAutoApply] = useState(() => isAutoApplyEnabled())
   const [applying, setApplying] = useState(false)
@@ -2165,6 +2165,52 @@ function UpdatesTab() {
               <span className={`absolute top-0.5 w-5 h-5 rounded-full bg-white shadow transition-transform ${autoApply ? 'right-0.5' : 'right-5'}`} />
             </button>
           </label>
+        </div>
+      </Card>
+
+      {/* ── بسته‌های نصبی نیتیو (APK / IPA / PWA) ──────────────────── */}
+      <Card className="p-5">
+        <h3 className="text-base font-bold text-slate-800 dark:text-slate-100 flex items-center gap-2 mb-2">
+          <Smartphone size={18} className="text-indigo-600" /> بسته‌های نصبی موبایل (APK و IPA)
+        </h3>
+        <p className="text-xs text-slate-500 dark:text-slate-400 mb-4 leading-relaxed">
+          نرم‌افزار مینادنت علاوه بر وب‌اپلیکیشن (PWA)، دارای فایل‌های نصبی مستقل برای گوشی‌ها و تبلت‌های مطب است که به‌صورت بلادرنگ با سرور و کلاینت‌های دیگر سینک می‌شوند.
+        </p>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <a
+            href={result?.apkUrl || '/downloads/minadent.apk'}
+            download="minadent.apk"
+            onClick={() => { h.tap(); chimes.playPop() }}
+            className="flex items-center justify-between p-3.5 rounded-2xl border border-emerald-200 dark:border-emerald-800 bg-emerald-50/50 dark:bg-emerald-950/30 hover:bg-emerald-100/60 dark:hover:bg-emerald-900/40 transition-all hover:scale-[1.02] active:scale-98 group cursor-pointer shadow-xs"
+          >
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-emerald-600 text-white flex items-center justify-center shadow-sm">
+                <Download size={20} />
+              </div>
+              <div>
+                <p className="text-sm font-bold text-slate-800 dark:text-slate-100">فایل نصبی اندروید (APK)</p>
+                <p className="text-[10px] text-emerald-700 dark:text-emerald-400">دانلود و نصب مستقیم روی گوشی‌ها و تبلت‌های اندروید</p>
+              </div>
+            </div>
+          </a>
+
+          <a
+            href={result?.ipaUrl || '/downloads/minadent.ipa'}
+            download="minadent.ipa"
+            onClick={() => { h.tap(); chimes.playPop() }}
+            className="flex items-center justify-between p-3.5 rounded-2xl border border-sky-200 dark:border-sky-800 bg-sky-50/50 dark:bg-sky-950/30 hover:bg-sky-100/60 dark:hover:bg-sky-900/40 transition-all hover:scale-[1.02] active:scale-98 group cursor-pointer shadow-xs"
+          >
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-sky-600 text-white flex items-center justify-center shadow-sm">
+                <Download size={20} />
+              </div>
+              <div>
+                <p className="text-sm font-bold text-slate-800 dark:text-slate-100">بسته نصبی آیفون/آیپد (IPA)</p>
+                <p className="text-[10px] text-sky-700 dark:text-sky-400">پروفایل سازمانی iOS و دستگاه‌های اپل</p>
+              </div>
+            </div>
+          </a>
         </div>
       </Card>
     </div>

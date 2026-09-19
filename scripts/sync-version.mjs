@@ -48,7 +48,7 @@ if (isBumpPatch || isBumpMinor || isBumpMajor) {
 const today = new Date().toISOString().split('T')[0]
 const buildTimestamp = Date.now()
 
-const releaseNotes = 'به‌روزرسانی جامع داشبورد اجرایی، تثبیت کپسول‌های پایش عملیاتی (چک‌ها، ایمپلنت، بدهی، لابراتوار) و فعال‌سازی پاپ‌آپ تفصیلی بیماران'
+const releaseNotes = 'ناوبری عمیق و تعاملی نشان‌های بالینی و مالی (چک‌ها، اقساط، بدهی، دندان و لابراتوار)، بهینه‌سازی مصرف باتری و جلوگیری از داغ‌شدن موبایل در سینک هوشمند، حذف متون زائد در صفحات موبایل، پشتیبانی از بسته‌های نصبی APK و IPA'
 
 // 1. Update public/version.json
 const versionJson = {
@@ -57,6 +57,8 @@ const versionJson = {
   buildTimestamp,
   description: releaseNotes,
   releaseNotes,
+  apkUrl: '/downloads/minadent.apk',
+  ipaUrl: '/downloads/minadent.ipa',
 }
 writeFileSync(versionPath, JSON.stringify(versionJson, null, 2) + '\n', 'utf8')
 console.log(`✓ Synchronized ${versionPath} (v${version})`)

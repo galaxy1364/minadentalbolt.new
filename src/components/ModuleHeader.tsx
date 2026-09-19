@@ -31,7 +31,7 @@ export function ModuleHeader({ moduleKey, title, subtitle, action }: {
         </ModuleIconBadge>
         <div>
           <h1 className="text-lg font-extrabold text-slate-800 dark:text-slate-100 leading-tight">{title}</h1>
-          {subtitle && <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">{subtitle}</p>}
+          {subtitle && <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5 hidden sm:block">{subtitle}</p>}
         </div>
       </div>
       {action && <div className="relative shrink-0">{action}</div>}

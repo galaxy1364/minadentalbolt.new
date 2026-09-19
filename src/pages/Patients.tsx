@@ -642,10 +642,20 @@ export default function Patients() {
                   <div className="flex flex-col items-end shrink-0" onClick={(e) => e.stopPropagation()}>
                     <span className="text-[10px] font-bold text-slate-400 dark:text-slate-500 mb-0.5">شماره پرونده</span>
                     {patient.file_number ? (
-                      <span className="inline-flex items-center gap-1.5 font-mono font-black text-xs sm:text-sm px-3 py-1 rounded-xl bg-slate-900 dark:bg-primary-950 text-white dark:text-primary-200 border border-slate-700/80 dark:border-primary-700/80 shadow-xs tracking-wider" dir="ltr">
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          h.tap()
+                          navigate(`/patients/${patient.id}`, { state: { initialTab: 'overview' } })
+                        }}
+                        title="مشاهده پرونده کامل بیمار"
+                        className="inline-flex items-center gap-1.5 font-mono font-black text-xs sm:text-sm px-3 py-1 rounded-xl bg-slate-900 dark:bg-primary-950 text-white dark:text-primary-200 border border-slate-700/80 dark:border-primary-700/80 shadow-xs tracking-wider hover:scale-105 active:scale-95 transition-all cursor-pointer"
+                        dir="ltr"
+                      >
                         <FileText size={13} className="text-primary-400 shrink-0" />
                         <HighlightText text={toPersianDigits(patient.file_number)} query={searchQuery} />
-                      </span>
+                      </button>
                     ) : (
                       <span className="text-xs text-slate-400 italic">ثبت‌نشده</span>
                     )}
@@ -657,54 +667,117 @@ export default function Patients() {
                   {/* Debt / Settlement badge */}
                   {fin.totalCost > 0 ? (
                     fin.balance <= 0 ? (
-                      <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-xl bg-emerald-50 dark:bg-emerald-950/50 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800 text-xs font-bold">
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          h.tap()
+                          navigate(`/patients/${patient.id}`, { state: { initialTab: 'payments', focusSection: 'section-payments-ledger' } })
+                        }}
+                        title="مشاهده گردش مالی و فاکتورها"
+                        className="inline-flex items-center gap-1.5 px-3 py-1 rounded-xl bg-emerald-50 dark:bg-emerald-950/50 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800 text-xs font-bold hover:scale-105 active:scale-95 transition-all cursor-pointer shadow-xs"
+                      >
                         <CheckCircle2 size={13} className="text-emerald-600 dark:text-emerald-400" />
                         <span>تسویه حساب کامل</span>
-                      </span>
+                      </button>
                     ) : (
-                      <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-xl bg-rose-50 dark:bg-rose-950/50 text-rose-700 dark:text-rose-300 border border-rose-200 dark:border-rose-800 text-xs font-black shadow-xs">
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          h.tap()
+                          navigate(`/patients/${patient.id}`, { state: { initialTab: 'payments', openPaymentModal: true } })
+                        }}
+                        title="ثبت تسویه و دریافت بدهی بیمار"
+                        className="inline-flex items-center gap-1.5 px-3 py-1 rounded-xl bg-rose-50 dark:bg-rose-950/50 text-rose-700 dark:text-rose-300 border border-rose-200 dark:border-rose-800 text-xs font-black shadow-xs hover:scale-105 active:scale-95 transition-all cursor-pointer"
+                      >
                         <span className="w-2 h-2 rounded-full bg-rose-500 animate-pulse" />
                         <Banknote size={13} className="text-rose-600 dark:text-rose-400" />
                         <span>بدهی: {formatCurrency(fin.balance)} تومان</span>
-                      </span>
+                      </button>
                     )
                   ) : (
-                    <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 text-xs font-medium">
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        h.tap()
+                        navigate(`/patients/${patient.id}`, { state: { initialTab: 'payments' } })
+                      }}
+                      title="مشاهده بخش مالی"
+                      className="inline-flex items-center gap-1 px-2.5 py-1 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 text-xs font-medium hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors cursor-pointer"
+                    >
                       بدون گردش مالی
-                    </span>
+                    </button>
                   )}
 
                   {/* Live Cheques badge */}
                   {activeCheques > 0 && (
-                    <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-xl bg-amber-50 dark:bg-amber-950/50 text-amber-800 dark:text-amber-300 border border-amber-200 dark:border-amber-800 text-xs font-bold">
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        h.tap()
+                        navigate(`/patients/${patient.id}`, { state: { initialTab: 'payments', focusSection: 'section-cheques' } })
+                      }}
+                      title="مشاهده و مدیریت چک‌های صیادی بیمار"
+                      className="inline-flex items-center gap-1.5 px-3 py-1 rounded-xl bg-amber-50 dark:bg-amber-950/50 text-amber-800 dark:text-amber-300 border border-amber-200 dark:border-amber-800 text-xs font-bold hover:scale-105 active:scale-95 transition-all cursor-pointer shadow-xs"
+                    >
                       <CreditCard size={13} className="text-amber-600 dark:text-amber-400" />
                       <span>{toPersianDigits(activeCheques)} چک در جریان</span>
-                    </span>
+                    </button>
                   )}
 
                   {/* Live Installments badge */}
                   {activePlans > 0 && (
-                    <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-xl bg-indigo-50 dark:bg-indigo-950/50 text-indigo-800 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800 text-xs font-bold">
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        h.tap()
+                        navigate(`/patients/${patient.id}`, { state: { initialTab: 'payments', focusSection: 'section-payment-plans' } })
+                      }}
+                      title="مشاهده و پیگیری اقساط فعال"
+                      className="inline-flex items-center gap-1.5 px-3 py-1 rounded-xl bg-indigo-50 dark:bg-indigo-950/50 text-indigo-800 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800 text-xs font-bold hover:scale-105 active:scale-95 transition-all cursor-pointer shadow-xs"
+                    >
                       <CalendarClock size={13} className="text-indigo-600 dark:text-indigo-400" />
                       <span>{toPersianDigits(activePlans)} طرح اقساط فعال</span>
-                    </span>
+                    </button>
                   )}
                 </div>
 
                 {/* Medical alerts row */}
                 {(hasAllergies || hasConditions) && (
-                  <div className="flex items-center gap-2 pt-1 flex-wrap relative z-10">
+                  <div className="flex items-center gap-2 pt-1 flex-wrap relative z-10" onClick={(e) => e.stopPropagation()}>
                     {hasAllergies && (
-                      <span className="status-pill bg-rose-50 text-rose-700 border border-rose-200 dark:bg-rose-950/30 dark:text-rose-300 dark:border-rose-900/50 flex items-center gap-1 text-[11px] font-bold">
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          h.tap()
+                          navigate(`/patients/${patient.id}`, { state: { initialTab: 'overview', focusSection: 'medical-alerts' } })
+                        }}
+                        title="مشاهده هشدارهای بالینی و حساسیت‌ها"
+                        className="status-pill bg-rose-50 text-rose-700 border border-rose-200 dark:bg-rose-950/30 dark:text-rose-300 dark:border-rose-900/50 flex items-center gap-1 text-[11px] font-bold hover:scale-105 active:scale-95 transition-all cursor-pointer"
+                      >
                         <AlertCircle size={11} className="text-rose-500" />
                         <span>حساسیت: {patient.allergies}</span>
-                      </span>
+                      </button>
                     )}
                     {hasConditions && (
-                      <span className="status-pill bg-amber-50 text-amber-800 border border-amber-200 dark:bg-amber-950/30 dark:text-amber-300 dark:border-amber-900/50 flex items-center gap-1 text-[11px] font-bold">
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          h.tap()
+                          navigate(`/patients/${patient.id}`, { state: { initialTab: 'overview', focusSection: 'medical-alerts' } })
+                        }}
+                        title="مشاهده سوابق و بیماری‌های زمینه‌ای بیمار"
+                        className="status-pill bg-amber-50 text-amber-800 border border-amber-200 dark:bg-amber-950/30 dark:text-amber-300 dark:border-amber-900/50 flex items-center gap-1 text-[11px] font-bold hover:scale-105 active:scale-95 transition-all cursor-pointer"
+                      >
                         <Heart size={11} className="text-amber-600" />
                         <span>بیماری: {patient.medical_conditions}</span>
-                      </span>
+                      </button>
                     )}
                   </div>
                 )}

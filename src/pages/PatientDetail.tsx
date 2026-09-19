@@ -10,7 +10,7 @@ import { buildPatientAlerts, alertChips } from '../lib/patientAlerts'
 import { buildDoctorLedger } from '../lib/doctorLedger'
 import { phasePlanProgress, phaseSchedule, validatePhase, nextPhaseNumber, comparePhaseCostToTreatments } from '../lib/phases'
 import { useState, useEffect, useCallback, useMemo } from 'react'
-import { useParams, useNavigate } from 'react-router-dom'
+import { useParams, useNavigate, useLocation } from 'react-router-dom'
 import { ArrowRight, Edit2, Phone, Mail, MapPin, Calendar, CreditCard, Activity, FileText, Image as ImageIcon, Shield, Pill, Smile, Award, AlertCircle, Clock, CheckCircle2, Layers, Plus, Trash2, FileSignature, Printer, Bone, FlaskConical, Stethoscope, Archive as ArchiveIcon, RotateCcw, Sparkles, AlertTriangle, HeartPulse, Users, UserPlus, Link2, Download, CheckSquare, Square, Tags, FileHeart, Camera } from 'lucide-react'
 import { fetchPatient, updatePatient, fetchTimeline, fetchTreatments, fetchAppointments, fetchPayments, createPayment, fetchToothRecords, createToothRecord, updateToothRecord, fetchPrescriptions, fetchRadiologyImages, updateRadiologyImage, fetchEncounters, fetchDoctors, fetchImplantCases, fetchTreatmentPhases, createTreatmentPhase, updateTreatmentPhase, fetchConsentForms, createConsentForm, updateConsentForm, fetchLabOrders, updateTreatment, fetchCheques, createCheque, updateCheque, fetchPaymentPlans, createPaymentPlan, updatePaymentPlan, fetchAllInstallments, updateInstallment, fetchPerioExams, createPerioExam, updatePerioExam, fetchOrthoExams, createOrthoExam, updateOrthoExam, fetchPatients } from '../lib/api'
 import { toJalaliString, toJalaliStringPretty, formatCurrency, toPersianDigits, formatTime, toEnglishDigits } from '../lib/persianDate'
@@ -163,6 +163,14 @@ function getVipLabel(level: number | null): { label: string; color: string } {
 export default function PatientDetail() {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
+  const location = useLocation()
+  const locState = (location.state || {}) as {
+    initialTab?: string
+    openPaymentModal?: boolean
+    openChequeModal?: boolean
+    openPlanModal?: boolean
+    focusSection?: string
+  }
   const { confirmAction, ConfirmActionModal } = useConfirmAction()
   const { maskNationalId, maskPhoneNumber } = usePrivacyMode()
 
@@ -182,7 +190,7 @@ export default function PatientDetail() {
   const [loading, setLoading] = useState(true)
 
   // Tab state
-  const [activeTab, setActiveTab] = useState('overview')
+  const [activeTab, setActiveTab] = useState(() => locState.initialTab || 'overview')
 
   // Tab data
   const [cheques, setCheques] = useState<Cheque[]>([])
@@ -616,6 +624,37 @@ export default function PatientDetail() {
       payments,
     })
   }, [patient, encounters, appointments, treatments, payments])
+
+  // Handle direct interactive deep-links (opening payment modals, cheques, or focused sections)
+  useEffect(() => {
+    if (!patient) return
+
+    if (locState.initialTab && locState.initialTab !== activeTab) {
+      setActiveTab(locState.initialTab)
+    }
+
+    if (locState.openPaymentModal) {
+      const bal = patientBalance.balance > 0 ? String(patientBalance.balance) : ''
+      setPaymentForm((prev) => ({ ...prev, amount: bal }))
+      setPaymentModalOpen(true)
+    } else if (locState.openChequeModal) {
+      setChequeModalOpen(true)
+    } else if (locState.openPlanModal) {
+      setPlanModalOpen(true)
+    }
+
+    if (locState.focusSection) {
+      const timer = setTimeout(() => {
+        const el = document.getElementById(locState.focusSection!)
+        if (el) {
+          el.scrollIntoView({ behavior: 'smooth', block: 'center' })
+          el.classList.add('ring-2', 'ring-primary-500', 'ring-offset-2', 'transition-all')
+          setTimeout(() => el.classList.remove('ring-2', 'ring-primary-500', 'ring-offset-2', 'transition-all'), 2500)
+        }
+      }, 350)
+      return () => clearTimeout(timer)
+    }
+  }, [patient, locState.openPaymentModal, locState.openChequeModal, locState.openPlanModal, locState.focusSection, patientBalance.balance])
 
   // ── Staged treatment plan (phases) ──────────────────────────────
   const [phaseModalOpen, setPhaseModalOpen] = useState(false)
@@ -4653,7 +4692,9 @@ export default function PatientDetail() {
       {/* Floating clinical and financial alerts. Rendered above the header
           rather than inside it: the whole point is that they interrupt
           regardless of how far down the file has been scrolled. */}
-      <PatientAlerts patient={patient} balance={{ balance: patientBalance.balance }} />
+      <div id="medical-alerts">
+        <PatientAlerts patient={patient} balance={{ balance: patientBalance.balance }} />
+      </div>
 
       {/* Header */}
       {renderHeader()}

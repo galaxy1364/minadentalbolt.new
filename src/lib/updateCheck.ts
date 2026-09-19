@@ -9,6 +9,9 @@ export interface UpdateCheckResult {
   remoteVersion: string | null
   remoteBuildDate: string | null
   remoteTimestamp: number | null
+  apkUrl?: string | null
+  ipaUrl?: string | null
+  description?: string | null
 }
 
 export function isAutoCheckEnabled(): boolean {
@@ -57,6 +60,9 @@ export async function checkForUpdate(): Promise<UpdateCheckResult> {
       remoteVersion,
       remoteBuildDate: data.buildDate ?? null,
       remoteTimestamp: data.buildTimestamp ?? null,
+      apkUrl: data.apkUrl ?? '/downloads/minadent.apk',
+      ipaUrl: data.ipaUrl ?? '/downloads/minadent.ipa',
+      description: data.description ?? null,
     }
   } catch {
     return { updateAvailable: false, remoteVersion: null, remoteBuildDate: null, remoteTimestamp: null }

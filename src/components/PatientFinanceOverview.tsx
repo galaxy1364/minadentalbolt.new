@@ -296,11 +296,13 @@ export function PatientFinanceOverview({
       )}
 
       {/* ── Balance / Debt Bar ──────────────────────────────────── */}
-      <PatientDebtBar patientId={patientId} balance={balance} />
+      <div id="section-settlement">
+        <PatientDebtBar patientId={patientId} balance={balance} />
+      </div>
 
       {/* ── طرح‌های اقساط بیمار (Installment Plans) ────────────────── */}
       {myPlans.length > 0 && (
-        <section className="space-y-2.5">
+        <section id="section-payment-plans" className="space-y-2.5">
           <h4 className="flex items-center gap-1.5 text-xs font-bold text-slate-700 dark:text-slate-200">
             <CalendarClock size={14} className="text-violet-500" />
             <span>طرح‌های اقساط فعال ({toPersianDigits(myPlans.length)})</span>
@@ -432,7 +434,7 @@ export function PatientFinanceOverview({
 
       {/* ── چک‌ها (Cheques) ─────────────────────────────────────── */}
       {myCheques.length > 0 && (
-        <section className="space-y-2">
+        <section id="section-cheques" className="space-y-2">
           <h4 className="flex items-center gap-1.5 text-xs font-bold text-slate-700 dark:text-slate-200">
             <Banknote size={14} className="text-amber-500" />
             <span>چک‌های بیمار ({toPersianDigits(myCheques.length)})</span>
@@ -537,7 +539,7 @@ export function PatientFinanceOverview({
       )}
 
       {/* ── تاریخچه‌ی پرداخت (Payments History) ──────────────────── */}
-      <section className="space-y-2">
+      <section id="section-payments-ledger" className="space-y-2">
         <h4 className="flex items-center gap-1.5 text-xs font-bold text-slate-700 dark:text-slate-200">
           <CreditCard size={14} className="text-emerald-500" />
           <span>تاریخچه‌ی پرداخت‌ها ({toPersianDigits(mine.length)})</span>

@@ -473,6 +473,7 @@ export function initRealtimeSync(): () => void {
   // heartbeat catches a dead socket and reconnects before the user notices.
   if (heartbeatTimer) clearInterval(heartbeatTimer)
   heartbeatTimer = setInterval(() => {
+    if (typeof document !== 'undefined' && document.hidden) return
     if (typeof navigator !== 'undefined' && !navigator.onLine) return
     if (!isSubscribed || !channel) {
       setupChannel()
@@ -484,7 +485,7 @@ export function initRealtimeSync(): () => void {
         setupChannel()
       })
     }
-  }, 10000)
+  }, 15000)
 
   return () => stopRealtimeSync()
 }
