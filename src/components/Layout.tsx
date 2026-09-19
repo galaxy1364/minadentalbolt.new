@@ -1,7 +1,8 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react'
+import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { HashRouter, Routes, Route, useNavigate, useLocation } from 'react-router-dom'
 import {
   MoreHorizontal, X, Wifi, WifiOff, RefreshCw, Moon, Sun, LogOut, AlertTriangle, Sparkles, Bell, Compass, Eye, EyeOff,
+  Search, ChevronLeft,
 } from 'lucide-react'
 import { Spinner, ToastContainer, Button, Modal, showToast } from './ui'
 import { usePrivacyMode } from '../lib/privacyMask'
@@ -316,16 +317,54 @@ function LogoutConfirmModal({
   )
 }
 
-// ── More drawer ─────────────────────────────────────────
+// ── Metadata & Categorization for Clinic Services Hub ──────────────────
+const MODULE_METADATA: Record<string, { category: 'clinical' | 'operations' | 'intelligence'; description: string }> = {
+  '/implants': { category: 'clinical', description: 'شناسنامه قطعات ITI و ۴ فاز جراحی' },
+  '/radiology': { category: 'clinical', description: 'نمایشگر و آرشیو گرافی‌های OPG و PA' },
+  '/prescriptions': { category: 'clinical', description: 'ثبت نسخه الکترونیک و دارونامه کلینیک' },
+  '/waiting-list': { category: 'clinical', description: 'مدیریت صف و سالن انتظار بیماران' },
+  '/archive': { category: 'clinical', description: 'بایگانی دیجیتال اسناد و مدارک راکد' },
+
+  '/insurance': { category: 'operations', description: 'محاسبه تعرفه بیمه پایه و تکمیلی' },
+  '/inventory': { category: 'operations', description: 'کنترل موجودی و کسر خودکار متریال' },
+  '/staff': { category: 'operations', description: 'کادر درمان، دستیاران و سطح دسترسی' },
+  '/calendar': { category: 'operations', description: 'تقویم جامع کلینیک، شیفت‌ها و رویدادها' },
+  '/sms': { category: 'operations', description: 'سامانه پیامک هوشمند، تبریک و پیگیری' },
+  '/reminders': { category: 'operations', description: 'یادآوری خودکار مراقبت پس از درمان' },
+
+  '/roadmap': { category: 'intelligence', description: 'هاب هوشمندی و نقشه راه بالینی' },
+  '/personal-finance': { category: 'intelligence', description: 'کارانه، تسویه و سهم درمان پزشک' },
+  '/reports': { category: 'intelligence', description: 'گزارش‌های آماری، مالی و KPI مطب' },
+  '/settings': { category: 'intelligence', description: 'پیکربندی کلینیک، پشتیبان‌گیری و امنیت' },
+}
+
+// ── More drawer (Enterprise Services Hub) ─────────────────────────────
 function MoreDrawer({ open, onClose }: { open: boolean; onClose: () => void }) {
   const navigate = useNavigate()
   const location = useLocation()
   const { profile, session, signOut } = useAuth()
   const [logoutConfirmOpen, setLogoutConfirmOpen] = useState(false)
   const [loggingOut, setLoggingOut] = useState(false)
+  const [searchQuery, setSearchQuery] = useState('')
+  const [activeCategory, setActiveCategory] = useState<'all' | 'clinical' | 'operations' | 'intelligence'>('all')
+
   const effectiveRole = profile?.role || (session ? 'owner' : undefined)
   const isActive = (path: string) => path === '/' ? location.pathname === '/' : location.pathname.startsWith(path)
   const visibleModules = secondaryModules.filter((item: ModuleIdentity) => canAccess(effectiveRole, item.path))
+
+  const filteredModules = useMemo(() => {
+    const q = searchQuery.trim().toLowerCase()
+    return visibleModules.filter((item) => {
+      const meta = MODULE_METADATA[item.path]
+      if (activeCategory !== 'all' && meta?.category !== activeCategory) {
+        return false
+      }
+      if (!q) return true
+      const matchLabel = item.label.toLowerCase().includes(q)
+      const matchDesc = meta?.description.toLowerCase().includes(q)
+      return matchLabel || matchDesc
+    })
+  }, [visibleModules, activeCategory, searchQuery])
 
   const handleLogout = async () => {
     setLoggingOut(true)
@@ -342,60 +381,158 @@ function MoreDrawer({ open, onClose }: { open: boolean; onClose: () => void }) {
   return (
     <>
       <div className="fixed inset-0 z-50" onClick={() => { h.cancel(); onClose() }}>
-        <div className="absolute inset-0 bg-black/25 backdrop-blur-sm" />
+        <div className="absolute inset-0 bg-black/40 backdrop-blur-md transition-opacity duration-300" />
         <div
-          className="absolute bottom-0 left-0 right-0 rounded-t-3xl shadow-ios-xl pb-safe drawer-in flex flex-col overflow-hidden"
+          className="absolute bottom-0 left-0 right-0 max-w-2xl mx-auto rounded-t-[32px] shadow-2xl pb-safe drawer-in flex flex-col overflow-hidden border-t border-white/80 dark:border-slate-700/80"
           style={{
-            maxHeight: '90dvh',
-            background: 'linear-gradient(160deg, rgba(139,92,246,0.12), rgba(6,182,212,0.10) 45%, rgba(255,255,255,1) 75%)',
+            maxHeight: '88dvh',
+            background: 'linear-gradient(165deg, rgba(255,255,255,0.98), rgba(248,250,252,0.95))',
           }}
           onClick={(e) => e.stopPropagation()}
         >
-          <div className="dark:bg-slate-800/95 absolute inset-0 -z-10 dark:block hidden" />
-          <div className="flex justify-center pt-3 pb-2 shrink-0">
-            <div className="w-10 h-1 rounded-full bg-slate-200 dark:bg-slate-600" />
+          <div className="dark:bg-slate-900/98 absolute inset-0 -z-10 dark:block hidden" />
+          
+          {/* Grab Handle */}
+          <div className="flex justify-center pt-3 pb-1 shrink-0">
+            <div className="w-12 h-1.5 rounded-full bg-slate-300 dark:bg-slate-700" />
           </div>
-          <div className="flex items-center justify-between px-5 pb-3 shrink-0">
-            <h3 className="text-sm font-bold text-slate-700 dark:text-slate-200">همه ماژول‌ها</h3>
-            <button onClick={() => { h.cancel(); onClose() }} aria-label="بستن" className="p-1.5 rounded-xl bg-white/70 dark:bg-slate-700 text-slate-500 dark:text-slate-300 hover:bg-white transition-all-smooth press-scale">
+
+          {/* Header & Close */}
+          <div className="flex items-center justify-between px-5 pt-1 pb-3 shrink-0">
+            <div>
+              <h3 className="text-base font-extrabold text-slate-900 dark:text-slate-100 flex items-center gap-2">
+                مرکز خدمات و ماژول‌های کلینیک
+                <span className="text-[11px] font-bold px-2 py-0.5 rounded-full bg-primary-100 dark:bg-primary-950/60 text-primary-700 dark:text-primary-300">
+                  {toPersianDigits(filteredModules.length)} ماژول
+                </span>
+              </h3>
+              <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">
+                دسترسی سریع و استاندارد به تمام بخش‌های بالینی، مدیریتی و هوشمندی مطب
+              </p>
+            </div>
+            <button
+              onClick={() => { h.cancel(); onClose() }}
+              aria-label="بستن"
+              className="w-8 h-8 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-700 flex items-center justify-center transition-all press-scale"
+            >
               <X size={16} />
             </button>
           </div>
-          <div className="grid grid-cols-4 gap-2 px-4 pb-4 overflow-y-auto min-h-0 flex-1">
-            {visibleModules.map((item: ModuleIdentity) => {
-              const Icon = item.icon
-              const active = isActive(item.path)
-              return (
+
+          {/* Real-time Search Box */}
+          <div className="px-5 mb-2.5 shrink-0">
+            <div className="relative">
+              <input
+                type="text"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder="جستجوی سریع در خدمات، انبار، بیمه، رادیولوژی، گزارش‌ها..."
+                className="w-full h-11 pr-10 pl-9 rounded-2xl bg-slate-100/90 dark:bg-slate-800/90 border border-slate-200/80 dark:border-slate-700/80 text-xs font-medium text-slate-800 dark:text-slate-100 placeholder:text-slate-400 dark:placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-primary-500/30 focus:border-primary-500 transition-all"
+              />
+              <Search size={17} className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
+              {searchQuery && (
                 <button
-                  key={item.path}
-                  onClick={() => { h.select(); navigate(item.path); onClose() }}
-                  className={`flex flex-col items-center gap-2 p-3 rounded-2xl transition-all-smooth press-scale ${
-                    active ? 'text-slate-700 dark:text-slate-200' : 'text-slate-500 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-700/50'
-                  }`}
+                  onClick={() => setSearchQuery('')}
+                  className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200"
                 >
-                  <ModuleIconBadge color={item.color} size={38}>
-                    <Icon size={34} />
-                  </ModuleIconBadge>
-                  <span className={`text-[11px] font-medium text-center leading-tight ${active ? 'font-bold' : ''}`}>{item.label}</span>
+                  <X size={14} />
                 </button>
-              )
-            })}
+              )}
+            </div>
           </div>
-          <div className="mt-auto px-4 py-3 border-t border-slate-100 dark:border-slate-700 flex items-center justify-between shrink-0 bg-white/50 dark:bg-slate-800/50">
-            <div className="flex items-center gap-2 min-w-0">
-              <div className="w-8 h-8 rounded-full bg-primary-100 dark:bg-primary-900/40 text-primary-700 dark:text-primary-300 flex items-center justify-center font-bold text-xs shrink-0">
-                {profile?.full_name ? profile.full_name.charAt(0) : 'ک'}
+
+          {/* Categorized Filter Chips */}
+          <div className="flex items-center gap-1.5 px-5 pb-3 shrink-0 overflow-x-auto no-scrollbar">
+            {[
+              { id: 'all', label: 'همه بخش‌ها' },
+              { id: 'clinical', label: '🩺 بالینی و درمان' },
+              { id: 'operations', label: '🏢 مدیریت مطب' },
+              { id: 'intelligence', label: '📊 هوشمندی و مالی' },
+            ].map((cat) => (
+              <button
+                key={cat.id}
+                onClick={() => { h.tap(); setActiveCategory(cat.id as any) }}
+                className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all shrink-0 press-scale ${
+                  activeCategory === cat.id
+                    ? 'bg-slate-900 dark:bg-white text-white dark:text-slate-900 shadow-sm'
+                    : 'bg-slate-100 dark:bg-slate-800/80 text-slate-600 dark:text-slate-400 hover:bg-slate-200/80 dark:hover:bg-slate-700/80'
+                }`}
+              >
+                {cat.label}
+              </button>
+            ))}
+          </div>
+
+          {/* Modules Grid */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 px-5 pb-4 overflow-y-auto min-h-0 flex-1">
+            {filteredModules.length === 0 ? (
+              <div className="col-span-full text-center py-12">
+                <Search size={32} className="mx-auto text-slate-300 dark:text-slate-600 mb-2" />
+                <p className="text-sm font-bold text-slate-600 dark:text-slate-300">خدمتی مطابق جستجوی شما یافت نشد</p>
+                <p className="text-xs text-slate-400 mt-1">عنوان دیگری را جستجو کنید یا فیلتر دسته‌بندی را تغییر دهید.</p>
+              </div>
+            ) : (
+              filteredModules.map((item: ModuleIdentity) => {
+                const Icon = item.icon
+                const active = isActive(item.path)
+                const meta = MODULE_METADATA[item.path]
+                return (
+                  <button
+                    key={item.path}
+                    onClick={() => {
+                      h.select()
+                      navigate(item.path)
+                      onClose()
+                    }}
+                    className={`card-tactile-3d min-h-[64px] p-3 rounded-2xl border transition-all press-scale text-right flex items-center justify-between gap-3 group ${
+                      active
+                        ? 'bg-white dark:bg-slate-800 border-primary-500/60 ring-2 ring-primary-500/20 shadow-md'
+                        : 'bg-white/80 dark:bg-slate-800/70 border-slate-200/70 dark:border-slate-700/60 hover:bg-slate-50 dark:hover:bg-slate-800 shadow-xs'
+                    }`}
+                  >
+                    <div className="flex items-center gap-3 min-w-0">
+                      <ModuleIconBadge color={item.color} size={42}>
+                        <Icon size={38} />
+                      </ModuleIconBadge>
+                      <div className="min-w-0">
+                        <p className="text-sm font-bold text-slate-800 dark:text-slate-100 truncate flex items-center gap-1.5">
+                          {item.label}
+                          {active && <span className="w-1.5 h-1.5 rounded-full bg-primary-500 animate-pulse" />}
+                        </p>
+                        <p className="text-[11px] text-slate-500 dark:text-slate-400 truncate mt-0.5">
+                          {meta?.description || 'امکانات و ابزارهای ماژول'}
+                        </p>
+                      </div>
+                    </div>
+                    <div className="text-slate-400 group-hover:text-primary-600 dark:group-hover:text-primary-400 transition-colors shrink-0">
+                      <ChevronLeft size={16} />
+                    </div>
+                  </button>
+                )
+              })
+            )}
+          </div>
+
+          {/* Profile and Logout Footer */}
+          <div className="mt-auto px-5 py-3 border-t border-slate-200/60 dark:border-slate-800 flex items-center justify-between shrink-0 bg-white/70 dark:bg-slate-900/70 backdrop-blur-md">
+            <div className="flex items-center gap-2.5 min-w-0">
+              <div className="w-9 h-9 rounded-full bg-gradient-to-br from-primary-500 to-primary-700 text-white flex items-center justify-center font-bold text-xs shadow-xs shrink-0">
+                {profile?.full_name ? profile.full_name.charAt(0) : 'م'}
               </div>
               <div className="min-w-0">
-                <p className="text-xs font-bold text-slate-700 dark:text-slate-200 truncate">{profile?.full_name || 'کاربر سیستم'}</p>
-                <p className="text-[10px] text-slate-400 dark:text-slate-500 truncate">{roleLabel(effectiveRole)}</p>
+                <p className="text-xs font-extrabold text-slate-800 dark:text-slate-100 truncate">
+                  {profile?.full_name || 'کاربر سیستم مینادنت'}
+                </p>
+                <p className="text-[10px] text-slate-500 dark:text-slate-400 truncate">
+                  {roleLabel(effectiveRole)} · <span className="font-mono">v{APP_VERSION}</span>
+                </p>
               </div>
             </div>
             <button
               onClick={() => { h.tap(); setLogoutConfirmOpen(true) }}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold text-error-600 dark:text-error-400 hover:bg-error-50 dark:hover:bg-error-900/30 transition-all-smooth press-scale"
+              className="btn-tactile-3d flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold text-rose-600 dark:text-rose-400 bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-900/50 hover:bg-rose-100 transition-all press-scale"
             >
-              <LogOut size={14} />
+              <LogOut size={13} />
               <span>خروج از حساب</span>
             </button>
           </div>
@@ -421,14 +558,6 @@ function BottomTabBar() {
   const isActive = (path: string) => path === '/' ? location.pathname === '/' : location.pathname.startsWith(path)
   const effectiveRole = profile?.role || (session ? 'owner' : undefined)
 
-  // Badge on the مالی (Billing) nav icon — how many patients currently
-  // owe money, refreshed on every navigation so it stays live as
-  // payments get recorded elsewhere in the app. Pure local Dexie reads,
-  // so this is cheap even running on every route change.
-  // MOD-FEAT-037: every module with open work gets a badge, coloured by
-  // how urgent the worst item in it is. Before this only مالی had one,
-  // and it was always red — a bar that only ever shouts about money
-  // teaches people the rest is quiet.
   useEffect(() => {
     let cancelled = false
     const today = new Date().toISOString().slice(0, 10)
@@ -454,7 +583,7 @@ function BottomTabBar() {
   return (
     <>
       <nav className="fixed bottom-0 left-0 right-0 z-40 tab-bar pb-safe">
-        <div className="flex items-stretch h-[4.5rem]">
+        <div className="flex items-stretch h-[4.5rem] max-w-2xl mx-auto">
           {visiblePrimary.map((item: ModuleIdentity) => {
             const Icon = item.icon
             const active = isActive(item.path)
@@ -462,18 +591,13 @@ function BottomTabBar() {
               <button
                 key={item.path}
                 onClick={() => { h.select(); navigate(item.path) }}
-                className="flex-1 flex flex-col items-center justify-center gap-0.5 transition-all-smooth"
-                // Every module keeps its own colour, not just the active
-                // one. Grey icons made the bar read as one undifferentiated
-                // strip; colour is how you find the module you want without
-                // reading five labels at 10px.
+                className="flex-1 flex flex-col items-center justify-center gap-0.5 transition-all-smooth press-scale"
                 style={{ color: active ? item.color : `color-mix(in srgb, ${item.color} 62%, #94a3b8)` }}
               >
-                <div className="relative p-1 transition-all-smooth">
-                  {/* Bigger: 20px was below the size an icon can carry a
-                      recognisable shape at, so the custom glyphs read as
-                      smudges on a phone. */}
-                  <Icon size={active ? 28 : 25} strokeWidth={active ? 2.4 : 1.9} />
+                <div className={`relative transition-all duration-300 flex flex-col items-center justify-center ${
+                  active ? 'p-1 px-3 rounded-2xl bg-white/80 dark:bg-slate-800/90 shadow-xs border border-white/80 dark:border-white/10 scale-105' : 'p-1'
+                }`}>
+                  <Icon size={active ? 27 : 24} strokeWidth={active ? 2.4 : 1.9} />
                   {(() => {
                     const w = openWork[item.path]
                     if (!w || w.count === 0) return null
@@ -483,16 +607,13 @@ function BottomTabBar() {
                         style={{ backgroundColor: LEVEL_COLORS[w.level] }}
                         aria-label={`${w.count} کار باز`}
                       >
-                        {/* The rest of the shell is in Persian digits;
-                            a Latin "1" here was the only ASCII numeral
-                            left on the bottom bar. */}
                         {w.count > 99 ? '+۹۹' : toPersianDigits(w.count)}
                       </span>
                     )
                   })()}
                 </div>
                 <span
-                  className="text-[10px] font-medium leading-none"
+                  className={`text-[10px] leading-none ${active ? 'font-extrabold' : 'font-medium'}`}
                   style={{ color: active ? item.color : `color-mix(in srgb, ${item.color} 55%, #94a3b8)` }}
                 >
                   {item.label}
@@ -502,15 +623,17 @@ function BottomTabBar() {
           })}
           <button
             onClick={() => { h.pop(); setMoreOpen(true) }}
-            className={`flex-1 flex flex-col items-center justify-center gap-0.5 transition-all-smooth ${
+            className={`flex-1 flex flex-col items-center justify-center gap-0.5 transition-all-smooth press-scale ${
               isMoreActive ? '' : 'text-slate-400 hover:text-slate-600 dark:hover:text-slate-300'
             }`}
             style={{ color: isMoreActive && currentMod ? currentMod.color : 'var(--module-color, #64748b)' }}
           >
-            <div className="p-1 transition-all-smooth">
-              <MoreHorizontal size={isMoreActive ? 28 : 25} strokeWidth={isMoreActive ? 2.4 : 1.9} />
+            <div className={`transition-all duration-300 flex flex-col items-center justify-center ${
+              isMoreActive ? 'p-1 px-3 rounded-2xl bg-white/80 dark:bg-slate-800/90 shadow-xs border border-white/80 dark:border-white/10 scale-105' : 'p-1'
+            }`}>
+              <MoreHorizontal size={isMoreActive ? 27 : 24} strokeWidth={isMoreActive ? 2.4 : 1.9} />
             </div>
-            <span className={`text-[10px] font-medium leading-none ${isMoreActive ? '' : 'text-slate-400 dark:text-slate-500'}`}
+            <span className={`text-[10px] leading-none ${isMoreActive ? 'font-extrabold' : 'font-medium text-slate-400 dark:text-slate-500'}`}
               style={isMoreActive && currentMod ? { color: currentMod.color } : undefined}
             >
               بیشتر
@@ -679,7 +802,7 @@ function LayoutInner({ children }: { children: React.ReactNode }) {
               )}
             </div>
           </button>
-          <div className="flex items-center gap-1.5 shrink-0">
+          <div className="flex items-center gap-1 p-1 rounded-2xl bg-white/70 dark:bg-slate-800/70 backdrop-blur-xl border border-slate-200/60 dark:border-slate-700/60 shadow-xs shrink-0">
             {/* AI Assistant Button — Apple Intelligence Sparkle Trigger */}
             <button
               onClick={() => {
@@ -688,7 +811,7 @@ function LayoutInner({ children }: { children: React.ReactNode }) {
               }}
               aria-label="دستیار هوشمند بالینی مینادنت"
               title="دستیار هوشمند صوتی و متنی مینادنت"
-              className="relative flex items-center justify-center w-9 h-9 rounded-xl glass border-t border-t-white/90 dark:border-t-white/20 border border-sky-400/50 dark:border-sky-500/40 bg-sky-50/70 dark:bg-sky-950/40 text-sky-600 dark:text-sky-400 shadow-md shadow-sky-500/15 hover:-translate-y-0.5 active:translate-y-0.5 transition-all press-scale"
+              className="relative flex items-center justify-center w-9 h-9 sm:w-10 sm:h-10 rounded-xl glass border-t border-t-white/90 dark:border-t-white/20 border border-sky-400/50 dark:border-sky-500/40 bg-sky-50/70 dark:bg-sky-950/40 text-sky-600 dark:text-sky-400 shadow-md shadow-sky-500/15 hover:-translate-y-0.5 active:translate-y-0.5 transition-all press-scale"
             >
               <Sparkles size={17} className="animate-pulse text-sky-500 drop-shadow-xs" />
             </button>
