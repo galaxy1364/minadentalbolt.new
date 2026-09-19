@@ -396,35 +396,47 @@ export default function Patients() {
       />
 
       {/* Stats */}
-      <div className="grid grid-cols-4 gap-2">
-        <div className="quick-stat !p-3">
-          <div className="flex items-center gap-1 mb-0.5"><Users size={12} className="text-primary-600" /><span className="text-[9px] text-slate-500">کل</span></div>
-          <p className="text-lg font-extrabold text-slate-800">{toPersianDigits(stats.total)}</p>
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+        <div className="card-tactile-3d p-3 rounded-2xl bg-white/85 dark:bg-slate-800/85 backdrop-blur-md border border-slate-200/60 dark:border-slate-700/60 shadow-xs">
+          <div className="flex items-center gap-1.5 mb-1">
+            <Users size={14} className="text-primary-600 dark:text-primary-400" />
+            <span className="text-[11px] font-bold text-slate-500 dark:text-slate-400">کل بیماران</span>
+          </div>
+          <p className="text-xl font-extrabold text-slate-800 dark:text-slate-100 tabular-nums">{toPersianDigits(stats.total)}</p>
         </div>
-        <div className="quick-stat !p-3">
-          <div className="flex items-center gap-1 mb-0.5"><Award size={12} className="text-warning-600" /><span className="text-[9px] text-slate-500">VIP</span></div>
-          <p className="text-lg font-extrabold text-slate-800">{toPersianDigits(stats.vip)}</p>
+        <div className="card-tactile-3d p-3 rounded-2xl bg-white/85 dark:bg-slate-800/85 backdrop-blur-md border border-slate-200/60 dark:border-slate-700/60 shadow-xs">
+          <div className="flex items-center gap-1.5 mb-1">
+            <Award size={14} className="text-warning-600 dark:text-warning-400" />
+            <span className="text-[11px] font-bold text-slate-500 dark:text-slate-400">بیماران VIP</span>
+          </div>
+          <p className="text-xl font-extrabold text-slate-800 dark:text-slate-100 tabular-nums">{toPersianDigits(stats.vip)}</p>
         </div>
-        <div className="quick-stat !p-3">
-          <div className="flex items-center gap-1 mb-0.5"><Plus size={12} className="text-success-600" /><span className="text-[9px] text-slate-500">این ماه</span></div>
-          <p className="text-lg font-extrabold text-slate-800">{toPersianDigits(stats.newThisMonth)}</p>
+        <div className="card-tactile-3d p-3 rounded-2xl bg-white/85 dark:bg-slate-800/85 backdrop-blur-md border border-slate-200/60 dark:border-slate-700/60 shadow-xs">
+          <div className="flex items-center gap-1.5 mb-1">
+            <Plus size={14} className="text-emerald-600 dark:text-emerald-400" />
+            <span className="text-[11px] font-bold text-slate-500 dark:text-slate-400">جدید این ماه</span>
+          </div>
+          <p className="text-xl font-extrabold text-slate-800 dark:text-slate-100 tabular-nums">{toPersianDigits(stats.newThisMonth)}</p>
         </div>
-        <div className="quick-stat !p-3">
-          <div className="flex items-center gap-1 mb-0.5"><Smile size={12} className="text-accent-600" /><span className="text-[9px] text-slate-500">فعال</span></div>
-          <p className="text-lg font-extrabold text-slate-800">{toPersianDigits(stats.active)}</p>
+        <div className="card-tactile-3d p-3 rounded-2xl bg-white/85 dark:bg-slate-800/85 backdrop-blur-md border border-slate-200/60 dark:border-slate-700/60 shadow-xs">
+          <div className="flex items-center gap-1.5 mb-1">
+            <Smile size={14} className="text-violet-600 dark:text-violet-400" />
+            <span className="text-[11px] font-bold text-slate-500 dark:text-slate-400">پرونده‌های فعال</span>
+          </div>
+          <p className="text-xl font-extrabold text-slate-800 dark:text-slate-100 tabular-nums">{toPersianDigits(stats.active)}</p>
         </div>
       </div>
 
       {/* Search & Filter */}
       <div className="flex items-center gap-2">
         <div className="relative flex-1">
-          <Search size={16} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400" />
+          <Search size={16} className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
           <input
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder="جستجو بر اساس نام، تلفن، پرونده..."
+            placeholder="جستجو بر اساس نام، تلفن، کد ملی، شماره پرونده..."
             aria-label="جستجوی بیمار"
-            className="w-full pr-10 pl-3 py-2.5 rounded-xl border border-slate-200 bg-white text-sm focus:outline-none focus:ring-2 focus:ring-primary-400"
+            className="w-full pr-10 pl-3 min-h-[44px] rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-100 text-sm focus:outline-none focus:ring-2 focus:ring-primary-400 shadow-xs placeholder:text-slate-400 dark:placeholder:text-slate-500"
           />
         </div>
         <button
@@ -440,16 +452,25 @@ export default function Patients() {
           }}
           aria-label={privacyMode ? 'غیرفعال‌سازی حالت محرمانگی پیشخوان' : 'فعال‌سازی حالت محرمانگی پیشخوان'}
           title={privacyMode ? 'حالت محرمانگی پیشخوان فعال است — کلیک جهت نمایش کامل' : 'حالت محرمانگی پیشخوان (مخفی‌سازی کد ملی و تلفن مراجعین)'}
-          className={`p-2.5 rounded-xl border transition-all-smooth press-scale flex-shrink-0 flex items-center gap-1 ${
+          className={`min-w-[44px] min-h-[44px] rounded-xl border transition-all-smooth press-scale shrink-0 flex items-center justify-center shadow-xs ${
             privacyMode
               ? 'bg-emerald-50 text-emerald-700 border-emerald-300 dark:bg-emerald-950/40 dark:text-emerald-300 dark:border-emerald-800 ring-2 ring-emerald-500/20'
-              : 'bg-white border-slate-200 text-slate-500 hover:text-slate-700'
+              : 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-500 dark:text-slate-400 hover:text-slate-700'
           }`}
         >
-          {privacyMode ? <EyeOff size={16} className="text-emerald-600" /> : <Eye size={16} />}
+          {privacyMode ? <EyeOff size={17} className="text-emerald-600" /> : <Eye size={17} />}
         </button>
-        <button onClick={() => { h.tap(); setShowFilters(!showFilters) }} aria-label={showFilters ? 'بستن فیلترها' : 'باز کردن فیلترها'} aria-pressed={showFilters} className="p-2.5 rounded-xl bg-white border border-slate-200 text-slate-500 hover:text-primary-600 transition-all-smooth press-scale flex-shrink-0">
-          <Filter size={16} />
+        <button
+          onClick={() => { h.tap(); setShowFilters(!showFilters) }}
+          aria-label={showFilters ? 'بستن فیلترها' : 'باز کردن فیلترها'}
+          aria-pressed={showFilters}
+          className={`min-w-[44px] min-h-[44px] rounded-xl border transition-all-smooth press-scale shrink-0 flex items-center justify-center shadow-xs ${
+            showFilters
+              ? 'bg-primary-50 dark:bg-primary-950/40 border-primary-300 dark:border-primary-700 text-primary-600 dark:text-primary-400'
+              : 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-500 dark:text-slate-400 hover:text-primary-600'
+          }`}
+        >
+          <Filter size={17} />
         </button>
       </div>
 
