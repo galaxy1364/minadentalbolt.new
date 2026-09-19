@@ -97,15 +97,17 @@ export function MultiChairGrid({
   return (
     <div className="space-y-3 bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 p-3.5 shadow-sm">
       {/* Top Header & Day Navigation */}
-      <div className="flex items-center justify-between flex-wrap gap-2 pb-3 border-b border-slate-100 dark:border-slate-800">
-        <div className="flex items-center gap-1.5">
+      {/* Top Header & Day Navigation */}
+      <div className="flex items-center justify-between flex-wrap gap-2.5 pb-3 border-b border-slate-100 dark:border-slate-800">
+        <div className="flex items-center gap-1.5 flex-wrap">
           <button
             type="button"
             onClick={() => changeDateByDays(1)}
-            className="p-1.5 rounded-xl border border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800 transition-all text-slate-600 dark:text-slate-300 press-scale"
+            className="flex items-center justify-center min-w-[42px] min-h-[42px] rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-750 transition-all text-slate-600 dark:text-slate-300 press-scale shadow-xs"
             title="روز بعد"
+            aria-label="روز بعد"
           >
-            <ChevronRight size={16} />
+            <ChevronRight size={17} />
           </button>
           <button
             type="button"
@@ -114,10 +116,10 @@ export function MultiChairGrid({
               chimes.playPop()
               onDateChange(new Date().toISOString().slice(0, 10))
             }}
-            className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all press-scale ${
+            className={`flex items-center justify-center min-h-[42px] px-3.5 rounded-xl text-xs font-extrabold transition-all press-scale ${
               isToday
-                ? 'bg-primary-600 text-white shadow-sm'
-                : 'bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-200'
+                ? 'bg-primary-600 text-white shadow-xs'
+                : 'bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-200 border border-slate-200/60 dark:border-slate-700/60'
             }`}
           >
             امروز
@@ -125,24 +127,25 @@ export function MultiChairGrid({
           <button
             type="button"
             onClick={() => changeDateByDays(-1)}
-            className="p-1.5 rounded-xl border border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800 transition-all text-slate-600 dark:text-slate-300 press-scale"
+            className="flex items-center justify-center min-w-[42px] min-h-[42px] rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-750 transition-all text-slate-600 dark:text-slate-300 press-scale shadow-xs"
             title="روز قبل"
+            aria-label="روز قبل"
           >
-            <ChevronLeft size={16} />
+            <ChevronLeft size={17} />
           </button>
 
           <div className="mr-2">
-            <span className="text-sm font-bold text-slate-800 dark:text-slate-100">
+            <span className="text-sm font-extrabold text-slate-800 dark:text-slate-100">
               {toJalaliStringPretty(selectedDate)}
             </span>
-            <span className="text-xs text-slate-500 dark:text-slate-400 mr-1.5">
+            <span className="text-xs font-bold text-slate-500 dark:text-slate-400 mr-1.5">
               ({persianWeekdaysShort[getJalaliDateInfo(selectedDate).weekday]})
             </span>
           </div>
         </div>
 
         {/* Group By Toggle */}
-        <div className="flex items-center gap-1 bg-slate-100 dark:bg-slate-800 p-1 rounded-xl text-xs">
+        <div className="flex items-center gap-1 bg-slate-100 dark:bg-slate-800/80 p-1 rounded-xl border border-slate-200/60 dark:border-slate-700/60 text-xs">
           <button
             type="button"
             onClick={() => {
@@ -150,14 +153,14 @@ export function MultiChairGrid({
               chimes.playPop()
               setGroupBy('unit')
             }}
-            className={`flex items-center gap-1 px-2.5 py-1 rounded-lg font-medium transition-all press-scale ${
+            className={`flex items-center gap-1.5 min-h-[38px] px-3 rounded-lg font-bold transition-all press-scale ${
               groupBy === 'unit'
-                ? 'bg-white dark:bg-slate-700 text-primary-600 dark:text-primary-300 shadow-sm'
+                ? 'bg-white dark:bg-slate-700 text-primary-600 dark:text-primary-300 shadow-xs border border-slate-200/60 dark:border-slate-600'
                 : 'text-slate-600 dark:text-slate-400 hover:text-slate-800'
             }`}
           >
-            <Armchair size={13} />
-            یونیت‌ها (صندلی‌ها)
+            <Armchair size={15} />
+            <span>یونیت‌ها (صندلی‌ها)</span>
           </button>
           <button
             type="button"
@@ -166,14 +169,14 @@ export function MultiChairGrid({
               chimes.playPop()
               setGroupBy('doctor')
             }}
-            className={`flex items-center gap-1 px-2.5 py-1 rounded-lg font-medium transition-all press-scale ${
+            className={`flex items-center gap-1.5 min-h-[38px] px-3 rounded-lg font-bold transition-all press-scale ${
               groupBy === 'doctor'
-                ? 'bg-white dark:bg-slate-700 text-primary-600 dark:text-primary-300 shadow-sm'
+                ? 'bg-white dark:bg-slate-700 text-primary-600 dark:text-primary-300 shadow-xs border border-slate-200/60 dark:border-slate-600'
                 : 'text-slate-600 dark:text-slate-400 hover:text-slate-800'
             }`}
           >
-            <Stethoscope size={13} />
-            پزشکان
+            <Stethoscope size={15} />
+            <span>پزشکان</span>
           </button>
         </div>
       </div>

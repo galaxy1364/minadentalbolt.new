@@ -945,109 +945,135 @@ export default function Appointments() {
       </div>
 
       {/* ── Filter tabs + search + view toggle ── */}
-      <div className="flex items-center gap-2">
-        <div className="flex-1 flex items-center gap-2 overflow-x-auto dock-scroll">
+      <div className="card-tactile-3d flex flex-wrap items-center justify-between gap-2.5 p-2 rounded-2xl bg-white/80 dark:bg-slate-800/80 backdrop-blur-xl border border-slate-200/60 dark:border-slate-700/60 shadow-xs">
+        <div className="flex items-center gap-1.5 overflow-x-auto dock-scroll py-0.5">
           {filterTabs.map((t) => (
             <button
               key={t.key}
               onClick={() => { h.select(); setActiveFilter(t.key) }}
-              className={`filter-tab ${activeFilter === t.key ? 'active' : ''}`}
+              className={`filter-tab min-h-[44px] px-3.5 rounded-xl text-xs font-bold transition-all press-scale ${activeFilter === t.key ? 'active shadow-xs' : ''}`}
             >
               {t.label}
             </button>
           ))}
         </div>
-        {/* ── MOD-FEAT-NEW-002: پرینت نوبت‌نامه روزانه با پوسته امن PWA ── */}
-        <button
-          onClick={() => {
-            h.confirm()
-            const todayAppts = appointments
-              .filter((a) => a.date === todayStr)
-              .sort((a, b) => a.start_time.localeCompare(b.start_time))
-            const rows = todayAppts.map((a) => {
-              const p = a.patient ? `${a.patient.first_name} ${a.patient.last_name}` : 'نامشخص'
-              const d = a.doctor?.name ? `دکتر ${a.doctor.name}` : '—'
-              const t = getType(a.type).label
-              const s = getStatus(a.status).label
-              return `<tr><td>${toPersianDigits(a.start_time)}</td><td>${p}</td><td>${d}</td><td>${t}</td><td>${s}</td><td>${a.unit?.name || '—'}</td></tr>`
-            }).join('')
-            const doc = buildPrintDocument({
-              title: `نوبت‌نامه ${toJalaliStringPretty(todayStr)}`,
-              styles: `
-                h1 { font-size: 16px; margin-bottom: 12px; border-bottom: 2px solid #0d9488; padding-bottom: 6px; color: #0d9488; }
-                table { width: 100%; border-collapse: collapse; font-size: 12px; margin-top: 10px; }
-                th, td { border: 1px solid #cbd5e1; padding: 6px 8px; text-align: right; }
-                th { background: #f1f5f9; font-weight: bold; color: #334155; }
-                tr:nth-child(even) { background: #f8fafc; }
-              `,
-              bodyHtml: `
-                <h1>نوبت‌نامه — ${toJalaliStringPretty(todayStr)} (${toPersianDigits(todayAppts.length)} نوبت)</h1>
-                <table>
-                  <thead>
-                    <tr><th>ساعت</th><th>بیمار</th><th>پزشک</th><th>نوع</th><th>وضعیت</th><th>یونیت</th></tr>
-                  </thead>
-                  <tbody>${rows}</tbody>
-                </table>
-              `,
-              shareText: `نوبت‌نامه روزانه کلینیک دندانپزشکی مینا — ${toJalaliStringPretty(todayStr)}\nتعداد نوبت‌ها: ${toPersianDigits(todayAppts.length)}`,
-            })
-            const w = window.open('', '_blank')
-            if (w) { w.document.write(doc); w.document.close(); }
-          }}
-          className="p-2 rounded-xl bg-white border border-slate-200 text-slate-500 hover:text-primary-600 transition-all-smooth press-scale flex-shrink-0"
-          title="پرینت نوبت‌نامه امروز"
-          aria-label="پرینت نوبت‌نامه امروز"
-        >
-          <Printer size={16} />
-        </button>
-        <button
-          onClick={() => { h.tap(); setShowSearch(!showSearch) }}
-          className="p-2 rounded-xl bg-white border border-slate-200 text-slate-500 hover:text-primary-600 transition-all-smooth press-scale flex-shrink-0"
-          aria-label="جستجو"
-        >
-          <Search size={16} />
-        </button>
-        {/* ── 3-way View Mode Toggle ── */}
-        <div className="flex items-center gap-1 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl p-1 flex-shrink-0">
+
+        <div className="flex items-center gap-2 flex-wrap shrink-0">
+          {/* ── Print Button ── */}
           <button
-            type="button"
-            onClick={() => { h.toggle(); setViewMode('list') }}
-            className={`p-1.5 rounded-lg transition-all-smooth ${viewMode === 'list' ? 'bg-primary-50 dark:bg-primary-950/40 text-primary-600 dark:text-primary-400 font-bold' : 'text-slate-400 hover:text-slate-600'}`}
-            title="نمای لیست نوبت‌ها"
+            onClick={() => {
+              h.confirm()
+              const todayAppts = appointments
+                .filter((a) => a.date === todayStr)
+                .sort((a, b) => a.start_time.localeCompare(b.start_time))
+              const rows = todayAppts.map((a) => {
+                const p = a.patient ? `${a.patient.first_name} ${a.patient.last_name}` : 'نامشخص'
+                const d = a.doctor?.name ? `دکتر ${a.doctor.name}` : '—'
+                const t = getType(a.type).label
+                const s = getStatus(a.status).label
+                return `<tr><td>${toPersianDigits(a.start_time)}</td><td>${p}</td><td>${d}</td><td>${t}</td><td>${s}</td><td>${a.unit?.name || '—'}</td></tr>`
+              }).join('')
+              const doc = buildPrintDocument({
+                title: `نوبت‌نامه ${toJalaliStringPretty(todayStr)}`,
+                styles: `
+                  h1 { font-size: 16px; margin-bottom: 12px; border-bottom: 2px solid #0d9488; padding-bottom: 6px; color: #0d9488; }
+                  table { width: 100%; border-collapse: collapse; font-size: 12px; margin-top: 10px; }
+                  th, td { border: 1px solid #cbd5e1; padding: 6px 8px; text-align: right; }
+                  th { background: #f1f5f9; font-weight: bold; color: #334155; }
+                  tr:nth-child(even) { background: #f8fafc; }
+                `,
+                bodyHtml: `
+                  <h1>نوبت‌نامه — ${toJalaliStringPretty(todayStr)} (${toPersianDigits(todayAppts.length)} نوبت)</h1>
+                  <table>
+                    <thead>
+                      <tr><th>ساعت</th><th>بیمار</th><th>پزشک</th><th>نوع</th><th>وضعیت</th><th>یونیت</th></tr>
+                    </thead>
+                    <tbody>${rows}</tbody>
+                  </table>
+                `,
+                shareText: `نوبت‌نامه روزانه کلینیک دندانپزشکی مینا — ${toJalaliStringPretty(todayStr)}\nتعداد نوبت‌ها: ${toPersianDigits(todayAppts.length)}`,
+              })
+              const w = window.open('', '_blank')
+              if (w) { w.document.write(doc); w.document.close(); }
+            }}
+            className="flex items-center justify-center min-w-[44px] min-h-[44px] rounded-xl bg-white dark:bg-slate-700 border border-slate-200 dark:border-slate-600 text-slate-600 dark:text-slate-300 hover:text-primary-600 hover:border-primary-400 transition-all press-scale shadow-xs"
+            title="پرینت نوبت‌نامه امروز"
+            aria-label="پرینت نوبت‌نامه امروز"
           >
-            <List size={16} />
+            <Printer size={17} />
           </button>
+
+          {/* ── Search Button ── */}
           <button
-            type="button"
-            onClick={() => { h.toggle(); setViewMode('calendar') }}
-            className={`p-1.5 rounded-lg transition-all-smooth ${viewMode === 'calendar' ? 'bg-primary-50 dark:bg-primary-950/40 text-primary-600 dark:text-primary-400 font-bold' : 'text-slate-400 hover:text-slate-600'}`}
-            title="تقویم ماهانه"
+            onClick={() => { h.tap(); setShowSearch(!showSearch) }}
+            className={`flex items-center justify-center min-w-[44px] min-h-[44px] rounded-xl border transition-all press-scale shadow-xs ${
+              showSearch
+                ? 'bg-primary-50 dark:bg-primary-950/50 border-primary-400 text-primary-600 dark:text-primary-400'
+                : 'bg-white dark:bg-slate-700 border-slate-200 dark:border-slate-600 text-slate-600 dark:text-slate-300 hover:text-primary-600'
+            }`}
+            aria-label="جستجو در نوبت‌ها"
+            title="جستجوی نوبت‌ها"
           >
-            <Calendar size={16} />
+            <Search size={17} />
           </button>
+
+          {/* ── 3-way View Mode Toggle ── */}
+          <div className="flex items-center gap-1 bg-slate-100 dark:bg-slate-900/60 p-1 rounded-xl border border-slate-200/80 dark:border-slate-700/80">
+            <button
+              type="button"
+              onClick={() => { h.toggle(); setViewMode('list') }}
+              className={`flex items-center gap-1.5 min-h-[40px] px-3 rounded-lg text-xs font-extrabold transition-all press-scale ${
+                viewMode === 'list'
+                  ? 'bg-white dark:bg-slate-700 text-primary-600 dark:text-primary-400 shadow-xs border border-slate-200/70 dark:border-slate-600'
+                  : 'text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-slate-200'
+              }`}
+              title="نمای لیست نوبت‌ها"
+            >
+              <List size={15} />
+              <span>لیست</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => { h.toggle(); setViewMode('calendar') }}
+              className={`flex items-center gap-1.5 min-h-[40px] px-3 rounded-lg text-xs font-extrabold transition-all press-scale ${
+                viewMode === 'calendar'
+                  ? 'bg-white dark:bg-slate-700 text-primary-600 dark:text-primary-400 shadow-xs border border-slate-200/70 dark:border-slate-600'
+                  : 'text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-slate-200'
+              }`}
+              title="تقویم ماهانه"
+            >
+              <Calendar size={15} />
+              <span>تقویم</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => { h.toggle(); setViewMode('operatory') }}
+              className={`flex items-center gap-1.5 min-h-[40px] px-3 rounded-lg text-xs font-extrabold transition-all press-scale ${
+                viewMode === 'operatory'
+                  ? 'bg-white dark:bg-slate-700 text-primary-600 dark:text-primary-400 shadow-xs border border-slate-200/70 dark:border-slate-600'
+                  : 'text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-slate-200'
+              }`}
+              title="جدول ستونی یونیت‌ها و صندلی‌ها"
+            >
+              <Grid size={15} />
+              <span>صندلی‌ها</span>
+            </button>
+          </div>
+
+          {/* ── Waiting Room TV Display Launcher Button ── */}
           <button
             type="button"
-            onClick={() => { h.toggle(); setViewMode('operatory') }}
-            className={`p-1.5 rounded-lg transition-all-smooth ${viewMode === 'operatory' ? 'bg-primary-50 dark:bg-primary-950/40 text-primary-600 dark:text-primary-400 font-bold' : 'text-slate-400 hover:text-slate-600'}`}
-            title="جدول ستونی یونیت‌ها و صندلی‌ها"
+            onClick={() => {
+              h.tap()
+              window.open('#/waiting-room', '_blank')
+            }}
+            className="flex items-center gap-1.5 min-h-[44px] px-3.5 rounded-xl bg-gradient-to-r from-teal-500 to-emerald-600 text-white font-extrabold text-xs shadow-md shadow-emerald-500/20 border-t border-white/30 hover:brightness-110 active:scale-95 transition-all press-scale"
+            title="باز کردن مانیتور سالن انتظار (مخصوص تلویزیون و نمایشگر عمومی)"
           >
-            <Grid size={16} />
+            <Tv size={16} />
+            <span className="hidden sm:inline">مانیتور سالن</span>
           </button>
         </div>
-
-        {/* ── Waiting Room TV Display Launcher Button ── */}
-        <button
-          type="button"
-          onClick={() => {
-            h.tap()
-            window.open('#/waiting-room', '_blank')
-          }}
-          className="px-2.5 py-1.5 rounded-xl bg-teal-50 dark:bg-teal-950/40 border border-teal-200 dark:border-teal-800 text-teal-700 dark:text-teal-300 hover:bg-teal-100 dark:hover:bg-teal-900/60 transition-all-smooth press-scale flex items-center gap-1.5 text-xs font-bold shrink-0"
-          title="باز کردن مانیتور سالن انتظار (مخصوص تلویزیون و نمایشگر عمومی)"
-        >
-          <Tv size={15} />
-          <span className="hidden sm:inline">تلویزیون سالن انتظار</span>
-        </button>
       </div>
 
       {showSearch && (
