@@ -1117,8 +1117,37 @@ export default function Appointments() {
                       <div className="time-badge !min-w-[50px] !text-sm">
                         {toPersianDigits(appt.start_time)}
                       </div>
-                      <div className="flex-1 min-w-0">
-                        <h3 className="font-bold text-sm text-slate-800 dark:text-slate-100 break-words leading-tight">{patientName(appt)}</h3>
+                      <div className="flex-1 min-w-0" onClick={(e) => e.stopPropagation()}>
+                        <div className="flex items-center gap-2 mb-1 flex-wrap">
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              h.tap()
+                              if (appt.patient_id) navigate(`/patients/${appt.patient_id}`)
+                            }}
+                            title="مشاهده پرونده کامل بیمار"
+                            className="font-bold text-sm text-slate-800 dark:text-slate-100 break-words leading-tight hover:text-primary-600 dark:hover:text-primary-400 hover:underline text-right cursor-pointer"
+                          >
+                            {patientName(appt)}
+                          </button>
+                          {appt.patient?.file_number && (
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation()
+                                h.tap()
+                                if (appt.patient_id) navigate(`/patients/${appt.patient_id}`)
+                              }}
+                              title="شماره پرونده بیمار"
+                              className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md bg-slate-900 dark:bg-primary-950 text-white dark:text-primary-200 text-[10px] font-mono font-bold hover:scale-105 active:scale-95 transition-all cursor-pointer"
+                              dir="ltr"
+                            >
+                              <FileText size={10} className="text-primary-400" />
+                              <span>{toPersianDigits(appt.patient.file_number)}</span>
+                            </button>
+                          )}
+                        </div>
                         <div className="flex items-center gap-2 mt-1">
                           <span className={`status-pill ${tm.bg} ${tm.color}`}>{tm.label}</span>
                           <span className={`status-pill ${sm.bg} ${sm.color}`}>{sm.label}</span>
@@ -1201,8 +1230,35 @@ export default function Appointments() {
 
                   {/* Content */}
                   <div className="flex-1 min-w-0" onClick={(e) => e.stopPropagation()}>
-                    <div className="flex items-center gap-2 mb-1">
-                      <h3 className="font-bold text-sm text-slate-800 dark:text-slate-100 break-words leading-tight">{patientName(appt)}</h3>
+                    <div className="flex items-center gap-2 mb-1 flex-wrap">
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          h.tap()
+                          if (appt.patient_id) navigate(`/patients/${appt.patient_id}`)
+                        }}
+                        title="مشاهده پرونده کامل بیمار"
+                        className="font-bold text-sm text-slate-800 dark:text-slate-100 break-words leading-tight hover:text-primary-600 dark:hover:text-primary-400 hover:underline text-right cursor-pointer"
+                      >
+                        {patientName(appt)}
+                      </button>
+                      {appt.patient?.file_number && (
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            h.tap()
+                            if (appt.patient_id) navigate(`/patients/${appt.patient_id}`)
+                          }}
+                          title="شماره پرونده بیمار"
+                          className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg bg-slate-900 dark:bg-primary-950 text-white dark:text-primary-200 text-[10px] font-mono font-bold hover:scale-105 active:scale-95 transition-all cursor-pointer"
+                          dir="ltr"
+                        >
+                          <FileText size={10} className="text-primary-400" />
+                          <span>{toPersianDigits(appt.patient.file_number)}</span>
+                        </button>
+                      )}
                     </div>
                     <div className="flex items-center gap-1.5 flex-wrap mb-2">
                       <span className={`status-pill ${tm.bg} ${tm.color}`}>
@@ -1219,10 +1275,30 @@ export default function Appointments() {
                         </span>
                       )}
                     </div>
-                    <div className="flex items-center gap-3 text-[11px] text-slate-500">
-                      <span className="flex items-center gap-1"><User size={11} /> {doctorName(appt)}</span>
-                      {unitName(appt) && <span>{unitName(appt)}</span>}
-                      {appt.estimated_fee != null && <span>{formatCurrency(appt.estimated_fee)} ت</span>}
+                    <div className="flex items-center gap-3 text-[11px] text-slate-500 flex-wrap">
+                      <span className="flex items-center gap-1 font-medium text-slate-700 dark:text-slate-300">
+                        <User size={11} className="text-primary-500" /> دکتر {doctorName(appt)}
+                      </span>
+                      {unitName(appt) && (
+                        <span className="flex items-center gap-1 font-medium text-slate-600 dark:text-slate-400">
+                          <Armchair size={11} className="text-teal-500" /> {unitName(appt)}
+                        </span>
+                      )}
+                      {appt.estimated_fee != null && (
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            h.tap()
+                            if (appt.patient_id) navigate(`/patients/${appt.patient_id}`, { state: { initialTab: 'payments' } })
+                          }}
+                          title="مشاهده تعرفه و صورت‌حساب در پرونده"
+                          className="flex items-center gap-1 font-mono font-bold text-slate-700 dark:text-slate-200 hover:text-primary-600 transition-colors cursor-pointer"
+                        >
+                          <DollarSign size={11} className="text-emerald-500" />
+                          <span>{formatCurrency(appt.estimated_fee)} ت</span>
+                        </button>
+                      )}
                     </div>
 
                     {/* ── بنر و نشانگر اتمام کار پزشک و آمادگی تسویه (ردیف اول) ── */}

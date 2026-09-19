@@ -1,6 +1,7 @@
 // MultiChairGrid.tsx — Multi-Chair Operatory Grid View for Dental Appointments
 // Displays appointments in parallel columns by dental chair/unit or by doctor
 import React, { useMemo } from 'react'
+import { useNavigate } from 'react-router-dom'
 import {
   ChevronRight,
   ChevronLeft,
@@ -12,6 +13,7 @@ import {
   Armchair,
   Volume2,
   UserCheck,
+  FileText,
 } from 'lucide-react'
 import { AppointmentWithRelations, Unit, Doctor } from '../types'
 import { toJalaliStringPretty, toPersianDigits, getJalaliDateInfo, persianWeekdaysShort } from '../lib/persianDate'
@@ -48,6 +50,7 @@ export function MultiChairGrid({
   onCallPatient,
   onQuickStatus,
 }: MultiChairGridProps) {
+  const navigate = useNavigate()
   const [groupBy, setGroupBy] = React.useState<'unit' | 'doctor'>('unit')
 
   // Filter appointments for selected day
@@ -256,11 +259,27 @@ export function MultiChairGrid({
                                     borderRightColor: docCol || '#0d9488',
                                   }}
                                 >
-                                  <div className="flex items-center justify-between text-xs">
-                                    <span className="font-bold text-slate-800 dark:text-slate-100 truncate">
-                                      {patient ? `${patient.first_name} ${patient.last_name}` : 'بیمار'}
-                                    </span>
-                                    <span className="text-[10px] font-mono text-slate-500">
+                                  <div className="flex items-center justify-between text-xs gap-1">
+                                    <div className="flex items-center gap-1 min-w-0">
+                                      <button
+                                        type="button"
+                                        onClick={(e) => {
+                                          e.stopPropagation()
+                                          h.tap()
+                                          if (appt.patient_id) navigate(`/patients/${appt.patient_id}`)
+                                        }}
+                                        title="مشاهده پرونده کامل بیمار"
+                                        className="font-bold text-slate-800 dark:text-slate-100 truncate hover:text-primary-600 dark:hover:text-primary-400 hover:underline text-right cursor-pointer"
+                                      >
+                                        {patient ? `${patient.first_name} ${patient.last_name}` : 'بیمار'}
+                                      </button>
+                                      {patient?.file_number && (
+                                        <span className="text-[9px] font-mono px-1 py-0.2 bg-slate-900 dark:bg-primary-950 text-white dark:text-primary-300 rounded font-bold" dir="ltr">
+                                          {toPersianDigits(patient.file_number)}
+                                        </span>
+                                      )}
+                                    </div>
+                                    <span className="text-[10px] font-mono text-slate-500 shrink-0">
                                       {toPersianDigits(appt.start_time)}
                                     </span>
                                   </div>

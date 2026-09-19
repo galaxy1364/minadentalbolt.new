@@ -913,9 +913,36 @@ export default function Laboratory() {
               <h4 className="text-sm font-bold text-slate-800 truncate">
                 {workTypeMeta?.label || 'سفارش'}
               </h4>
-              <p className="text-xs text-slate-500 truncate">
-                {getPatientName(order.patient_id)} - {getLabName(order.lab_id)}
-              </p>
+              <div className="flex items-center gap-1.5 flex-wrap">
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    h.tap()
+                    if (order.patient_id) appointmentNav(`/patients/${order.patient_id}`, { state: { initialTab: 'labOrders' } })
+                  }}
+                  className="text-xs font-bold text-slate-700 dark:text-slate-200 hover:text-primary-600 dark:hover:text-primary-400 hover:underline cursor-pointer"
+                  title="مشاهده سفارشات لابراتوار در پرونده بیمار"
+                >
+                  {getPatientName(order.patient_id)}
+                </button>
+                {patientMap.get(order.patient_id)?.file_number && (
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      h.tap()
+                      if (order.patient_id) appointmentNav(`/patients/${order.patient_id}`)
+                    }}
+                    title="شماره پرونده بیمار"
+                    className="inline-flex items-center gap-1 px-1.5 py-0.2 rounded bg-slate-900 dark:bg-primary-950 text-white dark:text-primary-300 text-[10px] font-mono font-bold hover:scale-105 active:scale-95 transition-all cursor-pointer"
+                    dir="ltr"
+                  >
+                    <span>{toPersianDigits(patientMap.get(order.patient_id)!.file_number!)}</span>
+                  </button>
+                )}
+                <span className="text-xs text-slate-400">- {getLabName(order.lab_id)}</span>
+              </div>
             </div>
           </div>
           <div className="flex items-center gap-1.5 flex-wrap shrink-0">
@@ -936,7 +963,18 @@ export default function Laboratory() {
           {order.tooth_number && (
             <div className="flex items-center gap-1">
               <span className="text-slate-400">دندان:</span>
-              <span className="font-medium">{toothLabel(order.tooth_number)}</span>
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation()
+                  h.tap()
+                  if (order.patient_id) appointmentNav(`/patients/${order.patient_id}`, { state: { initialTab: 'teeth' } })
+                }}
+                className="font-bold text-primary-600 dark:text-primary-400 hover:underline cursor-pointer"
+                title="مشاهده چارت دندانی در پرونده بیمار"
+              >
+                {toothLabel(order.tooth_number)}
+              </button>
             </div>
           )}
           {order.shade && (
@@ -1106,7 +1144,18 @@ export default function Laboratory() {
           <div className="flex items-center gap-3 text-xs text-slate-400">
             <span>{toJalaliStringPretty(order.created_at)}</span>
             {order.cost != null && (
-              <span className="font-bold text-slate-700">{formatCurrency(order.cost)} ت</span>
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation()
+                  h.tap()
+                  if (order.patient_id) appointmentNav(`/patients/${order.patient_id}`, { state: { initialTab: 'payments' } })
+                }}
+                className="font-bold text-slate-700 dark:text-slate-200 hover:text-primary-600 transition-colors cursor-pointer"
+                title="مشاهده صورت‌حساب مالی در پرونده بیمار"
+              >
+                {formatCurrency(order.cost)} ت
+              </button>
             )}
           </div>
           <div className="flex items-center gap-1">

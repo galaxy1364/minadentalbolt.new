@@ -12,7 +12,7 @@ import { findDuplicatePayments, duplicateWarning } from '../lib/duplicatePayment
 import { PatientFinanceOverview } from '../components/PatientFinanceOverview'
 import { formatCrossFamilyPaymentNote } from '../lib/familyBilling'
 import { useNavigate, useLocation } from 'react-router-dom'
-import { CreditCard, Plus, Search, DollarSign, TrendingUp, Wallet, Calendar, CalendarClock, CheckCircle2, AlertCircle, Edit2, Filter, Receipt, Banknote, Clock, Printer, Ban, Archive, MessageSquare, Users, Sparkles, Loader2 } from 'lucide-react'
+import { CreditCard, Plus, Search, DollarSign, TrendingUp, Wallet, Calendar, CalendarClock, CheckCircle2, AlertCircle, Edit2, Filter, Receipt, Banknote, Clock, Printer, Ban, Archive, MessageSquare, Users, Sparkles, Loader2, FileText } from 'lucide-react'
 import { ChevronDown } from 'lucide-react'
 import { BarChart, Bar, XAxis, YAxis, Tooltip as RTooltip, ResponsiveContainer, PieChart, Pie, Cell as RCell } from 'recharts'
 import { fetchPayments, createPayment, updatePayment, fetchEncounters, fetchCheques, createCheque, updateCheque, fetchPaymentPlans, createPaymentPlan, updatePaymentPlan, updateInstallment, fetchPatients, fetchExpenses, createExpense, updateExpense, deactivateExpense, fetchTreatments, fetchImplantCases, fetchDoctors, fetchLabOrders } from '../lib/api'
@@ -972,16 +972,43 @@ export default function Billing() {
                           تاریخش، بابت چه دندونی، کدوم دکتر». The name is
                           the natural handle — it is what someone is
                           looking at when the question occurs to them. */}
-                      <p className="text-xs text-slate-500">
+                      <div className="flex items-center gap-1.5 flex-wrap text-xs text-slate-500">
                         <button
                           type="button"
-                          onClick={() => { h.tap(); setFinanceOverviewPatientId(p.patient_id) }}
-                          className="font-bold text-primary-700 dark:text-primary-400 hover:underline"
+                          onClick={() => {
+                            h.tap()
+                            navigate(`/patients/${p.patient_id}`, { state: { initialTab: 'payments' } })
+                          }}
+                          className="font-bold text-primary-700 dark:text-primary-400 hover:underline cursor-pointer"
+                          title="مشاهده پرونده کامل بیمار"
                         >
                           {getPatientName(p.patient_id)}
                         </button>
-                        {' - '}{methodMeta.label} - {toJalaliStringPretty(p.payment_date)}
-                      </p>
+                        {patientMap.get(p.patient_id)?.file_number && (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              h.tap()
+                              navigate(`/patients/${p.patient_id}`)
+                            }}
+                            title="شماره پرونده بیمار"
+                            className="inline-flex items-center gap-1 px-1.5 py-0.2 rounded bg-slate-900 dark:bg-primary-950 text-white dark:text-primary-300 text-[10px] font-mono font-bold hover:scale-105 active:scale-95 transition-all cursor-pointer"
+                            dir="ltr"
+                          >
+                            <FileText size={9} className="text-primary-400" />
+                            <span>{toPersianDigits(patientMap.get(p.patient_id)!.file_number!)}</span>
+                          </button>
+                        )}
+                        <button
+                          type="button"
+                          onClick={() => { h.tap(); setFinanceOverviewPatientId(p.patient_id) }}
+                          className="text-[10px] px-1.5 py-0.5 rounded bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 text-slate-600 dark:text-slate-300 transition-colors cursor-pointer"
+                          title="نمایش وضعیت مالی این بیمار در پنجره شناور"
+                        >
+                          خلاصه مالی
+                        </button>
+                        <span>- {methodMeta.label} - {toJalaliStringPretty(p.payment_date)}</span>
+                      </div>
                       {/* MOD-FEAT-020: shown for every payment, including the
                           older ones that predate attribution — «بابت مشخص
                           نشده» is information, not noise: it marks exactly
@@ -995,9 +1022,18 @@ export default function Billing() {
                       {(() => {
                         const bal = patientBalancesMap.get(p.patient_id)?.balance ?? 0
                         return bal > 0 ? (
-                          <p className="text-[11px] font-bold text-error-600 mt-0.5">
-                            مانده‌حساب این بیمار: {formatCurrency(bal)} ت
-                          </p>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              h.tap()
+                              navigate(`/patients/${p.patient_id}`, { state: { initialTab: 'payments', openPaymentModal: true } })
+                            }}
+                            className="text-[11px] font-bold text-error-600 mt-0.5 hover:underline flex items-center gap-1 cursor-pointer"
+                            title="تسویه مستقیم این مانده در پرونده بیمار"
+                          >
+                            <span>مانده‌حساب این بیمار: {formatCurrency(bal)} ت</span>
+                            <span className="text-[10px] underline">(تسویه سریع)</span>
+                          </button>
                         ) : (
                           <p className="text-[11px] text-success-600 mt-0.5">این بیمار تسویه است</p>
                         )
@@ -1321,9 +1357,35 @@ export default function Billing() {
                           <span className="text-[10px] px-1.5 py-0.5 rounded-md bg-primary-100 text-primary-700 font-bold">چک قسط</span>
                         )}
                       </div>
-                      <p className="text-xs text-slate-500">
-                        {getPatientName(c.patient_id)} - سررسید: {toJalaliStringPretty(c.due_date)}
-                      </p>
+                      <div className="flex items-center gap-1.5 flex-wrap text-xs text-slate-500">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            h.tap()
+                            navigate(`/patients/${c.patient_id}`, { state: { initialTab: 'payments', focusSection: 'section-cheques' } })
+                          }}
+                          className="font-bold text-primary-700 dark:text-primary-400 hover:underline cursor-pointer"
+                          title="مشاهده چک‌های بیمار در پرونده"
+                        >
+                          {getPatientName(c.patient_id)}
+                        </button>
+                        {patientMap.get(c.patient_id)?.file_number && (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              h.tap()
+                              navigate(`/patients/${c.patient_id}`)
+                            }}
+                            title="شماره پرونده بیمار"
+                            className="inline-flex items-center gap-1 px-1.5 py-0.2 rounded bg-slate-900 dark:bg-primary-950 text-white dark:text-primary-300 text-[10px] font-mono font-bold hover:scale-105 active:scale-95 transition-all cursor-pointer"
+                            dir="ltr"
+                          >
+                            <FileText size={9} className="text-primary-400" />
+                            <span>{toPersianDigits(patientMap.get(c.patient_id)!.file_number!)}</span>
+                          </button>
+                        )}
+                        <span>- سررسید: {toJalaliStringPretty(c.due_date)}</span>
+                      </div>
                       {c.bank_name && <p className="text-xs text-slate-400">بانک: {c.bank_name} {c.cheque_number && `- شماره: ${toPersianDigits(c.cheque_number)}`}</p>}
                       {(c as any).sayad_id && (
                         <div className="flex items-center gap-1.5 flex-wrap mt-0.5">
@@ -1421,7 +1483,34 @@ export default function Billing() {
                 <div className="relative z-10">
                   <div className="flex items-center justify-between gap-3 flex-wrap mb-3">
                   <div>
-                    <p className="text-sm font-bold text-slate-800">{getPatientName(plan.patient_id)}</p>
+                    <div className="flex items-center gap-1.5 flex-wrap">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          h.tap()
+                          navigate(`/patients/${plan.patient_id}`, { state: { initialTab: 'payments', focusSection: 'section-payment-plans' } })
+                        }}
+                        className="font-bold text-sm text-slate-800 hover:text-primary-600 hover:underline cursor-pointer"
+                        title="مشاهده اقساط بیمار در پرونده"
+                      >
+                        {getPatientName(plan.patient_id)}
+                      </button>
+                      {patientMap.get(plan.patient_id)?.file_number && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            h.tap()
+                            navigate(`/patients/${plan.patient_id}`)
+                          }}
+                          title="شماره پرونده بیمار"
+                          className="inline-flex items-center gap-1 px-1.5 py-0.2 rounded bg-slate-900 dark:bg-primary-950 text-white dark:text-primary-300 text-[10px] font-mono font-bold hover:scale-105 active:scale-95 transition-all cursor-pointer"
+                          dir="ltr"
+                        >
+                          <FileText size={9} className="text-primary-400" />
+                          <span>{toPersianDigits(patientMap.get(plan.patient_id)!.file_number!)}</span>
+                        </button>
+                      )}
+                    </div>
                     <p className="text-xs text-slate-500">مبلغ کل: {formatCurrency(plan.total_amount)} تومان - {toPersianDigits(plan.installment_count)} قسط</p>
                   </div>
                   <div className="flex items-center gap-2">
@@ -1677,14 +1766,22 @@ export default function Billing() {
             return (
             <Card key={b.patientId} className={`p-4 cursor-pointer relative overflow-hidden transition-all duration-300 hover:shadow-xl hover:-translate-y-1 stagger-item bg-gradient-to-br ${theme.bg} ${theme.border}`} style={{ animationDelay: `${staggerDelay}s` }}>
               <div className={`absolute -right-16 -top-16 w-32 h-32 rounded-full blur-3xl opacity-20 breathe-slow ${theme.text}`} />
-              <div className="relative z-10 flex items-center justify-between gap-3" onClick={() => navigate(`/patients/${b.patientId}`)}>
+              <div className="relative z-10 flex items-center justify-between gap-3" onClick={() => { h.tap(); navigate(`/patients/${b.patientId}`, { state: { initialTab: 'payments', openPaymentModal: true } }) }}>
                 <div className="flex items-center gap-3">
                   <div className="w-10 h-10 rounded-xl bg-error-50 text-error-600 flex items-center justify-center">
                     <Wallet size={18} />
                   </div>
                   <div>
-                    <p className="text-sm font-medium text-slate-800">{getPatientName(b.patientId)}</p>
-                    <p className="text-xs text-slate-400">مانده حساب</p>
+                    <div className="flex items-center gap-1.5 flex-wrap">
+                      <p className="text-sm font-bold text-slate-800">{getPatientName(b.patientId)}</p>
+                      {patientMap.get(b.patientId)?.file_number && (
+                        <span className="inline-flex items-center gap-1 px-1.5 py-0.2 rounded bg-slate-900 dark:bg-primary-950 text-white dark:text-primary-300 text-[10px] font-mono font-bold" dir="ltr">
+                          <FileText size={9} className="text-primary-400" />
+                          <span>{toPersianDigits(patientMap.get(b.patientId)!.file_number!)}</span>
+                        </span>
+                      )}
+                    </div>
+                    <p className="text-xs text-error-600 font-medium">کلیک برای تسویه حساب فوری در پرونده</p>
                   </div>
                 </div>
                 <PatientDebtBar patientId={b.patientId} balance={{ balance: b.balance, paid: 0, totalCost: 0 }} variant="compact" />

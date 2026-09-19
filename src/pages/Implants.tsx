@@ -882,9 +882,50 @@ export default function Implants() {
                       <Smile size={24} />
                     </div>
                     <div>
-                      <h3 className="font-bold text-slate-800">{patientName(c)}</h3>
+                      <div className="flex items-center gap-1.5 flex-wrap">
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            h.tap()
+                            if (c.patient_id) navigate(`/patients/${c.patient_id}`, { state: { initialTab: 'treatments' } })
+                          }}
+                          className="font-bold text-slate-800 dark:text-slate-100 hover:text-primary-600 dark:hover:text-primary-400 hover:underline cursor-pointer"
+                          title="مشاهده پرونده کامل بیمار"
+                        >
+                          {patientName(c)}
+                        </button>
+                        {c.patient?.file_number && (
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              h.tap()
+                              if (c.patient_id) navigate(`/patients/${c.patient_id}`)
+                            }}
+                            title="شماره پرونده بیمار"
+                            className="inline-flex items-center gap-1 px-1.5 py-0.2 rounded bg-slate-900 dark:bg-primary-950 text-white dark:text-primary-300 text-[10px] font-mono font-bold hover:scale-105 active:scale-95 transition-all cursor-pointer"
+                            dir="ltr"
+                          >
+                            <span>{toPersianDigits(c.patient.file_number)}</span>
+                          </button>
+                        )}
+                      </div>
                       <p className="text-xs text-slate-500">
-                        دندان: <span className="font-medium text-slate-700">{c.tooth_number ? toothLabel(c.tooth_number) : '-'}</span>
+                        دندان: {c.tooth_number ? (
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              h.tap()
+                              if (c.patient_id) navigate(`/patients/${c.patient_id}`, { state: { initialTab: 'teeth' } })
+                            }}
+                            className="font-bold text-primary-600 dark:text-primary-400 hover:underline cursor-pointer"
+                            title="مشاهده چارت دندانی در پرونده بیمار"
+                          >
+                            {toothLabel(c.tooth_number)}
+                          </button>
+                        ) : '-'}
                         {c.doctor && ` | پزشک: ${doctorName(c)}`}
                       </p>
                     </div>
@@ -978,19 +1019,54 @@ export default function Implants() {
                     clicked. Removed. */}
 
                 {/* Cost breakdown */}
-                <div className="grid grid-cols-3 gap-2 mt-3 pt-3 border-t border-slate-100">
-                  <div>
-                    <p className="text-xs text-slate-400">کل هزینه</p>
-                    <p className="text-sm font-bold text-slate-700">{formatCurrency(c.total_cost || 0)} ت</p>
-                  </div>
-                  <div>
-                    <p className="text-xs text-slate-400">پرداختی</p>
+                <div className="grid grid-cols-3 gap-2 mt-3 pt-3 border-t border-slate-100 dark:border-slate-800">
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      h.tap()
+                      if (c.patient_id) navigate(`/patients/${c.patient_id}`, { state: { initialTab: 'treatments' } })
+                    }}
+                    className="text-right p-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer group"
+                    title="مشاهده درمان‌ها در پرونده بیمار"
+                  >
+                    <p className="text-xs text-slate-400 group-hover:text-primary-600">کل هزینه</p>
+                    <p className="text-sm font-bold text-slate-700 dark:text-slate-200">{formatCurrency(c.total_cost || 0)} ت</p>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      h.tap()
+                      if (c.patient_id) navigate(`/patients/${c.patient_id}`, { state: { initialTab: 'payments', focusSection: 'section-payments-ledger' } })
+                    }}
+                    className="text-right p-1.5 rounded-lg hover:bg-emerald-50 dark:hover:bg-emerald-950/30 transition-colors cursor-pointer group"
+                    title="مشاهده صورت‌حساب پرداختی‌ها در پرونده بیمار"
+                  >
+                    <p className="text-xs text-slate-400 group-hover:text-emerald-600">پرداختی</p>
                     <p className="text-sm font-bold text-success-600">{formatCurrency(c.paid_amount || 0)} ت</p>
-                  </div>
-                  <div>
-                    <p className="text-xs text-slate-400">باقی‌مانده</p>
-                    <p className={`text-sm font-bold ${remaining > 0 ? 'text-error-600' : 'text-slate-600'}`}>{formatCurrency(remaining)} ت</p>
-                  </div>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      h.tap()
+                      if (c.patient_id) {
+                        navigate(`/patients/${c.patient_id}`, {
+                          state: {
+                            initialTab: 'payments',
+                            openPaymentModal: remaining > 0,
+                            focusSection: 'section-settlement',
+                          },
+                        })
+                      }
+                    }}
+                    className="text-right p-1.5 rounded-lg hover:bg-rose-50 dark:hover:bg-rose-950/30 transition-colors cursor-pointer group"
+                    title={remaining > 0 ? 'تسویه حساب مستقیم این مانده در پرونده' : 'وضعیت تسویه'}
+                  >
+                    <p className="text-xs text-slate-400 group-hover:text-error-600">باقی‌مانده</p>
+                    <p className={`text-sm font-bold ${remaining > 0 ? 'text-error-600 underline' : 'text-slate-600'}`}>{formatCurrency(remaining)} ت</p>
+                  </button>
                 </div>
 
                 {/* Warranty */}
