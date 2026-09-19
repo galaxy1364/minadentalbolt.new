@@ -11,7 +11,7 @@ import { buildDoctorLedger } from '../lib/doctorLedger'
 import { phasePlanProgress, phaseSchedule, validatePhase, nextPhaseNumber, comparePhaseCostToTreatments } from '../lib/phases'
 import { useState, useEffect, useCallback, useMemo } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { ArrowRight, Edit2, Phone, Mail, MapPin, Calendar, CreditCard, Activity, FileText, Image as ImageIcon, Shield, Pill, Smile, Award, AlertCircle, Clock, CheckCircle2, Layers, Plus, Trash2, FileSignature, Printer, Bone, FlaskConical, Stethoscope, Archive as ArchiveIcon, RotateCcw, Sparkles, AlertTriangle, HeartPulse, Users, UserPlus, Link2, Download, CheckSquare, Square, Tags, FileHeart } from 'lucide-react'
+import { ArrowRight, Edit2, Phone, Mail, MapPin, Calendar, CreditCard, Activity, FileText, Image as ImageIcon, Shield, Pill, Smile, Award, AlertCircle, Clock, CheckCircle2, Layers, Plus, Trash2, FileSignature, Printer, Bone, FlaskConical, Stethoscope, Archive as ArchiveIcon, RotateCcw, Sparkles, AlertTriangle, HeartPulse, Users, UserPlus, Link2, Download, CheckSquare, Square, Tags, FileHeart, Camera } from 'lucide-react'
 import { fetchPatient, updatePatient, fetchTimeline, fetchTreatments, fetchAppointments, fetchPayments, createPayment, fetchToothRecords, createToothRecord, updateToothRecord, fetchPrescriptions, fetchRadiologyImages, updateRadiologyImage, fetchEncounters, fetchDoctors, fetchImplantCases, fetchTreatmentPhases, createTreatmentPhase, updateTreatmentPhase, fetchConsentForms, createConsentForm, updateConsentForm, fetchLabOrders, updateTreatment, fetchCheques, createCheque, updateCheque, fetchPaymentPlans, createPaymentPlan, updatePaymentPlan, fetchAllInstallments, updateInstallment, fetchPerioExams, createPerioExam, updatePerioExam, fetchOrthoExams, createOrthoExam, updateOrthoExam, fetchPatients } from '../lib/api'
 import { toJalaliString, toJalaliStringPretty, formatCurrency, toPersianDigits, formatTime, toEnglishDigits } from '../lib/persianDate'
 import { calcPatientBalance, calcFamilyBalance } from '../lib/finance'
@@ -44,6 +44,7 @@ import { buildPatientMedicationGuideDocument } from '../lib/patientMedicationGui
 import { usePrivacyMode } from '../lib/privacyMask'
 import { getClinicSetting } from '../lib/clinicSettings'
 import { buildChartHandoff } from '../lib/chartHandoff'
+import { DocumentScannerModal } from '../components/DocumentScannerModal'
 
 // ============================================================================
 // Constants
@@ -217,6 +218,11 @@ export default function PatientDetail() {
   }, [labOrders])
   const [paymentPlans, setPaymentPlans] = useState<PaymentPlan[]>([])
   const [installments, setInstallments] = useState<Installment[]>([])
+
+  // Document / Paper Record Scanner Modal (دوربین و اسکنر مدارک و رادیولوژی)
+  const [scannerModalOpen, setScannerModalOpen] = useState(false)
+  const [scannerInitialCategory, setScannerInitialCategory] = useState('paper_record')
+  const [docCategoryFilter, setDocCategoryFilter] = useState('all')
 
   // Direct Financial Operations Modals
   const [paymentModalOpen, setPaymentModalOpen] = useState(false)
@@ -1563,9 +1569,15 @@ export default function PatientDetail() {
                 <h1 className="text-base sm:text-lg font-black text-slate-900 dark:text-white tracking-tight leading-snug break-words">
                   {patient.first_name} {patient.last_name}
                 </h1>
-                <span className="font-mono text-[11px] font-extrabold px-2 py-0.5 rounded-lg bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-200/80 dark:border-slate-700">
-                  {patient.file_number ? `MD-${patient.file_number}` : `MD-${patient.id.slice(0, 5)}`}
-                </span>
+                {patient.file_number ? (
+                  <span className="font-mono text-xs font-black px-3 py-1 rounded-xl bg-slate-900 text-white dark:bg-primary-950 dark:text-primary-200 border border-slate-700/80 dark:border-primary-700 shadow-xs tracking-wider" dir="ltr">
+                    پرونده: {toPersianDigits(patient.file_number)}
+                  </span>
+                ) : (
+                  <span className="font-mono text-[11px] font-medium px-2 py-0.5 rounded-lg bg-slate-100 dark:bg-slate-800 text-slate-500 border border-slate-200 dark:border-slate-700">
+                    شناسه: {toPersianDigits(patient.id.slice(0, 6))}
+                  </span>
+                )}
                 {vipMeta.label !== 'عادی' && (
                   <Badge color={vipMeta.color}>{vipMeta.label}</Badge>
                 )}
@@ -1755,6 +1767,20 @@ export default function PatientDetail() {
               className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold bg-gradient-to-r from-teal-600 to-emerald-600 hover:from-teal-700 hover:to-emerald-700 text-white shadow-xs press-scale shrink-0"
             >
               <Calendar size={14} /> نوبت جدید
+            </button>
+
+            {/* Document & Paper Chart Camera Scanner */}
+            <button
+              type="button"
+              onClick={() => {
+                h.tap()
+                setScannerInitialCategory('paper_record')
+                setScannerModalOpen(true)
+              }}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold bg-gradient-to-r from-sky-600 to-blue-600 hover:from-sky-700 hover:to-blue-700 text-white shadow-xs press-scale shrink-0"
+              title="عکس‌برداری با دوربین گوشی و اسکن پرونده کاغذی، اسناد یا رادیولوژی"
+            >
+              <Camera size={14} /> اسکن مدارک / رادیولوژی
             </button>
 
             {/* 2. Visit / Treatment */}
@@ -3666,6 +3692,20 @@ export default function PatientDetail() {
           <div className="flex items-center gap-2 flex-wrap">
             <Button
               size="sm"
+              variant="primary"
+              onClick={() => {
+                h.tap()
+                chimes.playPop()
+                setScannerInitialCategory('radiology')
+                setScannerModalOpen(true)
+              }}
+              className="flex items-center gap-1.5 text-xs font-bold"
+              title="عکس‌برداری با دوربین یا آپلود فایل رادیولوژی و ذخیره لوکال"
+            >
+              <Camera size={14} /> اسکن و افزودن گرافی
+            </Button>
+            <Button
+              size="sm"
               variant="secondary"
               onClick={handlePrintRadiologyPortfolio}
               className="flex items-center gap-1.5 text-xs font-medium"
@@ -4056,57 +4096,309 @@ export default function PatientDetail() {
   }
 
   // ===========================================================================
-  // Render: Documents Tab
+  // Render: Documents Tab (اسناد، پرونده‌های کاغذی و تصاویر بالینی)
   // ===========================================================================
 
   const renderDocuments = () => {
-    const docCount = encounters.length + radiologyImages.length + prescriptions.length
-    if (docCount === 0) {
-      return (
-        <Card className="p-6">
-          <EmptyState icon={<FileText size={32} />} title="سندی ثبت نشده" description="برای این بیمار سندی ثبت نشده است" />
-        </Card>
-      )
+    // Active scanned documents & images
+    const activeScannedImages = radiologyImages.filter((img) => img.is_active !== false)
+    
+    // Filtered by category
+    const filteredDocs = docCategoryFilter === 'all'
+      ? activeScannedImages
+      : docCategoryFilter === 'paper_record'
+      ? activeScannedImages.filter((img) => img.image_type === 'paper_record' || !img.image_type)
+      : docCategoryFilter === 'radiology'
+      ? activeScannedImages.filter((img) => img.image_type === 'radiology' || img.image_type === 'periapical' || img.image_type === 'opg' || img.image_type === 'cbct')
+      : docCategoryFilter === 'consent'
+      ? activeScannedImages.filter((img) => img.image_type === 'consent')
+      : docCategoryFilter === 'lab_report'
+      ? activeScannedImages.filter((img) => img.image_type === 'lab_report')
+      : activeScannedImages
+
+    const getDocCategoryMeta = (type: string | null) => {
+      switch (type) {
+        case 'paper_record':
+          return { label: 'پرونده کاغذی', icon: '📄', color: 'bg-amber-50 text-amber-800 border-amber-200 dark:bg-amber-950/40 dark:text-amber-300 dark:border-amber-800' }
+        case 'radiology':
+        case 'periapical':
+        case 'opg':
+        case 'cbct':
+          return { label: 'رادیولوژی', icon: '🩻', color: 'bg-blue-50 text-blue-800 border-blue-200 dark:bg-blue-950/40 dark:text-blue-300 dark:border-blue-800' }
+        case 'consent':
+          return { label: 'رضایت‌نامه دستی', icon: '✍️', color: 'bg-purple-50 text-purple-800 border-purple-200 dark:bg-purple-950/40 dark:text-purple-300 dark:border-purple-800' }
+        case 'lab_report':
+          return { label: 'آزمایش / لابراتوار', icon: '🧪', color: 'bg-emerald-50 text-emerald-800 border-emerald-200 dark:bg-emerald-950/40 dark:text-emerald-300 dark:border-emerald-800' }
+        case 'clinical_photo':
+          return { label: 'فتوگرافی بالینی', icon: '📸', color: 'bg-teal-50 text-teal-800 border-teal-200 dark:bg-teal-950/40 dark:text-teal-300 dark:border-teal-800' }
+        default:
+          return { label: 'سند بالینی', icon: '📋', color: 'bg-slate-50 text-slate-700 border-slate-200 dark:bg-slate-800 dark:text-slate-300 dark:border-slate-700' }
+      }
     }
+
+    const handleDownloadDoc = (e: React.MouseEvent, img: RadiologyImage) => {
+      e.stopPropagation()
+      if (!img.image_url) return
+      h.tap()
+      chimes.playPop()
+      const a = document.createElement('a')
+      a.href = img.image_url
+      a.download = `doc-${patient?.file_number || patient?.id}-${img.image_type || 'scan'}-${img.id.slice(0, 6)}.jpg`
+      document.body.appendChild(a)
+      a.click()
+      document.body.removeChild(a)
+      showToast('info', 'تصویر سند روی حافظه دستگاه ذخیره شد')
+    }
+
+    const handleArchiveDoc = (e: React.MouseEvent, img: RadiologyImage) => {
+      e.stopPropagation()
+      h.tap()
+      confirmAction({
+        type: 'status',
+        title: 'آرشیو کردن تصویر سند',
+        warning: 'این تصویر هیچ‌وقت از بین نمی‌رود و در دیتابیس لوکال کلینیک باقی می‌ماند، اما از این لیست مخفی می‌شود.',
+        fields: [
+          { label: 'شرح سند', value: img.description || 'بدون شرح', highlight: true },
+          { label: 'تاریخ ثبت', value: img.taken_at ? toJalaliStringPretty(img.taken_at) : '—' },
+        ],
+        confirmLabel: 'تایید آرشیو',
+        onConfirm: async () => {
+          try {
+            await updateRadiologyImage(img.id, { is_active: false } as any)
+            chimes.playSuccess()
+            showToast('success', 'تصویر سند به بایگانی منتقل شد')
+            await loadTabData()
+          } catch {
+            chimes.playWarning()
+            showToast('error', 'خطا در بایگانی سند')
+          }
+        },
+      })
+    }
+
     return (
       <div className="space-y-4">
-        {/* Encounters */}
-        {encounters.length > 0 && (
-          <Card className="p-4">
-            <h3 className="text-sm font-bold text-slate-700 mb-3">ویزیت‌ها</h3>
-            <div className="space-y-2">
-              {encounters.map((e) => (
-                <div key={e.id} className="flex items-center justify-between gap-3 p-2 rounded-lg border border-slate-100">
-                  <div>
-                    <p className="text-sm text-slate-700">{e.chief_complaint || 'ویزیت'}</p>
-                    <p className="text-xs text-slate-400">{toJalaliStringPretty(e.encounter_date)}</p>
-                  </div>
-                  <Badge color={e.status === 'completed' ? 'success' : 'warning'}>
-                    {e.status === 'completed' ? 'تکمیل شده' : e.status === 'in_progress' ? 'در حال انجام' : e.status}
-                  </Badge>
-                </div>
-              ))}
-            </div>
+        {/* Controls & Scanner Action Header */}
+        <div className="flex items-center justify-between gap-3 flex-wrap bg-white dark:bg-slate-900 p-4 rounded-3xl border border-slate-100 dark:border-slate-800 shadow-sm">
+          <div>
+            <h3 className="text-sm sm:text-base font-black text-slate-900 dark:text-slate-50 flex items-center gap-2">
+              <Camera size={18} className="text-primary-600 dark:text-primary-400" />
+              <span>اسناد، سوابق کاغذی و عکس‌های رادیولوژی</span>
+            </h3>
+            <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+              عکس‌برداری با دوربین گوشی یا تبلت، ذخیره در دیتابیس محلی دستگاه و سینک خودکار شبکه
+            </p>
+          </div>
+
+          <div className="flex items-center gap-2 flex-wrap">
+            <Button
+              size="sm"
+              variant="primary"
+              onClick={() => {
+                h.tap()
+                chimes.playPop()
+                setScannerInitialCategory('paper_record')
+                setScannerModalOpen(true)
+              }}
+              className="flex items-center gap-1.5 text-xs font-bold"
+            >
+              <Camera size={14} /> اسکن یا عکاسی سند جدید
+            </Button>
+          </div>
+        </div>
+
+        {/* Category Filter Pills */}
+        <div className="flex items-center gap-1.5 overflow-x-auto pb-1 scrollbar-none">
+          {[
+            { key: 'all', label: 'همه اسناد', count: activeScannedImages.length },
+            { key: 'paper_record', label: 'پرونده کاغذی', count: activeScannedImages.filter((i) => i.image_type === 'paper_record' || !i.image_type).length },
+            { key: 'radiology', label: 'رادیولوژی و گرافی', count: activeScannedImages.filter((i) => i.image_type === 'radiology' || i.image_type === 'periapical' || i.image_type === 'opg' || i.image_type === 'cbct').length },
+            { key: 'consent', label: 'رضایت‌نامه دستی', count: activeScannedImages.filter((i) => i.image_type === 'consent').length },
+            { key: 'lab_report', label: 'آزمایش و لابراتوار', count: activeScannedImages.filter((i) => i.image_type === 'lab_report').length },
+          ].map((cat) => (
+            <button
+              key={cat.key}
+              type="button"
+              onClick={() => {
+                h.tap()
+                setDocCategoryFilter(cat.key)
+              }}
+              className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all-smooth press-scale shrink-0 ${
+                docCategoryFilter === cat.key
+                  ? 'bg-primary-600 text-white shadow-xs'
+                  : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200'
+              }`}
+            >
+              <span>{cat.label}</span>
+              <span className="font-mono text-[11px] mr-1.5 opacity-80">({toPersianDigits(cat.count)})</span>
+            </button>
+          ))}
+        </div>
+
+        {/* Scanned Documents Grid */}
+        {filteredDocs.length === 0 ? (
+          <Card className="p-8 text-center">
+            <EmptyState
+              icon={<Camera size={40} className="text-primary-500" />}
+              title="هیچ سند یا عکسی ثبت نشده است"
+              description="با دوربین گوشی یا تبلت از پرونده کاغذی، عکس‌های رادیولوژی یا برگه‌های آزمایش عکس بگیرید تا مستقیماً به پرونده متصل و در تمام دستگاه‌ها سینک شود."
+              action={
+                <Button
+                  size="sm"
+                  variant="primary"
+                  onClick={() => {
+                    h.tap()
+                    setScannerInitialCategory('paper_record')
+                    setScannerModalOpen(true)
+                  }}
+                  className="flex items-center gap-1.5"
+                >
+                  <Camera size={14} /> عکس‌برداری با دوربین
+                </Button>
+              }
+            />
           </Card>
+        ) : (
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3.5">
+            {filteredDocs.map((img) => {
+              const meta = getDocCategoryMeta(img.image_type)
+              return (
+                <div
+                  key={img.id}
+                  onClick={() => {
+                    h.tap()
+                    setSelectedRadImage(img)
+                  }}
+                  className="group relative flex flex-col p-3 rounded-2xl bg-white dark:bg-slate-850 border border-slate-200/80 dark:border-slate-700/80 shadow-xs hover:shadow-md transition-all-smooth cursor-pointer press-scale overflow-hidden"
+                >
+                  {/* Image Thumbnail Container */}
+                  <div className="relative aspect-[4/3] rounded-xl overflow-hidden bg-slate-950 flex items-center justify-center mb-2.5">
+                    {img.image_url ? (
+                      <img
+                        src={img.image_url}
+                        alt={img.description || 'Document'}
+                        className="w-full h-full object-contain group-hover:scale-105 transition-transform duration-500"
+                        loading="lazy"
+                      />
+                    ) : (
+                      <FileText size={32} className="text-slate-600" />
+                    )}
+
+                    {/* Category Capsule on Image */}
+                    <div className="absolute top-2 right-2">
+                      <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-lg border text-[10px] font-bold backdrop-blur-md shadow-xs ${meta.color}`}>
+                        <span>{meta.icon}</span>
+                        <span>{meta.label}</span>
+                      </span>
+                    </div>
+
+                    {/* Tooth Number Capsule if present */}
+                    {img.tooth_number && (
+                      <div className="absolute bottom-2 right-2">
+                        <span className="inline-flex items-center px-2 py-0.5 rounded-md bg-black/70 text-white font-mono text-[10px] font-bold">
+                          دندان {toothLabel(img.tooth_number)}
+                        </span>
+                      </div>
+                    )}
+
+                    {/* Date on Image */}
+                    {img.taken_at && (
+                      <div className="absolute bottom-2 left-2">
+                        <span className="inline-flex items-center px-2 py-0.5 rounded-md bg-black/70 text-slate-200 font-mono text-[10px]">
+                          {toJalaliString(img.taken_at)}
+                        </span>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Title & Notes */}
+                  <div className="flex-1 min-w-0">
+                    <h4 className="text-xs sm:text-sm font-bold text-slate-800 dark:text-slate-100 truncate mb-1">
+                      {img.description || meta.label}
+                    </h4>
+                    {img.notes && (
+                      <p className="text-[11px] text-slate-500 dark:text-slate-400 line-clamp-2 leading-relaxed">
+                        {img.notes}
+                      </p>
+                    )}
+                  </div>
+
+                  {/* Action Buttons Bar */}
+                  <div className="flex items-center justify-between pt-2.5 mt-2 border-t border-slate-100 dark:border-slate-800/80 text-xs">
+                    <span className="text-[10px] text-primary-600 dark:text-primary-400 font-bold group-hover:underline">
+                      مشاهده و بزرگنمایی
+                    </span>
+
+                    <div className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
+                      <button
+                        type="button"
+                        onClick={(e) => handleDownloadDoc(e, img)}
+                        className="p-1.5 rounded-lg text-slate-500 hover:text-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700/60 transition-colors"
+                        title="دانلود و ذخیره یک نسخه روی حافظه گوشی"
+                      >
+                        <Download size={14} />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={(e) => handleArchiveDoc(e, img)}
+                        className="p-1.5 rounded-lg text-rose-500 hover:text-rose-700 hover:bg-rose-50 dark:hover:bg-rose-950/30 transition-colors"
+                        title="آرشیو سند"
+                      >
+                        <Trash2 size={14} />
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )
+            })}
+          </div>
         )}
 
-        {/* Summary counts */}
-        <div className="grid grid-cols-3 gap-3">
-          <Card className="p-4 text-center">
-            <FileText size={20} className="mx-auto text-primary-500 mb-1" />
-            <p className="text-lg font-bold text-slate-800">{toPersianDigits(encounters.length)}</p>
-            <p className="text-xs text-slate-500">ویزیت</p>
-          </Card>
-          <Card className="p-4 text-center">
-            <ImageIcon size={20} className="mx-auto text-accent-500 mb-1" />
-            <p className="text-lg font-bold text-slate-800">{toPersianDigits(radiologyImages.length)}</p>
-            <p className="text-xs text-slate-500">رادیولوژی</p>
-          </Card>
-          <Card className="p-4 text-center">
-            <Pill size={20} className="mx-auto text-success-500 mb-1" />
-            <p className="text-lg font-bold text-slate-800">{toPersianDigits(prescriptions.length)}</p>
-            <p className="text-xs text-slate-500">نسخه</p>
-          </Card>
+        {/* Encounters & Prescriptions Clinical Paper Trail */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-3 pt-2">
+          {encounters.length > 0 && (
+            <Card className="p-4">
+              <h3 className="text-xs sm:text-sm font-bold text-slate-700 dark:text-slate-200 mb-3 flex items-center justify-between">
+                <span>سوابق مراجعات و ویزیت‌ها</span>
+                <span className="font-mono text-xs opacity-70">{toPersianDigits(encounters.length)} مورد</span>
+              </h3>
+              <div className="space-y-2 max-h-56 overflow-y-auto pr-1">
+                {encounters.map((e) => (
+                  <div key={e.id} className="flex items-center justify-between gap-3 p-2.5 rounded-xl border border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-800/40">
+                    <div>
+                      <p className="text-xs font-bold text-slate-800 dark:text-slate-200">{e.chief_complaint || 'ویزیت عمومی'}</p>
+                      <p className="text-[11px] text-slate-400 font-mono mt-0.5">{toJalaliStringPretty(e.encounter_date)}</p>
+                    </div>
+                    <Badge color={e.status === 'completed' ? 'success' : 'warning'}>
+                      {e.status === 'completed' ? 'تکمیل شده' : e.status === 'in_progress' ? 'در حال انجام' : e.status}
+                    </Badge>
+                  </div>
+                ))}
+              </div>
+            </Card>
+          )}
+
+          {prescriptions.length > 0 && (
+            <Card className="p-4">
+              <h3 className="text-xs sm:text-sm font-bold text-slate-700 dark:text-slate-200 mb-3 flex items-center justify-between">
+                <span>نسخه‌های دارویی صادرشده</span>
+                <span className="font-mono text-xs opacity-70">{toPersianDigits(prescriptions.length)} نسخه</span>
+              </h3>
+              <div className="space-y-2 max-h-56 overflow-y-auto pr-1">
+                {prescriptions.map((p) => (
+                  <div key={p.id} className="flex items-center justify-between gap-3 p-2.5 rounded-xl border border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-800/40">
+                    <div>
+                      <p className="text-xs font-bold text-slate-800 dark:text-slate-200">
+                        {typeof p.medications === 'string' ? p.medications : p.notes || 'نسخه دارویی'}
+                      </p>
+                      <p className="text-[11px] text-slate-400 font-mono mt-0.5">{toJalaliStringPretty(p.created_at)}</p>
+                    </div>
+                    <Pill size={14} className="text-primary-500 shrink-0" />
+                  </div>
+                ))}
+              </div>
+            </Card>
+          )}
         </div>
       </div>
     )
@@ -5184,6 +5476,20 @@ export default function PatientDetail() {
           </div>
         </div>
       </Modal>
+
+      {/* Document & Paper Chart Scanner Modal */}
+      {patient && (
+        <DocumentScannerModal
+          open={scannerModalOpen}
+          onClose={() => setScannerModalOpen(false)}
+          patientId={patient.id}
+          patientName={`${patient.first_name} ${patient.last_name}`}
+          initialCategory={scannerInitialCategory}
+          onSuccess={async () => {
+            await loadTabData()
+          }}
+        />
+      )}
     </div>
   )
 }

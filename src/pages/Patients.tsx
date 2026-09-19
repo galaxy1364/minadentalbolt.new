@@ -1,11 +1,11 @@
 import { useState, useEffect, useCallback, useMemo } from 'react'
 import { PatientDebtBar } from '../components/PatientDebtBar'
 import { useNavigate } from 'react-router-dom'
-import { Plus, Search, Edit2, Phone, Filter, Users, Award, AlertCircle, Smile, FileText, User, Heart, Shield, MapPin, Archive, Calendar, MessageSquare, Eye, EyeOff } from 'lucide-react'
-import { fetchPatients, createPatient, updatePatient, fetchDoctors, fetchPayments, fetchTreatments, fetchImplantCases, peekNextFileNumber } from '../lib/api'
+import { Plus, Search, Edit2, Phone, Filter, Users, Award, AlertCircle, Smile, FileText, User, Heart, Shield, MapPin, Archive, Calendar, MessageSquare, Eye, EyeOff, Banknote, CalendarClock, ChevronLeft, CreditCard, CheckCircle2 } from 'lucide-react'
+import { fetchPatients, createPatient, updatePatient, fetchDoctors, fetchPayments, fetchTreatments, fetchImplantCases, peekNextFileNumber, fetchCheques, fetchPaymentPlans } from '../lib/api'
 import { useDataRefresh } from '../lib/realtimeSync'
 import { toJalaliStringPretty, formatCurrency, toPersianDigits } from '../lib/persianDate'
-import { Patient, Doctor, Payment, Treatment, ImplantCase } from '../types'
+import { Patient, Doctor, Payment, Treatment, ImplantCase, Cheque, PaymentPlan } from '../types'
 import { Modal, Card, Button, Input, Select, Textarea, Spinner, EmptyState, showToast, HighlightText, SkeletonList } from '../components/ui'
 import { recordAuditLog } from '../lib/auditLogger'
 import { usePrivacyMode } from '../lib/privacyMask'
@@ -65,6 +65,8 @@ export default function Patients() {
   const [payments, setPayments] = useState<Payment[]>([])
   const [treatments, setTreatments] = useState<Treatment[]>([])
   const [implantCases, setImplantCases] = useState<ImplantCase[]>([])
+  const [cheques, setCheques] = useState<Cheque[]>([])
+  const [paymentPlans, setPaymentPlans] = useState<PaymentPlan[]>([])
   const [loading, setLoading] = useState(true)
 
   const [searchQuery, setSearchQuery] = useState('')
@@ -88,16 +90,30 @@ export default function Patients() {
   const loadData = useCallback(async () => {
     setLoading(true)
     try {
-      const [pats, docs, pays, trts, implCases] = await Promise.all([fetchPatients(), fetchDoctors(), fetchPayments(), fetchTreatments(), fetchImplantCases()])
-      setPatients(pats); setDoctors(docs); setPayments(pays); setTreatments(trts); setImplantCases(implCases)
+      const [pats, docs, pays, trts, implCases, chqs, plans] = await Promise.all([
+        fetchPatients(),
+        fetchDoctors(),
+        fetchPayments(),
+        fetchTreatments(),
+        fetchImplantCases(),
+        fetchCheques(),
+        fetchPaymentPlans(),
+      ])
+      setPatients(pats)
+      setDoctors(docs)
+      setPayments(pays)
+      setTreatments(trts)
+      setImplantCases(implCases)
+      setCheques(chqs)
+      setPaymentPlans(plans)
     } catch { showToast('error', 'خطا در بارگذاری بیماران') }
     finally { setLoading(false) }
   }, [])
 
   useEffect(() => { loadData() }, [loadData])
 
-  // Real-time automatic synchronization when patients/payments update on any device
-  useDataRefresh(['patients', 'payments', 'treatments', 'implant_cases'], loadData)
+  // Real-time automatic synchronization when patients/payments/cheques/plans update on any device
+  useDataRefresh(['patients', 'payments', 'treatments', 'implant_cases', 'cheques', 'payment_plans'], loadData)
 
   const patientFinances = useMemo(() => {
     const map = new Map<string, { balance: number; paid: number; totalCost: number }>()
@@ -109,6 +125,28 @@ export default function Patients() {
     }
     return map
   }, [patients, payments, treatments, implantCases])
+
+  // Counts pending or deposited cheques per patient for live card badges
+  const patientChequesMap = useMemo(() => {
+    const map = new Map<string, number>()
+    for (const c of cheques) {
+      if (c.patient_id && (c.status === 'pending' || c.status === 'deposited')) {
+        map.set(c.patient_id, (map.get(c.patient_id) || 0) + 1)
+      }
+    }
+    return map
+  }, [cheques])
+
+  // Counts active installment plans per patient for live card badges
+  const patientPlansMap = useMemo(() => {
+    const map = new Map<string, number>()
+    for (const pl of paymentPlans) {
+      if (pl.patient_id && pl.status === 'active') {
+        map.set(pl.patient_id, (map.get(pl.patient_id) || 0) + 1)
+      }
+    }
+    return map
+  }, [paymentPlans])
 
   // All distinct patient tags currently in use — powers the grouping/
   // segmentation filter row (مینادنت's "گروه‌بندی و تفکیک بیماران").
@@ -543,79 +581,150 @@ export default function Patients() {
             const hasAllergies = !isNegativeValue(patient.allergies)
             const hasConditions = !isNegativeValue(patient.medical_conditions)
             const theme = tileThemes[getHashColor(patient.id)]
+            const activeCheques = patientChequesMap.get(patient.id) || 0
+            const activePlans = patientPlansMap.get(patient.id) || 0
 
             return (
               <div
                 key={patient.id}
-                className={`stagger-item relative overflow-hidden flex flex-col gap-3 p-3.5 rounded-2xl cursor-pointer hover:shadow-md border border-slate-100 dark:border-slate-700 bg-gradient-to-br ${theme.bg} ${theme.ring} focus:outline-none focus:ring-4 transition-all duration-300 group`}
+                className={`stagger-item relative overflow-hidden flex flex-col gap-3 p-4 rounded-3xl cursor-pointer hover:shadow-lg border border-slate-200/80 dark:border-slate-700/80 bg-gradient-to-br ${theme.bg} ${theme.ring} focus:outline-none focus:ring-4 transition-all duration-300 group`}
                 style={{ animationDelay: `${Math.min(idx, 10) * 30}ms` }}
                 onClick={() => { h.tap(); navigate(`/patients/${patient.id}`) }}
               >
-                <div className={`absolute -top-6 -right-6 w-24 h-24 rounded-full bg-gradient-to-br ${theme.blob} to-transparent blur-xl pointer-events-none breathe-slow opacity-50 group-hover:opacity-80 transition-opacity duration-700`} />
+                <div className={`absolute -top-6 -right-6 w-28 h-28 rounded-full bg-gradient-to-br ${theme.blob} to-transparent blur-2xl pointer-events-none breathe-slow opacity-40 group-hover:opacity-75 transition-opacity duration-700`} />
                 
+                {/* Top Section: Avatar + Name + Dedicated File Number Capsule */}
                 <div className="flex items-start justify-between gap-3 relative z-10">
-                  <div className="flex items-center gap-3 min-w-0 flex-1">
+                  <div className="flex items-center gap-3.5 min-w-0 flex-1">
                     {/* Avatar */}
-                    <div className={`w-12 h-12 rounded-2xl overflow-hidden ${theme.iconBg} flex items-center justify-center text-white font-bold text-sm flex-shrink-0 shadow-ios`}>
+                    <div className={`w-13 h-13 sm:w-14 sm:h-14 rounded-2xl overflow-hidden ${theme.iconBg} flex items-center justify-center text-white font-black text-base sm:text-lg flex-shrink-0 shadow-ios ring-2 ring-white/60 dark:ring-slate-800`}>
                       {patient.avatar_url ? <img src={patient.avatar_url} alt="" className="w-full h-full object-cover" /> : getInitials(patient)}
                     </div>
 
-                    {/* Content */}
+                    {/* Name & Demographics */}
                     <div className="min-w-0 flex-1">
-                      <div className="flex items-center gap-2 mb-1">
-                        <h3 className={`font-bold text-sm sm:text-base break-words leading-tight ${fin.balance > 0 ? 'text-error-600' : 'text-slate-800 dark:text-slate-100'}`}>
+                      <div className="flex items-center gap-2 mb-1 flex-wrap">
+                        <h3 className={`font-black text-base sm:text-lg break-words leading-tight ${fin.balance > 0 ? 'text-rose-700 dark:text-rose-400' : 'text-slate-900 dark:text-slate-50'}`}>
                           <HighlightText text={`${patient.first_name} ${patient.last_name}`} query={searchQuery} />
                         </h3>
-                        {vipMeta.value > 0 && <span className="text-[11px] shrink-0">{vipMeta.icon}</span>}
+                        {vipMeta.value > 0 && <span className="text-xs shrink-0" title={`سطح ${vipMeta.label}`}>{vipMeta.icon}</span>}
+                        {!patient.is_active && (
+                          <span className="status-pill bg-slate-200/80 text-slate-600 dark:bg-slate-700 dark:text-slate-300 text-[10px] font-bold">بایگانی</span>
+                        )}
                       </div>
 
-                      <div className="flex items-center gap-x-2.5 gap-y-1 flex-wrap text-[11px] text-slate-500 dark:text-slate-400">
-                        {patient.file_number && (
-                          <span className={`inline-flex items-center gap-1 font-mono font-bold px-1.5 py-0.5 rounded-md bg-slate-100 dark:bg-slate-700/60 ${fin.balance > 0 ? 'text-error-600 dark:text-error-400' : 'text-slate-700 dark:text-slate-200'}`}>
-                            <FileText size={11} className="shrink-0" />
-                            <HighlightText text={patient.file_number} query={searchQuery} />
-                          </span>
-                        )}
-                        {age !== null && <span>{toPersianDigits(age)} سال</span>}
-                        {patient.gender && <span>{patient.gender === 'male' ? 'آقا' : 'خانم'}</span>}
+                      <div className="flex items-center gap-x-3 gap-y-1 flex-wrap text-xs text-slate-500 dark:text-slate-400">
+                        {age !== null && <span className="font-medium">{toPersianDigits(age)} سال</span>}
+                        {patient.gender && <span className="font-medium">{patient.gender === 'male' ? 'آقا' : 'خانم'}</span>}
                         {patient.phone && (
                           <a
                             href={`tel:${patient.phone}`}
                             onClick={(e) => e.stopPropagation()}
-                            className="flex items-center gap-0.5 hover:text-primary-600 transition-colors font-mono"
+                            className="flex items-center gap-1 hover:text-primary-600 dark:hover:text-primary-400 transition-colors font-mono"
                             dir="ltr"
                             title="تماس تلفنی با بیمار"
                           >
-                            <Phone size={10} /> <HighlightText text={privacyMode ? maskPhoneNumber(patient.phone) : toPersianDigits(patient.phone)} query={searchQuery} />
+                            <Phone size={11} className="text-slate-400 shrink-0" />
+                            <span>{privacyMode ? maskPhoneNumber(patient.phone) : toPersianDigits(patient.phone)}</span>
                           </a>
                         )}
                         {patient.national_id && (
-                          <span className="flex items-center gap-0.5 text-slate-500 font-mono text-[10px]" dir="ltr" title="کد ملی بیمار">
-                            <Shield size={10} className="text-slate-400" />
-                            <HighlightText text={privacyMode ? maskNationalId(patient.national_id) : toPersianDigits(patient.national_id)} query={searchQuery} />
+                          <span className="flex items-center gap-1 text-slate-500 font-mono text-[11px]" dir="ltr" title="کد ملی بیمار">
+                            <Shield size={11} className="text-slate-400 shrink-0" />
+                            <span>{privacyMode ? maskNationalId(patient.national_id) : toPersianDigits(patient.national_id)}</span>
                           </span>
                         )}
                       </div>
                     </div>
                   </div>
 
-                  {/* Financial Status Pill */}
-                  <div className="shrink-0" onClick={(e) => e.stopPropagation()}>
-                    {fin.totalCost > 0 ? (
-                      fin.balance <= 0 ? (
-                        <span className="status-pill bg-success-100 text-success-700 dark:bg-success-900/30 dark:text-success-400 font-bold text-xs">تسویه</span>
-                      ) : (
-                        <PatientDebtBar patientId={patient.id} balance={fin} variant="compact" />
-                      )
+                  {/* Dedicated File Number Capsule (شماره پرونده برجسته و تفکیک‌شده) */}
+                  <div className="flex flex-col items-end shrink-0" onClick={(e) => e.stopPropagation()}>
+                    <span className="text-[10px] font-bold text-slate-400 dark:text-slate-500 mb-0.5">شماره پرونده</span>
+                    {patient.file_number ? (
+                      <span className="inline-flex items-center gap-1.5 font-mono font-black text-xs sm:text-sm px-3 py-1 rounded-xl bg-slate-900 dark:bg-primary-950 text-white dark:text-primary-200 border border-slate-700/80 dark:border-primary-700/80 shadow-xs tracking-wider" dir="ltr">
+                        <FileText size={13} className="text-primary-400 shrink-0" />
+                        <HighlightText text={toPersianDigits(patient.file_number)} query={searchQuery} />
+                      </span>
                     ) : (
-                      <span className="status-pill bg-slate-100 text-slate-500 dark:bg-slate-700 dark:text-slate-300 text-xs">بدون تراکنش</span>
+                      <span className="text-xs text-slate-400 italic">ثبت‌نشده</span>
                     )}
                   </div>
                 </div>
 
+                {/* Live Financial & Banking Overview Rail (نوار زنده مالی، بدهی، چک‌ها و اقساط در نگاه اول) */}
+                <div className="flex items-center gap-2 flex-wrap pt-1 relative z-10" onClick={(e) => e.stopPropagation()}>
+                  {/* Debt / Settlement badge */}
+                  {fin.totalCost > 0 ? (
+                    fin.balance <= 0 ? (
+                      <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-xl bg-emerald-50 dark:bg-emerald-950/50 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800 text-xs font-bold">
+                        <CheckCircle2 size={13} className="text-emerald-600 dark:text-emerald-400" />
+                        <span>تسویه حساب کامل</span>
+                      </span>
+                    ) : (
+                      <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-xl bg-rose-50 dark:bg-rose-950/50 text-rose-700 dark:text-rose-300 border border-rose-200 dark:border-rose-800 text-xs font-black shadow-xs">
+                        <span className="w-2 h-2 rounded-full bg-rose-500 animate-pulse" />
+                        <Banknote size={13} className="text-rose-600 dark:text-rose-400" />
+                        <span>بدهی: {formatCurrency(fin.balance)} تومان</span>
+                      </span>
+                    )
+                  ) : (
+                    <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 text-xs font-medium">
+                      بدون گردش مالی
+                    </span>
+                  )}
+
+                  {/* Live Cheques badge */}
+                  {activeCheques > 0 && (
+                    <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-xl bg-amber-50 dark:bg-amber-950/50 text-amber-800 dark:text-amber-300 border border-amber-200 dark:border-amber-800 text-xs font-bold">
+                      <CreditCard size={13} className="text-amber-600 dark:text-amber-400" />
+                      <span>{toPersianDigits(activeCheques)} چک در جریان</span>
+                    </span>
+                  )}
+
+                  {/* Live Installments badge */}
+                  {activePlans > 0 && (
+                    <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-xl bg-indigo-50 dark:bg-indigo-950/50 text-indigo-800 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800 text-xs font-bold">
+                      <CalendarClock size={13} className="text-indigo-600 dark:text-indigo-400" />
+                      <span>{toPersianDigits(activePlans)} طرح اقساط فعال</span>
+                    </span>
+                  )}
+                </div>
+
+                {/* Medical alerts row */}
+                {(hasAllergies || hasConditions) && (
+                  <div className="flex items-center gap-2 pt-1 flex-wrap relative z-10">
+                    {hasAllergies && (
+                      <span className="status-pill bg-rose-50 text-rose-700 border border-rose-200 dark:bg-rose-950/30 dark:text-rose-300 dark:border-rose-900/50 flex items-center gap-1 text-[11px] font-bold">
+                        <AlertCircle size={11} className="text-rose-500" />
+                        <span>حساسیت: {patient.allergies}</span>
+                      </span>
+                    )}
+                    {hasConditions && (
+                      <span className="status-pill bg-amber-50 text-amber-800 border border-amber-200 dark:bg-amber-950/30 dark:text-amber-300 dark:border-amber-900/50 flex items-center gap-1 text-[11px] font-bold">
+                        <Heart size={11} className="text-amber-600" />
+                        <span>بیماری: {patient.medical_conditions}</span>
+                      </span>
+                    )}
+                  </div>
+                )}
+
                 {/* Sterile-Glove Friendly Actions Bar */}
-                <div className="flex items-center justify-between pt-2 border-t border-slate-100/70 dark:border-slate-700/60 relative z-10" onClick={(e) => e.stopPropagation()}>
-                  <div className="flex items-center gap-2">
+                <div className="flex items-center justify-between pt-2.5 border-t border-slate-200/70 dark:border-slate-700/60 relative z-10 flex-wrap gap-2" onClick={(e) => e.stopPropagation()}>
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <button
+                      onClick={() => {
+                        h.tap()
+                        navigate(`/patients/${patient.id}`)
+                      }}
+                      aria-label={`ورود به پرونده ${patient.first_name} ${patient.last_name}`}
+                      title="مشاهده و مدیریت کامل پرونده بیمار"
+                      className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-primary-600 hover:bg-primary-700 text-white text-xs font-bold shadow-xs transition-all-smooth press-scale"
+                    >
+                      <span>پرونده بیمار</span>
+                      <ChevronLeft size={14} />
+                    </button>
+
                     <button
                       onClick={() => {
                         h.tap()
@@ -629,11 +738,12 @@ export default function Patients() {
                       }}
                       aria-label={`رزرو نوبت برای ${patient.first_name} ${patient.last_name}`}
                       title="رزرو نوبت برای این بیمار"
-                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-primary-50 hover:bg-primary-100 text-primary-700 dark:bg-primary-900/30 dark:text-primary-300 text-xs font-bold transition-all-smooth press-scale"
+                      className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-primary-50 hover:bg-primary-100 text-primary-700 dark:bg-primary-900/30 dark:text-primary-300 text-xs font-bold transition-all-smooth press-scale"
                     >
                       <Calendar size={13} />
                       <span>رزرو نوبت</span>
                     </button>
+
                     {(() => {
                       const cleanPhone = patient.phone ? patient.phone.replace(/\D/g, '').replace(/^0/, '98') : null
                       if (!cleanPhone) return null
@@ -643,7 +753,7 @@ export default function Patients() {
                           href={`https://wa.me/${cleanPhone}?text=${encodeURIComponent(waText)}`}
                           target="_blank"
                           rel="noopener noreferrer"
-                          className="flex items-center gap-1 px-2.5 py-1.5 rounded-xl bg-emerald-50 hover:bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300 text-xs font-medium transition-all-smooth press-scale"
+                          className="flex items-center gap-1 px-2.5 py-2 rounded-xl bg-emerald-50 hover:bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300 text-xs font-medium transition-all-smooth press-scale"
                           title="ارسال پیام در واتساپ به بیمار"
                           onClick={() => chimes.playPop()}
                         >
@@ -659,7 +769,7 @@ export default function Patients() {
                       onClick={() => openEditModal(patient)}
                       aria-label={`ویرایش ${patient.first_name} ${patient.last_name}`}
                       title="ویرایش پرونده"
-                      className="p-2 rounded-xl text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-700/60 transition-all-smooth press-scale"
+                      className="min-w-[40px] min-h-[40px] flex items-center justify-center rounded-xl text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-700/60 transition-all-smooth press-scale"
                     >
                       <Edit2 size={15} />
                     </button>
@@ -667,31 +777,12 @@ export default function Patients() {
                       onClick={() => handleDelete(patient)}
                       aria-label={`غیرفعال کردن ${patient.first_name} ${patient.last_name}`}
                       title="غیرفعال کردن"
-                      className="p-2 rounded-xl text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-900/20 transition-all-smooth press-scale"
+                      className="min-w-[40px] min-h-[40px] flex items-center justify-center rounded-xl text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-900/20 transition-all-smooth press-scale"
                     >
                       <Archive size={15} />
                     </button>
                   </div>
                 </div>
-
-                {/* Medical alerts row */}
-                {(hasAllergies || hasConditions || !patient.is_active) && (
-                  <div className="flex items-center gap-1.5 pt-2 border-t border-slate-100/50 dark:border-slate-700/50 flex-wrap relative z-10">
-                    {hasAllergies && (
-                      <span className="status-pill bg-error-50 text-error-600 border border-error-100 flex items-center gap-1">
-                        <AlertCircle size={10} className="text-error-500" />
-                        <span>حساسیت{patient.allergies ? `: ${patient.allergies}` : ''}</span>
-                      </span>
-                    )}
-                    {hasConditions && (
-                      <span className="status-pill bg-warning-50 text-warning-700 border border-warning-100 flex items-center gap-1">
-                        <Heart size={10} className="text-warning-500" />
-                        <span>بیماری زمینه‌ای{patient.medical_conditions ? `: ${patient.medical_conditions}` : ''}</span>
-                      </span>
-                    )}
-                    {!patient.is_active && <span className="status-pill bg-slate-100 text-slate-500">غیرفعال</span>}
-                  </div>
-                )}
               </div>
             )
           })}
