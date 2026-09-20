@@ -330,70 +330,119 @@ export function Tabs({
   const [startX, setStartX] = useState(0)
   const [scrollLeftState, setScrollLeftState] = useState(0)
 
-  // Color mapping for clinical tabs
-  const colorMap: Record<string, { activeBg: string; activeText: string; activeBorder: string; iconColor: string; inactiveHover: string }> = {
+  // Color mapping for clinical tabs - active and vibrant inactive styling
+  const colorMap: Record<
+    string,
+    {
+      activeBg: string
+      activeText: string
+      activeBorder: string
+      iconColor: string
+      inactiveBg: string
+      inactiveBorder: string
+      inactiveText: string
+      inactiveHover: string
+      badgeInactive: string
+    }
+  > = {
     teal: {
       activeBg: 'bg-teal-600 text-white shadow-teal-500/25',
       activeText: 'text-white',
       activeBorder: 'border-teal-500',
       iconColor: 'text-teal-600 dark:text-teal-400',
-      inactiveHover: 'hover:bg-teal-50 dark:hover:bg-teal-950/40 hover:text-teal-700 dark:hover:text-teal-300',
+      inactiveBg: 'bg-teal-50/90 dark:bg-teal-950/40',
+      inactiveBorder: 'border-teal-200/90 dark:border-teal-800/60',
+      inactiveText: 'text-teal-800 dark:text-teal-200',
+      inactiveHover: 'hover:bg-teal-100/90 dark:hover:bg-teal-900/60',
+      badgeInactive: 'bg-teal-200/70 dark:bg-teal-800/60 text-teal-900 dark:text-teal-100',
     },
     blue: {
       activeBg: 'bg-blue-600 text-white shadow-blue-500/25',
       activeText: 'text-white',
       activeBorder: 'border-blue-500',
       iconColor: 'text-blue-600 dark:text-blue-400',
-      inactiveHover: 'hover:bg-blue-50 dark:hover:bg-blue-950/40 hover:text-blue-700 dark:hover:text-blue-300',
+      inactiveBg: 'bg-blue-50/90 dark:bg-blue-950/40',
+      inactiveBorder: 'border-blue-200/90 dark:border-blue-800/60',
+      inactiveText: 'text-blue-800 dark:text-blue-200',
+      inactiveHover: 'hover:bg-blue-100/90 dark:hover:bg-blue-900/60',
+      badgeInactive: 'bg-blue-200/70 dark:bg-blue-800/60 text-blue-900 dark:text-blue-100',
     },
     purple: {
       activeBg: 'bg-purple-600 text-white shadow-purple-500/25',
       activeText: 'text-white',
       activeBorder: 'border-purple-500',
       iconColor: 'text-purple-600 dark:text-purple-400',
-      inactiveHover: 'hover:bg-purple-50 dark:hover:bg-purple-950/40 hover:text-purple-700 dark:hover:text-purple-300',
+      inactiveBg: 'bg-purple-50/90 dark:bg-purple-950/40',
+      inactiveBorder: 'border-purple-200/90 dark:border-purple-800/60',
+      inactiveText: 'text-purple-800 dark:text-purple-200',
+      inactiveHover: 'hover:bg-purple-100/90 dark:hover:bg-purple-900/60',
+      badgeInactive: 'bg-purple-200/70 dark:bg-purple-800/60 text-purple-900 dark:text-purple-100',
     },
     amber: {
       activeBg: 'bg-amber-600 text-white shadow-amber-500/25',
       activeText: 'text-white',
       activeBorder: 'border-amber-500',
       iconColor: 'text-amber-600 dark:text-amber-400',
-      inactiveHover: 'hover:bg-amber-50 dark:hover:bg-amber-950/40 hover:text-amber-700 dark:hover:text-amber-300',
+      inactiveBg: 'bg-amber-50/90 dark:bg-amber-950/40',
+      inactiveBorder: 'border-amber-200/90 dark:border-amber-800/60',
+      inactiveText: 'text-amber-800 dark:text-amber-200',
+      inactiveHover: 'hover:bg-amber-100/90 dark:hover:bg-amber-900/60',
+      badgeInactive: 'bg-amber-200/70 dark:bg-amber-800/60 text-amber-900 dark:text-amber-100',
     },
     emerald: {
       activeBg: 'bg-emerald-600 text-white shadow-emerald-500/25',
       activeText: 'text-white',
       activeBorder: 'border-emerald-500',
       iconColor: 'text-emerald-600 dark:text-emerald-400',
-      inactiveHover: 'hover:bg-emerald-50 dark:hover:bg-emerald-950/40 hover:text-emerald-700 dark:hover:text-emerald-300',
+      inactiveBg: 'bg-emerald-50/90 dark:bg-emerald-950/40',
+      inactiveBorder: 'border-emerald-200/90 dark:border-emerald-800/60',
+      inactiveText: 'text-emerald-800 dark:text-emerald-200',
+      inactiveHover: 'hover:bg-emerald-100/90 dark:hover:bg-emerald-900/60',
+      badgeInactive: 'bg-emerald-200/70 dark:bg-emerald-800/60 text-emerald-900 dark:text-emerald-100',
     },
     rose: {
       activeBg: 'bg-rose-600 text-white shadow-rose-500/25',
       activeText: 'text-white',
       activeBorder: 'border-rose-500',
       iconColor: 'text-rose-600 dark:text-rose-400',
-      inactiveHover: 'hover:bg-rose-50 dark:hover:bg-rose-950/40 hover:text-rose-700 dark:hover:text-rose-300',
+      inactiveBg: 'bg-rose-50/90 dark:bg-rose-950/40',
+      inactiveBorder: 'border-rose-200/90 dark:border-rose-800/60',
+      inactiveText: 'text-rose-800 dark:text-rose-200',
+      inactiveHover: 'hover:bg-rose-100/90 dark:hover:bg-rose-900/60',
+      badgeInactive: 'bg-rose-200/70 dark:bg-rose-800/60 text-rose-900 dark:text-rose-100',
     },
     indigo: {
       activeBg: 'bg-indigo-600 text-white shadow-indigo-500/25',
       activeText: 'text-white',
       activeBorder: 'border-indigo-500',
       iconColor: 'text-indigo-600 dark:text-indigo-400',
-      inactiveHover: 'hover:bg-indigo-50 dark:hover:bg-indigo-950/40 hover:text-indigo-700 dark:hover:text-indigo-300',
+      inactiveBg: 'bg-indigo-50/90 dark:bg-indigo-950/40',
+      inactiveBorder: 'border-indigo-200/90 dark:border-indigo-800/60',
+      inactiveText: 'text-indigo-800 dark:text-indigo-200',
+      inactiveHover: 'hover:bg-indigo-100/90 dark:hover:bg-indigo-900/60',
+      badgeInactive: 'bg-indigo-200/70 dark:bg-indigo-800/60 text-indigo-900 dark:text-indigo-100',
     },
     cyan: {
       activeBg: 'bg-cyan-600 text-white shadow-cyan-500/25',
       activeText: 'text-white',
       activeBorder: 'border-cyan-500',
       iconColor: 'text-cyan-600 dark:text-cyan-400',
-      inactiveHover: 'hover:bg-cyan-50 dark:hover:bg-cyan-950/40 hover:text-cyan-700 dark:hover:text-cyan-300',
+      inactiveBg: 'bg-cyan-50/90 dark:bg-cyan-950/40',
+      inactiveBorder: 'border-cyan-200/90 dark:border-cyan-800/60',
+      inactiveText: 'text-cyan-800 dark:text-cyan-200',
+      inactiveHover: 'hover:bg-cyan-100/90 dark:hover:bg-cyan-900/60',
+      badgeInactive: 'bg-cyan-200/70 dark:bg-cyan-800/60 text-cyan-900 dark:text-cyan-100',
     },
     violet: {
       activeBg: 'bg-violet-600 text-white shadow-violet-500/25',
       activeText: 'text-white',
       activeBorder: 'border-violet-500',
       iconColor: 'text-violet-600 dark:text-violet-400',
-      inactiveHover: 'hover:bg-violet-50 dark:hover:bg-violet-950/40 hover:text-violet-700 dark:hover:text-violet-300',
+      inactiveBg: 'bg-violet-50/90 dark:bg-violet-950/40',
+      inactiveBorder: 'border-violet-200/90 dark:border-violet-800/60',
+      inactiveText: 'text-violet-800 dark:text-violet-200',
+      inactiveHover: 'hover:bg-violet-100/90 dark:hover:bg-violet-900/60',
+      badgeInactive: 'bg-violet-200/70 dark:bg-violet-800/60 text-violet-900 dark:text-violet-100',
     },
   }
 
@@ -402,13 +451,17 @@ export function Tabs({
     activeText: 'text-white',
     activeBorder: 'border-primary-500',
     iconColor: 'text-primary-600 dark:text-primary-400',
-    inactiveHover: 'hover:bg-white/60 dark:hover:bg-slate-700/60 hover:text-primary-700 dark:hover:text-primary-300',
+    inactiveBg: 'bg-primary-50/90 dark:bg-primary-950/40',
+    inactiveBorder: 'border-primary-200/90 dark:border-primary-800/60',
+    inactiveText: 'text-primary-800 dark:text-primary-200',
+    inactiveHover: 'hover:bg-primary-100/90 dark:hover:bg-primary-900/60',
+    badgeInactive: 'bg-primary-200/70 dark:bg-primary-800/60 text-primary-900 dark:text-primary-100',
   }
 
   // Auto-scroll active tab into center view
   useEffect(() => {
     const activeEl = tabButtonRefs.current[active]
-    if (activeEl && scrollStripRef.current) {
+    if (activeEl && scrollStripRef.current && typeof activeEl.scrollIntoView === 'function') {
       activeEl.scrollIntoView({
         behavior: 'smooth',
         inline: 'center',
@@ -454,24 +507,17 @@ export function Tabs({
   // Close quick menu when clicking outside or pressing Escape
   useEffect(() => {
     if (!quickMenuOpen) return
-    const handleClickOutside = (e: MouseEvent) => {
-      if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
-        setQuickMenuOpen(false)
-      }
-    }
     const handleKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape') setQuickMenuOpen(false)
     }
-    window.addEventListener('mousedown', handleClickOutside)
     window.addEventListener('keydown', handleKey)
     return () => {
-      window.removeEventListener('mousedown', handleClickOutside)
       window.removeEventListener('keydown', handleKey)
     }
   }, [quickMenuOpen])
 
   return (
-    <div className={`relative group/tabs ${quickMenuOpen ? 'z-50' : 'z-20'} ${className}`} ref={containerRef}>
+    <div className={`relative group/tabs z-20 ${className}`} ref={containerRef}>
       <div className="relative flex items-center gap-1.5 p-1.5 bg-gradient-to-r from-slate-100/90 via-white/80 to-slate-100/90 dark:from-slate-850/90 dark:via-slate-800/90 dark:to-slate-850/90 backdrop-blur-xl rounded-2xl border border-slate-200/80 dark:border-slate-700/80 shadow-xs">
         {/* Scroll Left Button (Rightwards in RTL) */}
         <button
@@ -514,7 +560,7 @@ export function Tabs({
                 className={`flex-shrink-0 min-h-[42px] flex items-center gap-2 px-3.5 sm:px-4 py-2 rounded-xl text-xs sm:text-sm font-bold transition-all duration-200 press-scale border ${
                   isCurrent
                     ? `${theme.activeBg} ${theme.activeBorder} shadow-md scale-[1.02]`
-                    : `bg-white/60 dark:bg-slate-800/60 text-slate-700 dark:text-slate-300 border-slate-200/60 dark:border-slate-700/60 ${theme.inactiveHover}`
+                    : `${theme.inactiveBg} ${theme.inactiveBorder} ${theme.inactiveText} ${theme.inactiveHover}`
                 }`}
               >
                 {tab.icon && (
@@ -532,7 +578,7 @@ export function Tabs({
                     className={`text-[10px] px-1.5 py-0.5 rounded-full font-black ${
                       isCurrent
                         ? 'bg-white/20 text-white'
-                        : 'bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-200'
+                        : theme.badgeInactive
                     }`}
                   >
                     {toPersianDigits(String(tab.badge))}
@@ -573,69 +619,105 @@ export function Tabs({
             >
               <ChevronDown size={17} className={`transition-transform duration-200 ${quickMenuOpen ? 'rotate-180' : ''}`} />
             </button>
-
-            {/* Quick Menu Popover / Mobile Sheet */}
-            {quickMenuOpen && (
-              <>
-                {/* Click outside backdrop */}
-                <div
-                  className="fixed inset-0 z-40 bg-black/30 sm:bg-black/10 backdrop-blur-2xs"
-                  onClick={() => setQuickMenuOpen(false)}
-                />
-                <div
-                  className="fixed inset-x-3 bottom-24 sm:static sm:absolute sm:left-0 sm:top-full sm:bottom-auto sm:mt-2 sm:w-72 max-h-[72vh] sm:max-h-96 overflow-y-auto dock-scroll p-3 bg-white/98 dark:bg-slate-850/98 backdrop-blur-2xl rounded-3xl sm:rounded-2xl shadow-2xl border-2 border-primary-500/40 dark:border-primary-500/50 z-50 animate-in fade-in slide-in-from-bottom-4 sm:slide-in-from-top-2 duration-200"
-                  role="menu"
-                >
-                  <div className="px-3 py-2 border-b border-slate-100 dark:border-slate-700/60 mb-2 flex items-center justify-between">
-                    <span className="text-xs font-bold text-slate-800 dark:text-slate-200 flex items-center gap-1.5">
-                      <Layers size={14} className="text-primary-600 dark:text-primary-400" />
-                      <span>دسترسی سریع به بخش‌های پرونده:</span>
-                    </span>
-                    <span className="text-[10px] font-mono font-black px-2 py-0.5 rounded-full bg-primary-50 dark:bg-primary-950/40 text-primary-700 dark:text-primary-300">
-                      {toPersianDigits(tabs.length)} بخش
-                    </span>
-                  </div>
-                  <div className="space-y-1">
-                    {tabs.map((tab) => {
-                      const isCurrent = active === tab.key
-                      const theme = (tab.color && colorMap[tab.color]) || defaultTheme
-                      return (
-                        <button
-                          key={tab.key}
-                          type="button"
-                          onClick={() => {
-                            h.select()
-                            onChange(tab.key)
-                            setQuickMenuOpen(false)
-                          }}
-                          className={`w-full flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-xs font-bold transition-all-smooth text-right ${
-                            isCurrent
-                              ? `${theme.activeBg} shadow-xs font-black`
-                              : `text-slate-700 dark:text-slate-200 hover:bg-slate-100/80 dark:hover:bg-slate-800/80`
-                          }`}
-                        >
-                          {tab.icon && (
-                            <span className={`shrink-0 ${isCurrent ? 'text-white' : theme.iconColor}`}>
-                              {tab.icon}
-                            </span>
-                          )}
-                          <span className="truncate flex-1">{tab.label}</span>
-                          {tab.badge !== undefined && (
-                            <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-200 font-mono">
-                              {toPersianDigits(String(tab.badge))}
-                            </span>
-                          )}
-                          {isCurrent && <CheckCircle2 size={14} className="text-white shrink-0" />}
-                        </button>
-                      )
-                    })}
-                  </div>
-                </div>
-              </>
-            )}
           </div>
         )}
       </div>
+
+      {/* Quick Menu Navigator: rendered via Portal directly to body to guarantee ZERO page layout shift or overflow bugs */}
+      {quickMenuOpen && typeof document !== 'undefined' && createPortal(
+        <div
+          className="fixed inset-0 z-[100] flex items-end sm:items-center justify-center p-3 sm:p-4 bg-slate-950/60 backdrop-blur-sm animate-in fade-in duration-150"
+          onClick={(e) => {
+            if (e.target === e.currentTarget) {
+              h.cancel()
+              setQuickMenuOpen(false)
+            }
+          }}
+        >
+          <div
+            className="relative w-full max-w-2xl max-h-[85vh] flex flex-col bg-white/98 dark:bg-slate-900/98 backdrop-blur-2xl rounded-3xl shadow-2xl border-2 border-primary-500/30 dark:border-primary-500/40 overflow-hidden animate-in zoom-in-95 duration-200"
+            role="dialog"
+            aria-modal="true"
+            aria-label="دسترسی سریع به بخش‌های پرونده"
+          >
+            {/* Modal Header */}
+            <div className="px-5 py-3.5 border-b border-slate-100 dark:border-slate-800/80 flex items-center justify-between bg-slate-50/80 dark:bg-slate-850/80">
+              <div className="flex items-center gap-2">
+                <div className="w-8 h-8 rounded-xl bg-primary-100 dark:bg-primary-950/60 flex items-center justify-center text-primary-600 dark:text-primary-400">
+                  <Layers size={18} />
+                </div>
+                <div>
+                  <h3 className="text-sm font-black text-slate-900 dark:text-white">
+                    دسترسی سریع به بخش‌های پرونده
+                  </h3>
+                  <p className="text-[11px] text-slate-500 dark:text-slate-400 font-medium">
+                    انتخاب مستقیم از میان {toPersianDigits(tabs.length)} بخش تخصصی بالینی
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  h.cancel()
+                  setQuickMenuOpen(false)
+                }}
+                className="w-8 h-8 rounded-xl bg-slate-200/70 hover:bg-slate-300 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 flex items-center justify-center transition-all press-scale"
+                aria-label="بستن"
+              >
+                <X size={16} />
+              </button>
+            </div>
+
+            {/* Tabs Grid: 100% Colorful tactile pills */}
+            <div className="p-4 overflow-y-auto dock-scroll grid grid-cols-1 sm:grid-cols-2 gap-2.5 max-h-[60vh]">
+              {tabs.map((tab) => {
+                const isCurrent = active === tab.key
+                const theme = (tab.color && colorMap[tab.color]) || defaultTheme
+                return (
+                  <button
+                    key={tab.key}
+                    type="button"
+                    onClick={() => {
+                      h.select()
+                      onChange(tab.key)
+                      setQuickMenuOpen(false)
+                    }}
+                    className={`flex items-center justify-between gap-3 p-3 rounded-2xl text-xs font-bold transition-all press-scale border ${
+                      isCurrent
+                        ? `${theme.activeBg} ${theme.activeBorder} shadow-md font-black scale-[1.01]`
+                        : `${theme.inactiveBg} ${theme.inactiveBorder} ${theme.inactiveText} ${theme.inactiveHover}`
+                    }`}
+                  >
+                    <div className="flex items-center gap-2.5 truncate">
+                      {tab.icon && (
+                        <span className={`shrink-0 ${isCurrent ? 'text-white' : theme.iconColor}`}>
+                          {tab.icon}
+                        </span>
+                      )}
+                      <span className="truncate">{tab.label}</span>
+                    </div>
+                    <div className="flex items-center gap-1.5 shrink-0">
+                      {tab.badge !== undefined && (
+                        <span
+                          className={`text-[10px] px-2 py-0.5 rounded-full font-black font-mono ${
+                            isCurrent
+                              ? 'bg-white/20 text-white'
+                              : theme.badgeInactive
+                          }`}
+                        >
+                          {toPersianDigits(String(tab.badge))}
+                        </span>
+                      )}
+                      {isCurrent && <CheckCircle2 size={16} className="text-white shrink-0" />}
+                    </div>
+                  </button>
+                )
+              })}
+            </div>
+          </div>
+        </div>,
+        document.body
+      )}
     </div>
   )
 }

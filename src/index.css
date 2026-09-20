@@ -1141,49 +1141,49 @@ input, textarea, select { font-size: 16px !important; }
 @keyframes gemini-mesh-pulse-1 {
   0%, 100% {
     transform: translate3d(0, 0, 0) scale(1) rotate(0deg);
-    opacity: 0.44;
+    opacity: 0.50;
   }
   33% {
-    transform: translate3d(-6%, 8%, 0) scale(1.18) rotate(4deg);
-    opacity: 0.58;
+    transform: translate3d(-6%, 8%, 0) scale(1.24) rotate(4deg);
+    opacity: 0.80;
   }
   66% {
     transform: translate3d(5%, -5%, 0) scale(0.92) rotate(-3deg);
-    opacity: 0.36;
+    opacity: 0.40;
   }
 }
 @keyframes gemini-mesh-pulse-2 {
   0%, 100% {
     transform: translate3d(0, 0, 0) scale(1) rotate(0deg);
-    opacity: 0.40;
+    opacity: 0.45;
   }
   40% {
-    transform: translate3d(8%, -6%, 0) scale(1.15) rotate(-5deg);
-    opacity: 0.52;
+    transform: translate3d(8%, -6%, 0) scale(1.20) rotate(-5deg);
+    opacity: 0.75;
   }
   75% {
     transform: translate3d(-7%, 7%, 0) scale(0.90) rotate(4deg);
-    opacity: 0.32;
+    opacity: 0.35;
   }
 }
 @keyframes gemini-mesh-pulse-3 {
   0%, 100% {
     transform: translate3d(0, 0, 0) scale(0.95);
-    opacity: 0.28;
+    opacity: 0.35;
   }
   50% {
-    transform: translate3d(10%, 10%, 0) scale(1.22);
-    opacity: 0.48;
+    transform: translate3d(10%, 10%, 0) scale(1.28);
+    opacity: 0.70;
   }
 }
 @keyframes gemini-mesh-pulse-4 {
   0%, 100% {
     transform: translate3d(0, 0, 0) scale(1.05);
-    opacity: 0.24;
+    opacity: 0.30;
   }
   50% {
     transform: translate3d(-8%, -10%, 0) scale(0.88);
-    opacity: 0.38;
+    opacity: 0.60;
   }
 }
 
@@ -1241,7 +1241,7 @@ input, textarea, select { font-size: 16px !important; }
   position: absolute;
   border-radius: 50%;
   filter: blur(85px);
-  opacity: 0.10;
+  opacity: 0.18;
   will-change: transform;
   transform: translate3d(0, 0, 0);
   -webkit-transform: translate3d(0, 0, 0);
@@ -1249,7 +1249,7 @@ input, textarea, select { font-size: 16px !important; }
   -webkit-backface-visibility: hidden;
   transition: background 800ms cubic-bezier(0.4, 0, 0.2, 1), opacity 800ms ease;
 }
-.dark .module-page-blob { opacity: 0.12; filter: blur(95px); }
+.dark .module-page-blob { opacity: 0.22; filter: blur(95px); }
 .module-page-blob-1 {
   width: 65vmax; height: 65vmax;
   top: -25%; right: -20%;
@@ -1451,13 +1451,13 @@ input, textarea, select { font-size: 16px !important; }
 @keyframes geminiBlobBreathe {
   0%, 100% {
     transform: scale(1) translate3d(0, 0, 0);
-    opacity: 0.30;
+    opacity: 0.38;
     filter: blur(28px);
   }
   50% {
-    transform: scale(1.25) translate3d(6px, -6px, 0);
-    opacity: 0.60;
-    filter: blur(36px);
+    transform: scale(1.32) translate3d(8px, -8px, 0);
+    opacity: 0.78;
+    filter: blur(38px);
   }
 }
 

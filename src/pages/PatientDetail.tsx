@@ -1956,9 +1956,9 @@ export default function PatientDetail() {
               <button
                 type="button"
                 onClick={handlePrintFullChart}
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700 hover:bg-slate-200 press-scale shadow-xs min-h-[38px]"
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold bg-indigo-50 dark:bg-indigo-950/40 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800 hover:bg-indigo-100 dark:hover:bg-indigo-900/60 press-scale shadow-xs min-h-[38px]"
               >
-                <Printer size={14} /> <span>چاپ پرونده</span>
+                <Printer size={14} className="text-indigo-600 dark:text-indigo-400" /> <span>چاپ پرونده</span>
               </button>
 
               {/* Edit File */}
@@ -4830,9 +4830,9 @@ export default function PatientDetail() {
   return (
     <div className={`relative min-h-screen -m-3 sm:-m-6 p-3 sm:p-6 bg-gradient-to-br ${pageTheme.bg} overflow-hidden space-y-4 transition-all duration-500`}>
       {/* Dynamic Gemini Breathing Aura */}
-      <div className={`absolute -top-32 -right-32 w-96 h-96 rounded-full bg-gradient-to-br ${pageTheme.blob} pointer-events-none breathe-slow opacity-40 blur-3xl`} />
-      <div className={`absolute top-1/3 -left-32 w-80 h-80 rounded-full bg-gradient-to-tr ${pageTheme.blob} pointer-events-none breathe-slow opacity-30 blur-3xl`} style={{ animationDelay: '-4s' }} />
-      <div className={`absolute bottom-10 right-1/4 w-72 h-72 rounded-full bg-gradient-to-tl ${pageTheme.blob} pointer-events-none breathe-slow opacity-25 blur-3xl`} style={{ animationDelay: '-2s' }} />
+      <div className={`absolute -top-24 -right-24 w-[32rem] h-[32rem] rounded-full bg-gradient-to-br ${pageTheme.blob} pointer-events-none breathe-slow opacity-65 blur-3xl`} />
+      <div className={`absolute top-1/3 -left-28 w-[28rem] h-[28rem] rounded-full bg-gradient-to-tr ${pageTheme.blob} pointer-events-none breathe-slow opacity-55 blur-3xl`} style={{ animationDelay: '-4s' }} />
+      <div className={`absolute bottom-10 right-1/4 w-[26rem] h-[26rem] rounded-full bg-gradient-to-tl ${pageTheme.blob} pointer-events-none breathe-slow opacity-50 blur-3xl`} style={{ animationDelay: '-2s' }} />
 
       <div className="relative z-10 space-y-4">
         {/* Floating clinical and financial alerts. Rendered above the header
