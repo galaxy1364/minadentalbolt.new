@@ -11,7 +11,8 @@ import { buildDoctorLedger } from '../lib/doctorLedger'
 import { phasePlanProgress, phaseSchedule, validatePhase, nextPhaseNumber, comparePhaseCostToTreatments } from '../lib/phases'
 import { useState, useEffect, useCallback, useMemo } from 'react'
 import { useParams, useNavigate, useLocation } from 'react-router-dom'
-import { ArrowRight, Edit2, Phone, Mail, MapPin, Calendar, CreditCard, Activity, FileText, Image as ImageIcon, Shield, Pill, Smile, Award, AlertCircle, Clock, CheckCircle2, Layers, Plus, Trash2, FileSignature, Printer, Bone, FlaskConical, Stethoscope, Archive as ArchiveIcon, RotateCcw, Sparkles, AlertTriangle, HeartPulse, Users, UserPlus, Link2, Download, CheckSquare, Square, Tags, FileHeart, Camera } from 'lucide-react'
+import { ArrowRight, Edit2, Phone, PhoneCall, MessageSquare, MessageCircle, Mail, MapPin, Calendar, CreditCard, Activity, FileText, Image as ImageIcon, Shield, Pill, Smile, Award, AlertCircle, Clock, CheckCircle2, Layers, Plus, Trash2, FileSignature, Printer, Bone, FlaskConical, Stethoscope, Archive as ArchiveIcon, RotateCcw, Sparkles, AlertTriangle, HeartPulse, Users, UserPlus, Link2, Download, CheckSquare, Square, Tags, FileHeart, Camera } from 'lucide-react'
+import { tileThemes, getHashColor } from '../lib/colors'
 import { fetchPatient, updatePatient, fetchTimeline, fetchTreatments, fetchAppointments, fetchPayments, createPayment, fetchToothRecords, createToothRecord, updateToothRecord, fetchPrescriptions, fetchRadiologyImages, updateRadiologyImage, fetchEncounters, fetchDoctors, fetchImplantCases, fetchTreatmentPhases, createTreatmentPhase, updateTreatmentPhase, fetchConsentForms, createConsentForm, updateConsentForm, fetchLabOrders, updateTreatment, fetchCheques, createCheque, updateCheque, fetchPaymentPlans, createPaymentPlan, updatePaymentPlan, fetchAllInstallments, updateInstallment, fetchPerioExams, createPerioExam, updatePerioExam, fetchOrthoExams, createOrthoExam, updateOrthoExam, fetchPatients } from '../lib/api'
 import { toJalaliString, toJalaliStringPretty, formatCurrency, toPersianDigits, formatTime, toEnglishDigits } from '../lib/persianDate'
 import { calcPatientBalance, calcFamilyBalance } from '../lib/finance'
@@ -172,7 +173,7 @@ export default function PatientDetail() {
     focusSection?: string
   }
   const { confirmAction, ConfirmActionModal } = useConfirmAction()
-  const { maskNationalId, maskPhoneNumber } = usePrivacyMode()
+  const { privacyMode, maskNationalId, maskPhoneNumber } = usePrivacyMode()
 
   const [patient, setPatient] = useState<Patient | null>(null)
   const [recordHistory, setRecordHistory] = useState<AuditLogEntry[]>([])
@@ -1550,6 +1551,7 @@ export default function PatientDetail() {
 
   const renderHeader = () => {
     if (!patient) return null
+    const theme = tileThemes[getHashColor(patient.id)]
     const age = calculateAge(patient.birth_date)
     const vipMeta = getVipLabel(patient.vip_level)
     const hasAllergies = patient.allergies && patient.allergies.trim().length > 0
@@ -1557,7 +1559,7 @@ export default function PatientDetail() {
     const hasMedications = patient.medications && patient.medications.trim().length > 0
 
     return (
-      <div className="rounded-3xl bg-white/95 dark:bg-slate-900/95 backdrop-blur-xl border border-slate-200/80 dark:border-slate-800 p-3.5 sm:p-4 shadow-sm transition-all space-y-2.5">
+      <div className={`rounded-3xl bg-white/90 dark:bg-slate-900/90 backdrop-blur-xl border-2 ${theme.border} p-4 sm:p-5 shadow-lg transition-all space-y-3`}>
         {!patient.is_active && (
           <div className="p-2.5 rounded-xl bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 flex items-center justify-between gap-2 flex-wrap text-xs">
             <div className="flex items-center gap-2 text-amber-800 dark:text-amber-200">
@@ -1589,31 +1591,36 @@ export default function PatientDetail() {
         {/* ═══ Tier 1: Identity & Financial Bento Row ═══ */}
         <div className="flex items-start justify-between gap-3 flex-wrap sm:flex-nowrap">
           {/* Patient Profile & Demographics */}
-          <div className="flex items-center gap-3 min-w-0 flex-1">
+          <div className="flex items-center gap-3.5 min-w-0 flex-1">
             <button
               onClick={() => navigate('/patients')}
-              className="p-2 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-500 transition-colors shrink-0"
+              className="p-2 rounded-2xl hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-500 transition-colors shrink-0"
               title="بازگشت به فهرست بیماران"
             >
               <ArrowRight size={20} />
             </button>
             <div
-              className={`w-12 h-12 sm:w-14 sm:h-14 rounded-2xl overflow-hidden bg-gradient-to-br ${getAvatarColor(patient.id)} flex items-center justify-center text-white font-black text-lg sm:text-xl shrink-0 shadow-xs`}
+              className={`w-14 h-14 sm:w-16 sm:h-16 rounded-2xl overflow-hidden ${patient.avatar_url ? '' : theme.iconBg} flex items-center justify-center text-white font-black text-xl sm:text-2xl shrink-0 shadow-md border-2 border-white/80 dark:border-slate-700`}
             >
               {patient.avatar_url ? <img src={patient.avatar_url} alt="" className="w-full h-full object-cover" /> : getInitials(patient)}
             </div>
             <div className="min-w-0 flex-1">
-              {/* Full Patient Name (Never Truncated) */}
+              {/* Full Patient Name + Non-Black Medical File Number Capsule */}
               <div className="flex items-center gap-2 flex-wrap">
-                <h1 className="text-base sm:text-lg font-black text-slate-900 dark:text-white tracking-tight leading-snug break-words">
+                <h1 className="text-base sm:text-xl font-black text-slate-900 dark:text-white tracking-tight leading-snug break-words">
                   {patient.first_name} {patient.last_name}
                 </h1>
                 {patient.file_number ? (
-                  <span className="font-mono text-xs font-black px-3 py-1 rounded-xl bg-slate-900 text-white dark:bg-primary-950 dark:text-primary-200 border border-slate-700/80 dark:border-primary-700 shadow-xs tracking-wider" dir="ltr">
-                    پرونده: {toPersianDigits(patient.file_number)}
+                  <span
+                    className={`inline-flex items-center gap-1.5 font-mono text-xs sm:text-sm font-black px-3.5 py-1.5 rounded-xl ${theme.capsuleBg} ${theme.capsuleText} border ${theme.capsuleBorder} shadow-xs tracking-wider backdrop-blur-md`}
+                    dir="ltr"
+                    title="شماره پرونده بالینی بیمار"
+                  >
+                    <FileText size={13} className="opacity-80 shrink-0" />
+                    <span>#{toPersianDigits(patient.file_number)}</span>
                   </span>
                 ) : (
-                  <span className="font-mono text-[11px] font-medium px-2 py-0.5 rounded-lg bg-slate-100 dark:bg-slate-800 text-slate-500 border border-slate-200 dark:border-slate-700">
+                  <span className="font-mono text-[11px] font-medium px-2.5 py-1 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-500 border border-slate-200 dark:border-slate-700">
                     شناسه: {toPersianDigits(patient.id.slice(0, 6))}
                   </span>
                 )}
@@ -1629,33 +1636,54 @@ export default function PatientDetail() {
                 ))}
               </div>
 
-              {/* Demographics & Direct Contacts */}
-              <div className="flex items-center gap-2 flex-wrap text-xs text-slate-500 dark:text-slate-400 mt-1">
-                {age !== null && <span>{toPersianDigits(age)} سال</span>}
+              {/* Demographics & Direct 1-Click Communication Hub */}
+              <div className="flex items-center gap-2.5 flex-wrap text-xs text-slate-500 dark:text-slate-400 mt-1.5">
+                {age !== null && <span className="font-medium">{toPersianDigits(age)} ساله</span>}
                 {patient.gender && <span>{patient.gender === 'male' ? '• آقا' : '• خانم'}</span>}
                 {patient.blood_type && (
-                  <span className="inline-flex items-center gap-1">
-                    <span className="w-2 h-2 rounded-full bg-rose-500" />
+                  <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md text-[10px] font-bold bg-rose-100/80 text-rose-700 dark:bg-rose-950/50 dark:text-rose-300">
+                    <span className="w-1.5 h-1.5 rounded-full bg-rose-500" />
                     {patient.blood_type}
                   </span>
                 )}
                 {patient.national_id && (
-                  <span className="font-mono text-[11px]" dir="ltr">
+                  <span className="font-mono text-[11px] text-slate-500" dir="ltr">
                     کد ملی: {maskNationalId(patient.national_id)}
                   </span>
                 )}
                 {patient.phone && (
-                  <div className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-lg bg-slate-100 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 text-[11px]">
-                    <a href={`tel:${patient.phone}`} className="text-primary-600 dark:text-primary-400 font-mono hover:underline flex items-center gap-1">
-                      <Phone size={10} /> <span dir="ltr">{toPersianDigits(patient.phone)}</span>
+                  <div className="inline-flex items-center gap-1.5 p-1 rounded-xl bg-white/90 dark:bg-slate-800/90 border border-slate-200/80 dark:border-slate-700 shadow-xs text-xs">
+                    <span className="font-mono font-bold text-slate-800 dark:text-slate-200 px-1.5" dir="ltr">
+                      {privacyMode ? maskPhoneNumber(patient.phone) : toPersianDigits(patient.phone)}
+                    </span>
+                    <a
+                      href={`tel:${patient.phone}`}
+                      onClick={() => { h.tap(); chimes.playPop() }}
+                      className="inline-flex items-center gap-1 px-2 py-1 rounded-lg bg-teal-50 hover:bg-teal-100 text-teal-700 dark:bg-teal-950/40 dark:text-teal-300 text-[11px] font-bold transition-all press-scale"
+                      title="تماس تلفنی مستقیم با بیمار"
+                    >
+                      <PhoneCall size={11} className="text-teal-600" />
+                      <span>تماس</span>
                     </a>
                     <a
-                      href={`https://wa.me/${patient.phone.replace(/^0/, '98')}`}
+                      href={`sms:${patient.phone}`}
+                      onClick={() => { h.tap(); chimes.playPop() }}
+                      className="inline-flex items-center gap-1 px-2 py-1 rounded-lg bg-sky-50 hover:bg-sky-100 text-sky-700 dark:bg-sky-950/40 dark:text-sky-300 text-[11px] font-bold transition-all press-scale"
+                      title="ارسال پیامک به بیمار"
+                    >
+                      <MessageSquare size={11} className="text-sky-600" />
+                      <span>پیامک</span>
+                    </a>
+                    <a
+                      href={`https://wa.me/${patient.phone.replace(/\D/g, '').replace(/^0/, '98')}`}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="text-emerald-600 dark:text-emerald-400 font-bold hover:underline text-[10px]"
+                      onClick={() => { h.tap(); chimes.playPop() }}
+                      className="inline-flex items-center gap-1 px-2 py-1 rounded-lg bg-emerald-50 hover:bg-emerald-100 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300 text-[11px] font-bold transition-all press-scale"
+                      title="گفتگو در واتساپ"
                     >
-                      واتس‌اپ
+                      <MessageCircle size={11} className="text-emerald-600" />
+                      <span>واتساپ</span>
                     </a>
                   </div>
                 )}
@@ -1709,7 +1737,7 @@ export default function PatientDetail() {
 
         {/* ═══ Tier 2: Quick Clinical Notes & Medical Warnings Rail ═══ */}
         {patient.notes && (
-          <div className="text-xs text-amber-900 dark:text-amber-200 bg-amber-50 dark:bg-amber-950/40 border-r-4 border-amber-500 px-3 py-1 rounded-xl font-medium inline-flex items-center gap-1.5 max-w-full">
+          <div className="text-xs text-amber-900 dark:text-amber-200 bg-amber-50 dark:bg-amber-950/40 border-r-4 border-amber-500 px-3 py-1.5 rounded-xl font-medium inline-flex items-center gap-1.5 max-w-full">
             <FileText size={12} className="text-amber-600 shrink-0" />
             <span className="truncate">«{patient.notes}»</span>
           </div>
@@ -1718,42 +1746,42 @@ export default function PatientDetail() {
         {(hasAllergies || hasConditions || hasMedications || patient.anticoagulant_use || patient.bisphosphonate_use || patient.endocarditis_prophylaxis || (patient.bp_systolic != null && patient.bp_systolic >= 140) || (patient.diabetes_hba1c != null && patient.diabetes_hba1c >= 7) || (patient.pregnancy_trimester != null && patient.pregnancy_trimester > 0)) && (
           <div className="flex items-center gap-1.5 overflow-x-auto py-1 scrollbar-none text-[11px]">
             {hasAllergies && (
-              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg bg-rose-50 dark:bg-rose-950/50 text-rose-700 dark:text-rose-300 border border-rose-200 dark:border-rose-800 shrink-0 font-medium">
+              <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-rose-50 dark:bg-rose-950/50 text-rose-700 dark:text-rose-300 border border-rose-200 dark:border-rose-800 shrink-0 font-bold">
                 <AlertCircle size={11} className="text-rose-600" /> حساسیت: {patient.allergies}
               </span>
             )}
             {hasConditions && (
-              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg bg-amber-50 dark:bg-amber-950/50 text-amber-700 dark:text-amber-300 border border-amber-200 dark:border-amber-800 shrink-0 font-medium">
+              <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-amber-50 dark:bg-amber-950/50 text-amber-700 dark:text-amber-300 border border-amber-200 dark:border-amber-800 shrink-0 font-bold">
                 <AlertCircle size={11} className="text-amber-600" /> بیماری: {patient.medical_conditions}
               </span>
             )}
             {hasMedications && (
-              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg bg-sky-50 dark:bg-sky-950/50 text-sky-700 dark:text-sky-300 border border-sky-200 dark:border-sky-800 shrink-0 font-medium">
+              <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-sky-50 dark:bg-sky-950/50 text-sky-700 dark:text-sky-300 border border-sky-200 dark:border-sky-800 shrink-0 font-medium">
                 <Pill size={11} className="text-sky-600" /> دارو: {patient.medications}
               </span>
             )}
             {patient.anticoagulant_use && (
-              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg bg-red-100 dark:bg-red-950/60 text-red-800 dark:text-red-200 border border-red-300 shrink-0 font-bold">
+              <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-red-100 dark:bg-red-950/60 text-red-800 dark:text-red-200 border border-red-300 shrink-0 font-bold animate-pulse">
                 <AlertTriangle size={11} className="text-red-600" /> ضد انعقاد {patient.inr_value ? `(INR: ${toPersianDigits(patient.inr_value)})` : ''}
               </span>
             )}
             {patient.bisphosphonate_use && (
-              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg bg-red-100 dark:bg-red-950/60 text-red-800 dark:text-red-200 border border-red-300 shrink-0 font-bold">
-                <AlertTriangle size={11} className="text-red-600" /> مصرف بیس‌فسفونات (خطر ONJ)
+              <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-purple-50 dark:bg-purple-950/60 text-purple-800 dark:text-purple-200 border border-purple-300 shrink-0 font-bold">
+                <AlertTriangle size={11} className="text-purple-600" /> مصرف بیس‌فسفونات (خطر ONJ)
               </span>
             )}
             {patient.endocarditis_prophylaxis && (
-              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg bg-amber-100 dark:bg-amber-950/60 text-amber-800 dark:text-amber-200 border border-amber-300 shrink-0 font-bold">
+              <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-amber-100 dark:bg-amber-950/60 text-amber-800 dark:text-amber-200 border border-amber-300 shrink-0 font-bold">
                 <HeartPulse size={11} className="text-amber-600" /> اندوکاردیت (پروفیلاکسی)
               </span>
             )}
             {patient.bp_systolic != null && patient.bp_systolic >= 140 && (
-              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg bg-amber-50 dark:bg-amber-950/50 text-amber-800 dark:text-amber-300 border border-amber-300 shrink-0 font-medium">
+              <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-amber-50 dark:bg-amber-950/50 text-amber-800 dark:text-amber-300 border border-amber-300 shrink-0 font-medium">
                 <Activity size={11} className="text-amber-600" /> فشار خون: {toPersianDigits(patient.bp_systolic)}/{toPersianDigits(patient.bp_diastolic || 90)}
               </span>
             )}
             {patient.diabetes_hba1c != null && patient.diabetes_hba1c >= 7 && (
-              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg bg-amber-50 dark:bg-amber-950/50 text-amber-800 dark:text-amber-300 border border-amber-300 shrink-0 font-medium">
+              <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-amber-50 dark:bg-amber-950/50 text-amber-800 dark:text-amber-300 border border-amber-300 shrink-0 font-medium">
                 <Activity size={11} className="text-amber-600" /> دیابت (HbA1c: {toPersianDigits(patient.diabetes_hba1c)}٪)
               </span>
             )}
@@ -1762,7 +1790,7 @@ export default function PatientDetail() {
 
         {/* Active Lab Order Ribbon */}
         {activeLabOrder && (
-          <div className="p-2 rounded-xl bg-cyan-50/90 dark:bg-cyan-950/40 border border-cyan-200 dark:border-cyan-800 text-cyan-950 dark:text-cyan-200 flex items-center justify-between gap-2 text-xs">
+          <div className="p-2.5 rounded-2xl bg-cyan-50/90 dark:bg-cyan-950/40 border border-cyan-200 dark:border-cyan-800 text-cyan-950 dark:text-cyan-200 flex items-center justify-between gap-2 text-xs">
             <div className="flex items-center gap-2 min-w-0">
               <FlaskConical size={14} className="text-cyan-600 shrink-0" />
               <span className="font-bold truncate">
@@ -1780,7 +1808,7 @@ export default function PatientDetail() {
                 h.tap()
                 setActiveTab('labOrders')
               }}
-              className="px-2.5 py-1 rounded-lg bg-cyan-600 hover:bg-cyan-700 text-white font-bold text-[10px] shrink-0 transition-colors press-scale"
+              className="px-2.5 py-1 rounded-xl bg-cyan-600 hover:bg-cyan-700 text-white font-bold text-[10px] shrink-0 transition-colors press-scale"
             >
               پیگیری کارتابل
             </button>
@@ -1841,9 +1869,9 @@ export default function PatientDetail() {
                 h.tap()
                 setActiveTab('teeth')
               }}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold bg-teal-50 dark:bg-teal-950/40 text-teal-700 dark:text-teal-300 border border-teal-200 dark:border-teal-800 hover:bg-teal-100 dark:hover:bg-teal-900/60 press-scale shrink-0"
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold bg-white dark:bg-slate-800 text-teal-700 dark:text-teal-300 border border-teal-200 dark:border-teal-800 hover:bg-teal-50 dark:hover:bg-teal-900/60 press-scale shrink-0 shadow-xs"
             >
-              <Smile size={14} /> چارت دندان
+              <Smile size={14} className="text-teal-600" /> چارت دندان
             </button>
 
             {/* 4. Payment */}
@@ -1853,9 +1881,9 @@ export default function PatientDetail() {
                 h.tap()
                 handleOpenPaymentModal()
               }}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800 hover:bg-emerald-100 dark:hover:bg-emerald-900/60 press-scale shrink-0"
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800 hover:bg-emerald-100 dark:hover:bg-emerald-900/60 press-scale shrink-0 shadow-xs"
             >
-              <CreditCard size={14} /> دریافت وجه
+              <CreditCard size={14} className="text-emerald-600" /> دریافت وجه
             </button>
 
             {/* 5. Sayad Cheque */}
@@ -1865,9 +1893,9 @@ export default function PatientDetail() {
                 h.tap()
                 handleOpenChequeModal()
               }}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-300 border border-amber-200 dark:border-amber-800 hover:bg-amber-100 dark:hover:bg-amber-900/60 press-scale shrink-0"
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-300 border border-amber-200 dark:border-amber-800 hover:bg-amber-100 dark:hover:bg-amber-900/60 press-scale shrink-0 shadow-xs"
             >
-              <FileSignature size={14} /> ثبت چک صیادی
+              <FileSignature size={14} className="text-amber-600" /> ثبت چک صیادی
             </button>
 
             {/* 6. Prescription */}
@@ -1883,9 +1911,9 @@ export default function PatientDetail() {
                   },
                 })
               }}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold bg-purple-50 dark:bg-purple-950/40 text-purple-700 dark:text-purple-300 border border-purple-200 dark:border-purple-800 hover:bg-purple-100 dark:hover:bg-purple-900/60 press-scale shrink-0"
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold bg-purple-50 dark:bg-purple-950/40 text-purple-700 dark:text-purple-300 border border-purple-200 dark:border-purple-800 hover:bg-purple-100 dark:hover:bg-purple-900/60 press-scale shrink-0 shadow-xs"
             >
-              <Pill size={14} /> صدور نسخه
+              <Pill size={14} className="text-purple-600" /> صدور نسخه
             </button>
 
             {/* 7. Lab Order */}
@@ -1895,9 +1923,9 @@ export default function PatientDetail() {
                 h.tap()
                 setActiveTab('labOrders')
               }}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold bg-cyan-50 dark:bg-cyan-950/40 text-cyan-700 dark:text-cyan-300 border border-cyan-200 dark:border-cyan-800 hover:bg-cyan-100 dark:hover:bg-cyan-900/60 press-scale shrink-0"
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold bg-cyan-50 dark:bg-cyan-950/40 text-cyan-700 dark:text-cyan-300 border border-cyan-200 dark:border-cyan-800 hover:bg-cyan-100 dark:hover:bg-cyan-900/60 press-scale shrink-0 shadow-xs"
             >
-              <FlaskConical size={14} /> سفارش لابراتوار
+              <FlaskConical size={14} className="text-cyan-600" /> سفارش لابراتوار
             </button>
 
             {/* 8. Implant Case */}
@@ -1907,16 +1935,16 @@ export default function PatientDetail() {
                 h.tap()
                 setActiveTab('implants')
               }}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold bg-blue-50 dark:bg-blue-950/40 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-800 hover:bg-blue-100 dark:hover:bg-blue-900/60 press-scale shrink-0"
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold bg-blue-50 dark:bg-blue-950/40 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-800 hover:bg-blue-100 dark:hover:bg-blue-900/60 press-scale shrink-0 shadow-xs"
             >
-              <Bone size={14} /> پرونده ایمپلنت
+              <Bone size={14} className="text-blue-600" /> پرونده ایمپلنت
             </button>
 
             {/* 9. Print Record */}
             <button
               type="button"
               onClick={handlePrintFullChart}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold bg-indigo-50 dark:bg-indigo-950/40 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800 hover:bg-indigo-100 dark:hover:bg-indigo-900/60 press-scale shrink-0"
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700 hover:bg-slate-200 press-scale shrink-0 shadow-xs"
             >
               <Printer size={14} /> چاپ پرونده
             </button>
@@ -2041,11 +2069,27 @@ export default function PatientDetail() {
         )}
 
         {/* Personal Info */}
-        <Card className="p-4">
-          <h3 className="text-sm font-bold text-slate-700 mb-3 flex items-center gap-2">
-            <FileText size={16} /> اطلاعات شخصی
-          </h3>
-          <div className="space-y-2">
+        <div className="rounded-3xl bg-white/95 dark:bg-slate-900/90 backdrop-blur-xl border border-slate-200/80 dark:border-slate-800 p-5 shadow-sm hover:shadow-md transition-all">
+          <div className="flex items-center justify-between gap-2 mb-4 pb-3 border-b border-slate-100 dark:border-slate-800">
+            <h3 className="text-sm font-bold text-slate-800 dark:text-slate-100 flex items-center gap-2">
+              <span className="p-2 rounded-xl bg-sky-50 dark:bg-sky-950/50 text-sky-600 dark:text-sky-400">
+                <FileText size={16} />
+              </span>
+              <span>اطلاعات شخصی بیمار</span>
+            </h3>
+            <button
+              type="button"
+              onClick={() => {
+                h.tap()
+                setEditModalOpen(true)
+              }}
+              className="text-xs text-primary-600 dark:text-primary-400 hover:text-primary-700 font-bold flex items-center gap-1 px-2.5 py-1 rounded-xl bg-primary-50 dark:bg-primary-950/40 border border-primary-100 dark:border-primary-900/50 transition-colors press-scale"
+            >
+              <Edit2 size={12} />
+              <span>ویرایش</span>
+            </button>
+          </div>
+          <div className="space-y-1">
             <InfoRow label="نام کامل" value={`${patient.first_name} ${patient.last_name}`} />
             <InfoRow label="کد ملی" value={patient.national_id ? maskNationalId(patient.national_id) : '-'} dir="ltr" />
             <InfoRow label="تاریخ تولد" value={patient.birth_date ? toJalaliStringPretty(patient.birth_date) : '-'} />
@@ -2053,34 +2097,97 @@ export default function PatientDetail() {
             <InfoRow label="جنسیت" value={patient.gender === 'male' ? 'آقا' : patient.gender === 'female' ? 'خانم' : '-'} />
             <InfoRow label="گروه خونی" value={patient.blood_type || '-'} />
           </div>
-        </Card>
+        </div>
 
         {/* Contact */}
-        <Card className="p-4">
-          <h3 className="text-sm font-bold text-slate-700 mb-3 flex items-center gap-2">
-            <Phone size={16} /> اطلاعات تماس
-          </h3>
-          <div className="space-y-2">
-            <InfoRow label="تلفن" value={patient.phone ? maskPhoneNumber(patient.phone) : '-'} dir="ltr" icon={<Phone size={12} />} />
-            <InfoRow label="شماره منزل" value={patient.phone2 ? maskPhoneNumber(patient.phone2) : '-'} dir="ltr" />
+        <div className="rounded-3xl bg-white/95 dark:bg-slate-900/90 backdrop-blur-xl border border-slate-200/80 dark:border-slate-800 p-5 shadow-sm hover:shadow-md transition-all">
+          <div className="flex items-center justify-between gap-2 mb-4 pb-3 border-b border-slate-100 dark:border-slate-800">
+            <h3 className="text-sm font-bold text-slate-800 dark:text-slate-100 flex items-center gap-2">
+              <span className="p-2 rounded-xl bg-teal-50 dark:bg-teal-950/50 text-teal-600 dark:text-teal-400">
+                <Phone size={16} />
+              </span>
+              <span>اطلاعات تماس و ارتباطی</span>
+            </h3>
+            {patient.phone && (
+              <a
+                href={`tel:${patient.phone}`}
+                onClick={() => { h.tap(); chimes.playPop() }}
+                className="text-xs text-teal-600 dark:text-teal-400 hover:text-teal-700 font-bold flex items-center gap-1 px-2.5 py-1 rounded-xl bg-teal-50 dark:bg-teal-950/40 border border-teal-100 dark:border-teal-900/50 transition-colors press-scale"
+              >
+                <PhoneCall size={12} />
+                <span>تماس مستقیم</span>
+              </a>
+            )}
+          </div>
+          <div className="space-y-1">
+            <InfoRow label="تلفن همراه" value={patient.phone ? maskPhoneNumber(patient.phone) : '-'} dir="ltr" icon={<Phone size={12} />} />
+            <InfoRow label="شماره منزل / ثابت" value={patient.phone2 ? maskPhoneNumber(patient.phone2) : '-'} dir="ltr" />
             <InfoRow label="ایمیل" value={patient.email || '-'} dir="ltr" icon={<Mail size={12} />} />
             <InfoRow label="استان" value={patient.province || '-'} />
             <InfoRow label="شهر" value={patient.city || '-'} />
-            <InfoRow label="آدرس" value={patient.address || '-'} icon={<MapPin size={12} />} />
+            <InfoRow label="آدرس سکونت" value={patient.address || '-'} icon={<MapPin size={12} />} />
             <InfoRow label="کد پستی" value={patient.postal_code ? toPersianDigits(patient.postal_code) : '-'} dir="ltr" />
           </div>
-        </Card>
+        </div>
 
         {/* Medical History */}
-        <Card className="p-4">
-          <h3 className="text-sm font-bold text-slate-700 mb-3 flex items-center gap-2">
-            <Activity size={16} /> سوابق پزشکی و غربالگری سلامت
-          </h3>
-          <div className="space-y-2">
-            <InfoRow label="تاریخچه پزشکی" value={patient.medical_history || '-'} />
-            <InfoRow label="حساسیت‌ها" value={patient.allergies || '-'} />
-            <InfoRow label="داروهای مصرفی" value={patient.medications || '-'} />
-            <InfoRow label="بیماری‌های زمینه‌ای" value={patient.medical_conditions || '-'} />
+        <div className="rounded-3xl bg-white/95 dark:bg-slate-900/90 backdrop-blur-xl border border-slate-200/80 dark:border-slate-800 p-5 shadow-sm hover:shadow-md transition-all">
+          <div className="flex items-center justify-between gap-2 mb-4 pb-3 border-b border-slate-100 dark:border-slate-800">
+            <h3 className="text-sm font-bold text-slate-800 dark:text-slate-100 flex items-center gap-2">
+              <span className="p-2 rounded-xl bg-rose-50 dark:bg-rose-950/50 text-rose-600 dark:text-rose-400">
+                <Activity size={16} />
+              </span>
+              <span>سوابق پزشکی و غربالگری سلامت</span>
+            </h3>
+            <button
+              type="button"
+              onClick={() => {
+                h.tap()
+                setEditModalOpen(true)
+              }}
+              className="text-xs text-rose-600 dark:text-rose-400 hover:text-rose-700 font-bold flex items-center gap-1 px-2.5 py-1 rounded-xl bg-rose-50 dark:bg-rose-950/40 border border-rose-100 dark:border-rose-900/50 transition-colors press-scale"
+            >
+              <FileHeart size={12} />
+              <span>ویرایش سوابق</span>
+            </button>
+          </div>
+          <div className="space-y-1">
+            <InfoRow
+              label="تاریخچه پزشکی"
+              value={patient.medical_history ? (
+                <span>{patient.medical_history}</span>
+              ) : (
+                <span className="text-[11px] text-slate-400 dark:text-slate-500 font-normal">فاقد سوابق جراحی یا بستری قبلی</span>
+              )}
+            />
+            <InfoRow
+              label="حساسیت‌ها"
+              value={patient.allergies ? (
+                <span className="text-rose-600 dark:text-rose-400 font-bold">{patient.allergies}</span>
+              ) : (
+                <span className="inline-flex items-center gap-1 text-[11px] font-bold text-emerald-700 dark:text-emerald-300 bg-emerald-50 dark:bg-emerald-950/40 px-2 py-0.5 rounded-lg border border-emerald-200/60 dark:border-emerald-800/40">
+                  <CheckCircle2 size={11} className="text-emerald-600" /> فاقد حساسیت دارویی گزارش‌شده
+                </span>
+              )}
+            />
+            <InfoRow
+              label="داروهای مصرفی"
+              value={patient.medications ? (
+                <span className="text-sky-700 dark:text-sky-300 font-semibold">{patient.medications}</span>
+              ) : (
+                <span className="text-[11px] text-slate-400 dark:text-slate-500 font-normal">عدم مصرف داروی مزمن</span>
+              )}
+            />
+            <InfoRow
+              label="بیماری‌های زمینه‌ای"
+              value={patient.medical_conditions ? (
+                <span className="text-amber-600 dark:text-amber-400 font-bold">{patient.medical_conditions}</span>
+              ) : (
+                <span className="inline-flex items-center gap-1 text-[11px] font-bold text-emerald-700 dark:text-emerald-300 bg-emerald-50 dark:bg-emerald-950/40 px-2 py-0.5 rounded-lg border border-emerald-200/60 dark:border-emerald-800/40">
+                  <CheckCircle2 size={11} className="text-emerald-600" /> بدون بیماری سیستمیک ثبت‌شده
+                </span>
+              )}
+            />
             {patient.anticoagulant_use && (
               <InfoRow
                 label="داروی ضد انعقاد"
@@ -2124,33 +2231,39 @@ export default function PatientDetail() {
               />
             )}
           </div>
-        </Card>
+        </div>
 
         {/* Insurance & Summary */}
-        <Card className="p-4">
-          <h3 className="text-sm font-bold text-slate-700 mb-3 flex items-center gap-2">
-            <Shield size={16} /> بیمه و خلاصه
-          </h3>
-          <div className="space-y-2">
+        <div className="rounded-3xl bg-white/95 dark:bg-slate-900/90 backdrop-blur-xl border border-slate-200/80 dark:border-slate-800 p-5 shadow-sm hover:shadow-md transition-all">
+          <div className="flex items-center justify-between gap-2 mb-4 pb-3 border-b border-slate-100 dark:border-slate-800">
+            <h3 className="text-sm font-bold text-slate-800 dark:text-slate-100 flex items-center gap-2">
+              <span className="p-2 rounded-xl bg-purple-50 dark:bg-purple-950/50 text-purple-600 dark:text-purple-400">
+                <Shield size={16} />
+              </span>
+              <span>بیمه و خلاصه پرونده</span>
+            </h3>
+            <Badge color={getVipLabel(patient.vip_level).color}>{getVipLabel(patient.vip_level).label}</Badge>
+          </div>
+          <div className="space-y-1">
             <InfoRow label="اطلاعات بیمه" value={patient.insurance_info || '-'} />
             <InfoRow label="شماره بیمه" value={patient.insurance_number ? toPersianDigits(patient.insurance_number) : '-'} dir="ltr" />
             <InfoRow label="پزشک اصلی" value={getDoctorName(patient.primary_doctor_id)} />
             <InfoRow label="سطح VIP" value={getVipLabel(patient.vip_level).label} />
-            <InfoRow label="تاریخ ثبت" value={toJalaliStringPretty(patient.created_at)} />
-            <div className="pt-2 mt-2 border-t border-slate-100">
-              <div className="grid grid-cols-2 gap-2">
-                <div className="p-2 rounded-lg bg-success-50 text-center">
-                  <p className="text-xs text-slate-500">پرداختی کل</p>
-                  <p className="text-sm font-bold text-success-700">{formatCurrency(totalPaid)}</p>
+            <InfoRow label="تاریخ تشکیل پرونده" value={toJalaliStringPretty(patient.created_at)} />
+            <div className="pt-3 mt-3 border-t border-slate-100 dark:border-slate-800">
+              <div className="grid grid-cols-2 gap-2.5">
+                <div className="p-3 rounded-2xl bg-gradient-to-br from-emerald-50 to-teal-50 dark:from-emerald-950/30 dark:to-teal-950/20 border border-emerald-200/60 dark:border-emerald-800/40 text-center">
+                  <p className="text-[11px] font-semibold text-emerald-800 dark:text-emerald-300 mb-0.5">پرداختی کل بیمار</p>
+                  <p className="text-sm sm:text-base font-black text-emerald-700 dark:text-emerald-400 font-mono">{formatCurrency(totalPaid)} ت</p>
                 </div>
-                <div className="p-2 rounded-lg bg-primary-50 text-center">
-                  <p className="text-xs text-slate-500">هزینه درمان</p>
-                  <p className="text-sm font-bold text-primary-700">{formatCurrency(totalTreatmentCost)}</p>
+                <div className="p-3 rounded-2xl bg-gradient-to-br from-sky-50 to-blue-50 dark:from-sky-950/30 dark:to-blue-950/20 border border-sky-200/60 dark:border-sky-800/40 text-center">
+                  <p className="text-[11px] font-semibold text-sky-800 dark:text-sky-300 mb-0.5">کل هزینه درمان‌ها</p>
+                  <p className="text-sm sm:text-base font-black text-sky-700 dark:text-sky-400 font-mono">{formatCurrency(totalTreatmentCost)} ت</p>
                 </div>
               </div>
             </div>
           </div>
-        </Card>
+        </div>
 
         {/* Family & Household Linkage Card */}
         {(() => {
@@ -4658,14 +4771,26 @@ export default function PatientDetail() {
   // Helper Component
   // ===========================================================================
 
-  const InfoRow = ({ label, value, dir, icon }: { label: string; value: string; dir?: string; icon?: React.ReactNode }) => (
-    <div className="flex items-start justify-between gap-2 py-1">
-      <span className="text-xs text-slate-400 flex items-center gap-1 flex-shrink-0">
-        {icon}{label}
-      </span>
-      <span className="text-sm text-slate-700 text-left" dir={dir}>{value}</span>
-    </div>
-  )
+  const InfoRow = ({ label, value, dir, icon }: { label: string; value: React.ReactNode; dir?: string; icon?: React.ReactNode }) => {
+    const isDash = value === '-' || value === null || value === undefined || value === ''
+    return (
+      <div className="flex items-center justify-between gap-2 py-1.5 border-b border-slate-100/60 dark:border-slate-800/40 last:border-0">
+        <span className="text-xs font-medium text-slate-500 dark:text-slate-400 flex items-center gap-1.5 flex-shrink-0">
+          {icon && <span className="opacity-70">{icon}</span>}
+          {label}
+        </span>
+        {isDash ? (
+          <span className="text-[11px] font-medium px-2 py-0.5 rounded-lg bg-slate-100/80 dark:bg-slate-800/60 text-slate-400 dark:text-slate-500">
+            ثبت نشده
+          </span>
+        ) : (
+          <span className="text-xs font-semibold text-slate-800 dark:text-slate-200 text-left truncate max-w-[240px] sm:max-w-[320px]" dir={dir}>
+            {value}
+          </span>
+        )}
+      </div>
+    )
+  }
 
   // ===========================================================================
   // Main Render
@@ -4687,14 +4812,22 @@ export default function PatientDetail() {
     )
   }
 
+  const pageTheme = tileThemes[getHashColor(patient.id)]
+
   return (
-    <div className="space-y-4">
-      {/* Floating clinical and financial alerts. Rendered above the header
-          rather than inside it: the whole point is that they interrupt
-          regardless of how far down the file has been scrolled. */}
-      <div id="medical-alerts">
-        <PatientAlerts patient={patient} balance={{ balance: patientBalance.balance }} />
-      </div>
+    <div className={`relative min-h-screen -m-3 sm:-m-6 p-3 sm:p-6 bg-gradient-to-br ${pageTheme.bg} overflow-hidden space-y-4 transition-all duration-500`}>
+      {/* Dynamic Gemini Breathing Aura */}
+      <div className={`absolute -top-32 -right-32 w-96 h-96 rounded-full bg-gradient-to-br ${pageTheme.blob} pointer-events-none breathe-slow opacity-40 blur-3xl`} />
+      <div className={`absolute top-1/3 -left-32 w-80 h-80 rounded-full bg-gradient-to-tr ${pageTheme.blob} pointer-events-none breathe-slow opacity-30 blur-3xl`} style={{ animationDelay: '-4s' }} />
+      <div className={`absolute bottom-10 right-1/4 w-72 h-72 rounded-full bg-gradient-to-tl ${pageTheme.blob} pointer-events-none breathe-slow opacity-25 blur-3xl`} style={{ animationDelay: '-2s' }} />
+
+      <div className="relative z-10 space-y-4">
+        {/* Floating clinical and financial alerts. Rendered above the header
+            rather than inside it: the whole point is that they interrupt
+            regardless of how far down the file has been scrolled. */}
+        <div id="medical-alerts">
+          <PatientAlerts patient={patient} balance={{ balance: patientBalance.balance }} />
+        </div>
 
       {/* Header */}
       {renderHeader()}
@@ -5531,6 +5664,7 @@ export default function PatientDetail() {
           }}
         />
       )}
+      </div>
     </div>
   )
 }
