@@ -1,11 +1,11 @@
 import { useState, useEffect, useCallback, useMemo } from 'react'
 import { PatientDebtBar } from '../components/PatientDebtBar'
 import { useNavigate } from 'react-router-dom'
-import { Plus, Search, Edit2, Phone, PhoneCall, Filter, Users, Award, AlertCircle, Smile, FileText, User, Heart, Shield, MapPin, Archive, Calendar, MessageSquare, MessageCircle, Eye, EyeOff, Banknote, CalendarClock, ChevronLeft, CreditCard, CheckCircle2, LayoutGrid, List, Sparkles, Activity, Printer } from 'lucide-react'
-import { fetchPatients, createPatient, updatePatient, fetchDoctors, fetchPayments, fetchTreatments, fetchImplantCases, peekNextFileNumber, fetchCheques, fetchPaymentPlans } from '../lib/api'
+import { Plus, Search, Edit2, Phone, PhoneCall, Filter, Users, Award, AlertCircle, Smile, FileText, User, Heart, Shield, MapPin, Archive, Calendar, MessageSquare, MessageCircle, Eye, EyeOff, Banknote, CalendarClock, ChevronLeft, CreditCard, CheckCircle2, LayoutGrid, List, Sparkles, Activity, Printer, FlaskConical } from 'lucide-react'
+import { fetchPatients, createPatient, updatePatient, fetchDoctors, fetchPayments, fetchTreatments, fetchImplantCases, peekNextFileNumber, fetchCheques, fetchPaymentPlans, fetchLabOrders } from '../lib/api'
 import { useDataRefresh } from '../lib/realtimeSync'
 import { toJalaliStringPretty, formatCurrency, toPersianDigits } from '../lib/persianDate'
-import { Patient, Doctor, Payment, Treatment, ImplantCase, Cheque, PaymentPlan } from '../types'
+import { Patient, Doctor, Payment, Treatment, ImplantCase, Cheque, PaymentPlan, LabOrder } from '../types'
 import { Modal, Card, Button, Input, Select, Textarea, Spinner, EmptyState, showToast, HighlightText, SkeletonList } from '../components/ui'
 import { recordAuditLog } from '../lib/auditLogger'
 import { usePrivacyMode } from '../lib/privacyMask'
@@ -67,19 +67,20 @@ export default function Patients() {
   const [implantCases, setImplantCases] = useState<ImplantCase[]>([])
   const [cheques, setCheques] = useState<Cheque[]>([])
   const [paymentPlans, setPaymentPlans] = useState<PaymentPlan[]>([])
+  const [labOrders, setLabOrders] = useState<LabOrder[]>([])
   const [loading, setLoading] = useState(true)
 
   const [searchQuery, setSearchQuery] = useState('')
   const [filterVip, setFilterVip] = useState('')
   const [filterGender, setFilterGender] = useState('')
   const [filterTag, setFilterTag] = useState('')
-  // Defaults to active-only — an inactive patient genuinely "went to
-  // the archive" and shouldn't reappear mixed into the main list by
-  // default; the وضعیت filter can still opt into seeing them here too.
   const [filterActive, setFilterActive] = useState('true')
   const [showFilters, setShowFilters] = useState(false)
 
-  // Enterprise Widescreen UX: Dual View Modes ('grid' vs 'table')
+  // Fast Reception Workflow: Instant Status Filter Pills
+  const [quickFilter, setQuickFilter] = useState<'all' | 'debtors' | 'cheques' | 'plans' | 'implants' | 'lab' | 'vip' | 'archived'>('all')
+
+  // Dual View Modes ('grid' vs 'table')
   const [viewMode, setViewMode] = useState<'grid' | 'table'>(() => {
     try {
       return (localStorage.getItem('minadent-patients-view') as 'grid' | 'table') || 'grid'
@@ -87,8 +88,6 @@ export default function Patients() {
       return 'grid'
     }
   })
-  // Fast Reception Workflow: Instant Status Filter Pills
-  const [quickFilter, setQuickFilter] = useState<'all' | 'debtors' | 'cheques' | 'plans' | 'vip' | 'archived'>('all')
 
   const handleViewModeChange = (mode: 'grid' | 'table') => {
     h.tap()
@@ -107,7 +106,7 @@ export default function Patients() {
   const loadData = useCallback(async () => {
     setLoading(true)
     try {
-      const [pats, docs, pays, trts, implCases, chqs, plans] = await Promise.all([
+      const [pats, docs, pays, trts, implCases, chqs, plans, labs] = await Promise.all([
         fetchPatients(),
         fetchDoctors(),
         fetchPayments(),
@@ -115,6 +114,7 @@ export default function Patients() {
         fetchImplantCases(),
         fetchCheques(),
         fetchPaymentPlans(),
+        fetchLabOrders(),
       ])
       setPatients(pats)
       setDoctors(docs)
@@ -123,14 +123,14 @@ export default function Patients() {
       setImplantCases(implCases)
       setCheques(chqs)
       setPaymentPlans(plans)
+      setLabOrders(labs)
     } catch { showToast('error', 'خطا در بارگذاری بیماران') }
     finally { setLoading(false) }
   }, [])
 
   useEffect(() => { loadData() }, [loadData])
 
-  // Real-time automatic synchronization when patients/payments/cheques/plans update on any device
-  useDataRefresh(['patients', 'payments', 'treatments', 'implant_cases', 'cheques', 'payment_plans'], loadData)
+  useDataRefresh(['patients', 'payments', 'treatments', 'implant_cases', 'cheques', 'payment_plans', 'lab_orders'], loadData)
 
   const patientFinances = useMemo(() => {
     const map = new Map<string, { balance: number; paid: number; totalCost: number }>()
@@ -143,7 +143,6 @@ export default function Patients() {
     return map
   }, [patients, payments, treatments, implantCases])
 
-  // Counts pending or deposited cheques per patient for live card badges
   const patientChequesMap = useMemo(() => {
     const map = new Map<string, number>()
     for (const c of cheques) {
@@ -154,7 +153,6 @@ export default function Patients() {
     return map
   }, [cheques])
 
-  // Counts active installment plans per patient for live card badges
   const patientPlansMap = useMemo(() => {
     const map = new Map<string, number>()
     for (const pl of paymentPlans) {
@@ -165,6 +163,26 @@ export default function Patients() {
     return map
   }, [paymentPlans])
 
+  const patientImplantsMap = useMemo(() => {
+    const map = new Map<string, number>()
+    for (const ic of implantCases) {
+      if (ic.patient_id && ic.stage !== 'completed' && ic.stage !== 'cancelled') {
+        map.set(ic.patient_id, (map.get(ic.patient_id) || 0) + 1)
+      }
+    }
+    return map
+  }, [implantCases])
+
+  const patientLabOrdersMap = useMemo(() => {
+    const map = new Map<string, number>()
+    for (const lo of labOrders) {
+      if (lo.patient_id && lo.status !== 'delivered' && lo.status !== 'cancelled') {
+        map.set(lo.patient_id, (map.get(lo.patient_id) || 0) + 1)
+      }
+    }
+    return map
+  }, [labOrders])
+
   const doctorsMap = useMemo(() => {
     const map = new Map<string, Doctor>()
     for (const d of doctors) {
@@ -173,8 +191,6 @@ export default function Patients() {
     return map
   }, [doctors])
 
-  // All distinct patient tags currently in use — powers the grouping/
-  // segmentation filter row (مینادنت's "گروه‌بندی و تفکیک بیماران").
   const allTags = useMemo(() => {
     const set = new Set<string>()
     for (const p of patients) for (const t of p.tags || []) set.add(t)
@@ -183,7 +199,6 @@ export default function Patients() {
 
   const filteredPatients = useMemo(() => {
     let result = patients.filter((p) => {
-      // Fast reception status quick filters
       if (quickFilter === 'debtors') {
         const bal = patientFinances.get(p.id)?.balance || 0
         if (bal <= 0) return false
@@ -193,12 +208,17 @@ export default function Patients() {
       } else if (quickFilter === 'plans') {
         const planCount = patientPlansMap.get(p.id) || 0
         if (planCount <= 0) return false
+      } else if (quickFilter === 'implants') {
+        const impCount = patientImplantsMap.get(p.id) || 0
+        if (impCount <= 0) return false
+      } else if (quickFilter === 'lab') {
+        const labCount = patientLabOrdersMap.get(p.id) || 0
+        if (labCount <= 0) return false
       } else if (quickFilter === 'vip') {
         if ((p.vip_level ?? 0) <= 0) return false
       } else if (quickFilter === 'archived') {
         if (p.is_active) return false
       } else {
-        // 'all': respect active filter
         if (filterActive !== '' && p.is_active !== (filterActive === 'true')) return false
       }
 
@@ -227,21 +247,20 @@ export default function Patients() {
     }
 
     return result
-  }, [patients, searchQuery, quickFilter, filterVip, filterGender, filterActive, filterTag, patientFinances, patientChequesMap, patientPlansMap])
+  }, [patients, searchQuery, quickFilter, filterVip, filterGender, filterActive, filterTag, patientFinances, patientChequesMap, patientPlansMap, patientImplantsMap, patientLabOrdersMap])
 
   const stats = useMemo(() => {
     const total = patients.length
     const vip = patients.filter((p) => (p.vip_level ?? 0) > 0).length
-    const now = new Date()
-    const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString()
-    const newThisMonth = patients.filter((p) => p.created_at >= monthStart).length
     const active = patients.filter((p) => p.is_active).length
     const debtors = patients.filter((p) => (patientFinances.get(p.id)?.balance || 0) > 0).length
     const withCheques = Array.from(patientChequesMap.keys()).length
     const withPlans = Array.from(patientPlansMap.keys()).length
+    const withImplants = Array.from(patientImplantsMap.keys()).length
+    const withLab = Array.from(patientLabOrdersMap.keys()).length
     const archived = patients.filter((p) => !p.is_active).length
-    return { total, vip, newThisMonth, active, debtors, withCheques, withPlans, archived }
-  }, [patients, patientFinances, patientChequesMap, patientPlansMap])
+    return { total, vip, active, debtors, withCheques, withPlans, withImplants, withLab, archived }
+  }, [patients, patientFinances, patientChequesMap, patientPlansMap, patientImplantsMap, patientLabOrdersMap])
 
   const [nextFileNumber, setNextFileNumber] = useState('')
 
@@ -470,39 +489,35 @@ export default function Patients() {
         </div>
       )}
 
-      {/* Modern High-Efficiency Chip Action & Filter Rail */}
-      <div className="flex items-center gap-1.5 overflow-x-auto pb-1 no-scrollbar text-xs font-bold pt-1">
-        {/* Primary CTA: New Patient */}
-        <button
-          type="button"
-          onClick={openCreateModal}
-          aria-label="افزودن بیمار جدید"
-          className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-gradient-to-r from-teal-600 to-emerald-600 hover:from-teal-700 hover:to-emerald-700 text-white text-xs font-extrabold shadow-md hover:shadow-lg transition-all press-scale shrink-0 cursor-pointer"
-        >
-          <Plus size={15} />
-          <span>بیمار جدید</span>
-        </button>
+      {/* Top Header Row: Clean Title + Patient Count */}
+      <div className="flex items-center justify-between gap-2 px-1">
+        <div className="flex items-center gap-2">
+          <h1 className="text-base sm:text-lg font-black text-slate-900 dark:text-slate-100">پرونده‌های بیماران</h1>
+          <span className="text-xs font-bold text-teal-700 dark:text-teal-300 bg-teal-50 dark:bg-teal-950/50 border border-teal-200/60 dark:border-teal-800/60 rounded-full px-2.5 py-0.5">
+            {toPersianDigits(filteredPatients.length)} بیمار
+          </span>
+        </div>
+      </div>
 
-        <div className="h-5 w-px bg-slate-200 dark:bg-slate-700 shrink-0 mx-0.5" />
-
-        {/* Shortened Filter Chips */}
+      {/* 100% Dedicated Horizontal Scrolling Filter Chip Rail (Zero overlap, Zero clashing) */}
+      <div className="flex items-center gap-1.5 overflow-x-auto dock-scroll no-scrollbar py-1 text-xs font-bold -mx-2 px-2">
         <button
           type="button"
           onClick={() => { h.select(); setQuickFilter('all') }}
-          className={`px-3 py-1.5 rounded-xl transition-all whitespace-nowrap flex items-center gap-1.5 press-scale ${
+          className={`px-3 py-1.5 rounded-xl transition-all whitespace-nowrap flex items-center gap-1.5 press-scale shrink-0 ${
             quickFilter === 'all'
               ? 'bg-slate-900 dark:bg-white text-white dark:text-slate-900 shadow-xs'
               : 'bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 border border-slate-200/80 dark:border-slate-700 hover:bg-slate-50'
           }`}
         >
-          <span>همه</span>
+          <span>همه مراجعین</span>
           <span className="text-[10px] opacity-75 tabular-nums">({toPersianDigits(stats.total)})</span>
         </button>
 
         <button
           type="button"
           onClick={() => { h.select(); setQuickFilter('vip') }}
-          className={`px-3 py-1.5 rounded-xl transition-all whitespace-nowrap flex items-center gap-1.5 press-scale ${
+          className={`px-3 py-1.5 rounded-xl transition-all whitespace-nowrap flex items-center gap-1.5 press-scale shrink-0 ${
             quickFilter === 'vip'
               ? 'bg-violet-600 text-white shadow-xs'
               : 'bg-white dark:bg-slate-800 text-violet-600 dark:text-violet-400 border border-violet-200/80 dark:border-violet-900/50 hover:bg-violet-50/50'
@@ -515,7 +530,7 @@ export default function Patients() {
         <button
           type="button"
           onClick={() => { h.select(); setQuickFilter('debtors') }}
-          className={`px-3 py-1.5 rounded-xl transition-all whitespace-nowrap flex items-center gap-1.5 press-scale ${
+          className={`px-3 py-1.5 rounded-xl transition-all whitespace-nowrap flex items-center gap-1.5 press-scale shrink-0 ${
             quickFilter === 'debtors'
               ? 'bg-rose-600 text-white shadow-xs'
               : 'bg-white dark:bg-slate-800 text-rose-600 dark:text-rose-400 border border-rose-200/80 dark:border-rose-900/50 hover:bg-rose-50/50'
@@ -529,20 +544,20 @@ export default function Patients() {
         <button
           type="button"
           onClick={() => { h.select(); setQuickFilter('cheques') }}
-          className={`px-3 py-1.5 rounded-xl transition-all whitespace-nowrap flex items-center gap-1.5 press-scale ${
+          className={`px-3 py-1.5 rounded-xl transition-all whitespace-nowrap flex items-center gap-1.5 press-scale shrink-0 ${
             quickFilter === 'cheques'
               ? 'bg-amber-600 text-white shadow-xs'
               : 'bg-white dark:bg-slate-800 text-amber-700 dark:text-amber-400 border border-amber-200/80 dark:border-amber-900/50 hover:bg-amber-50/50'
           }`}
         >
-          <span>چک</span>
+          <span>چک صیادی</span>
           <span className="text-[10px] opacity-75 tabular-nums">({toPersianDigits(stats.withCheques)})</span>
         </button>
 
         <button
           type="button"
           onClick={() => { h.select(); setQuickFilter('plans') }}
-          className={`px-3 py-1.5 rounded-xl transition-all whitespace-nowrap flex items-center gap-1.5 press-scale ${
+          className={`px-3 py-1.5 rounded-xl transition-all whitespace-nowrap flex items-center gap-1.5 press-scale shrink-0 ${
             quickFilter === 'plans'
               ? 'bg-indigo-600 text-white shadow-xs'
               : 'bg-white dark:bg-slate-800 text-indigo-600 dark:text-indigo-400 border border-indigo-200/80 dark:border-indigo-900/50 hover:bg-indigo-50/50'
@@ -554,8 +569,34 @@ export default function Patients() {
 
         <button
           type="button"
+          onClick={() => { h.select(); setQuickFilter('implants') }}
+          className={`px-3 py-1.5 rounded-xl transition-all whitespace-nowrap flex items-center gap-1.5 press-scale shrink-0 ${
+            quickFilter === 'implants'
+              ? 'bg-teal-600 text-white shadow-xs'
+              : 'bg-white dark:bg-slate-800 text-teal-600 dark:text-teal-400 border border-teal-200/80 dark:border-teal-900/50 hover:bg-teal-50/50'
+          }`}
+        >
+          <span>ایمپلنت</span>
+          <span className="text-[10px] opacity-75 tabular-nums">({toPersianDigits(stats.withImplants)})</span>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => { h.select(); setQuickFilter('lab') }}
+          className={`px-3 py-1.5 rounded-xl transition-all whitespace-nowrap flex items-center gap-1.5 press-scale shrink-0 ${
+            quickFilter === 'lab'
+              ? 'bg-sky-600 text-white shadow-xs'
+              : 'bg-white dark:bg-slate-800 text-sky-600 dark:text-sky-400 border border-sky-200/80 dark:border-sky-900/50 hover:bg-sky-50/50'
+          }`}
+        >
+          <span>لابراتوار</span>
+          <span className="text-[10px] opacity-75 tabular-nums">({toPersianDigits(stats.withLab)})</span>
+        </button>
+
+        <button
+          type="button"
           onClick={() => { h.select(); setQuickFilter('archived') }}
-          className={`px-3 py-1.5 rounded-xl transition-all whitespace-nowrap flex items-center gap-1.5 press-scale ${
+          className={`px-3 py-1.5 rounded-xl transition-all whitespace-nowrap flex items-center gap-1.5 press-scale shrink-0 ${
             quickFilter === 'archived'
               ? 'bg-slate-600 text-white shadow-xs'
               : 'bg-white dark:bg-slate-800 text-slate-500 border border-slate-200/80 dark:border-slate-700 hover:bg-slate-50'
@@ -566,77 +607,64 @@ export default function Patients() {
         </button>
       </div>
 
-      {/* Search Bar, Privacy & View Toggles */}
-      <div className="space-y-2">
-        <div className="flex items-center gap-2">
-          <div className="relative flex-1">
-            <Search size={16} className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
-            <input
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="جستجو بر اساس نام، تلفن، کد ملی، شماره پرونده..."
-              aria-label="جستجوی بیمار"
-              className="w-full pr-10 pl-3 min-h-[42px] rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-100 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500 shadow-xs placeholder:text-slate-400 dark:placeholder:text-slate-500"
-            />
-          </div>
-
-          <button
-            onClick={() => {
-              h.tap()
-              const next = togglePrivacyMode()
-              showToast(
-                'info',
-                next
-                  ? 'حالت محرمانگی پیشخوان فعال شد — اطلاعات هویتی مراجعین ماسک شدند'
-                  : 'حالت محرمانگی پیشخوان غیرفعال شد'
-              )
-            }}
-            aria-label={privacyMode ? 'غیرفعال‌سازی حالت محرمانگی پیشخوان' : 'فعال‌سازی حالت محرمانگی پیشخوان'}
-            title={privacyMode ? 'حالت محرمانگی پیشخوان فعال است — کلیک جهت نمایش کامل' : 'حالت محرمانگی پیشخوان (مخفی‌سازی کد ملی و تلفن مراجعین)'}
-            className={`min-w-[42px] min-h-[42px] rounded-xl border transition-all-smooth press-scale shrink-0 flex items-center justify-center shadow-xs ${
-              privacyMode
-                ? 'bg-emerald-50 text-emerald-700 border-emerald-300 dark:bg-emerald-950/40 dark:text-emerald-300 dark:border-emerald-800 ring-2 ring-emerald-500/20'
-                : 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-500 dark:text-slate-400 hover:text-slate-700'
-            }`}
-          >
-            {privacyMode ? <EyeOff size={17} className="text-emerald-600" /> : <Eye size={17} />}
-          </button>
-
-          <button
-            onClick={() => { h.tap(); setShowFilters(!showFilters) }}
-            aria-label={showFilters ? 'بستن فیلترها' : 'باز کردن فیلترها'}
-            aria-pressed={showFilters}
-            className={`min-w-[42px] min-h-[42px] rounded-xl border transition-all-smooth press-scale shrink-0 flex items-center justify-center shadow-xs ${
-              showFilters
-                ? 'bg-teal-50 dark:bg-teal-950/40 border-teal-300 dark:border-teal-700 text-teal-700 dark:text-teal-300'
-                : 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-500 dark:text-slate-400 hover:text-teal-600'
-            }`}
-          >
-            <Filter size={17} />
-          </button>
-
-          {/* Dual View Toggle (Grid vs Table) */}
-          <div className="flex items-center bg-slate-100 dark:bg-slate-800 p-1 rounded-xl border border-slate-200/80 dark:border-slate-700">
-            <button
-              type="button"
-              onClick={() => handleViewModeChange('grid')}
-              aria-label="نمای کارت‌ها"
-              title="نمای کارت‌ها (Grid)"
-              className={`p-1.5 rounded-lg transition-all ${viewMode === 'grid' ? 'bg-white dark:bg-slate-900 text-teal-600 dark:text-teal-400 shadow-xs' : 'text-slate-400 hover:text-slate-600 dark:hover:text-slate-200'}`}
-            >
-              <LayoutGrid size={16} />
-            </button>
-            <button
-              type="button"
-              onClick={() => handleViewModeChange('table')}
-              aria-label="نمای جدول بالینی"
-              title="نمای جدول تفصیلی (Table)"
-              className={`p-1.5 rounded-lg transition-all ${viewMode === 'table' ? 'bg-white dark:bg-slate-900 text-teal-600 dark:text-teal-400 shadow-xs' : 'text-slate-400 hover:text-slate-600 dark:hover:text-slate-200'}`}
-            >
-              <List size={16} />
-            </button>
-          </div>
+      {/* Action Toolbar: Search + Integrated "+ بیمار جدید" CTA + Privacy + Filter */}
+      <div className="flex items-center gap-2">
+        <div className="relative flex-1">
+          <Search size={16} className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
+          <input
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            placeholder="جستجو بر اساس نام، تلفن، کد ملی، شماره پرونده..."
+            aria-label="جستجوی بیمار"
+            className="w-full pr-10 pl-3 min-h-[42px] rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-100 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500 shadow-xs placeholder:text-slate-400 dark:placeholder:text-slate-500"
+          />
         </div>
+
+        {/* Primary Action Button: Integrated "+ بیمار جدید" */}
+        <button
+          type="button"
+          onClick={openCreateModal}
+          aria-label="افزودن بیمار جدید"
+          className="flex items-center gap-1.5 px-3.5 min-h-[42px] rounded-xl bg-gradient-to-r from-teal-600 to-emerald-600 hover:from-teal-700 hover:to-emerald-700 text-white text-xs font-extrabold shadow-md hover:shadow-lg transition-all press-scale shrink-0 cursor-pointer"
+        >
+          <Plus size={16} />
+          <span>بیمار جدید</span>
+        </button>
+
+        <button
+          onClick={() => {
+            h.tap()
+            const next = togglePrivacyMode()
+            showToast(
+              'info',
+              next
+                ? 'حالت محرمانگی پیشخوان فعال شد — اطلاعات هویتی مراجعین ماسک شدند'
+                : 'حالت محرمانگی پیشخوان غیرفعال شد'
+            )
+          }}
+          aria-label={privacyMode ? 'غیرفعال‌سازی حالت محرمانگی پیشخوان' : 'فعال‌سازی حالت محرمانگی پیشخوان'}
+          title={privacyMode ? 'حالت محرمانگی پیشخوان فعال است — کلیک جهت نمایش کامل' : 'حالت محرمانگی پیشخوان (مخفی‌سازی کد ملی و تلفن مراجعین)'}
+          className={`min-w-[42px] min-h-[42px] rounded-xl border transition-all-smooth press-scale shrink-0 flex items-center justify-center shadow-xs ${
+            privacyMode
+              ? 'bg-emerald-50 text-emerald-700 border-emerald-300 dark:bg-emerald-950/40 dark:text-emerald-300 dark:border-emerald-800 ring-2 ring-emerald-500/20'
+              : 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-500 dark:text-slate-400 hover:text-slate-700'
+          }`}
+        >
+          {privacyMode ? <EyeOff size={17} className="text-emerald-600" /> : <Eye size={17} />}
+        </button>
+
+        <button
+          onClick={() => { h.tap(); setShowFilters(!showFilters) }}
+          aria-label={showFilters ? 'بستن فیلترها' : 'باز کردن فیلترها'}
+          aria-pressed={showFilters}
+          className={`min-w-[42px] min-h-[42px] rounded-xl border transition-all-smooth press-scale shrink-0 flex items-center justify-center shadow-xs ${
+            showFilters
+              ? 'bg-teal-50 dark:bg-teal-950/40 border-teal-300 dark:border-teal-700 text-teal-700 dark:text-teal-300'
+              : 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-500 dark:text-slate-400 hover:text-teal-600'
+          }`}
+        >
+          <Filter size={17} />
+        </button>
       </div>
 
       {/* Filters */}
@@ -695,7 +723,7 @@ export default function Patients() {
           })()}
         </Card>
       ) : viewMode === 'grid' ? (
-        /* Widescreen Responsive Compact Patient Grid (High Density 1/3 Height) */
+        /* Widescreen Responsive Standardized Patient Grid */
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
           {filteredPatients.map((patient, idx) => {
             const theme = tileThemes[getHashColor(patient.id)]
@@ -703,6 +731,8 @@ export default function Patients() {
             const fin = patientFinances.get(patient.id) || { balance: 0, paid: 0, totalCost: 0 }
             const activeCheques = patientChequesMap.get(patient.id) || 0
             const activePlans = patientPlansMap.get(patient.id) || 0
+            const activeImplants = patientImplantsMap.get(patient.id) || 0
+            const activeLabOrders = patientLabOrdersMap.get(patient.id) || 0
             const isDebtor = fin.balance > 0
             const isSettled = fin.totalCost > 0 && fin.balance <= 0
 
@@ -717,13 +747,13 @@ export default function Patients() {
             return (
               <div
                 key={patient.id}
-                className={`relative overflow-hidden flex flex-col justify-between p-3 rounded-2xl bg-gradient-to-br ${theme.bg} border ${theme.border} shadow-xs hover:shadow-md transition-all duration-200 group cursor-pointer ${borderStatusClass}`}
+                className={`relative overflow-hidden flex flex-col justify-between p-3.5 rounded-2xl bg-white dark:bg-slate-800 border border-slate-200/80 dark:border-slate-700/80 shadow-xs hover:shadow-md transition-all-smooth press-scale group cursor-pointer ${borderStatusClass}`}
                 style={{ animationDelay: `${Math.min(idx, 10) * 20}ms` }}
                 onClick={() => { h.tap(); navigate(`/patients/${patient.id}`) }}
               >
-                {/* Compact Row 1: Avatar + Name + File Number + Quick Action Icons */}
+                {/* Row 1: Avatar + Patient Name + VIP + File # Badge + Edit / Archive Icons */}
                 <div className="flex items-center justify-between gap-2 mb-2">
-                  <div className="flex items-center gap-2 min-w-0 flex-1">
+                  <div className="flex items-center gap-2.5 min-w-0 flex-1">
                     <div className={`w-9 h-9 rounded-xl ${patient.avatar_url ? '' : theme.iconBg} text-white font-black text-xs flex items-center justify-center flex-shrink-0 shadow-xs border border-white/60 dark:border-slate-700 overflow-hidden`}>
                       {patient.avatar_url ? (
                         <img src={patient.avatar_url} alt="" className="w-full h-full object-cover" />
@@ -733,7 +763,7 @@ export default function Patients() {
                     </div>
 
                     <div className="min-w-0 flex-1">
-                      <div className="flex items-center gap-1 truncate">
+                      <div className="flex items-center gap-1.5 truncate">
                         <h3 className={`font-black text-sm truncate ${isDebtor ? 'text-rose-700 dark:text-rose-400' : 'text-slate-900 dark:text-slate-100'}`}>
                           <HighlightText text={`${patient.first_name} ${patient.last_name}`} query={searchQuery} />
                         </h3>
@@ -744,7 +774,7 @@ export default function Patients() {
                     </div>
                   </div>
 
-                  {/* Dedicated Compact File Number Capsule + Quick Edit Icons */}
+                  {/* Medical File # Badge + Management Icons */}
                   <div className="flex items-center gap-1 shrink-0" onClick={(e) => e.stopPropagation()}>
                     {patient.file_number && (
                       <button
@@ -755,10 +785,10 @@ export default function Patients() {
                           navigate(`/patients/${patient.id}`)
                         }}
                         title="شماره پرونده — کلیک جهت مشاهده"
-                        className={`inline-flex items-center gap-1 font-mono font-extrabold text-[11px] px-2 py-0.5 rounded-lg ${theme.capsuleBg} ${theme.capsuleText} border ${theme.capsuleBorder} backdrop-blur-md hover:scale-105 transition-all`}
+                        className="inline-flex items-center gap-1 font-mono font-extrabold text-[11px] px-2 py-0.5 rounded-lg bg-amber-500/10 text-amber-800 dark:text-amber-300 border border-amber-300/40 hover:scale-105 transition-all"
                         dir="ltr"
                       >
-                        <FileText size={10} className="shrink-0 opacity-80" />
+                        <FileText size={11} className="shrink-0 opacity-80" />
                         <span>#<HighlightText text={toPersianDigits(patient.file_number)} query={searchQuery} /></span>
                       </button>
                     )}
@@ -768,7 +798,7 @@ export default function Patients() {
                       onClick={() => openEditModal(patient)}
                       title="ویرایش بیمار"
                       aria-label="ویرایش اطلاعات"
-                      className="p-1 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-white/80 dark:hover:bg-slate-800 transition-colors"
+                      className="p-1 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors"
                     >
                       <Edit2 size={13} />
                     </button>
@@ -784,13 +814,13 @@ export default function Patients() {
                   </div>
                 </div>
 
-                {/* Compact Row 2: Contact Info & Financial Status Pill */}
-                <div className="flex items-center justify-between gap-1.5 text-xs mb-2" onClick={(e) => e.stopPropagation()}>
-                  {/* Phone + Quick Call / SMS Buttons */}
+                {/* Row 2: Phone & Contact Buttons + Financial/Clinical Status Badges */}
+                <div className="flex items-center justify-between gap-1.5 text-xs mb-2.5 flex-wrap" onClick={(e) => e.stopPropagation()}>
+                  {/* Phone + 1-Touch Call & SMS triggers */}
                   <div className="flex items-center gap-1.5 min-w-0">
                     {patient.phone ? (
                       <div className="flex items-center gap-1 text-[11px] font-mono font-bold text-slate-700 dark:text-slate-300" dir="ltr">
-                        <Phone size={10} className="text-teal-600 shrink-0" />
+                        <Phone size={11} className="text-teal-600 shrink-0" />
                         <span>{privacyMode ? maskPhoneNumber(patient.phone) : toPersianDigits(patient.phone)}</span>
                       </div>
                     ) : (
@@ -798,29 +828,29 @@ export default function Patients() {
                     )}
 
                     {patient.phone && (
-                      <div className="flex items-center gap-0.5 shrink-0">
+                      <div className="flex items-center gap-1 shrink-0">
                         <a
                           href={`tel:${patient.phone}`}
                           onClick={() => { h.tap(); chimes.playPop() }}
-                          className="p-1 rounded-md bg-teal-500/10 hover:bg-teal-500/20 text-teal-700 dark:text-teal-300 border border-teal-300/30 text-[10px] transition-all press-scale"
+                          className="p-1 rounded-lg bg-teal-500/10 hover:bg-teal-500/20 text-teal-700 dark:text-teal-300 border border-teal-300/30 text-[10px] transition-all press-scale"
                           title="تماس تلفنی"
                         >
-                          <PhoneCall size={10} className="text-teal-600 dark:text-teal-400" />
+                          <PhoneCall size={11} className="text-teal-600 dark:text-teal-400" />
                         </a>
                         <a
                           href={`sms:${patient.phone}`}
                           onClick={() => { h.tap(); chimes.playPop() }}
-                          className="p-1 rounded-md bg-sky-500/10 hover:bg-sky-500/20 text-sky-700 dark:text-sky-300 border border-sky-300/30 text-[10px] transition-all press-scale"
+                          className="p-1 rounded-lg bg-sky-500/10 hover:bg-sky-500/20 text-sky-700 dark:text-sky-300 border border-sky-300/30 text-[10px] transition-all press-scale"
                           title="ارسال پیامک"
                         >
-                          <MessageSquare size={10} className="text-sky-600 dark:text-sky-400" />
+                          <MessageSquare size={11} className="text-sky-600 dark:text-sky-400" />
                         </a>
                       </div>
                     )}
                   </div>
 
-                  {/* Financial Status Badge */}
-                  <div className="shrink-0">
+                  {/* Financial & Clinical Badges Rail */}
+                  <div className="flex items-center gap-1 flex-wrap shrink-0">
                     {isDebtor ? (
                       <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg bg-rose-50 dark:bg-rose-950/50 text-rose-700 dark:text-rose-300 border border-rose-200 dark:border-rose-800 text-[10px] font-black">
                         <span className="w-1.5 h-1.5 rounded-full bg-rose-500 animate-pulse" />
@@ -831,23 +861,41 @@ export default function Patients() {
                         <CheckCircle2 size={10} className="text-emerald-600" />
                         <span>تسویه</span>
                       </span>
-                    ) : activeCheques > 0 ? (
-                      <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-lg bg-amber-50 dark:bg-amber-950/50 text-amber-800 dark:text-amber-300 text-[10px] font-bold">
+                    ) : null}
+
+                    {activeCheques > 0 && (
+                      <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-lg bg-amber-50 dark:bg-amber-950/50 text-amber-800 dark:text-amber-300 text-[10px] font-bold border border-amber-200/60 dark:border-amber-900/50">
                         <CreditCard size={10} className="text-amber-600" />
                         <span>{toPersianDigits(activeCheques)} چک</span>
                       </span>
-                    ) : activePlans > 0 ? (
-                      <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-lg bg-indigo-50 dark:bg-indigo-950/50 text-indigo-800 dark:text-indigo-300 text-[10px] font-bold">
+                    )}
+
+                    {activePlans > 0 && (
+                      <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-lg bg-indigo-50 dark:bg-indigo-950/50 text-indigo-800 dark:text-indigo-300 text-[10px] font-bold border border-indigo-200/60 dark:border-indigo-900/50">
                         <CalendarClock size={10} className="text-indigo-600" />
                         <span>{toPersianDigits(activePlans)} قسط</span>
                       </span>
-                    ) : null}
+                    )}
+
+                    {activeImplants > 0 && (
+                      <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-lg bg-teal-50 dark:bg-teal-950/50 text-teal-800 dark:text-teal-300 text-[10px] font-bold border border-teal-200/60 dark:border-teal-900/50">
+                        <Sparkles size={10} className="text-teal-600" />
+                        <span>ایمپلنت</span>
+                      </span>
+                    )}
+
+                    {activeLabOrders > 0 && (
+                      <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-lg bg-sky-50 dark:bg-sky-950/50 text-sky-800 dark:text-sky-300 text-[10px] font-bold border border-sky-200/60 dark:border-sky-900/50">
+                        <FlaskConical size={10} className="text-sky-600" />
+                        <span>لابراتوار</span>
+                      </span>
+                    )}
                   </div>
                 </div>
 
-                {/* Compact Row 3: High-Frequency Tactile Action Buttons */}
-                <div className="pt-1.5 border-t border-slate-200/60 dark:border-slate-800 flex items-center justify-between gap-1.5" onClick={(e) => e.stopPropagation()}>
-                  <div className="flex items-center gap-1">
+                {/* Row 3: Action Dock Buttons */}
+                <div className="pt-2 border-t border-slate-100 dark:border-slate-700/80 flex items-center justify-between gap-1.5" onClick={(e) => e.stopPropagation()}>
+                  <div className="flex items-center gap-1.5">
                     <button
                       type="button"
                       onClick={() => {
@@ -860,11 +908,11 @@ export default function Patients() {
                           },
                         })
                       }}
-                      className="inline-flex items-center gap-1 px-2 py-1 rounded-lg bg-white/90 hover:bg-slate-100 dark:bg-slate-800/90 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 border border-slate-200/80 dark:border-slate-700/80 text-[11px] font-bold transition-all press-scale shadow-2xs"
-                      title="ثبت نوبت سریع"
+                      className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-xl bg-teal-50 hover:bg-teal-100 dark:bg-teal-950/40 dark:hover:bg-teal-900/50 text-teal-800 dark:text-teal-200 text-[11px] font-bold transition-all press-scale"
+                      title="ثبت نوبت جدید برای این بیمار"
                     >
-                      <Calendar size={11} className="text-teal-600" />
-                      <span>نوبت</span>
+                      <Calendar size={12} className="text-teal-600" />
+                      <span>+ نوبت</span>
                     </button>
 
                     <button
@@ -873,10 +921,10 @@ export default function Patients() {
                         h.tap()
                         navigate(`/patients/${patient.id}`, { state: { initialTab: 'dental-chart' } })
                       }}
-                      className="inline-flex items-center gap-1 px-2 py-1 rounded-lg bg-white/90 hover:bg-teal-50 dark:bg-slate-800/90 dark:hover:bg-teal-950/40 text-slate-700 dark:text-slate-200 border border-slate-200/80 dark:border-slate-700/80 text-[11px] font-bold transition-all press-scale shadow-2xs"
+                      className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-slate-700 dark:hover:bg-slate-600 text-slate-800 dark:text-slate-100 text-[11px] font-bold transition-all press-scale"
                       title="چارت دندانپزشکی"
                     >
-                      <Activity size={11} className="text-teal-600" />
+                      <Activity size={12} className="text-teal-600" />
                       <span>چارت</span>
                     </button>
                   </div>
@@ -884,10 +932,10 @@ export default function Patients() {
                   <button
                     type="button"
                     onClick={() => { h.tap(); navigate(`/patients/${patient.id}`) }}
-                    className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-teal-600 hover:bg-teal-700 text-white text-[11px] font-bold shadow-2xs transition-all press-scale"
+                    className="inline-flex items-center gap-1 px-3 py-1.5 rounded-xl bg-teal-600 hover:bg-teal-700 text-white text-[11px] font-bold shadow-xs transition-all press-scale"
                   >
                     <span>پرونده</span>
-                    <ChevronLeft size={12} />
+                    <ChevronLeft size={13} />
                   </button>
                 </div>
               </div>
