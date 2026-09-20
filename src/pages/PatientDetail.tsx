@@ -1559,267 +1559,272 @@ export default function PatientDetail() {
     const hasMedications = patient.medications && patient.medications.trim().length > 0
 
     return (
-      <div className={`rounded-3xl bg-white/90 dark:bg-slate-900/90 backdrop-blur-xl border-2 ${theme.border} p-4 sm:p-5 shadow-lg transition-all space-y-3`}>
-        {!patient.is_active && (
-          <div className="p-2.5 rounded-xl bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 flex items-center justify-between gap-2 flex-wrap text-xs">
-            <div className="flex items-center gap-2 text-amber-800 dark:text-amber-200">
-              <ArchiveIcon size={14} className="shrink-0 text-amber-600" />
-              <span>این پرونده در وضعیت <strong>بایگانی‌شده (راکد)</strong> قرار دارد و در جستجوهای عادی نمایش داده نمی‌شود.</span>
-            </div>
-            <Button
-              size="sm"
-              variant="secondary"
-              onClick={async () => {
-                h.tap()
-                try {
-                  const updated = await updatePatient(patient.id, { is_active: true } as any)
-                  setPatient(updated)
-                  chimes.playSuccess()
-                  showToast('success', 'پرونده با موفقیت از بایگانی خارج و فعال شد')
-                } catch {
-                  chimes.playWarning()
-                  showToast('error', 'خطا در فعال‌سازی پرونده')
-                }
-              }}
-              className="text-xs flex items-center gap-1 bg-white dark:bg-slate-800 border-amber-300 hover:bg-amber-100 py-1 px-2.5"
-            >
-              <RotateCcw size={12} /> بازگردانی به فعال
-            </Button>
-          </div>
-        )}
+      <div className="space-y-2.5">
+        {/* Top Navigation Bar: Clean Back Button */}
+        <div className="flex items-center justify-between gap-2 px-1">
+          <button
+            type="button"
+            onClick={() => {
+              h.tap()
+              navigate('/patients')
+            }}
+            className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-2xl bg-white/90 dark:bg-slate-800/90 hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 border border-slate-200/80 dark:border-slate-700/80 text-xs font-bold transition-all shadow-xs press-scale"
+            title="بازگشت به فهرست بیماران"
+          >
+            <ArrowRight size={16} />
+            <span>بازگشت به فهرست بیماران</span>
+          </button>
+        </div>
 
-        {/* ═══ Tier 1: Identity & Financial Bento Row ═══ */}
-        <div className="flex items-start justify-between gap-3 flex-wrap sm:flex-nowrap">
-          {/* Patient Profile & Demographics */}
-          <div className="flex items-center gap-3.5 min-w-0 flex-1">
-            <button
-              onClick={() => navigate('/patients')}
-              className="p-2 rounded-2xl hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-500 transition-colors shrink-0"
-              title="بازگشت به فهرست بیماران"
-            >
-              <ArrowRight size={20} />
-            </button>
-            <div
-              className={`w-14 h-14 sm:w-16 sm:h-16 rounded-2xl overflow-hidden ${patient.avatar_url ? '' : theme.iconBg} flex items-center justify-center text-white font-black text-xl sm:text-2xl shrink-0 shadow-md border-2 border-white/80 dark:border-slate-700`}
-            >
-              {patient.avatar_url ? <img src={patient.avatar_url} alt="" className="w-full h-full object-cover" /> : getInitials(patient)}
-            </div>
-            <div className="min-w-0 flex-1">
-              {/* Full Patient Name + Non-Black Medical File Number Capsule */}
-              <div className="flex items-center gap-2 flex-wrap">
-                <h1 className="text-base sm:text-xl font-black text-slate-900 dark:text-white tracking-tight leading-snug break-words">
-                  {patient.first_name} {patient.last_name}
-                </h1>
-                {patient.file_number ? (
-                  <span
-                    className={`inline-flex items-center gap-1.5 font-mono text-xs sm:text-sm font-black px-3.5 py-1.5 rounded-xl ${theme.capsuleBg} ${theme.capsuleText} border ${theme.capsuleBorder} shadow-xs tracking-wider backdrop-blur-md`}
-                    dir="ltr"
-                    title="شماره پرونده بالینی بیمار"
-                  >
-                    <FileText size={13} className="opacity-80 shrink-0" />
-                    <span>#{toPersianDigits(patient.file_number)}</span>
-                  </span>
-                ) : (
-                  <span className="font-mono text-[11px] font-medium px-2.5 py-1 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-500 border border-slate-200 dark:border-slate-700">
-                    شناسه: {toPersianDigits(patient.id.slice(0, 6))}
-                  </span>
-                )}
-                {vipMeta.label !== 'عادی' && (
-                  <Badge color={vipMeta.color}>{vipMeta.label}</Badge>
-                )}
-                {retentionProfile && (
-                  <Badge color={retentionProfile.tierColor}>{retentionProfile.tierLabel}</Badge>
-                )}
-                {!patient.is_active && <Badge color="error">بایگانی</Badge>}
-                {headerChips.map((chip) => (
-                  <Badge key={chip} color="error">{chip}</Badge>
-                ))}
+        <div className={`rounded-3xl bg-white/90 dark:bg-slate-900/90 backdrop-blur-xl border-2 ${theme.border} p-4 sm:p-5 shadow-lg transition-all space-y-3`}>
+          {!patient.is_active && (
+            <div className="p-2.5 rounded-xl bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 flex items-center justify-between gap-2 flex-wrap text-xs">
+              <div className="flex items-center gap-2 text-amber-800 dark:text-amber-200">
+                <ArchiveIcon size={14} className="shrink-0 text-amber-600" />
+                <span>این پرونده در وضعیت <strong>بایگانی‌شده (راکد)</strong> قرار دارد و در جستجوهای عادی نمایش داده نمی‌شود.</span>
               </div>
-
-              {/* Demographics & Direct 1-Click Communication Hub */}
-              <div className="flex items-center gap-2.5 flex-wrap text-xs text-slate-500 dark:text-slate-400 mt-1.5">
-                {age !== null && <span className="font-medium">{toPersianDigits(age)} ساله</span>}
-                {patient.gender && <span>{patient.gender === 'male' ? '• آقا' : '• خانم'}</span>}
-                {patient.blood_type && (
-                  <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md text-[10px] font-bold bg-rose-100/80 text-rose-700 dark:bg-rose-950/50 dark:text-rose-300">
-                    <span className="w-1.5 h-1.5 rounded-full bg-rose-500" />
-                    {patient.blood_type}
-                  </span>
-                )}
-                {patient.national_id && (
-                  <span className="font-mono text-[11px] text-slate-500" dir="ltr">
-                    کد ملی: {maskNationalId(patient.national_id)}
-                  </span>
-                )}
-                {patient.phone && (
-                  <div className="inline-flex items-center gap-1.5 p-1 rounded-xl bg-white/90 dark:bg-slate-800/90 border border-slate-200/80 dark:border-slate-700 shadow-xs text-xs">
-                    <span className="font-mono font-bold text-slate-800 dark:text-slate-200 px-1.5" dir="ltr">
-                      {privacyMode ? maskPhoneNumber(patient.phone) : toPersianDigits(patient.phone)}
-                    </span>
-                    <a
-                      href={`tel:${patient.phone}`}
-                      onClick={() => { h.tap(); chimes.playPop() }}
-                      className="inline-flex items-center gap-1 px-2 py-1 rounded-lg bg-teal-50 hover:bg-teal-100 text-teal-700 dark:bg-teal-950/40 dark:text-teal-300 text-[11px] font-bold transition-all press-scale"
-                      title="تماس تلفنی مستقیم با بیمار"
-                    >
-                      <PhoneCall size={11} className="text-teal-600" />
-                      <span>تماس</span>
-                    </a>
-                    <a
-                      href={`sms:${patient.phone}`}
-                      onClick={() => { h.tap(); chimes.playPop() }}
-                      className="inline-flex items-center gap-1 px-2 py-1 rounded-lg bg-sky-50 hover:bg-sky-100 text-sky-700 dark:bg-sky-950/40 dark:text-sky-300 text-[11px] font-bold transition-all press-scale"
-                      title="ارسال پیامک به بیمار"
-                    >
-                      <MessageSquare size={11} className="text-sky-600" />
-                      <span>پیامک</span>
-                    </a>
-                    <a
-                      href={`https://wa.me/${patient.phone.replace(/\D/g, '').replace(/^0/, '98')}`}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      onClick={() => { h.tap(); chimes.playPop() }}
-                      className="inline-flex items-center gap-1 px-2 py-1 rounded-lg bg-emerald-50 hover:bg-emerald-100 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300 text-[11px] font-bold transition-all press-scale"
-                      title="گفتگو در واتساپ"
-                    >
-                      <MessageCircle size={11} className="text-emerald-600" />
-                      <span>واتساپ</span>
-                    </a>
-                  </div>
-                )}
-              </div>
-            </div>
-          </div>
-
-          {/* Quick Financial Bento Pod (RTL Left) */}
-          <div className="flex items-center gap-2 shrink-0 self-start sm:self-center flex-wrap">
-            {cheques.length > 0 && (
-              <button
-                type="button"
-                onClick={() => {
+              <Button
+                size="sm"
+                variant="secondary"
+                onClick={async () => {
                   h.tap()
-                  setActiveTab('payments')
+                  try {
+                    const updated = await updatePatient(patient.id, { is_active: true } as any)
+                    setPatient(updated)
+                    chimes.playSuccess()
+                    showToast('success', 'پرونده با موفقیت از بایگانی خارج و فعال شد')
+                  } catch {
+                    chimes.playWarning()
+                    showToast('error', 'خطا در فعال‌سازی پرونده')
+                  }
                 }}
-                className="flex items-center gap-1 px-2.5 py-1.5 rounded-xl bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800 text-amber-800 dark:text-amber-300 text-xs font-bold hover:bg-amber-100 transition-colors press-scale"
-                title="مشاهده چک‌ها"
+                className="text-xs flex items-center gap-1 bg-white dark:bg-slate-800 border-amber-300 hover:bg-amber-100 py-1 px-2.5"
               >
-                <FileSignature size={13} className="text-amber-600" />
-                <span>{toPersianDigits(cheques.length)} چک</span>
-              </button>
-            )}
+                <RotateCcw size={12} /> بازگردانی به فعال
+              </Button>
+            </div>
+          )}
 
-            {patientBalance.balance > 0 ? (
-              <div className="flex items-center gap-2 px-3 py-1.5 rounded-2xl bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-800 text-rose-900 dark:text-rose-200 text-xs">
-                <CreditCard size={14} className="text-rose-600 dark:text-rose-400 shrink-0" />
-                <div>
-                  <span className="text-[10px] text-rose-500 block leading-none">بدهی بیمار</span>
-                  <span className="font-extrabold">{formatCurrency(patientBalance.balance)} ت</span>
+          {/* ═══ Tier 1: Identity & Financial Bento Row ═══ */}
+          <div className="flex items-start justify-between gap-3 flex-wrap sm:flex-nowrap">
+            {/* Patient Profile & Demographics */}
+            <div className="flex items-center gap-3.5 min-w-0 flex-1">
+              <div
+                className={`w-14 h-14 sm:w-16 sm:h-16 rounded-2xl overflow-hidden ${patient.avatar_url ? '' : theme.iconBg} flex items-center justify-center text-white font-black text-xl sm:text-2xl shrink-0 shadow-md border-2 border-white/80 dark:border-slate-700`}
+              >
+                {patient.avatar_url ? <img src={patient.avatar_url} alt="" className="w-full h-full object-cover" /> : getInitials(patient)}
+              </div>
+              <div className="min-w-0 flex-1">
+                {/* Full Patient Name + Non-Black Medical File Number Capsule */}
+                <div className="flex items-center gap-2 flex-wrap">
+                  <h1 className="text-base sm:text-xl font-black text-slate-900 dark:text-white tracking-tight leading-snug break-words">
+                    {patient.first_name} {patient.last_name}
+                  </h1>
+                  {patient.file_number ? (
+                    <span
+                      className={`inline-flex items-center gap-1.5 font-mono text-xs sm:text-sm font-black px-3.5 py-1.5 rounded-xl ${theme.capsuleBg} ${theme.capsuleText} border ${theme.capsuleBorder} shadow-xs tracking-wider backdrop-blur-md`}
+                      dir="ltr"
+                      title="شماره پرونده بالینی بیمار"
+                    >
+                      <FileText size={13} className="opacity-80 shrink-0" />
+                      <span>#{toPersianDigits(patient.file_number)}</span>
+                    </span>
+                  ) : (
+                    <span className="font-mono text-[11px] font-medium px-2.5 py-1 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-500 border border-slate-200 dark:border-slate-700">
+                      شناسه: {toPersianDigits(patient.id.slice(0, 6))}
+                    </span>
+                  )}
+                  {vipMeta.label !== 'عادی' && (
+                    <Badge color={vipMeta.color}>{vipMeta.label}</Badge>
+                  )}
+                  {!patient.is_active && <Badge color="error">بایگانی</Badge>}
+                  {headerChips.map((chip) => (
+                    <Badge key={chip} color="error">{chip}</Badge>
+                  ))}
                 </div>
+
+                {/* Demographics & Direct 1-Click Communication Hub */}
+                <div className="flex items-center gap-2.5 flex-wrap text-xs text-slate-500 dark:text-slate-400 mt-1.5">
+                  {age !== null && <span className="font-medium">{toPersianDigits(age)} ساله</span>}
+                  {patient.gender && <span>{patient.gender === 'male' ? '• آقا' : '• خانم'}</span>}
+                  {patient.blood_type && (
+                    <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md text-[10px] font-bold bg-rose-100/80 text-rose-700 dark:bg-rose-950/50 dark:text-rose-300">
+                      <span className="w-1.5 h-1.5 rounded-full bg-rose-500" />
+                      {patient.blood_type}
+                    </span>
+                  )}
+                  {patient.national_id && (
+                    <span className="font-mono text-[11px] text-slate-500" dir="ltr">
+                      کد ملی: {maskNationalId(patient.national_id)}
+                    </span>
+                  )}
+                  {patient.phone && (
+                    <div className="inline-flex items-center gap-1.5 p-1 rounded-xl bg-white/90 dark:bg-slate-800/90 border border-slate-200/80 dark:border-slate-700 shadow-xs text-xs">
+                      <span className="font-mono font-bold text-slate-800 dark:text-slate-200 px-1.5" dir="ltr">
+                        {privacyMode ? maskPhoneNumber(patient.phone) : toPersianDigits(patient.phone)}
+                      </span>
+                      <a
+                        href={`tel:${patient.phone}`}
+                        onClick={() => { h.tap(); chimes.playPop() }}
+                        className="inline-flex items-center gap-1 px-2 py-1 rounded-lg bg-teal-50 hover:bg-teal-100 text-teal-700 dark:bg-teal-950/40 dark:text-teal-300 text-[11px] font-bold transition-all press-scale"
+                        title="تماس تلفنی مستقیم با بیمار"
+                      >
+                        <PhoneCall size={11} className="text-teal-600" />
+                        <span>تماس</span>
+                      </a>
+                      <a
+                        href={`sms:${patient.phone}`}
+                        onClick={() => { h.tap(); chimes.playPop() }}
+                        className="inline-flex items-center gap-1 px-2 py-1 rounded-lg bg-sky-50 hover:bg-sky-100 text-sky-700 dark:bg-sky-950/40 dark:text-sky-300 text-[11px] font-bold transition-all press-scale"
+                        title="ارسال پیامک به بیمار"
+                      >
+                        <MessageSquare size={11} className="text-sky-600" />
+                        <span>پیامک</span>
+                      </a>
+                      <a
+                        href={`https://wa.me/${patient.phone.replace(/\D/g, '').replace(/^0/, '98')}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        onClick={() => { h.tap(); chimes.playPop() }}
+                        className="inline-flex items-center gap-1 px-2 py-1 rounded-lg bg-emerald-50 hover:bg-emerald-100 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300 text-[11px] font-bold transition-all press-scale"
+                        title="گفتگو در واتساپ"
+                      >
+                        <MessageCircle size={11} className="text-emerald-600" />
+                        <span>واتساپ</span>
+                      </a>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            {/* Quick Financial Bento Pod (RTL Left) */}
+            <div className="flex items-center gap-2 shrink-0 self-start sm:self-center flex-wrap">
+              {cheques.length > 0 && (
                 <button
                   type="button"
                   onClick={() => {
                     h.tap()
-                    handleOpenPaymentModal()
+                    setActiveTab('payments')
                   }}
-                  className="px-2.5 py-1 rounded-xl bg-rose-600 hover:bg-rose-700 text-white font-bold text-[11px] transition-colors press-scale shadow-xs"
+                  className="flex items-center gap-1 px-2.5 py-1.5 rounded-xl bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800 text-amber-800 dark:text-amber-300 text-xs font-bold hover:bg-amber-100 transition-colors press-scale"
+                  title="مشاهده چک‌ها"
                 >
-                  تسویه
+                  <FileSignature size={13} className="text-amber-600" />
+                  <span>{toPersianDigits(cheques.length)} چک</span>
                 </button>
-              </div>
-            ) : (
-              <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-2xl bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800 text-emerald-800 dark:text-emerald-300 text-xs font-bold">
-                <CheckCircle2 size={14} className="text-emerald-600" />
-                <span>تسویه حساب</span>
-              </div>
-            )}
-          </div>
-        </div>
+              )}
 
-        {/* ═══ Tier 2: Quick Clinical Notes & Medical Warnings Rail ═══ */}
-        {patient.notes && (
-          <div className="text-xs text-amber-900 dark:text-amber-200 bg-amber-50 dark:bg-amber-950/40 border-r-4 border-amber-500 px-3 py-1.5 rounded-xl font-medium inline-flex items-center gap-1.5 max-w-full">
-            <FileText size={12} className="text-amber-600 shrink-0" />
-            <span className="truncate">«{patient.notes}»</span>
-          </div>
-        )}
-
-        {(hasAllergies || hasConditions || hasMedications || patient.anticoagulant_use || patient.bisphosphonate_use || patient.endocarditis_prophylaxis || (patient.bp_systolic != null && patient.bp_systolic >= 140) || (patient.diabetes_hba1c != null && patient.diabetes_hba1c >= 7) || (patient.pregnancy_trimester != null && patient.pregnancy_trimester > 0)) && (
-          <div className="flex items-center gap-1.5 overflow-x-auto py-1 scrollbar-none text-[11px]">
-            {hasAllergies && (
-              <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-rose-50 dark:bg-rose-950/50 text-rose-700 dark:text-rose-300 border border-rose-200 dark:border-rose-800 shrink-0 font-bold">
-                <AlertCircle size={11} className="text-rose-600" /> حساسیت: {patient.allergies}
-              </span>
-            )}
-            {hasConditions && (
-              <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-amber-50 dark:bg-amber-950/50 text-amber-700 dark:text-amber-300 border border-amber-200 dark:border-amber-800 shrink-0 font-bold">
-                <AlertCircle size={11} className="text-amber-600" /> بیماری: {patient.medical_conditions}
-              </span>
-            )}
-            {hasMedications && (
-              <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-sky-50 dark:bg-sky-950/50 text-sky-700 dark:text-sky-300 border border-sky-200 dark:border-sky-800 shrink-0 font-medium">
-                <Pill size={11} className="text-sky-600" /> دارو: {patient.medications}
-              </span>
-            )}
-            {patient.anticoagulant_use && (
-              <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-red-100 dark:bg-red-950/60 text-red-800 dark:text-red-200 border border-red-300 shrink-0 font-bold animate-pulse">
-                <AlertTriangle size={11} className="text-red-600" /> ضد انعقاد {patient.inr_value ? `(INR: ${toPersianDigits(patient.inr_value)})` : ''}
-              </span>
-            )}
-            {patient.bisphosphonate_use && (
-              <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-purple-50 dark:bg-purple-950/60 text-purple-800 dark:text-purple-200 border border-purple-300 shrink-0 font-bold">
-                <AlertTriangle size={11} className="text-purple-600" /> مصرف بیس‌فسفونات (خطر ONJ)
-              </span>
-            )}
-            {patient.endocarditis_prophylaxis && (
-              <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-amber-100 dark:bg-amber-950/60 text-amber-800 dark:text-amber-200 border border-amber-300 shrink-0 font-bold">
-                <HeartPulse size={11} className="text-amber-600" /> اندوکاردیت (پروفیلاکسی)
-              </span>
-            )}
-            {patient.bp_systolic != null && patient.bp_systolic >= 140 && (
-              <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-amber-50 dark:bg-amber-950/50 text-amber-800 dark:text-amber-300 border border-amber-300 shrink-0 font-medium">
-                <Activity size={11} className="text-amber-600" /> فشار خون: {toPersianDigits(patient.bp_systolic)}/{toPersianDigits(patient.bp_diastolic || 90)}
-              </span>
-            )}
-            {patient.diabetes_hba1c != null && patient.diabetes_hba1c >= 7 && (
-              <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-amber-50 dark:bg-amber-950/50 text-amber-800 dark:text-amber-300 border border-amber-300 shrink-0 font-medium">
-                <Activity size={11} className="text-amber-600" /> دیابت (HbA1c: {toPersianDigits(patient.diabetes_hba1c)}٪)
-              </span>
-            )}
-          </div>
-        )}
-
-        {/* Active Lab Order Ribbon */}
-        {activeLabOrder && (
-          <div className="p-2.5 rounded-2xl bg-cyan-50/90 dark:bg-cyan-950/40 border border-cyan-200 dark:border-cyan-800 text-cyan-950 dark:text-cyan-200 flex items-center justify-between gap-2 text-xs">
-            <div className="flex items-center gap-2 min-w-0">
-              <FlaskConical size={14} className="text-cyan-600 shrink-0" />
-              <span className="font-bold truncate">
-                سفارش فعال لابراتوار: {activeLabOrder.work_type || 'پروتز/روکش'}
-                {activeLabOrder.tooth_number ? ` (دندان ${toothLabel(activeLabOrder.tooth_number)})` : ''}
-              </span>
-              <span className="text-[11px] text-cyan-700 dark:text-cyan-300 hidden sm:inline">
-                وضعیت: {activeLabOrder.status === 'in_progress' ? 'در حال ساخت' : activeLabOrder.status === 'sent' ? 'ارسال‌شده به لابراتوار' : activeLabOrder.status}
-                {activeLabOrder.deadline ? ` — موعد: ${toJalaliStringPretty(activeLabOrder.deadline)}` : ''}
-              </span>
+              {patientBalance.balance > 0 ? (
+                <div className="flex items-center gap-2 px-3 py-1.5 rounded-2xl bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-800 text-rose-900 dark:text-rose-200 text-xs">
+                  <CreditCard size={14} className="text-rose-600 dark:text-rose-400 shrink-0" />
+                  <div>
+                    <span className="text-[10px] text-rose-500 block leading-none">بدهی بیمار</span>
+                    <span className="font-extrabold">{formatCurrency(patientBalance.balance)} ت</span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      h.tap()
+                      handleOpenPaymentModal()
+                    }}
+                    className="px-2.5 py-1 rounded-xl bg-rose-600 hover:bg-rose-700 text-white font-bold text-[11px] transition-colors press-scale shadow-xs"
+                  >
+                    تسویه
+                  </button>
+                </div>
+              ) : (
+                <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-2xl bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800 text-emerald-800 dark:text-emerald-300 text-xs font-bold">
+                  <CheckCircle2 size={14} className="text-emerald-600" />
+                  <span>تسویه حساب</span>
+                </div>
+              )}
             </div>
-            <button
-              type="button"
-              onClick={() => {
-                h.tap()
-                setActiveTab('labOrders')
-              }}
-              className="px-2.5 py-1 rounded-xl bg-cyan-600 hover:bg-cyan-700 text-white font-bold text-[10px] shrink-0 transition-colors press-scale"
-            >
-              پیگیری کارتابل
-            </button>
           </div>
-        )}
 
-        {/* ═══ Tier 3: One-Stop All Clinical & Administrative Actions (iOS 27 Fluid Bento Hub) ═══ */}
-        <div className="pt-3 border-t border-slate-100 dark:border-slate-800/80">
-          <div className="flex flex-wrap items-center gap-2">
-            {/* 1. Primary Clinical Triggers */}
-            <div className="flex flex-wrap items-center gap-1.5">
+          {/* ═══ Tier 2: Quick Clinical Notes & Medical Warnings Rail ═══ */}
+          {patient.notes && (
+            <div className="text-xs text-amber-900 dark:text-amber-200 bg-amber-50 dark:bg-amber-950/40 border-r-4 border-amber-500 px-3 py-1.5 rounded-xl font-medium inline-flex items-center gap-1.5 max-w-full">
+              <FileText size={12} className="text-amber-600 shrink-0" />
+              <span className="truncate">«{patient.notes}»</span>
+            </div>
+          )}
+
+          {(hasAllergies || hasConditions || hasMedications || patient.anticoagulant_use || patient.bisphosphonate_use || patient.endocarditis_prophylaxis || (patient.bp_systolic != null && patient.bp_systolic >= 140) || (patient.diabetes_hba1c != null && patient.diabetes_hba1c >= 7) || (patient.pregnancy_trimester != null && patient.pregnancy_trimester > 0)) && (
+            <div className="flex items-center gap-1.5 overflow-x-auto py-1 scrollbar-none text-[11px]">
+              {hasAllergies && (
+                <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-rose-50 dark:bg-rose-950/50 text-rose-700 dark:text-rose-300 border border-rose-200 dark:border-rose-800 shrink-0 font-bold">
+                  <AlertCircle size={11} className="text-rose-600" /> حساسیت: {patient.allergies}
+                </span>
+              )}
+              {hasConditions && (
+                <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-amber-50 dark:bg-amber-950/50 text-amber-700 dark:text-amber-300 border border-amber-200 dark:border-amber-800 shrink-0 font-bold">
+                  <AlertCircle size={11} className="text-amber-600" /> بیماری: {patient.medical_conditions}
+                </span>
+              )}
+              {hasMedications && (
+                <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-sky-50 dark:bg-sky-950/50 text-sky-700 dark:text-sky-300 border border-sky-200 dark:border-sky-800 shrink-0 font-medium">
+                  <Pill size={11} className="text-sky-600" /> دارو: {patient.medications}
+                </span>
+              )}
+              {patient.anticoagulant_use && (
+                <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-red-100 dark:bg-red-950/60 text-red-800 dark:text-red-200 border border-red-300 shrink-0 font-bold animate-pulse">
+                  <AlertTriangle size={11} className="text-red-600" /> ضد انعقاد {patient.inr_value ? `(INR: ${toPersianDigits(patient.inr_value)})` : ''}
+                </span>
+              )}
+              {patient.bisphosphonate_use && (
+                <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-purple-50 dark:bg-purple-950/60 text-purple-800 dark:text-purple-200 border border-purple-300 shrink-0 font-bold">
+                  <AlertTriangle size={11} className="text-purple-600" /> مصرف بیس‌فسفونات (خطر ONJ)
+                </span>
+              )}
+              {patient.endocarditis_prophylaxis && (
+                <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-amber-100 dark:bg-amber-950/60 text-amber-800 dark:text-amber-200 border border-amber-300 shrink-0 font-bold">
+                  <HeartPulse size={11} className="text-amber-600" /> اندوکاردیت (پروفیلاکسی)
+                </span>
+              )}
+              {patient.bp_systolic != null && patient.bp_systolic >= 140 && (
+                <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-amber-50 dark:bg-amber-950/50 text-amber-800 dark:text-amber-300 border border-amber-300 shrink-0 font-medium">
+                  <Activity size={11} className="text-amber-600" /> فشار خون: {toPersianDigits(patient.bp_systolic)}/{toPersianDigits(patient.bp_diastolic || 90)}
+                </span>
+              )}
+              {patient.diabetes_hba1c != null && patient.diabetes_hba1c >= 7 && (
+                <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-amber-50 dark:bg-amber-950/50 text-amber-800 dark:text-amber-300 border border-amber-300 shrink-0 font-medium">
+                  <Activity size={11} className="text-amber-600" /> دیابت (HbA1c: {toPersianDigits(patient.diabetes_hba1c)}٪)
+                </span>
+              )}
+            </div>
+          )}
+
+          {/* Active Lab Order Ribbon */}
+          {activeLabOrder && (
+            <div className="p-2.5 rounded-2xl bg-cyan-50/90 dark:bg-cyan-950/40 border border-cyan-200 dark:border-cyan-800 text-cyan-950 dark:text-cyan-200 flex items-center justify-between gap-2 text-xs">
+              <div className="flex items-center gap-2 min-w-0">
+                <FlaskConical size={14} className="text-cyan-600 shrink-0" />
+                <span className="font-bold truncate">
+                  سفارش فعال لابراتوار: {activeLabOrder.work_type || 'پروتز/روکش'}
+                  {activeLabOrder.tooth_number ? ` (دندان ${toothLabel(activeLabOrder.tooth_number)})` : ''}
+                </span>
+                <span className="text-[11px] text-cyan-700 dark:text-cyan-300 hidden sm:inline">
+                  وضعیت: {activeLabOrder.status === 'in_progress' ? 'در حال ساخت' : activeLabOrder.status === 'sent' ? 'ارسال‌شده به لابراتوار' : activeLabOrder.status}
+                  {activeLabOrder.deadline ? ` — موعد: ${toJalaliStringPretty(activeLabOrder.deadline)}` : ''}
+                </span>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  h.tap()
+                  setActiveTab('labOrders')
+                }}
+                className="px-2.5 py-1 rounded-xl bg-cyan-600 hover:bg-cyan-700 text-white font-bold text-[10px] shrink-0 transition-colors press-scale"
+              >
+                پیگیری کارتابل
+              </button>
+            </div>
+          )}
+
+          {/* ═══ Tier 3: One-Stop All Clinical & Administrative Actions (Structured Bento Grid) ═══ */}
+          <div className="pt-3 border-t border-slate-100 dark:border-slate-800/80">
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-2">
               {/* New Appointment */}
               <button
                 type="button"
@@ -1833,9 +1838,9 @@ export default function PatientDetail() {
                     },
                   })
                 }}
-                className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-bold bg-gradient-to-r from-teal-600 to-emerald-600 hover:from-teal-700 hover:to-emerald-700 text-white shadow-xs press-scale min-h-[42px]"
+                className="flex items-center justify-center gap-1.5 px-3 py-2.5 rounded-2xl text-xs font-bold bg-gradient-to-r from-teal-600 to-emerald-600 hover:from-teal-700 hover:to-emerald-700 text-white shadow-xs press-scale min-h-[44px]"
               >
-                <Calendar size={15} /> <span>نوبت جدید</span>
+                <Calendar size={15} className="shrink-0" /> <span className="truncate">نوبت جدید</span>
               </button>
 
               {/* Document & Paper Chart Camera Scanner */}
@@ -1846,10 +1851,10 @@ export default function PatientDetail() {
                   setScannerInitialCategory('paper_record')
                   setScannerModalOpen(true)
                 }}
-                className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-bold bg-gradient-to-r from-sky-600 to-blue-600 hover:from-sky-700 hover:to-blue-700 text-white shadow-xs press-scale min-h-[42px]"
+                className="flex items-center justify-center gap-1.5 px-3 py-2.5 rounded-2xl text-xs font-bold bg-gradient-to-r from-sky-600 to-blue-600 hover:from-sky-700 hover:to-blue-700 text-white shadow-xs press-scale min-h-[44px]"
                 title="عکس‌برداری با دوربین گوشی و اسکن پرونده کاغذی، اسناد یا رادیولوژی"
               >
-                <Camera size={15} /> <span>اسکن مدارک / رادیولوژی</span>
+                <Camera size={15} className="shrink-0" /> <span className="truncate">اسکن مدارک / رادیولوژی</span>
               </button>
 
               {/* Visit / Treatment */}
@@ -1859,9 +1864,9 @@ export default function PatientDetail() {
                   h.tap()
                   setActiveTab('treatments')
                 }}
-                className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-bold bg-gradient-to-r from-violet-600 to-indigo-600 hover:from-violet-700 hover:to-indigo-700 text-white shadow-xs press-scale min-h-[42px]"
+                className="flex items-center justify-center gap-1.5 px-3 py-2.5 rounded-2xl text-xs font-bold bg-gradient-to-r from-violet-600 to-indigo-600 hover:from-violet-700 hover:to-indigo-700 text-white shadow-xs press-scale min-h-[44px]"
               >
-                <Stethoscope size={15} /> <span>ثبت درمان</span>
+                <Stethoscope size={15} className="shrink-0" /> <span className="truncate">ثبت درمان</span>
               </button>
 
               {/* Dental Chart (FDI) */}
@@ -1871,16 +1876,11 @@ export default function PatientDetail() {
                   h.tap()
                   setActiveTab('teeth')
                 }}
-                className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-bold bg-white dark:bg-slate-800 text-teal-700 dark:text-teal-300 border border-teal-200 dark:border-teal-800 hover:bg-teal-50 dark:hover:bg-teal-900/60 press-scale shadow-xs min-h-[42px]"
+                className="flex items-center justify-center gap-1.5 px-3 py-2.5 rounded-2xl text-xs font-bold bg-white dark:bg-slate-800 text-teal-700 dark:text-teal-300 border border-teal-200 dark:border-teal-800 hover:bg-teal-50 dark:hover:bg-teal-900/60 press-scale shadow-xs min-h-[44px]"
               >
-                <Smile size={15} className="text-teal-600" /> <span>چارت دندان</span>
+                <Smile size={15} className="text-teal-600 shrink-0" /> <span className="truncate">چارت دندان</span>
               </button>
-            </div>
 
-            <div className="h-6 w-px bg-slate-200 dark:bg-slate-700 hidden sm:block mx-0.5" />
-
-            {/* 2. Financial Triggers */}
-            <div className="flex flex-wrap items-center gap-1.5">
               {/* Payment */}
               <button
                 type="button"
@@ -1888,9 +1888,9 @@ export default function PatientDetail() {
                   h.tap()
                   handleOpenPaymentModal()
                 }}
-                className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-bold bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800 hover:bg-emerald-100 dark:hover:bg-emerald-900/60 press-scale shadow-xs min-h-[42px]"
+                className="flex items-center justify-center gap-1.5 px-3 py-2.5 rounded-2xl text-xs font-bold bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800 hover:bg-emerald-100 dark:hover:bg-emerald-900/60 press-scale shadow-xs min-h-[44px]"
               >
-                <CreditCard size={15} className="text-emerald-600" /> <span>دریافت وجه</span>
+                <CreditCard size={15} className="text-emerald-600 shrink-0" /> <span className="truncate">دریافت وجه</span>
               </button>
 
               {/* Sayad Cheque */}
@@ -1900,16 +1900,11 @@ export default function PatientDetail() {
                   h.tap()
                   handleOpenChequeModal()
                 }}
-                className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-bold bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-300 border border-amber-200 dark:border-amber-800 hover:bg-amber-100 dark:hover:bg-amber-900/60 press-scale shadow-xs min-h-[42px]"
+                className="flex items-center justify-center gap-1.5 px-3 py-2.5 rounded-2xl text-xs font-bold bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-300 border border-amber-200 dark:border-amber-800 hover:bg-amber-100 dark:hover:bg-amber-900/60 press-scale shadow-xs min-h-[44px]"
               >
-                <FileSignature size={15} className="text-amber-600" /> <span>ثبت چک صیادی</span>
+                <FileSignature size={15} className="text-amber-600 shrink-0" /> <span className="truncate">ثبت چک صیادی</span>
               </button>
-            </div>
 
-            <div className="h-6 w-px bg-slate-200 dark:bg-slate-700 hidden sm:block mx-0.5" />
-
-            {/* 3. Specialized & Operations Triggers */}
-            <div className="flex flex-wrap items-center gap-1.5">
               {/* Prescription */}
               <button
                 type="button"
@@ -1923,9 +1918,9 @@ export default function PatientDetail() {
                     },
                   })
                 }}
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold bg-purple-50 dark:bg-purple-950/40 text-purple-700 dark:text-purple-300 border border-purple-200 dark:border-purple-800 hover:bg-purple-100 dark:hover:bg-purple-900/60 press-scale shadow-xs min-h-[38px]"
+                className="flex items-center justify-center gap-1.5 px-3 py-2.5 rounded-2xl text-xs font-bold bg-purple-50 dark:bg-purple-950/40 text-purple-700 dark:text-purple-300 border border-purple-200 dark:border-purple-800 hover:bg-purple-100 dark:hover:bg-purple-900/60 press-scale shadow-xs min-h-[44px]"
               >
-                <Pill size={14} className="text-purple-600" /> <span>صدور نسخه</span>
+                <Pill size={15} className="text-purple-600 shrink-0" /> <span className="truncate">صدور نسخه</span>
               </button>
 
               {/* Lab Order */}
@@ -1935,9 +1930,9 @@ export default function PatientDetail() {
                   h.tap()
                   setActiveTab('labOrders')
                 }}
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold bg-cyan-50 dark:bg-cyan-950/40 text-cyan-700 dark:text-cyan-300 border border-cyan-200 dark:border-cyan-800 hover:bg-cyan-100 dark:hover:bg-cyan-900/60 press-scale shadow-xs min-h-[38px]"
+                className="flex items-center justify-center gap-1.5 px-3 py-2.5 rounded-2xl text-xs font-bold bg-cyan-50 dark:bg-cyan-950/40 text-cyan-700 dark:text-cyan-300 border border-cyan-200 dark:border-cyan-800 hover:bg-cyan-100 dark:hover:bg-cyan-900/60 press-scale shadow-xs min-h-[44px]"
               >
-                <FlaskConical size={14} className="text-cyan-600" /> <span>سفارش لابراتوار</span>
+                <FlaskConical size={15} className="text-cyan-600 shrink-0" /> <span className="truncate">سفارش لابراتوار</span>
               </button>
 
               {/* Implant Case */}
@@ -1947,18 +1942,18 @@ export default function PatientDetail() {
                   h.tap()
                   setActiveTab('implants')
                 }}
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold bg-blue-50 dark:bg-blue-950/40 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-800 hover:bg-blue-100 dark:hover:bg-blue-900/60 press-scale shadow-xs min-h-[38px]"
+                className="flex items-center justify-center gap-1.5 px-3 py-2.5 rounded-2xl text-xs font-bold bg-blue-50 dark:bg-blue-950/40 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-800 hover:bg-blue-100 dark:hover:bg-blue-900/60 press-scale shadow-xs min-h-[44px]"
               >
-                <Bone size={14} className="text-blue-600" /> <span>پرونده ایمپلنت</span>
+                <Bone size={15} className="text-blue-600 shrink-0" /> <span className="truncate">پرونده ایمپلنت</span>
               </button>
 
               {/* Print Record */}
               <button
                 type="button"
                 onClick={handlePrintFullChart}
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold bg-indigo-50 dark:bg-indigo-950/40 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800 hover:bg-indigo-100 dark:hover:bg-indigo-900/60 press-scale shadow-xs min-h-[38px]"
+                className="flex items-center justify-center gap-1.5 px-3 py-2.5 rounded-2xl text-xs font-bold bg-indigo-50 dark:bg-indigo-950/40 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800 hover:bg-indigo-100 dark:hover:bg-indigo-900/60 press-scale shadow-xs min-h-[44px]"
               >
-                <Printer size={14} className="text-indigo-600 dark:text-indigo-400" /> <span>چاپ پرونده</span>
+                <Printer size={15} className="text-indigo-600 dark:text-indigo-400 shrink-0" /> <span className="truncate">چاپ پرونده</span>
               </button>
 
               {/* Edit File */}
@@ -2007,9 +2002,9 @@ export default function PatientDetail() {
                   }
                   setEditModalOpen(true)
                 }}
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold bg-sky-50 dark:bg-sky-950/40 text-sky-700 dark:text-sky-300 border border-sky-200 dark:border-sky-800 hover:bg-sky-100 dark:hover:bg-sky-900/60 press-scale min-h-[38px]"
+                className="flex items-center justify-center gap-1.5 px-3 py-2.5 rounded-2xl text-xs font-bold bg-sky-50 dark:bg-sky-950/40 text-sky-700 dark:text-sky-300 border border-sky-200 dark:border-sky-800 hover:bg-sky-100 dark:hover:bg-sky-900/60 press-scale min-h-[44px]"
               >
-                <Edit2 size={14} /> <span>ویرایش پرونده</span>
+                <Edit2 size={15} className="shrink-0" /> <span className="truncate">ویرایش پرونده</span>
               </button>
             </div>
           </div>
@@ -2050,37 +2045,6 @@ export default function PatientDetail() {
     const age = calculateAge(patient.birth_date)
     return (
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
-        {/* Retention & CRM Loyalty Profile */}
-        {retentionProfile && (
-          <Card className="p-4 lg:col-span-2 bg-gradient-to-r from-slate-50 via-white to-slate-50 dark:from-slate-800/80 dark:via-slate-850 dark:to-slate-800/80 border border-slate-200 dark:border-slate-700">
-            <div className="flex items-center justify-between gap-2 mb-2 flex-wrap">
-              <div className="flex items-center gap-2">
-                <Smile size={16} className="text-primary-600" />
-                <h3 className="text-sm font-bold text-slate-800 dark:text-slate-100">وضعیت وفاداری و تعامل بالینی بیمار (CRM Retention)</h3>
-              </div>
-              <div className="flex items-center gap-2">
-                <Badge color={retentionProfile.tierColor}>{retentionProfile.tierLabel}</Badge>
-                <span className="text-xs font-extrabold text-slate-700 dark:text-slate-200">
-                  امتیاز: {toPersianDigits(retentionProfile.score)} / ۱۰۰
-                </span>
-              </div>
-            </div>
-            <p className="text-xs text-slate-600 dark:text-slate-300 mb-2">
-              <strong>اقدام پیشنهادی کلینیک:</strong> {retentionProfile.recommendedAction}
-            </p>
-            {retentionProfile.riskFactors.length > 0 && (
-              <div className="flex items-center gap-1.5 flex-wrap pt-2 border-t border-slate-100 dark:border-slate-700/60">
-                <span className="text-[11px] font-bold text-amber-600 dark:text-amber-400">عوامل ریسک:</span>
-                {retentionProfile.riskFactors.map((rf) => (
-                  <span key={rf} className="text-[11px] px-2 py-0.5 rounded bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-300 border border-amber-200 dark:border-amber-800/60">
-                    {rf}
-                  </span>
-                ))}
-              </div>
-            )}
-          </Card>
-        )}
-
         {/* Personal Info */}
         <div className="rounded-3xl bg-white/95 dark:bg-slate-900/90 backdrop-blur-xl border border-slate-200/80 dark:border-slate-800 p-5 shadow-sm hover:shadow-md transition-all">
           <div className="flex items-center justify-between gap-2 mb-4 pb-3 border-b border-slate-100 dark:border-slate-800">
@@ -2297,9 +2261,6 @@ export default function PatientDetail() {
                         </Badge>
                       )}
                     </h3>
-                    <p className="text-xs text-slate-400">
-                      پیوند بین اعضای خانواده جهت دسترسی سریع به پرونده‌ها و یکپارچگی سوابق درمان
-                    </p>
                   </div>
                 </div>
                 <Button
@@ -2319,14 +2280,10 @@ export default function PatientDetail() {
               </div>
 
               {fam.members.length === 0 ? (
-                <div className="p-4 rounded-xl bg-slate-50 dark:bg-slate-800/50 border border-dashed border-slate-200 dark:border-slate-700 flex flex-col sm:flex-row items-center justify-between gap-3 text-center sm:text-right">
-                  <div className="text-xs text-slate-500 space-y-0.5">
-                    <p className="font-semibold text-slate-700 dark:text-slate-300">
-                      این پرونده هنوز به خانواده یا سرپرستی متصل نشده است.
-                    </p>
-                    <p>
-                      با تعیین سرپرست یا افزودن اعضای خانواده (همسر، فرزندان، والدین)، دسترسی یک‌کلیکی به سوابق سلامت بستگان فعال می‌شود.
-                    </p>
+                <div className="p-3.5 rounded-2xl bg-slate-50 dark:bg-slate-800/50 border border-dashed border-slate-200 dark:border-slate-700 flex flex-col sm:flex-row items-center justify-between gap-3">
+                  <div className="flex items-center gap-2 text-xs font-semibold text-slate-600 dark:text-slate-300">
+                    <Users size={16} className="text-slate-400 shrink-0" />
+                    <span>عدم اتصال به سرپرست یا پرونده‌های خانوادگی</span>
                   </div>
                   <Button
                     size="sm"
@@ -2338,7 +2295,7 @@ export default function PatientDetail() {
                       setIsHeadToggle(patient.family_relationship === 'head')
                       setFamilyModalOpen(true)
                     }}
-                    className="text-xs shrink-0 flex items-center gap-1"
+                    className="text-xs shrink-0 flex items-center gap-1.5"
                   >
                     <UserPlus size={14} /> اتصال به خانواده / تعیین سرپرست
                   </Button>
