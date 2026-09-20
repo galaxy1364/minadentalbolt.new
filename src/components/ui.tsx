@@ -458,15 +458,28 @@ export function Tabs({
     badgeInactive: 'bg-primary-200/70 dark:bg-primary-800/60 text-primary-900 dark:text-primary-100',
   }
 
-  // Auto-scroll active tab into center view
+  // Auto-scroll active tab into center view — strictly internal container scroll, NEVER touches window/page layout
   useEffect(() => {
+    const container = scrollStripRef.current
     const activeEl = tabButtonRefs.current[active]
-    if (activeEl && scrollStripRef.current && typeof activeEl.scrollIntoView === 'function') {
-      activeEl.scrollIntoView({
+    if (!container || !activeEl) return
+
+    // Calculate relative offset within the scroll strip container only
+    const containerRect = container.getBoundingClientRect()
+    const elRect = activeEl.getBoundingClientRect()
+
+    const offset = (elRect.left + elRect.width / 2) - (containerRect.left + containerRect.width / 2)
+
+    if (Math.abs(offset) > 4) {
+      container.scrollBy({
+        left: offset,
         behavior: 'smooth',
-        inline: 'center',
-        block: 'nearest',
       })
+    }
+
+    // Defensive guarantee: ensure window horizontal scroll never deviates from 0
+    if (typeof window !== 'undefined' && window.scrollX !== 0) {
+      window.scrollTo(0, window.scrollY)
     }
   }, [active])
 

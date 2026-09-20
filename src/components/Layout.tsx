@@ -815,7 +815,7 @@ function LayoutInner({ children }: { children: React.ReactNode }) {
   }, [])
 
   return (
-    <div className="min-h-screen bg-slate-50 dark:bg-slate-950 flex flex-col" dir="rtl">
+    <div className="min-h-screen bg-slate-50 dark:bg-slate-950 flex flex-col w-full max-w-full overflow-x-clip" dir="rtl">
       <div className="module-page-bg" aria-hidden="true">
         <div className="module-page-blob module-page-blob-1" />
         <div className="module-page-blob module-page-blob-2" />

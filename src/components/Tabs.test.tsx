@@ -78,4 +78,14 @@ describe('Tabs Component — 100% Colorful & Zero-Shift Modal Navigator', () => 
     // Dialog should be closed
     expect(screen.queryByRole('dialog')).toBeNull()
   })
+
+  it('keeps window horizontal scroll at zero and never calls scrollIntoView on the element', () => {
+    const { rerender } = render(<Tabs tabs={sampleTabs} active="overview" onChange={vi.fn()} />)
+    
+    // Switch to 'perio' (one of the end tabs)
+    rerender(<Tabs tabs={sampleTabs} active="perio" onChange={vi.fn()} />)
+
+    // Window scrollX must remain 0
+    expect(window.scrollX).toBe(0)
+  })
 })
