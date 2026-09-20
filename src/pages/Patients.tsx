@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useMemo } from 'react'
 import { PatientDebtBar } from '../components/PatientDebtBar'
 import { useNavigate } from 'react-router-dom'
-import { Plus, Search, Edit2, Phone, PhoneCall, Filter, Users, Award, AlertCircle, Smile, FileText, User, Heart, Shield, MapPin, Archive, Calendar, MessageSquare, MessageCircle, Eye, EyeOff, Banknote, CalendarClock, ChevronLeft, CreditCard, CheckCircle2, LayoutGrid, List, Sparkles, Activity, Printer, FlaskConical } from 'lucide-react'
+import { Plus, Search, Edit2, Phone, PhoneCall, Filter, Users, Award, AlertCircle, Smile, FileText, User, Heart, Shield, MapPin, Archive, Calendar, MessageSquare, MessageCircle, Eye, EyeOff, Banknote, CalendarClock, ChevronLeft, CreditCard, CheckCircle2, Check, LayoutGrid, List, Sparkles, Activity, Printer, FlaskConical } from 'lucide-react'
 import { fetchPatients, createPatient, updatePatient, fetchDoctors, fetchPayments, fetchTreatments, fetchImplantCases, peekNextFileNumber, fetchCheques, fetchPaymentPlans, fetchLabOrders } from '../lib/api'
 import { useDataRefresh } from '../lib/realtimeSync'
 import { toJalaliStringPretty, formatCurrency, toPersianDigits } from '../lib/persianDate'
@@ -465,7 +465,7 @@ export default function Patients() {
 
   if (loading) {
     return (
-      <div className="space-y-5 max-w-7xl mx-auto w-full px-3 sm:px-6 lg:px-8 py-4" aria-busy="true" aria-live="polite">
+      <div className="space-y-5 w-full px-1 py-2" aria-busy="true" aria-live="polite">
         <div className="skeleton h-12 w-full rounded-2xl" />
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
           {[0, 1, 2, 3].map((i) => <div key={i} className="skeleton h-20 rounded-2xl" />)}
@@ -479,7 +479,7 @@ export default function Patients() {
   }
 
   return (
-    <div className="space-y-3.5 w-full px-2 sm:px-4 py-2 relative" {...ptr.handlers}>
+    <div className="space-y-3.5 w-full px-0.5 sm:px-1 py-1 relative" {...ptr.handlers}>
       {ptr.pullDistance > 0 && (
         <div className="pull-indicator" style={{ opacity: ptr.isRefreshing ? 1 : ptr.pullProgress, top: -4 }}>
           <div className="flex flex-col items-center gap-1">
@@ -510,21 +510,8 @@ export default function Patients() {
               : 'bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 border border-slate-200/80 dark:border-slate-700 hover:bg-slate-50'
           }`}
         >
-          <span>همه مراجعین</span>
+          <span>همه</span>
           <span className="text-[10px] opacity-75 tabular-nums">({toPersianDigits(stats.total)})</span>
-        </button>
-
-        <button
-          type="button"
-          onClick={() => { h.select(); setQuickFilter('vip') }}
-          className={`px-3 py-1.5 rounded-xl transition-all whitespace-nowrap flex items-center gap-1.5 press-scale shrink-0 ${
-            quickFilter === 'vip'
-              ? 'bg-violet-600 text-white shadow-xs'
-              : 'bg-white dark:bg-slate-800 text-violet-600 dark:text-violet-400 border border-violet-200/80 dark:border-violet-900/50 hover:bg-violet-50/50'
-          }`}
-        >
-          <span>VIP</span>
-          <span className="text-[10px] opacity-75 tabular-nums">({toPersianDigits(stats.vip)})</span>
         </button>
 
         <button
@@ -550,7 +537,7 @@ export default function Patients() {
               : 'bg-white dark:bg-slate-800 text-amber-700 dark:text-amber-400 border border-amber-200/80 dark:border-amber-900/50 hover:bg-amber-50/50'
           }`}
         >
-          <span>چک صیادی</span>
+          <span>چک</span>
           <span className="text-[10px] opacity-75 tabular-nums">({toPersianDigits(stats.withCheques)})</span>
         </button>
 
@@ -604,6 +591,19 @@ export default function Patients() {
         >
           <span>بایگانی</span>
           <span className="text-[10px] opacity-75 tabular-nums">({toPersianDigits(stats.archived)})</span>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => { h.select(); setQuickFilter('vip') }}
+          className={`px-3 py-1.5 rounded-xl transition-all whitespace-nowrap flex items-center gap-1.5 press-scale shrink-0 ${
+            quickFilter === 'vip'
+              ? 'bg-violet-600 text-white shadow-xs'
+              : 'bg-white dark:bg-slate-800 text-violet-600 dark:text-violet-400 border border-violet-200/80 dark:border-violet-900/50 hover:bg-violet-50/50'
+          }`}
+        >
+          <span>VIP</span>
+          <span className="text-[10px] opacity-75 tabular-nums">({toPersianDigits(stats.vip)})</span>
         </button>
       </div>
 
@@ -798,29 +798,28 @@ export default function Patients() {
                       onClick={() => openEditModal(patient)}
                       title="ویرایش بیمار"
                       aria-label="ویرایش اطلاعات"
-                      className="p-1 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors"
+                      className="p-1 rounded-lg text-emerald-600 dark:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-950/30 transition-colors"
                     >
-                      <Edit2 size={13} />
+                      <Edit2 size={16} />
                     </button>
                     <button
                       type="button"
                       onClick={() => handleDelete(patient)}
                       title="انتقال به بایگانی"
                       aria-label="انتقال به بایگانی"
-                      className="p-1 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/30 transition-colors"
+                      className="p-1 rounded-lg text-amber-600 dark:text-amber-400 hover:bg-amber-50 dark:hover:bg-amber-950/30 transition-colors"
                     >
-                      <Archive size={13} />
+                      <Archive size={16} />
                     </button>
                   </div>
                 </div>
 
                 {/* Row 2: Contact Hub & Financial/Clinical Status Badges */}
                 <div className="flex items-center justify-between gap-2 text-xs mb-2.5 flex-wrap" onClick={(e) => e.stopPropagation()}>
-                  {/* Phone + Frameless 1-Touch Call & SMS triggers (Zero nested boxes) */}
+                  {/* Phone + Frameless 1-Touch Call & SMS triggers */}
                   <div className="flex items-center gap-2 min-w-0">
                     {patient.phone ? (
-                      <div className="flex items-center gap-1.5 font-mono font-bold text-slate-800 dark:text-slate-200 text-xs" dir="ltr">
-                        <Phone size={13} className="text-teal-600 shrink-0" />
+                      <div className="flex items-center font-mono font-bold text-slate-800 dark:text-slate-200 text-xs" dir="ltr">
                         <span>{privacyMode ? maskPhoneNumber(patient.phone) : toPersianDigits(patient.phone)}</span>
                       </div>
                     ) : (
@@ -836,7 +835,7 @@ export default function Patients() {
                           title="تماس تلفنی با بیمار"
                           aria-label="تماس تلفنی"
                         >
-                          <PhoneCall size={15} />
+                          <PhoneCall size={17} />
                         </a>
                         <a
                           href={`sms:${patient.phone}`}
@@ -845,7 +844,7 @@ export default function Patients() {
                           title="ارسال پیامک به بیمار"
                           aria-label="ارسال پیامک"
                         >
-                          <MessageSquare size={15} />
+                          <MessageSquare size={17} />
                         </a>
                       </div>
                     )}
@@ -860,7 +859,7 @@ export default function Patients() {
                       </span>
                     ) : isSettled ? (
                       <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-lg bg-emerald-50 dark:bg-emerald-950/50 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800 text-[10px] font-bold">
-                        <CheckCircle2 size={10} className="text-emerald-600" />
+                        <Check size={14} className="stroke-[3] text-emerald-600 dark:text-emerald-400 shrink-0" />
                         <span>تسویه</span>
                       </span>
                     ) : null}
@@ -880,15 +879,15 @@ export default function Patients() {
                     )}
 
                     {activeImplants > 0 && (
-                      <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-lg bg-teal-50 dark:bg-teal-950/50 text-teal-800 dark:text-teal-300 text-[10px] font-bold border border-teal-200/60 dark:border-teal-900/50">
-                        <Sparkles size={10} className="text-teal-600" />
+                      <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-lg bg-purple-50 dark:bg-purple-950/50 text-purple-700 dark:text-purple-300 border border-purple-200 dark:border-purple-800 text-[10px] font-bold">
+                        <Sparkles size={10} className="text-purple-600 dark:text-purple-400" />
                         <span>ایمپلنت</span>
                       </span>
                     )}
 
                     {activeLabOrders > 0 && (
-                      <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-lg bg-sky-50 dark:bg-sky-950/50 text-sky-800 dark:text-sky-300 text-[10px] font-bold border border-sky-200/60 dark:border-sky-900/50">
-                        <FlaskConical size={10} className="text-sky-600" />
+                      <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-lg bg-blue-50 dark:bg-blue-950/50 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-800 text-[10px] font-bold">
+                        <FlaskConical size={10} className="text-blue-600 dark:text-blue-400" />
                         <span>لابراتوار</span>
                       </span>
                     )}

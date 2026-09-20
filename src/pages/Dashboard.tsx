@@ -1195,33 +1195,18 @@ export default function Dashboard() {
           </div>
         </div>
       )}
-      {/* ═══ Clean 1-Row Executive Header ══════════════ */}
-      <div className="tile-in flex items-center justify-between gap-2 p-3 rounded-2xl bg-white/90 dark:bg-slate-800/90 backdrop-blur-md border border-slate-200/60 dark:border-slate-700/60 shadow-md shadow-slate-900/5" style={{ animationDelay: '0ms' }}>
-        {/* Right: Clinic Title + Jalali Date Badge */}
-        <div className="flex items-center gap-2.5 min-w-0">
-          <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-violet-500 via-purple-600 to-indigo-700 flex items-center justify-center text-white shadow-md shadow-purple-500/25 border-t border-white/40 shrink-0">
-            <Building2 size={18} />
-          </div>
-          <div className="min-w-0">
-            <div className="flex items-center gap-1.5">
-              <span className="text-xs sm:text-sm font-extrabold text-slate-800 dark:text-slate-100 truncate">مینادنتال</span>
-              <span className="text-[10px] font-bold text-violet-700 dark:text-violet-300 bg-violet-50 dark:bg-violet-950/40 border border-violet-200/60 dark:border-violet-800/50 rounded-full px-2 py-0.5 shrink-0">
-                {roleGreeting[role] || roleGreeting.owner}
-              </span>
-            </div>
-            <div className="flex items-center gap-1.5 mt-0.5">
-              <button
-                type="button"
-                onClick={() => { h.tap(); navigate('/appointments') }}
-                className="inline-flex items-center gap-1 text-[11px] font-bold text-violet-700 dark:text-violet-300 bg-violet-50/80 dark:bg-violet-950/40 hover:bg-violet-100 dark:hover:bg-violet-900/60 border border-violet-200/60 dark:border-violet-800/50 rounded-lg px-2 py-0.5 shadow-2xs transition-all press-scale cursor-pointer"
-                title="مشاهده تقویم و نوبت‌ها"
-              >
-                <Calendar size={11} className="text-violet-500 shrink-0" />
-                <span>{toJalaliStringPretty(todayStr)}</span>
-              </button>
-            </div>
-          </div>
-        </div>
+      {/* ═══ Clean 1-Row Compact Date & Toolbar Header ══════════════ */}
+      <div className="tile-in flex items-center justify-between gap-2 px-3 py-2 rounded-2xl bg-white/90 dark:bg-slate-800/90 backdrop-blur-md border border-slate-200/60 dark:border-slate-700/60 shadow-xs" style={{ animationDelay: '0ms' }}>
+        {/* Right: Direct Calendar / Jalali Date Trigger */}
+        <button
+          type="button"
+          onClick={() => { h.tap(); navigate('/appointments') }}
+          className="inline-flex items-center gap-1.5 text-xs font-bold text-violet-700 dark:text-violet-300 bg-violet-50/80 dark:bg-violet-950/40 hover:bg-violet-100 dark:hover:bg-violet-900/60 border border-violet-200/60 dark:border-violet-800/50 rounded-xl px-2.5 py-1.5 shadow-2xs transition-all press-scale cursor-pointer"
+          title="مشاهده تقویم و نوبت‌ها"
+        >
+          <Calendar size={14} className="text-violet-500 shrink-0" />
+          <span>{toJalaliStringPretty(todayStr)}</span>
+        </button>
 
         {/* Center / Left: Inline Doctor Filter + Actions */}
         <div className="flex items-center gap-1.5 shrink-0">
@@ -1230,7 +1215,7 @@ export default function Dashboard() {
               value={doctorFilter}
               onChange={(e) => { h.tap(); setDoctorFilter(e.target.value) }}
               aria-label="فیلتر پزشک"
-              className="hidden sm:block min-h-[44px] px-2.5 py-2 rounded-xl text-[11px] font-bold bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-200 border border-slate-200/60 dark:border-slate-600 shadow-sm focus:ring-2 focus:ring-primary-400 cursor-pointer max-w-[110px]"
+              className="hidden sm:block min-h-[38px] px-2.5 py-1.5 rounded-xl text-[11px] font-bold bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-200 border border-slate-200/60 dark:border-slate-600 shadow-sm focus:ring-2 focus:ring-primary-400 cursor-pointer max-w-[120px]"
             >
               <option value="all">همه پزشکان</option>
               {doctors.map((d) => (
@@ -1245,9 +1230,9 @@ export default function Dashboard() {
             aria-label="به‌روزرسانی"
             title="به‌روزرسانی داده‌ها"
             disabled={refreshing}
-            className="flex items-center justify-center min-w-[44px] min-h-[44px] rounded-xl bg-gradient-to-br from-teal-500 to-emerald-600 text-white shadow-md shadow-emerald-500/25 border-t border-t-white/40 border border-emerald-400/30 hover:brightness-110 active:scale-95 transition-all press-scale disabled:opacity-50"
+            className="flex items-center justify-center min-w-[38px] min-h-[38px] rounded-xl bg-gradient-to-br from-teal-500 to-emerald-600 text-white shadow-md shadow-emerald-500/25 border-t border-t-white/40 border border-emerald-400/30 hover:brightness-110 active:scale-95 transition-all press-scale disabled:opacity-50"
           >
-            <RefreshCw size={17} className={`drop-shadow-xs ${refreshing ? 'animate-spin' : ''}`} />
+            <RefreshCw size={15} className={`drop-shadow-xs ${refreshing ? 'animate-spin' : ''}`} />
           </button>
 
           {/* Notifications Bell - Vibrant Amber / Orange 3D Gradient */}

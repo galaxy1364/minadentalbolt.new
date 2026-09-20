@@ -855,10 +855,9 @@ function LayoutInner({ children }: { children: React.ReactNode }) {
             </button>
 
             <HeaderAlarmButton onClick={() => setAlarmCenterOpen(true)} />
-            <PrivacyModeToggle />
+            <SyncIndicator />
             <DarkModeToggle />
             <LogoutButton />
-            <SyncIndicator />
           </div>
         </div>
       </header>
