@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useMemo } from 'react'
 import { PatientDebtBar } from '../components/PatientDebtBar'
 import { useNavigate } from 'react-router-dom'
-import { Plus, Search, Edit2, Phone, Filter, Users, Award, AlertCircle, Smile, FileText, User, Heart, Shield, MapPin, Archive, Calendar, MessageSquare, Eye, EyeOff, Banknote, CalendarClock, ChevronLeft, CreditCard, CheckCircle2, LayoutGrid, List, Sparkles } from 'lucide-react'
+import { Plus, Search, Edit2, Phone, PhoneCall, Filter, Users, Award, AlertCircle, Smile, FileText, User, Heart, Shield, MapPin, Archive, Calendar, MessageSquare, MessageCircle, Eye, EyeOff, Banknote, CalendarClock, ChevronLeft, CreditCard, CheckCircle2, LayoutGrid, List, Sparkles, Activity, Printer } from 'lucide-react'
 import { fetchPatients, createPatient, updatePatient, fetchDoctors, fetchPayments, fetchTreatments, fetchImplantCases, peekNextFileNumber, fetchCheques, fetchPaymentPlans } from '../lib/api'
 import { useDataRefresh } from '../lib/realtimeSync'
 import { toJalaliStringPretty, formatCurrency, toPersianDigits } from '../lib/persianDate'
@@ -164,6 +164,14 @@ export default function Patients() {
     }
     return map
   }, [paymentPlans])
+
+  const doctorsMap = useMemo(() => {
+    const map = new Map<string, Doctor>()
+    for (const d of doctors) {
+      map.set(d.id, d)
+    }
+    return map
+  }, [doctors])
 
   // All distinct patient tags currently in use — powers the grouping/
   // segmentation filter row (مینادنت's "گروه‌بندی و تفکیک بیماران").
@@ -734,8 +742,9 @@ export default function Patients() {
         </Card>
       ) : viewMode === 'grid' ? (
         /* Widescreen Responsive Patient Grid */
-        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5">
           {filteredPatients.map((patient, idx) => {
+            const theme = tileThemes[getHashColor(patient.id)]
             const vipMeta = getVipMeta(patient.vip_level)
             const age = calculateAge(patient.birth_date)
             const fin = patientFinances.get(patient.id) || { balance: 0, paid: 0, totalCost: 0 }
@@ -745,6 +754,9 @@ export default function Patients() {
             const activePlans = patientPlansMap.get(patient.id) || 0
             const isDebtor = fin.balance > 0
             const isSettled = fin.totalCost > 0 && fin.balance <= 0
+            const primaryDoctor = patient.primary_doctor_id ? doctorsMap.get(patient.primary_doctor_id) : null
+            const cleanPhone = patient.phone ? patient.phone.replace(/\D/g, '').replace(/^0/, '98') : null
+            const waText = `سلام ${patient.first_name} ${patient.last_name} عزیز،\nپیام از طرف کلینیک دندانپزشکی مینا.\nجهت هماهنگی و پیگیری نوبت با ما در ارتباط باشید.`
 
             const borderStatusClass = isDebtor
               ? 'border-r-4 border-r-rose-500'
@@ -752,25 +764,34 @@ export default function Patients() {
               ? 'border-r-4 border-r-emerald-500'
               : !patient.is_active
               ? 'border-r-4 border-r-slate-400'
-              : 'border-r-4 border-r-teal-500'
+              : `border-r-4 ${theme.border}`
 
             return (
               <div
                 key={patient.id}
-                className={`relative overflow-hidden flex flex-col justify-between p-4 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200/90 dark:border-slate-800 shadow-xs hover:shadow-md transition-all duration-200 group ${borderStatusClass}`}
+                className={`relative overflow-hidden flex flex-col justify-between p-4 sm:p-5 rounded-3xl bg-gradient-to-br ${theme.bg} border-2 ${theme.border} shadow-sm hover:shadow-xl transition-all duration-300 group cursor-pointer ${borderStatusClass}`}
                 style={{ animationDelay: `${Math.min(idx, 10) * 25}ms` }}
                 onClick={() => { h.tap(); navigate(`/patients/${patient.id}`) }}
               >
-                <div>
+                {/* Breathing Gemini-like dynamic colorful aura */}
+                <div
+                  className={`absolute -top-12 -right-12 w-48 h-48 rounded-full bg-gradient-to-br ${theme.blob} pointer-events-none breathe-slow opacity-40 group-hover:opacity-75 transition-opacity duration-700 blur-2xl`}
+                />
+                <div
+                  className={`absolute -bottom-10 -left-10 w-40 h-40 rounded-full bg-gradient-to-tr ${theme.blob} pointer-events-none breathe-slow opacity-25 group-hover:opacity-50 transition-opacity duration-700 blur-2xl`}
+                  style={{ animationDelay: '-4s' }}
+                />
+
+                <div className="relative z-10">
                   {/* Top Section: Avatar + Name + Dedicated File Number Capsule */}
-                  <div className="flex items-start justify-between gap-3 mb-3">
+                  <div className="flex items-start justify-between gap-3 mb-3.5">
                     <div className="flex items-center gap-3 min-w-0 flex-1">
                       {/* Avatar */}
-                      <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-slate-100 to-slate-200 dark:from-slate-800 dark:to-slate-700 border border-slate-200 dark:border-slate-700 flex items-center justify-center text-slate-700 dark:text-slate-200 font-black text-sm flex-shrink-0 shadow-xs overflow-hidden">
+                      <div className={`w-12 h-12 rounded-2xl ${patient.avatar_url ? '' : theme.iconBg} text-white font-black text-sm flex items-center justify-center flex-shrink-0 shadow-md border border-white/60 dark:border-slate-700 overflow-hidden`}>
                         {patient.avatar_url ? (
                           <img src={patient.avatar_url} alt="" className="w-full h-full object-cover" />
                         ) : (
-                          getInitials(patient)
+                          <span>{getInitials(patient)}</span>
                         )}
                       </div>
 
@@ -780,20 +801,29 @@ export default function Patients() {
                           <h3 className={`font-black text-base truncate ${isDebtor ? 'text-rose-700 dark:text-rose-400' : 'text-slate-900 dark:text-slate-100'}`}>
                             <HighlightText text={`${patient.first_name} ${patient.last_name}`} query={searchQuery} />
                           </h3>
-                          {vipMeta.value > 0 && <span className="text-xs shrink-0" title={`سطح ${vipMeta.label}`}>{vipMeta.icon}</span>}
+                          {vipMeta.value > 0 && (
+                            <span className="text-xs shrink-0 drop-shadow-xs" title={`سطح ${vipMeta.label}`}>{vipMeta.icon}</span>
+                          )}
                           {!patient.is_active && (
-                            <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400">بایگانی</span>
+                            <span className="px-1.5 py-0.5 rounded-md text-[10px] font-bold bg-slate-200/80 text-slate-700 dark:bg-slate-800 dark:text-slate-300">
+                              بایگانی
+                            </span>
                           )}
                         </div>
 
-                        <div className="flex items-center gap-2 text-xs text-slate-500 dark:text-slate-400 mt-0.5">
-                          {age !== null && <span>{toPersianDigits(age)} ساله</span>}
+                        <div className="flex items-center gap-2 text-xs text-slate-600 dark:text-slate-400 mt-1 flex-wrap">
+                          {age !== null && <span className="font-medium">{toPersianDigits(age)} ساله</span>}
                           {patient.gender && <span>• {patient.gender === 'male' ? 'آقا' : 'خانم'}</span>}
+                          {patient.blood_type && (
+                            <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-red-100/80 text-red-700 dark:bg-red-950/50 dark:text-red-300">
+                              {patient.blood_type}
+                            </span>
+                          )}
                         </div>
                       </div>
                     </div>
 
-                    {/* Dedicated File Number Capsule */}
+                    {/* Dedicated Non-Black Elegant Medical File Number Capsule */}
                     <div className="shrink-0" onClick={(e) => e.stopPropagation()}>
                       {patient.file_number ? (
                         <button
@@ -804,58 +834,136 @@ export default function Patients() {
                             navigate(`/patients/${patient.id}`)
                           }}
                           title="شماره پرونده — کلیک برای مشاهده پرونده"
-                          className="inline-flex items-center gap-1 font-mono font-black text-xs px-2.5 py-1 rounded-lg bg-slate-900 dark:bg-slate-800 text-white border border-slate-700 shadow-xs hover:bg-slate-800 transition-colors"
+                          className={`inline-flex items-center gap-1.5 font-mono font-black text-xs sm:text-sm px-3 py-1.5 rounded-xl ${theme.capsuleBg} ${theme.capsuleText} border ${theme.capsuleBorder} shadow-xs hover:scale-105 transition-all backdrop-blur-md`}
                           dir="ltr"
                         >
-                          <FileText size={12} className="text-teal-400 shrink-0" />
-                          <HighlightText text={toPersianDigits(patient.file_number)} query={searchQuery} />
+                          <FileText size={13} className="shrink-0 opacity-80" />
+                          <span>#<HighlightText text={toPersianDigits(patient.file_number)} query={searchQuery} /></span>
                         </button>
                       ) : (
-                        <span className="text-[11px] text-slate-400 italic">بدون پرونده</span>
+                        <span className="text-[11px] text-slate-400 italic px-2 py-1 rounded-lg bg-slate-100/60 dark:bg-slate-800/60">بدون پرونده</span>
                       )}
                     </div>
                   </div>
 
-                  {/* Identifiers & Phone */}
-                  <div className="flex items-center gap-3 text-xs text-slate-600 dark:text-slate-400 mb-3" onClick={(e) => e.stopPropagation()}>
-                    {patient.phone && (
-                      <a
-                        href={`tel:${patient.phone}`}
-                        className="flex items-center gap-1 hover:text-teal-600 dark:hover:text-teal-400 font-mono"
-                        dir="ltr"
-                        title="تماس تلفنی"
-                      >
-                        <Phone size={12} className="text-slate-400" />
-                        <span>{privacyMode ? maskPhoneNumber(patient.phone) : toPersianDigits(patient.phone)}</span>
-                      </a>
-                    )}
-                    {patient.national_id && (
-                      <span className="flex items-center gap-1 font-mono text-slate-500" dir="ltr" title="کد ملی">
-                        <Shield size={12} className="text-slate-400" />
-                        <span>{privacyMode ? maskNationalId(patient.national_id) : toPersianDigits(patient.national_id)}</span>
-                      </span>
-                    )}
+                  {/* Direct Sterile-Touch Communication Hub (Phone, Call, SMS, WhatsApp) */}
+                  <div className="flex items-center justify-between gap-2 p-2 rounded-2xl bg-white/70 dark:bg-slate-900/60 backdrop-blur-xs border border-slate-200/60 dark:border-slate-800/60 mb-3" onClick={(e) => e.stopPropagation()}>
+                    {/* Phone & National ID text */}
+                    <div className="flex flex-col gap-0.5 min-w-0 text-xs">
+                      {patient.phone ? (
+                        <div className="flex items-center gap-1.5 font-mono font-bold text-slate-800 dark:text-slate-200" dir="ltr">
+                          <Phone size={11} className="text-teal-600 shrink-0" />
+                          <span>{privacyMode ? maskPhoneNumber(patient.phone) : toPersianDigits(patient.phone)}</span>
+                        </div>
+                      ) : (
+                        <span className="text-slate-400 text-[11px]">بدون شماره تماس</span>
+                      )}
+                      {patient.national_id && (
+                        <div className="flex items-center gap-1 font-mono text-[11px] text-slate-500 dark:text-slate-400" dir="ltr">
+                          <Shield size={10} className="text-slate-400 shrink-0" />
+                          <span>{privacyMode ? maskNationalId(patient.national_id) : toPersianDigits(patient.national_id)}</span>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* 1-Click Interactive Triggers: Call, SMS, WhatsApp */}
+                    <div className="flex items-center gap-1 shrink-0">
+                      {patient.phone && (
+                        <>
+                          <a
+                            href={`tel:${patient.phone}`}
+                            onClick={() => { h.tap(); chimes.playPop() }}
+                            className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-xl bg-teal-500/10 hover:bg-teal-500/20 text-teal-700 dark:text-teal-300 border border-teal-300/40 text-[11px] font-bold transition-all press-scale shadow-xs"
+                            title="تماس مستقیم با بیمار"
+                          >
+                            <PhoneCall size={12} className="text-teal-600 dark:text-teal-400 shrink-0" />
+                            <span className="hidden sm:inline">تماس</span>
+                          </a>
+
+                          <a
+                            href={`sms:${patient.phone}`}
+                            onClick={() => { h.tap(); chimes.playPop() }}
+                            className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-xl bg-sky-500/10 hover:bg-sky-500/20 text-sky-700 dark:text-sky-300 border border-sky-300/40 text-[11px] font-bold transition-all press-scale shadow-xs"
+                            title="ارسال پیامک به بیمار"
+                          >
+                            <MessageSquare size={12} className="text-sky-600 dark:text-sky-400 shrink-0" />
+                            <span className="hidden sm:inline">پیامک</span>
+                          </a>
+                        </>
+                      )}
+
+                      {cleanPhone && (
+                        <a
+                          href={`https://wa.me/${cleanPhone}?text=${encodeURIComponent(waText)}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          onClick={() => { h.tap(); chimes.playPop() }}
+                          className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-xl bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-700 dark:text-emerald-300 border border-emerald-300/40 text-[11px] font-bold transition-all press-scale shadow-xs"
+                          title="گفتگو در واتساپ"
+                        >
+                          <MessageCircle size={12} className="text-emerald-600 dark:text-emerald-400 shrink-0" />
+                          <span>واتساپ</span>
+                        </a>
+                      )}
+                    </div>
                   </div>
 
+                  {/* Doctor & Insurance Meta Row */}
+                  {(primaryDoctor || patient.insurance_info) && (
+                    <div className="flex items-center gap-2 flex-wrap text-xs mb-3" onClick={(e) => e.stopPropagation()}>
+                      {primaryDoctor && (
+                        <div className="inline-flex items-center gap-1 px-2.5 py-1 rounded-xl bg-slate-100/80 dark:bg-slate-800/80 text-slate-700 dark:text-slate-300 border border-slate-200/70 dark:border-slate-700/70 text-[11px] font-medium">
+                          <User size={11} className="text-teal-600 shrink-0" />
+                          <span>پزشک: <strong className="font-bold text-slate-900 dark:text-slate-100">{primaryDoctor.name}</strong></span>
+                          {primaryDoctor.specialty && <span className="text-slate-400 text-[10px]">({primaryDoctor.specialty})</span>}
+                        </div>
+                      )}
+
+                      {patient.insurance_info && (
+                        <div className="inline-flex items-center gap-1 px-2.5 py-1 rounded-xl bg-blue-50/80 dark:bg-blue-950/40 text-blue-700 dark:text-blue-300 border border-blue-200/70 dark:border-blue-800/60 text-[11px] font-semibold">
+                          <Shield size={11} className="text-blue-500 shrink-0" />
+                          <span>بیمه: {patient.insurance_info}</span>
+                          {patient.insurance_number && <span className="font-mono text-[10px]" dir="ltr">({toPersianDigits(patient.insurance_number)})</span>}
+                        </div>
+                      )}
+                    </div>
+                  )}
+
                   {/* Clinical Alerts Row */}
-                  {(hasAllergies || hasConditions) && (
+                  {(hasAllergies || hasConditions || patient.anticoagulant_use || patient.bisphosphonate_use || patient.pregnancy_trimester) && (
                     <div className="flex items-center gap-1.5 flex-wrap mb-3" onClick={(e) => e.stopPropagation()}>
                       {hasAllergies && (
-                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-rose-50 text-rose-700 dark:bg-rose-950/40 dark:text-rose-300 text-[11px] font-bold border border-rose-200 dark:border-rose-900/40">
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-rose-50 text-rose-700 dark:bg-rose-950/50 dark:text-rose-300 text-[11px] font-bold border border-rose-200 dark:border-rose-900/50">
                           <AlertCircle size={11} className="text-rose-500 shrink-0" />
                           <span>حساسیت: {patient.allergies}</span>
                         </span>
                       )}
                       {hasConditions && (
-                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-amber-50 text-amber-800 dark:bg-amber-950/40 dark:text-amber-300 text-[11px] font-bold border border-amber-200 dark:border-amber-900/40">
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-amber-50 text-amber-800 dark:bg-amber-950/50 dark:text-amber-300 text-[11px] font-bold border border-amber-200 dark:border-amber-900/50">
                           <Heart size={11} className="text-amber-600 shrink-0" />
                           <span>بیماری: {patient.medical_conditions}</span>
+                        </span>
+                      )}
+                      {patient.anticoagulant_use && (
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-red-100/80 text-red-800 dark:bg-red-950/60 dark:text-red-200 text-[11px] font-bold border border-red-300 dark:border-red-800 animate-pulse">
+                          <AlertCircle size={11} className="text-red-600 shrink-0" />
+                          <span>مصرف ضدانعقاد {patient.inr_value ? `(INR: ${toPersianDigits(patient.inr_value)})` : ''}</span>
+                        </span>
+                      )}
+                      {patient.bisphosphonate_use && (
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-purple-50 text-purple-800 dark:bg-purple-950/50 dark:text-purple-300 text-[11px] font-bold border border-purple-200 dark:border-purple-900/50">
+                          <span>بیس‌فسفونات (ریسک استئونکروز)</span>
+                        </span>
+                      )}
+                      {patient.pregnancy_trimester && (
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-pink-50 text-pink-800 dark:bg-pink-950/50 dark:text-pink-300 text-[11px] font-bold border border-pink-200 dark:border-pink-900/50">
+                          <span>بارداری سه ماهه {toPersianDigits(patient.pregnancy_trimester)}</span>
                         </span>
                       )}
                     </div>
                   )}
 
-                  {/* Financial Overview Rail (Sanitized — No Dead Buttons) */}
+                  {/* Financial Overview Rail */}
                   {(isDebtor || isSettled || activeCheques > 0 || activePlans > 0) && (
                     <div className="flex items-center gap-2 flex-wrap mb-3" onClick={(e) => e.stopPropagation()}>
                       {isDebtor ? (
@@ -867,28 +975,29 @@ export default function Patients() {
                             navigate(`/patients/${patient.id}`, { state: { initialTab: 'payments', openPaymentModal: true } })
                           }}
                           title="ثبت تسویه و دریافت بدهی بیمار"
-                          className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-rose-50 dark:bg-rose-950/50 text-rose-700 dark:text-rose-300 border border-rose-200 dark:border-rose-800 text-xs font-black shadow-xs hover:bg-rose-100 transition-colors"
+                          className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-rose-50 dark:bg-rose-950/50 text-rose-700 dark:text-rose-300 border border-rose-200 dark:border-rose-800 text-xs font-black shadow-xs hover:bg-rose-100 dark:hover:bg-rose-900/60 transition-colors press-scale"
                         >
                           <span className="w-2 h-2 rounded-full bg-rose-500 animate-pulse" />
                           <Banknote size={13} className="text-rose-600 dark:text-rose-400" />
                           <span>بدهی: {formatCurrency(fin.balance)} تومان</span>
+                          <span className="text-[10px] underline font-normal mr-1">تسویه</span>
                         </button>
                       ) : isSettled ? (
-                        <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-emerald-50 dark:bg-emerald-950/50 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800 text-xs font-bold">
+                        <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-xl bg-emerald-50 dark:bg-emerald-950/50 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800 text-xs font-bold">
                           <CheckCircle2 size={13} className="text-emerald-600" />
                           <span>تسویه حساب کامل</span>
                         </span>
                       ) : null}
 
                       {activeCheques > 0 && (
-                        <span className="inline-flex items-center gap-1 px-2 py-1 rounded-lg bg-amber-50 dark:bg-amber-950/50 text-amber-800 dark:text-amber-300 border border-amber-200 dark:border-amber-800 text-xs font-bold">
+                        <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-xl bg-amber-50 dark:bg-amber-950/50 text-amber-800 dark:text-amber-300 border border-amber-200 dark:border-amber-800 text-xs font-bold">
                           <CreditCard size={12} className="text-amber-600" />
                           <span>{toPersianDigits(activeCheques)} چک صیادی</span>
                         </span>
                       )}
 
                       {activePlans > 0 && (
-                        <span className="inline-flex items-center gap-1 px-2 py-1 rounded-lg bg-indigo-50 dark:bg-indigo-950/50 text-indigo-800 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800 text-xs font-bold">
+                        <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-xl bg-indigo-50 dark:bg-indigo-950/50 text-indigo-800 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800 text-xs font-bold">
                           <CalendarClock size={12} className="text-indigo-600" />
                           <span>{toPersianDigits(activePlans)} اقساط فعال</span>
                         </span>
@@ -898,7 +1007,7 @@ export default function Patients() {
                 </div>
 
                 {/* Sterile Action Buttons */}
-                <div className="pt-3 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between gap-2" onClick={(e) => e.stopPropagation()}>
+                <div className="relative z-10 pt-3 border-t border-slate-200/60 dark:border-slate-800 flex items-center justify-between gap-2 flex-wrap" onClick={(e) => e.stopPropagation()}>
                   <div className="flex items-center gap-1.5 flex-wrap">
                     <button
                       type="button"
@@ -921,30 +1030,25 @@ export default function Patients() {
                           },
                         })
                       }}
-                      className="flex items-center gap-1 px-2.5 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 text-xs font-bold transition-all-smooth press-scale"
+                      className="flex items-center gap-1 px-2.5 py-1.5 rounded-xl bg-white/90 hover:bg-slate-100 dark:bg-slate-800/90 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 border border-slate-200/80 dark:border-slate-700/80 text-xs font-bold transition-all-smooth press-scale shadow-xs"
+                      title="ثبت نوبت جدید"
                     >
-                      <Calendar size={13} />
+                      <Calendar size={13} className="text-teal-600" />
                       <span>نوبت</span>
                     </button>
 
-                    {(() => {
-                      const cleanPhone = patient.phone ? patient.phone.replace(/\D/g, '').replace(/^0/, '98') : null
-                      if (!cleanPhone) return null
-                      const waText = `سلام ${patient.first_name} ${patient.last_name} عزیز،\nپیام از طرف کلینیک دندانپزشکی مینا.\nجهت هماهنگی و پیگیری نوبت با ما در ارتباط باشید.`
-                      return (
-                        <a
-                          href={`https://wa.me/${cleanPhone}?text=${encodeURIComponent(waText)}`}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="flex items-center gap-1 px-2.5 py-1.5 rounded-xl bg-emerald-50 hover:bg-emerald-100 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300 text-xs font-bold transition-all-smooth press-scale"
-                          title="ارسال پیام در واتساپ"
-                          onClick={() => chimes.playPop()}
-                        >
-                          <MessageSquare size={13} />
-                          <span>واتساپ</span>
-                        </a>
-                      )
-                    })()}
+                    <button
+                      type="button"
+                      onClick={() => {
+                        h.tap()
+                        navigate(`/patients/${patient.id}`, { state: { initialTab: 'dental-chart' } })
+                      }}
+                      className="flex items-center gap-1 px-2.5 py-1.5 rounded-xl bg-white/90 hover:bg-teal-50 dark:bg-slate-800/90 dark:hover:bg-teal-950/40 text-slate-700 dark:text-slate-200 border border-slate-200/80 dark:border-slate-700/80 text-xs font-bold transition-all-smooth press-scale shadow-xs"
+                      title="مشاهده چارت دندانپزشکی"
+                    >
+                      <Activity size={13} className="text-teal-600" />
+                      <span>چارت</span>
+                    </button>
                   </div>
 
                   <div className="flex items-center gap-1">
@@ -953,7 +1057,7 @@ export default function Patients() {
                       onClick={() => openEditModal(patient)}
                       title="ویرایش اطلاعات بیمار"
                       aria-label="ویرایش اطلاعات"
-                      className="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+                      className="p-1.5 rounded-xl text-slate-400 hover:text-slate-700 hover:bg-white/80 dark:hover:bg-slate-800 transition-colors"
                     >
                       <Edit2 size={15} />
                     </button>
@@ -962,7 +1066,7 @@ export default function Patients() {
                       onClick={() => handleDelete(patient)}
                       title="انتقال به بایگانی / غیرفعال‌سازی"
                       aria-label="انتقال به بایگانی"
-                      className="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/30 transition-colors"
+                      className="p-1.5 rounded-xl text-slate-400 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/30 transition-colors"
                     >
                       <Archive size={15} />
                     </button>
@@ -980,7 +1084,8 @@ export default function Patients() {
               <tr>
                 <th className="p-3.5 font-bold">بیمار</th>
                 <th className="p-3.5 font-bold">شماره پرونده</th>
-                <th className="p-3.5 font-bold">تلفن و کد ملی</th>
+                <th className="p-3.5 font-bold">ارتباط و مشخصات</th>
+                <th className="p-3.5 font-bold">پزشک و بیمه</th>
                 <th className="p-3.5 font-bold">هشدارهای بالینی</th>
                 <th className="p-3.5 font-bold">وضعیت مالی</th>
                 <th className="p-3.5 font-bold text-center">عملیات</th>
@@ -988,6 +1093,7 @@ export default function Patients() {
             </thead>
             <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
               {filteredPatients.map((patient) => {
+                const theme = tileThemes[getHashColor(patient.id)]
                 const vipMeta = getVipMeta(patient.vip_level)
                 const age = calculateAge(patient.birth_date)
                 const fin = patientFinances.get(patient.id) || { balance: 0, paid: 0, totalCost: 0 }
@@ -995,6 +1101,9 @@ export default function Patients() {
                 const isSettled = fin.totalCost > 0 && fin.balance <= 0
                 const hasAllergies = !isNegativeValue(patient.allergies)
                 const hasConditions = !isNegativeValue(patient.medical_conditions)
+                const primaryDoctor = patient.primary_doctor_id ? doctorsMap.get(patient.primary_doctor_id) : null
+                const cleanPhone = patient.phone ? patient.phone.replace(/\D/g, '').replace(/^0/, '98') : null
+                const waText = `سلام ${patient.first_name} ${patient.last_name} عزیز،\nپیام از طرف کلینیک دندانپزشکی مینا.\nجهت هماهنگی و پیگیری نوبت با ما در ارتباط باشید.`
 
                 return (
                   <tr
@@ -1004,8 +1113,8 @@ export default function Patients() {
                   >
                     <td className="p-3.5">
                       <div className="flex items-center gap-2.5">
-                        <div className="w-8 h-8 rounded-lg bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 flex items-center justify-center font-bold text-xs text-slate-700 dark:text-slate-200 shrink-0">
-                          {patient.avatar_url ? <img src={patient.avatar_url} alt="" className="w-full h-full object-cover rounded-lg" /> : getInitials(patient)}
+                        <div className={`w-9 h-9 rounded-xl ${patient.avatar_url ? '' : theme.iconBg} text-white font-bold text-xs flex items-center justify-center shrink-0 shadow-xs border border-white/60 dark:border-slate-700 overflow-hidden`}>
+                          {patient.avatar_url ? <img src={patient.avatar_url} alt="" className="w-full h-full object-cover rounded-xl" /> : getInitials(patient)}
                         </div>
                         <div>
                           <div className="flex items-center gap-1">
@@ -1022,26 +1131,75 @@ export default function Patients() {
                       </div>
                     </td>
 
+                    {/* Non-Black Elegant File Number Capsule */}
                     <td className="p-3.5 font-mono font-bold" dir="ltr">
                       {patient.file_number ? (
-                        <span className="px-2 py-0.5 rounded bg-slate-900 text-white text-[11px]">
-                          {toPersianDigits(patient.file_number)}
+                        <span className={`inline-flex items-center gap-1 font-mono font-black text-xs px-2.5 py-1 rounded-lg ${theme.capsuleBg} ${theme.capsuleText} border ${theme.capsuleBorder} shadow-xs`}>
+                          <FileText size={11} className="opacity-80" />
+                          <span>#{toPersianDigits(patient.file_number)}</span>
                         </span>
                       ) : (
                         <span className="text-slate-400">—</span>
                       )}
                     </td>
 
-                    <td className="p-3.5">
-                      <div className="space-y-0.5 font-mono text-[11px]" dir="ltr">
+                    <td className="p-3.5" onClick={(e) => e.stopPropagation()}>
+                      <div className="space-y-1 font-mono text-[11px]" dir="ltr">
                         {patient.phone && (
-                          <div className="text-slate-600 dark:text-slate-300">
-                            {privacyMode ? maskPhoneNumber(patient.phone) : toPersianDigits(patient.phone)}
+                          <div className="flex items-center gap-2 text-slate-700 dark:text-slate-300 font-bold">
+                            <span>{privacyMode ? maskPhoneNumber(patient.phone) : toPersianDigits(patient.phone)}</span>
+                            <div className="flex items-center gap-1">
+                              <a
+                                href={`tel:${patient.phone}`}
+                                onClick={() => { h.tap(); chimes.playPop() }}
+                                className="p-1 rounded-md text-teal-600 hover:bg-teal-50 dark:hover:bg-teal-950/40"
+                                title="تماس تلفنی"
+                              >
+                                <PhoneCall size={12} />
+                              </a>
+                              <a
+                                href={`sms:${patient.phone}`}
+                                onClick={() => { h.tap(); chimes.playPop() }}
+                                className="p-1 rounded-md text-sky-600 hover:bg-sky-50 dark:hover:bg-sky-950/40"
+                                title="ارسال پیامک"
+                              >
+                                <MessageSquare size={12} />
+                              </a>
+                              {cleanPhone && (
+                                <a
+                                  href={`https://wa.me/${cleanPhone}?text=${encodeURIComponent(waText)}`}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  onClick={() => { h.tap(); chimes.playPop() }}
+                                  className="p-1 rounded-md text-emerald-600 hover:bg-emerald-50 dark:hover:bg-emerald-950/40"
+                                  title="ارسال پیام در واتساپ"
+                                >
+                                  <MessageCircle size={12} />
+                                </a>
+                              )}
+                            </div>
                           </div>
                         )}
                         {patient.national_id && (
                           <div className="text-slate-400">
-                            {privacyMode ? maskNationalId(patient.national_id) : toPersianDigits(patient.national_id)}
+                            کد ملی: {privacyMode ? maskNationalId(patient.national_id) : toPersianDigits(patient.national_id)}
+                          </div>
+                        )}
+                      </div>
+                    </td>
+
+                    <td className="p-3.5">
+                      <div className="space-y-0.5 text-xs">
+                        {primaryDoctor ? (
+                          <div className="font-medium text-slate-800 dark:text-slate-200">
+                            دکتر {primaryDoctor.name}
+                          </div>
+                        ) : (
+                          <span className="text-slate-400">—</span>
+                        )}
+                        {patient.insurance_info && (
+                          <div className="text-[11px] text-blue-600 dark:text-blue-400">
+                            {patient.insurance_info}
                           </div>
                         )}
                       </div>
@@ -1059,7 +1217,12 @@ export default function Patients() {
                             بیماری زمینه‌ای
                           </span>
                         )}
-                        {!hasAllergies && !hasConditions && (
+                        {patient.anticoagulant_use && (
+                          <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-red-100 text-red-800 border border-red-200 animate-pulse">
+                            ضدانعقاد
+                          </span>
+                        )}
+                        {!hasAllergies && !hasConditions && !patient.anticoagulant_use && (
                           <span className="text-slate-400">—</span>
                         )}
                       </div>
@@ -1084,7 +1247,7 @@ export default function Patients() {
                           type="button"
                           onClick={() => { h.tap(); navigate(`/patients/${patient.id}`) }}
                           title="ورود به پرونده"
-                          className="px-2.5 py-1 rounded-lg bg-teal-600 hover:bg-teal-700 text-white font-bold text-[11px]"
+                          className="px-2.5 py-1 rounded-lg bg-teal-600 hover:bg-teal-700 text-white font-bold text-[11px] shadow-xs"
                         >
                           پرونده
                         </button>

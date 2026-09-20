@@ -1444,6 +1444,26 @@ input, textarea, select { font-size: 16px !important; }
 
 @media (prefers-reduced-motion: reduce) {
   .gemini-ambient-card { animation: none !important; }
+  .breathe-slow { animation: none !important; }
+}
+
+/* ── Dynamic Gemini Ambient Aura for Cards ── */
+@keyframes geminiBlobBreathe {
+  0%, 100% {
+    transform: scale(1) translate3d(0, 0, 0);
+    opacity: 0.30;
+    filter: blur(28px);
+  }
+  50% {
+    transform: scale(1.25) translate3d(6px, -6px, 0);
+    opacity: 0.60;
+    filter: blur(36px);
+  }
+}
+
+.breathe-slow {
+  animation: geminiBlobBreathe 8s ease-in-out infinite;
+  will-change: transform, opacity, filter;
 }
 
 /* Custom smooth scroll track for tabs rail */
