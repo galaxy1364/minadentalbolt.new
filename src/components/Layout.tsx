@@ -582,8 +582,8 @@ function BottomTabBar() {
 
   return (
     <>
-      <nav className="fixed bottom-0 left-0 right-0 z-40 tab-bar pb-safe">
-        <div className="flex items-stretch h-[4.5rem] max-w-2xl mx-auto">
+      <nav className="fixed bottom-0 left-0 right-0 z-40 tab-bar pb-safe sm:bottom-4 sm:left-1/2 sm:-translate-x-1/2 sm:w-[94%] sm:max-w-2xl sm:rounded-3xl sm:pb-0 transition-all duration-300">
+        <div className="flex items-stretch h-[4.5rem] max-w-2xl mx-auto px-1 sm:px-2">
           {visiblePrimary.map((item: ModuleIdentity) => {
             const Icon = item.icon
             const active = isActive(item.path)
@@ -594,16 +594,21 @@ function BottomTabBar() {
                 className="flex-1 flex flex-col items-center justify-center gap-0.5 transition-all-smooth press-scale"
                 style={{ color: active ? item.color : `color-mix(in srgb, ${item.color} 62%, #94a3b8)` }}
               >
-                <div className={`relative transition-all duration-300 flex flex-col items-center justify-center ${
-                  active ? 'p-1 px-3 rounded-2xl bg-white/80 dark:bg-slate-800/90 shadow-xs border border-white/80 dark:border-white/10 scale-105' : 'p-1'
-                }`}>
-                  <Icon size={active ? 27 : 24} strokeWidth={active ? 2.4 : 1.9} />
+                <div
+                  className={`relative transition-all duration-300 flex flex-col items-center justify-center ${
+                    active
+                      ? 'p-1.5 px-3 rounded-2xl bg-white/90 dark:bg-slate-800/95 border border-white/90 dark:border-white/10 scale-105'
+                      : 'p-1 hover:scale-105'
+                  }`}
+                  style={active ? { boxShadow: `0 4px 14px color-mix(in srgb, ${item.color} 30%, transparent)` } : undefined}
+                >
+                  <Icon size={active ? 26 : 23} strokeWidth={active ? 2.5 : 1.9} />
                   {(() => {
                     const w = openWork[item.path]
                     if (!w || w.count === 0) return null
                     return (
                       <span
-                        className="absolute -top-1 -left-1 min-w-[16px] h-4 px-1 rounded-full text-white text-[9px] font-bold flex items-center justify-center border border-white dark:border-slate-900"
+                        className="absolute -top-1 -left-1 min-w-[16px] h-4 px-1 rounded-full text-white text-[9px] font-bold flex items-center justify-center border border-white dark:border-slate-900 shadow-sm"
                         style={{ backgroundColor: LEVEL_COLORS[w.level] }}
                         aria-label={`${w.count} کار باز`}
                       >
@@ -613,7 +618,7 @@ function BottomTabBar() {
                   })()}
                 </div>
                 <span
-                  className={`text-[10px] leading-none ${active ? 'font-extrabold' : 'font-medium'}`}
+                  className={`text-[10px] leading-none tracking-tight ${active ? 'font-extrabold' : 'font-medium'}`}
                   style={{ color: active ? item.color : `color-mix(in srgb, ${item.color} 55%, #94a3b8)` }}
                 >
                   {item.label}
@@ -628,12 +633,17 @@ function BottomTabBar() {
             }`}
             style={{ color: isMoreActive && currentMod ? currentMod.color : 'var(--module-color, #64748b)' }}
           >
-            <div className={`transition-all duration-300 flex flex-col items-center justify-center ${
-              isMoreActive ? 'p-1 px-3 rounded-2xl bg-white/80 dark:bg-slate-800/90 shadow-xs border border-white/80 dark:border-white/10 scale-105' : 'p-1'
-            }`}>
-              <MoreHorizontal size={isMoreActive ? 27 : 24} strokeWidth={isMoreActive ? 2.4 : 1.9} />
+            <div
+              className={`transition-all duration-300 flex flex-col items-center justify-center ${
+                isMoreActive
+                  ? 'p-1.5 px-3 rounded-2xl bg-white/90 dark:bg-slate-800/95 border border-white/90 dark:border-white/10 scale-105'
+                  : 'p-1 hover:scale-105'
+              }`}
+              style={isMoreActive && currentMod ? { boxShadow: `0 4px 14px color-mix(in srgb, ${currentMod.color} 30%, transparent)` } : undefined}
+            >
+              <MoreHorizontal size={isMoreActive ? 26 : 23} strokeWidth={isMoreActive ? 2.5 : 1.9} />
             </div>
-            <span className={`text-[10px] leading-none ${isMoreActive ? 'font-extrabold' : 'font-medium text-slate-400 dark:text-slate-500'}`}
+            <span className={`text-[10px] leading-none tracking-tight ${isMoreActive ? 'font-extrabold' : 'font-medium text-slate-400 dark:text-slate-500'}`}
               style={isMoreActive && currentMod ? { color: currentMod.color } : undefined}
             >
               بیشتر

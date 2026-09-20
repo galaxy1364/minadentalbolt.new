@@ -1,7 +1,7 @@
 // Inventory.tsx - Persian RTL Dental Clinic Inventory Management
 import { useState, useEffect, useCallback, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Package, Boxes, Search, Plus, Edit2, AlertTriangle, TrendingDown, PackageCheck, Smile, ScanLine, Archive } from 'lucide-react'
+import { Package, Boxes, Search, Plus, Minus, Edit2, AlertTriangle, TrendingDown, PackageCheck, Smile, ScanLine, Archive } from 'lucide-react'
 import { BarcodeScanner } from '../components/BarcodeScanner'
 import { BarChart, Bar, XAxis, YAxis, Tooltip as RTooltip, ResponsiveContainer, Cell } from 'recharts'
 import { fetchInventoryItems, fetchInventoryCategories, createInventoryItem, updateInventoryItem, deactivateInventoryItem } from '../lib/api'
@@ -325,6 +325,26 @@ export default function Inventory() {
     }
   }
 
+  const handleQuickDecrement = async (item: InventoryItemWithRelations) => {
+    if ((item.quantity || 0) <= 0) {
+      showToast('info', 'موجودی این کالا در حال حاضر صفر است')
+      chimes.playWarning()
+      return
+    }
+    h.tap()
+    chimes.playPop()
+    try {
+      const nextQty = Math.max(0, (item.quantity || 0) - 1)
+      await updateInventoryItem(item.id, { quantity: nextQty } as any)
+      showToast('info', `مصرف ۱ عدد — موجودی ${item.name}: ${toPersianDigits(nextQty)}`)
+      chimes.playPop()
+      await loadData()
+    } catch {
+      showToast('error', 'خطا در کاهش موجودی')
+      chimes.playWarning()
+    }
+  }
+
   const handleDelete = (item: InventoryItemWithRelations) => {
     h.warning()
     confirmAction({
@@ -465,22 +485,79 @@ export default function Inventory() {
                     {filteredItems.map((i) => {
                       const stock = getStockStatus(i)
                       return (
-                        <tr key={i.id} className="border-b border-slate-50 hover:bg-slate-50 transition-all-smooth">
-                          <td className="px-4 py-3 font-medium text-slate-800">{i.name}</td>
-                          <td className="px-4 py-3 text-slate-600">{i.brand || '-'}</td>
-                          <td className="px-4 py-3 text-slate-700">
-                            {formatNumber(i.quantity ?? 0)} <span className="text-xs text-slate-400">{getUnitLabel(i.unit)}</span>
+                        <tr key={i.id} className="border-b border-slate-50 dark:border-slate-800/60 hover:bg-slate-50/80 dark:hover:bg-slate-800/40 transition-all-smooth">
+                          <td className="px-4 py-3 font-medium text-slate-800 dark:text-slate-100">
+                            <button
+                              type="button"
+                              onClick={() => openEditModal(i)}
+                              className="text-right font-bold text-slate-800 dark:text-slate-100 hover:text-primary-600 dark:hover:text-primary-400 transition-colors flex items-center gap-1.5 group"
+                              title="کلیک جهت مشاهده و ویرایش جزئیات کالا"
+                            >
+                              <span>{i.name}</span>
+                              <Edit2 size={12} className="opacity-0 group-hover:opacity-100 text-primary-500 transition-opacity" />
+                            </button>
+                            {i.supplier && (
+                              <span className="block text-[11px] text-slate-400 dark:text-slate-500 truncate mt-0.5">
+                                تأمین‌کننده: {i.supplier}
+                              </span>
+                            )}
                           </td>
-                          <td className="px-4 py-3 text-slate-600">{formatNumber(i.min_quantity ?? 0)}</td>
-                          <td className="px-4 py-3 text-slate-700 font-medium">
+                          <td className="px-4 py-3 text-slate-600 dark:text-slate-300">{i.brand || '-'}</td>
+                          <td className="px-4 py-3 text-slate-700 dark:text-slate-200">
+                            <span className="font-extrabold">{formatNumber(i.quantity ?? 0)}</span> <span className="text-xs text-slate-400">{getUnitLabel(i.unit)}</span>
+                          </td>
+                          <td className="px-4 py-3 text-slate-500 dark:text-slate-400 text-xs">{formatNumber(i.min_quantity ?? 0)}</td>
+                          <td className="px-4 py-3 text-slate-700 dark:text-slate-200 font-medium">
                             {i.unit_cost ? `${formatCurrency(i.unit_cost)} ت` : '-'}
                           </td>
-                          <td className="px-4 py-3"><Badge color={stock.color}>{stock.label}</Badge></td>
                           <td className="px-4 py-3">
-                            <div className="flex items-center gap-1">
-                              <button onClick={() => handleQuickIncrement(i)} aria-label="افزایش یک عدد موجودی" title="افزایش سریع موجودی (+۱)" className="p-1 rounded-lg bg-emerald-50 text-emerald-600 hover:bg-emerald-100 transition-all-smooth press-scale"><Plus size={14} /></button>
-                              <button onClick={() => openEditModal(i)} aria-label="ویرایش کالا" title="ویرایش" className="p-1 rounded-lg bg-slate-100 text-slate-600 hover:bg-slate-200 transition-all-smooth press-scale"><Edit2 size={14} /></button>
-                              <button onClick={() => handleDelete(i)} aria-label="غیرفعال کردن کالا" title="غیرفعال کردن" className="p-1 rounded-lg bg-error-50 text-error-500 hover:bg-error-100 transition-all-smooth press-scale"><Archive size={14} /></button>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                if (stock.color !== 'success') {
+                                  setLowStockOnly(true)
+                                }
+                              }}
+                              title={stock.color !== 'success' ? 'کلیک جهت فیلتر اقلام نیازمند شارژ' : 'موجودی کافی'}
+                              className="inline-flex"
+                            >
+                              <Badge color={stock.color}>{stock.label}</Badge>
+                            </button>
+                          </td>
+                          <td className="px-4 py-3">
+                            <div className="flex items-center gap-1 justify-end">
+                              <button
+                                onClick={() => handleQuickIncrement(i)}
+                                aria-label="افزایش یک عدد موجودی"
+                                title="افزایش سریع موجودی (+۱)"
+                                className="w-8 h-8 rounded-xl bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-100 dark:hover:bg-emerald-900/50 flex items-center justify-center transition-all-smooth press-scale border border-emerald-200/60 dark:border-emerald-800/40"
+                              >
+                                <Plus size={15} />
+                              </button>
+                              <button
+                                onClick={() => handleQuickDecrement(i)}
+                                aria-label="مصرف یا کاهش یک عدد موجودی"
+                                title="ثبت مصرف و کاهش موجودی (-۱)"
+                                className="w-8 h-8 rounded-xl bg-amber-50 dark:bg-amber-950/40 text-amber-600 dark:text-amber-400 hover:bg-amber-100 dark:hover:bg-amber-900/50 flex items-center justify-center transition-all-smooth press-scale border border-amber-200/60 dark:border-amber-800/40"
+                              >
+                                <Minus size={15} />
+                              </button>
+                              <button
+                                onClick={() => openEditModal(i)}
+                                aria-label="ویرایش کالا"
+                                title="ویرایش کالا"
+                                className="w-8 h-8 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700 flex items-center justify-center transition-all-smooth press-scale border border-slate-200/60 dark:border-slate-700/60"
+                              >
+                                <Edit2 size={14} />
+                              </button>
+                              <button
+                                onClick={() => handleDelete(i)}
+                                aria-label="غیرفعال کردن کالا"
+                                title="غیرفعال‌سازی"
+                                className="w-8 h-8 rounded-xl bg-rose-50 dark:bg-rose-950/40 text-rose-600 dark:text-rose-400 hover:bg-rose-100 dark:hover:bg-rose-900/50 flex items-center justify-center transition-all-smooth press-scale border border-rose-200/60 dark:border-rose-800/40"
+                              >
+                                <Archive size={14} />
+                              </button>
                             </div>
                           </td>
                         </tr>

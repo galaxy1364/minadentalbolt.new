@@ -1,5 +1,6 @@
 // Staff.tsx - Persian RTL Dental Clinic Staff Management with Doctor Revenue Sharing
 import { useState, useEffect, useCallback, useMemo } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { Users, Search, Plus, Phone, Mail, Calendar, DollarSign, Smile, Briefcase, Edit2, Stethoscope, Calculator, Award, TrendingUp, Percent, UserCheck, ChevronDown, ChevronUp, Shield, Lock, Unlock, RotateCcw, Archive, Download } from 'lucide-react'
 import { PieChart, Pie, Cell, Tooltip as RTooltip, ResponsiveContainer } from 'recharts'
 import { staffSaveMessage, LoginOutcome } from '../lib/staffSaveOutcome'
@@ -69,6 +70,7 @@ interface ShareResult {
 }
 
 export default function Staff() {
+  const navigate = useNavigate()
   const { confirmAction, ConfirmActionModal } = useConfirmAction()
   const [staff, setStaff] = useState<StaffType[]>([])
   const [staffLoginMap, setStaffLoginMap] = useState<Map<string, { userId: string; isActive: boolean }>>(new Map())
@@ -640,7 +642,19 @@ export default function Staff() {
                 <tbody>
                   {shareResults.map((r) => (
                     <tr key={r.doctorId} className="border-b border-slate-100 hover:bg-slate-50">
-                      <td className="py-2 px-2 font-medium text-slate-800">{r.doctorName}</td>
+                      <td className="py-2 px-2 font-medium text-slate-800">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            h.tap()
+                            navigate('/treatments', { state: { doctorFilter: r.doctorName } })
+                          }}
+                          className="hover:text-primary-600 dark:hover:text-primary-400 font-bold transition-colors text-right"
+                          title="مشاهده درمان‌های ثبت‌شده این پزشک"
+                        >
+                          {r.doctorName}
+                        </button>
+                      </td>
                       <td className="py-2 px-2 text-slate-600">{formatCurrency(r.totalProduction)} ت</td>
                       <td className="py-2 px-2 text-error-600">{formatCurrency(r.totalLabCost)} ت</td>
                       <td className="py-2 px-2 text-success-600 font-medium">{formatCurrency(r.netProduction)} ت</td>
@@ -917,13 +931,27 @@ export default function Staff() {
                       {s.phone && (
                         <div className="flex items-center gap-2 text-slate-600">
                           <Phone size={14} className="text-slate-400" />
-                          <span dir="ltr">{toPersianDigits(s.phone)}</span>
+                          <a
+                            href={`tel:${s.phone}`}
+                            dir="ltr"
+                            className="hover:text-primary-600 hover:underline transition-colors font-medium"
+                            title="تماس تلفنی با پرسنل"
+                          >
+                            {toPersianDigits(s.phone)}
+                          </a>
                         </div>
                       )}
                       {s.email && (
                         <div className="flex items-center gap-2 text-slate-600">
                           <Mail size={14} className="text-slate-400" />
-                          <span className="truncate" dir="ltr">{s.email}</span>
+                          <a
+                            href={`mailto:${s.email}`}
+                            dir="ltr"
+                            className="truncate hover:text-primary-600 hover:underline transition-colors"
+                            title="ارسال ایمیل به پرسنل"
+                          >
+                            {s.email}
+                          </a>
                         </div>
                       )}
                       {s.hire_date && (
@@ -939,13 +967,27 @@ export default function Staff() {
                         </div>
                       )}
                       {isDoctor && (
-                        <div className="flex items-center gap-2 text-primary-600 pt-1 border-t border-slate-100">
-                          <TrendingUp size={14} />
-                          <span className="text-xs">
-                            {s.share_type === 'net_split' ? `سهم: ${toPersianDigits(s.share_percentage ?? 50)}٪ از سود خالص (منهای لابراتوار)` :
-                             s.share_type === 'percentage' ? `سهم: ${toPersianDigits(s.share_percentage ?? 50)}٪ از کل کارکرد` :
-                             `سهم ثابت: ${formatCurrency(s.fixed_share_amount ?? 0)} ت`}
-                          </span>
+                        <div className="pt-2 mt-1 border-t border-slate-100 dark:border-slate-800 space-y-2">
+                          <div className="flex items-center gap-2 text-primary-600">
+                            <TrendingUp size={14} />
+                            <span className="text-xs">
+                              {s.share_type === 'net_split' ? `سهم: ${toPersianDigits(s.share_percentage ?? 50)}٪ از سود خالص (منهای لابراتوار)` :
+                               s.share_type === 'percentage' ? `سهم: ${toPersianDigits(s.share_percentage ?? 50)}٪ از کل کارکرد` :
+                               `سهم ثابت: ${formatCurrency(s.fixed_share_amount ?? 0)} ت`}
+                            </span>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              h.tap()
+                              navigate('/treatments', { state: { doctorFilter: s.full_name } })
+                            }}
+                            className="w-full py-1.5 px-2.5 rounded-xl bg-primary-50 dark:bg-primary-950/40 text-primary-700 dark:text-primary-300 hover:bg-primary-100 dark:hover:bg-primary-900/50 text-xs font-bold transition-all-smooth border border-primary-200/60 dark:border-primary-800/50 flex items-center justify-center gap-1.5 press-scale"
+                            title="مشاهده کلیه پرونده‌ها و درمان‌های انجام‌شده توسط این پزشک"
+                          >
+                            <Stethoscope size={13} />
+                            <span>مشاهده پرونده‌های درمانی پزشک</span>
+                          </button>
                         </div>
                       )}
                     </div>

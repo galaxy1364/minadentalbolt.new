@@ -142,9 +142,18 @@ export default function Treatments() {
   const [loading, setLoading] = useState(true)
 
   // Filters
-  const [searchQuery, setSearchQuery] = useState('')
+  const [searchQuery, setSearchQuery] = useState(
+    () => (location.state as { doctorFilter?: string } | null)?.doctorFilter || ''
+  )
   const [filterStatus, setFilterStatus] = useState('')
   const [filterCategory, setFilterCategory] = useState('')
+
+  useEffect(() => {
+    const passedDoctor = (location.state as { doctorFilter?: string } | null)?.doctorFilter
+    if (passedDoctor) {
+      setSearchQuery(passedDoctor)
+    }
+  }, [location.state])
 
   // Encounter modal
   const [encModalOpen, setEncModalOpen] = useState(false)
@@ -474,12 +483,14 @@ export default function Treatments() {
       if (searchQuery) {
         const name = e.patient ? `${e.patient.first_name} ${e.patient.last_name}` : ''
         const diag = e.diagnosis || ''
-        if (!name.toLowerCase().includes(searchQuery.toLowerCase()) && !diag.toLowerCase().includes(searchQuery.toLowerCase())) return false
+        const docName = e.doctor?.name || (e.doctor_id ? doctorMap.get(e.doctor_id)?.name : '') || ''
+        const q = searchQuery.toLowerCase()
+        if (!name.toLowerCase().includes(q) && !diag.toLowerCase().includes(q) && !docName.toLowerCase().includes(q)) return false
       }
       if (filterStatus && e.status !== filterStatus) return false
       return true
     })
-  }, [encounters, searchQuery, filterStatus])
+  }, [encounters, searchQuery, filterStatus, doctorMap])
 
   // MOD-FEAT-042: the «ویزیت‌ها» tab is one file per patient, not one row
   // per visit. The status filter keeps working — it narrows which visits
@@ -502,9 +513,14 @@ export default function Treatments() {
       const file = (p?.file_number || '').toLowerCase()
       const phone = p?.phone || ''
       const diag = g.encounters.some((e) => (e as EncounterWithRelations).diagnosis?.toLowerCase().includes(q))
-      return name.includes(q) || file.includes(q) || phone.includes(q) || diag
+      const docMatch = g.encounters.some((e) => {
+        const enc = e as EncounterWithRelations
+        const docName = enc.doctor?.name || (enc.doctor_id ? doctorMap.get(enc.doctor_id)?.name : '') || ''
+        return docName.toLowerCase().includes(q)
+      })
+      return name.includes(q) || file.includes(q) || phone.includes(q) || diag || docMatch
     })
-  }, [encounters, treatments, payments, implantCases, cheques, installments, filterStatus, searchQuery, patientMap])
+  }, [encounters, treatments, payments, implantCases, cheques, installments, filterStatus, searchQuery, patientMap, doctorMap])
 
   const togglePatient = (id: string) =>
     setExpandedPatients((prev) => {
@@ -1290,23 +1306,36 @@ export default function Treatments() {
             <input
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder={activeTab === 'encounters' ? 'جستجوی بیمار یا تشخیص...' : 'جستجوی نام یا کد رویه...'}
-              className="w-full pr-9 pl-3 py-2 rounded-xl border border-slate-200 bg-slate-50 text-sm focus:outline-none focus:ring-2 focus:ring-primary-400"
+              placeholder={activeTab === 'encounters' ? 'جستجوی بیمار، پزشک یا تشخیص...' : 'جستجوی نام یا کد رویه...'}
+              className="w-full pr-9 pl-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-sm focus:outline-none focus:ring-2 focus:ring-primary-400 dark:text-slate-100"
             />
           </div>
+          {searchQuery && (
+            <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-primary-50 dark:bg-primary-950/60 text-primary-700 dark:text-primary-300 text-xs font-bold border border-primary-200/70 dark:border-primary-800/60 shadow-xs">
+              <span>فیلتر: {searchQuery}</span>
+              <button
+                type="button"
+                onClick={() => setSearchQuery('')}
+                className="p-0.5 rounded-md hover:bg-primary-200/60 dark:hover:bg-primary-900/60 text-primary-600 dark:text-primary-300 transition-colors"
+                title="حذف فیلتر"
+              >
+                <X size={13} />
+              </button>
+            </div>
+          )}
           {activeTab === 'encounters' ? (
-            <select value={filterStatus} onChange={(e) => setFilterStatus(e.target.value)} className="px-3 py-2 rounded-xl border border-slate-200 bg-slate-50 text-sm focus:outline-none focus:ring-2 focus:ring-primary-400">
+            <select value={filterStatus} onChange={(e) => setFilterStatus(e.target.value)} className="px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-sm focus:outline-none focus:ring-2 focus:ring-primary-400 dark:text-slate-100">
               <option value="">همه وضعیت‌ها</option>
               {encounterStatuses.map((s) => <option key={s.value} value={s.value}>{s.label}</option>)}
             </select>
           ) : (
-            <select value={filterCategory} onChange={(e) => setFilterCategory(e.target.value)} className="px-3 py-2 rounded-xl border border-slate-200 bg-slate-50 text-sm focus:outline-none focus:ring-2 focus:ring-primary-400">
+            <select value={filterCategory} onChange={(e) => setFilterCategory(e.target.value)} className="px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-sm focus:outline-none focus:ring-2 focus:ring-primary-400 dark:text-slate-100">
               <option value="">همه دسته‌ها</option>
               {categoryOptions.map((c) => <option key={c.value} value={c.value}>{c.label}</option>)}
             </select>
           )}
           {(searchQuery || filterStatus || filterCategory) && (
-            <Button variant="ghost" size="sm" onClick={() => { setSearchQuery(''); setFilterStatus(''); setFilterCategory('') }}>پاک کردن</Button>
+            <Button variant="ghost" size="sm" onClick={() => { setSearchQuery(''); setFilterStatus(''); setFilterCategory('') }}>پاک کردن همه</Button>
           )}
         </div>
       </Card>

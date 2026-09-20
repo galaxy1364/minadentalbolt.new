@@ -618,26 +618,47 @@ export default function Insurance() {
                     {filteredClaims.map((c) => {
                       const meta = getClaimStatusMeta(c.status)
                       return (
-                        <tr key={c.id} className="border-b border-slate-50 hover:bg-slate-50 transition-all-smooth">
-                          <td className="px-4 py-3 font-medium text-slate-800">{claimPatientName(c)}</td>
-                          <td className="px-4 py-3 text-slate-600">{c.company?.name || '-'}</td>
-                          <td className="px-4 py-3 text-slate-700 font-medium">{c.amount ? `${formatCurrency(c.amount)} ت` : '-'}</td>
-                          <td className="px-4 py-3 text-slate-700">{c.approved_amount != null ? `${formatCurrency(c.approved_amount)} ت` : '-'}</td>
+                        <tr key={c.id} className="border-b border-slate-50 dark:border-slate-800/60 hover:bg-slate-50/80 dark:hover:bg-slate-800/40 transition-all-smooth">
+                          <td className="px-4 py-3 font-medium text-slate-800 dark:text-slate-100">
+                            <div className="flex items-center gap-2">
+                              <button
+                                type="button"
+                                onClick={() => navigate(`/patients/${c.patient_id}`)}
+                                className="font-bold text-slate-800 dark:text-slate-100 hover:text-primary-600 dark:hover:text-primary-400 transition-colors text-right"
+                                title="مشاهده پرونده جامع بیمار"
+                              >
+                                {claimPatientName(c)}
+                              </button>
+                              {c.patient?.file_number && (
+                                <button
+                                  type="button"
+                                  onClick={() => navigate(`/patients/${c.patient_id}`)}
+                                  className="inline-flex items-center px-1.5 py-0.5 rounded-md bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 font-mono text-[10px] font-bold cursor-pointer hover:bg-primary-50 hover:text-primary-600 transition-colors"
+                                  title="شماره پرونده بیمار"
+                                >
+                                  #{toPersianDigits(c.patient.file_number)}
+                                </button>
+                              )}
+                            </div>
+                          </td>
+                          <td className="px-4 py-3 text-slate-600 dark:text-slate-300">{c.company?.name || '-'}</td>
+                          <td className="px-4 py-3 text-slate-700 dark:text-slate-200 font-medium">{c.amount ? `${formatCurrency(c.amount)} ت` : '-'}</td>
+                          <td className="px-4 py-3 text-slate-700 dark:text-slate-200 font-bold">{c.approved_amount != null ? `${formatCurrency(c.approved_amount)} ت` : '-'}</td>
                           <td className="px-4 py-3"><Badge color={meta.color}>{meta.label}</Badge></td>
                           <td className="px-4 py-3">
-                            <div className="flex gap-1">
+                            <div className="flex items-center gap-1 justify-end">
                               {c.approved_amount != null && c.approved_amount > 0 && (
                                 c.payment_recorded_at ? (
-                                  <span title={`ثبت‌شده در ${toJalaliStringPretty(c.payment_recorded_at)}`} className="text-success-600 p-1"><CheckCircle2 size={15} /></span>
+                                  <span title={`ثبت‌شده در ${toJalaliStringPretty(c.payment_recorded_at)}`} className="text-success-600 p-1.5 flex items-center justify-center"><CheckCircle2 size={16} /></span>
                                 ) : (
-                                  <button onClick={() => handleRecordClaimAsPayment(c)} title="ثبت به‌عنوان پرداخت (کاهش مانده‌حساب بیمار)" className="text-success-500 hover:text-success-700 hover:bg-success-50 p-1 rounded-lg transition-colors"><Wallet size={15} /></button>
+                                  <button onClick={() => handleRecordClaimAsPayment(c)} title="ثبت به‌عنوان پرداخت (کاهش مانده‌حساب بیمار)" className="w-8 h-8 rounded-xl bg-success-50 dark:bg-success-950/40 text-success-600 dark:text-success-400 hover:bg-success-100 dark:hover:bg-success-900/50 flex items-center justify-center transition-all-smooth press-scale border border-success-200/60 dark:border-success-800/40"><Wallet size={14} /></button>
                                 )
                               )}
-                              <button onClick={() => handlePrintClaimCertificate(c)} aria-label="چاپ گواهی ادعای بیمه" title="چاپ گواهی تأیید خدمات و ادعای بیمه" className="text-slate-400 hover:text-blue-600 hover:bg-blue-50 p-1 rounded-lg transition-colors"><Printer size={15} /></button>
-                              <button onClick={() => handleSendWhatsAppClaim(c)} aria-label="ارسال وضعیت به واتساپ بیمار" title="ارسال وضعیت ادعای بیمه به واتساپ بیمار" className="text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 p-1 rounded-lg transition-colors"><MessageSquare size={15} /></button>
-                              <button onClick={() => openEditClaim(c)} className="text-slate-400 hover:text-primary-600 hover:bg-primary-50 p-1 rounded-lg transition-colors"><Edit2 size={15} /></button>
-                              <button onClick={() => handleDeleteClaim(c)} aria-label="لغو ادعای بیمه" title="لغو" className="text-slate-400 hover:text-error-600 hover:bg-error-50 p-1 rounded-lg transition-colors"><Ban size={15} /></button>
-                              <button onClick={() => navigate(`/patients/${c.patient_id}`)} className="text-primary-600 hover:text-primary-700 p-1 rounded-lg hover:bg-primary-50"><Eye size={15} /></button>
+                              <button onClick={() => handlePrintClaimCertificate(c)} aria-label="چاپ گواهی ادعای بیمه" title="چاپ گواهی تأیید خدمات و ادعای بیمه" className="w-8 h-8 rounded-xl bg-blue-50 dark:bg-blue-950/40 text-blue-600 dark:text-blue-400 hover:bg-blue-100 dark:hover:bg-blue-900/50 flex items-center justify-center transition-all-smooth press-scale border border-blue-200/60 dark:border-blue-800/40"><Printer size={14} /></button>
+                              <button onClick={() => handleSendWhatsAppClaim(c)} aria-label="ارسال وضعیت به واتساپ بیمار" title="ارسال وضعیت ادعای بیمه به واتساپ بیمار" className="w-8 h-8 rounded-xl bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-100 dark:hover:bg-emerald-900/50 flex items-center justify-center transition-all-smooth press-scale border border-emerald-200/60 dark:border-emerald-800/40"><MessageSquare size={14} /></button>
+                              <button onClick={() => openEditClaim(c)} aria-label="ویرایش ادعای بیمه" title="ویرایش" className="w-8 h-8 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700 flex items-center justify-center transition-all-smooth press-scale border border-slate-200/60 dark:border-slate-700/60"><Edit2 size={14} /></button>
+                              <button onClick={() => handleDeleteClaim(c)} aria-label="لغو ادعای بیمه" title="لغو ادعا" className="w-8 h-8 rounded-xl bg-rose-50 dark:bg-rose-950/40 text-rose-600 dark:text-rose-400 hover:bg-rose-100 dark:hover:bg-rose-900/50 flex items-center justify-center transition-all-smooth press-scale border border-rose-200/60 dark:border-rose-800/40"><Ban size={14} /></button>
+                              <button onClick={() => navigate(`/patients/${c.patient_id}`)} aria-label="مشاهده پرونده بیمار" title="مشاهده پرونده" className="w-8 h-8 rounded-xl bg-primary-50 dark:bg-primary-950/40 text-primary-600 dark:text-primary-400 hover:bg-primary-100 dark:hover:bg-primary-900/50 flex items-center justify-center transition-all-smooth press-scale border border-primary-200/60 dark:border-primary-800/40"><Eye size={14} /></button>
                             </div>
                           </td>
                         </tr>
