@@ -209,9 +209,6 @@ function SyncIndicator() {
   useEffect(() => {
     const unsub = subscribeSync((s, p, _lastSync, f) => {
       setStatus(s); setPending(p); setSpinning(s === 'syncing'); setFailed(f)
-      // Routine background sync is visible via the header sync indicator.
-      // Do NOT spam island notifications or sounds on routine sync cycles.
-      // Only notify when there is an actual critical sync failure.
       if (f > prevFailed.current) {
         pushIslandNotification({ id: 'sync-failed', title: 'نیاز به بررسی همگام‌سازی', message: `${f} مورد همگام‌سازی نشد — تنظیمات را ببینید`, icon: <AlertTriangle size={16} />, color: '#dc2626', duration: 6000 })
       }
@@ -225,29 +222,42 @@ function SyncIndicator() {
   const hasFailed = failed > 0
   const label = hasFailed
     ? `${failed} مورد همگام‌سازی نشد — برای بررسی بزنید`
-    : spinning ? 'در حال همگام‌سازی' : isOnline ? 'آنلاین' : 'حالت آفلاین — تغییرات با اتصال اینترنت سینک می‌شود'
+    : spinning ? 'در حال همگام‌سازی' : isOnline ? 'آنلاین (متصل)' : 'حالت آفلاین (قطع اتصال)'
+
+  const countBadge = hasFailed ? failed : pending
 
   return (
     <button
       onClick={() => { h.tap(); if (hasFailed) navigate('/settings'); else if (isOnline) syncNow() }}
       aria-label={label}
       title={label}
-      className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl glass border transition-all-smooth active:scale-95 ${
-        hasFailed ? 'border-error-300 dark:border-error-700 bg-error-50/90 dark:bg-error-900/30' :
-        isOnline ? 'border-white/60 dark:border-white/10' :
-        'border-warning-300 dark:border-warning-700 bg-warning-50/80 dark:bg-warning-900/20'
+      className={`relative flex items-center justify-center w-9 h-9 sm:w-10 sm:h-10 rounded-xl glass border-t border-t-white/90 dark:border-t-white/20 border transition-all press-scale hover:-translate-y-0.5 active:translate-y-0.5 shadow-md shadow-slate-900/10 ${
+        hasFailed
+          ? 'border-rose-400/60 bg-rose-50/80 dark:bg-rose-950/40 text-rose-600 dark:text-rose-400'
+          : isOnline
+          ? 'border-emerald-400/50 dark:border-emerald-500/40 bg-emerald-50/70 dark:bg-emerald-950/40 text-emerald-600 dark:text-emerald-400'
+          : 'border-amber-400/60 bg-amber-50/80 dark:bg-amber-950/40 text-amber-600 dark:text-amber-400'
       }`}
     >
-      {hasFailed
-        ? <AlertTriangle size={13} className="text-error-600" />
-        : spinning
-          ? <RefreshCw size={13} className="animate-spin text-primary-600" />
-          : isOnline
-            ? <Wifi size={13} className="text-primary-600" />
-            : <WifiOff size={13} className="text-warning-600" />
-      }
-      <div className={`w-1.5 h-1.5 rounded-full ${hasFailed ? 'bg-error-500 animate-pulse' : isOnline ? 'bg-primary-500' : 'bg-warning-500'} ${isOnline && !spinning && !hasFailed ? 'animate-pulse' : ''}`} />
-      {hasFailed ? <span className="text-[10px] text-error-600 font-bold">{failed}</span> : pending > 0 && <span className="text-[10px] text-slate-500 font-medium">{pending}</span>}
+      {hasFailed ? (
+        <AlertTriangle size={17} className="drop-shadow-xs animate-pulse" />
+      ) : spinning ? (
+        <RefreshCw size={17} className="animate-spin text-emerald-500 drop-shadow-xs" />
+      ) : isOnline ? (
+        <Wifi size={17} className="drop-shadow-xs" />
+      ) : (
+        <WifiOff size={17} className="drop-shadow-xs" />
+      )}
+
+      {countBadge > 0 && (
+        <span
+          className={`absolute -top-1 -right-1 min-w-[15px] h-[15px] px-1 rounded-full text-[9px] font-black flex items-center justify-center border border-white dark:border-slate-900 shadow-xs ${
+            hasFailed ? 'bg-rose-600 text-white animate-pulse' : 'bg-amber-500 text-white'
+          }`}
+        >
+          {toPersianDigits(countBadge > 99 ? '+۹۹' : countBadge)}
+        </span>
+      )}
     </button>
   )
 }
@@ -831,7 +841,7 @@ function LayoutInner({ children }: { children: React.ReactNode }) {
             <MinadentLogo size={38} className="shrink-0" />
             <div className="text-right">
               <p className="text-[14px] font-extrabold text-slate-800 dark:text-slate-100 leading-none">
-                مینادنتال <span className="text-[9px] font-mono text-slate-400 dark:text-slate-500">v{APP_VERSION}</span>
+                مینادنتال
               </p>
               {currentItem && (
                 <p className="text-[10px] font-semibold leading-none mt-1" style={{ color: currentItem.color }}>
