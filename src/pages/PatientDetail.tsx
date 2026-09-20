@@ -1815,190 +1815,203 @@ export default function PatientDetail() {
           </div>
         )}
 
-        {/* ═══ Tier 3: One-Stop All Clinical & Administrative Actions ═══ */}
-        <div className="pt-2 border-t border-slate-100 dark:border-slate-800">
-          <div className="flex items-center gap-1.5 overflow-x-auto pb-1 scrollbar-none">
-            {/* 1. New Appointment */}
-            <button
-              type="button"
-              onClick={() => {
-                h.tap()
-                navigate('/appointments', {
-                  state: {
-                    quickStartPatientId: patient.id,
-                    quickStartDoctorId: patient.primary_doctor_id,
-                    openWizard: true,
-                  },
-                })
-              }}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold bg-gradient-to-r from-teal-600 to-emerald-600 hover:from-teal-700 hover:to-emerald-700 text-white shadow-xs press-scale shrink-0"
-            >
-              <Calendar size={14} /> نوبت جدید
-            </button>
-
-            {/* Document & Paper Chart Camera Scanner */}
-            <button
-              type="button"
-              onClick={() => {
-                h.tap()
-                setScannerInitialCategory('paper_record')
-                setScannerModalOpen(true)
-              }}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold bg-gradient-to-r from-sky-600 to-blue-600 hover:from-sky-700 hover:to-blue-700 text-white shadow-xs press-scale shrink-0"
-              title="عکس‌برداری با دوربین گوشی و اسکن پرونده کاغذی، اسناد یا رادیولوژی"
-            >
-              <Camera size={14} /> اسکن مدارک / رادیولوژی
-            </button>
-
-            {/* 2. Visit / Treatment */}
-            <button
-              type="button"
-              onClick={() => {
-                h.tap()
-                setActiveTab('treatments')
-              }}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold bg-gradient-to-r from-violet-600 to-indigo-600 hover:from-violet-700 hover:to-indigo-700 text-white shadow-xs press-scale shrink-0"
-            >
-              <Stethoscope size={14} /> ثبت درمان
-            </button>
-
-            {/* 3. Dental Chart (FDI) */}
-            <button
-              type="button"
-              onClick={() => {
-                h.tap()
-                setActiveTab('teeth')
-              }}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold bg-white dark:bg-slate-800 text-teal-700 dark:text-teal-300 border border-teal-200 dark:border-teal-800 hover:bg-teal-50 dark:hover:bg-teal-900/60 press-scale shrink-0 shadow-xs"
-            >
-              <Smile size={14} className="text-teal-600" /> چارت دندان
-            </button>
-
-            {/* 4. Payment */}
-            <button
-              type="button"
-              onClick={() => {
-                h.tap()
-                handleOpenPaymentModal()
-              }}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800 hover:bg-emerald-100 dark:hover:bg-emerald-900/60 press-scale shrink-0 shadow-xs"
-            >
-              <CreditCard size={14} className="text-emerald-600" /> دریافت وجه
-            </button>
-
-            {/* 5. Sayad Cheque */}
-            <button
-              type="button"
-              onClick={() => {
-                h.tap()
-                handleOpenChequeModal()
-              }}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-300 border border-amber-200 dark:border-amber-800 hover:bg-amber-100 dark:hover:bg-amber-900/60 press-scale shrink-0 shadow-xs"
-            >
-              <FileSignature size={14} className="text-amber-600" /> ثبت چک صیادی
-            </button>
-
-            {/* 6. Prescription */}
-            <button
-              type="button"
-              onClick={() => {
-                h.tap()
-                navigate('/prescriptions', {
-                  state: {
-                    quickStartPatientId: patient.id,
-                    quickStartDoctorId: patient.primary_doctor_id,
-                    quickStartToothNumber: 'general',
-                  },
-                })
-              }}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold bg-purple-50 dark:bg-purple-950/40 text-purple-700 dark:text-purple-300 border border-purple-200 dark:border-purple-800 hover:bg-purple-100 dark:hover:bg-purple-900/60 press-scale shrink-0 shadow-xs"
-            >
-              <Pill size={14} className="text-purple-600" /> صدور نسخه
-            </button>
-
-            {/* 7. Lab Order */}
-            <button
-              type="button"
-              onClick={() => {
-                h.tap()
-                setActiveTab('labOrders')
-              }}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold bg-cyan-50 dark:bg-cyan-950/40 text-cyan-700 dark:text-cyan-300 border border-cyan-200 dark:border-cyan-800 hover:bg-cyan-100 dark:hover:bg-cyan-900/60 press-scale shrink-0 shadow-xs"
-            >
-              <FlaskConical size={14} className="text-cyan-600" /> سفارش لابراتوار
-            </button>
-
-            {/* 8. Implant Case */}
-            <button
-              type="button"
-              onClick={() => {
-                h.tap()
-                setActiveTab('implants')
-              }}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold bg-blue-50 dark:bg-blue-950/40 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-800 hover:bg-blue-100 dark:hover:bg-blue-900/60 press-scale shrink-0 shadow-xs"
-            >
-              <Bone size={14} className="text-blue-600" /> پرونده ایمپلنت
-            </button>
-
-            {/* 9. Print Record */}
-            <button
-              type="button"
-              onClick={handlePrintFullChart}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700 hover:bg-slate-200 press-scale shrink-0 shadow-xs"
-            >
-              <Printer size={14} /> چاپ پرونده
-            </button>
-
-            {/* 10. Edit File */}
-            <button
-              type="button"
-              onClick={() => {
-                h.tap()
-                chimes.playPop()
-                if (patient) {
-                  setFormData({
-                    first_name: patient.first_name || '',
-                    last_name: patient.last_name || '',
-                    national_id: patient.national_id || '',
-                    phone: patient.phone || '',
-                    phone2: patient.phone2 || '',
-                    email: patient.email || '',
-                    birth_date: patient.birth_date || '',
-                    gender: patient.gender || '',
-                    blood_type: patient.blood_type || '',
-                    address: patient.address || '',
-                    city: patient.city || '',
-                    province: patient.province || '',
-                    postal_code: patient.postal_code || '',
-                    medical_history: patient.medical_history || '',
-                    allergies: patient.allergies || '',
-                    medications: patient.medications || '',
-                    medical_conditions: patient.medical_conditions || '',
-                    insurance_info: patient.insurance_info || '',
-                    insurance_number: patient.insurance_number || '',
-                    notes: patient.notes || '',
-                    vip_level: String(patient.vip_level ?? 0),
-                    is_active: patient.is_active !== false,
-                    primary_doctor_id: patient.primary_doctor_id || '',
-                    tags: (patient.tags || []).join(', '),
-                    anticoagulant_use: Boolean(patient.anticoagulant_use),
-                    inr_value: patient.inr_value ? String(patient.inr_value) : '',
-                    bisphosphonate_use: Boolean(patient.bisphosphonate_use),
-                    bp_systolic: patient.bp_systolic ? String(patient.bp_systolic) : '',
-                    bp_diastolic: patient.bp_diastolic ? String(patient.bp_diastolic) : '',
-                    diabetes_hba1c: patient.diabetes_hba1c ? String(patient.diabetes_hba1c) : '',
-                    endocarditis_prophylaxis: Boolean(patient.endocarditis_prophylaxis),
-                    pregnancy_trimester: patient.pregnancy_trimester ? String(patient.pregnancy_trimester) : '',
-                    family_head_id: patient.family_head_id || '',
-                    family_relationship: patient.family_relationship || '',
+        {/* ═══ Tier 3: One-Stop All Clinical & Administrative Actions (iOS 27 Fluid Bento Hub) ═══ */}
+        <div className="pt-3 border-t border-slate-100 dark:border-slate-800/80">
+          <div className="flex flex-wrap items-center gap-2">
+            {/* 1. Primary Clinical Triggers */}
+            <div className="flex flex-wrap items-center gap-1.5">
+              {/* New Appointment */}
+              <button
+                type="button"
+                onClick={() => {
+                  h.tap()
+                  navigate('/appointments', {
+                    state: {
+                      quickStartPatientId: patient.id,
+                      quickStartDoctorId: patient.primary_doctor_id,
+                      openWizard: true,
+                    },
                   })
-                }
-                setEditModalOpen(true)
-              }}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold bg-sky-50 dark:bg-sky-950/40 text-sky-700 dark:text-sky-300 border border-sky-200 dark:border-sky-800 hover:bg-sky-100 dark:hover:bg-sky-900/60 press-scale shrink-0"
-            >
-              <Edit2 size={14} /> ویرایش پرونده
-            </button>
+                }}
+                className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-bold bg-gradient-to-r from-teal-600 to-emerald-600 hover:from-teal-700 hover:to-emerald-700 text-white shadow-xs press-scale min-h-[42px]"
+              >
+                <Calendar size={15} /> <span>نوبت جدید</span>
+              </button>
+
+              {/* Document & Paper Chart Camera Scanner */}
+              <button
+                type="button"
+                onClick={() => {
+                  h.tap()
+                  setScannerInitialCategory('paper_record')
+                  setScannerModalOpen(true)
+                }}
+                className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-bold bg-gradient-to-r from-sky-600 to-blue-600 hover:from-sky-700 hover:to-blue-700 text-white shadow-xs press-scale min-h-[42px]"
+                title="عکس‌برداری با دوربین گوشی و اسکن پرونده کاغذی، اسناد یا رادیولوژی"
+              >
+                <Camera size={15} /> <span>اسکن مدارک / رادیولوژی</span>
+              </button>
+
+              {/* Visit / Treatment */}
+              <button
+                type="button"
+                onClick={() => {
+                  h.tap()
+                  setActiveTab('treatments')
+                }}
+                className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-bold bg-gradient-to-r from-violet-600 to-indigo-600 hover:from-violet-700 hover:to-indigo-700 text-white shadow-xs press-scale min-h-[42px]"
+              >
+                <Stethoscope size={15} /> <span>ثبت درمان</span>
+              </button>
+
+              {/* Dental Chart (FDI) */}
+              <button
+                type="button"
+                onClick={() => {
+                  h.tap()
+                  setActiveTab('teeth')
+                }}
+                className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-bold bg-white dark:bg-slate-800 text-teal-700 dark:text-teal-300 border border-teal-200 dark:border-teal-800 hover:bg-teal-50 dark:hover:bg-teal-900/60 press-scale shadow-xs min-h-[42px]"
+              >
+                <Smile size={15} className="text-teal-600" /> <span>چارت دندان</span>
+              </button>
+            </div>
+
+            <div className="h-6 w-px bg-slate-200 dark:bg-slate-700 hidden sm:block mx-0.5" />
+
+            {/* 2. Financial Triggers */}
+            <div className="flex flex-wrap items-center gap-1.5">
+              {/* Payment */}
+              <button
+                type="button"
+                onClick={() => {
+                  h.tap()
+                  handleOpenPaymentModal()
+                }}
+                className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-bold bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800 hover:bg-emerald-100 dark:hover:bg-emerald-900/60 press-scale shadow-xs min-h-[42px]"
+              >
+                <CreditCard size={15} className="text-emerald-600" /> <span>دریافت وجه</span>
+              </button>
+
+              {/* Sayad Cheque */}
+              <button
+                type="button"
+                onClick={() => {
+                  h.tap()
+                  handleOpenChequeModal()
+                }}
+                className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-bold bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-300 border border-amber-200 dark:border-amber-800 hover:bg-amber-100 dark:hover:bg-amber-900/60 press-scale shadow-xs min-h-[42px]"
+              >
+                <FileSignature size={15} className="text-amber-600" /> <span>ثبت چک صیادی</span>
+              </button>
+            </div>
+
+            <div className="h-6 w-px bg-slate-200 dark:bg-slate-700 hidden sm:block mx-0.5" />
+
+            {/* 3. Specialized & Operations Triggers */}
+            <div className="flex flex-wrap items-center gap-1.5">
+              {/* Prescription */}
+              <button
+                type="button"
+                onClick={() => {
+                  h.tap()
+                  navigate('/prescriptions', {
+                    state: {
+                      quickStartPatientId: patient.id,
+                      quickStartDoctorId: patient.primary_doctor_id,
+                      quickStartToothNumber: 'general',
+                    },
+                  })
+                }}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold bg-purple-50 dark:bg-purple-950/40 text-purple-700 dark:text-purple-300 border border-purple-200 dark:border-purple-800 hover:bg-purple-100 dark:hover:bg-purple-900/60 press-scale shadow-xs min-h-[38px]"
+              >
+                <Pill size={14} className="text-purple-600" /> <span>صدور نسخه</span>
+              </button>
+
+              {/* Lab Order */}
+              <button
+                type="button"
+                onClick={() => {
+                  h.tap()
+                  setActiveTab('labOrders')
+                }}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold bg-cyan-50 dark:bg-cyan-950/40 text-cyan-700 dark:text-cyan-300 border border-cyan-200 dark:border-cyan-800 hover:bg-cyan-100 dark:hover:bg-cyan-900/60 press-scale shadow-xs min-h-[38px]"
+              >
+                <FlaskConical size={14} className="text-cyan-600" /> <span>سفارش لابراتوار</span>
+              </button>
+
+              {/* Implant Case */}
+              <button
+                type="button"
+                onClick={() => {
+                  h.tap()
+                  setActiveTab('implants')
+                }}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold bg-blue-50 dark:bg-blue-950/40 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-800 hover:bg-blue-100 dark:hover:bg-blue-900/60 press-scale shadow-xs min-h-[38px]"
+              >
+                <Bone size={14} className="text-blue-600" /> <span>پرونده ایمپلنت</span>
+              </button>
+
+              {/* Print Record */}
+              <button
+                type="button"
+                onClick={handlePrintFullChart}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700 hover:bg-slate-200 press-scale shadow-xs min-h-[38px]"
+              >
+                <Printer size={14} /> <span>چاپ پرونده</span>
+              </button>
+
+              {/* Edit File */}
+              <button
+                type="button"
+                onClick={() => {
+                  h.tap()
+                  chimes.playPop()
+                  if (patient) {
+                    setFormData({
+                      first_name: patient.first_name || '',
+                      last_name: patient.last_name || '',
+                      national_id: patient.national_id || '',
+                      phone: patient.phone || '',
+                      phone2: patient.phone2 || '',
+                      email: patient.email || '',
+                      birth_date: patient.birth_date || '',
+                      gender: patient.gender || '',
+                      blood_type: patient.blood_type || '',
+                      address: patient.address || '',
+                      city: patient.city || '',
+                      province: patient.province || '',
+                      postal_code: patient.postal_code || '',
+                      medical_history: patient.medical_history || '',
+                      allergies: patient.allergies || '',
+                      medications: patient.medications || '',
+                      medical_conditions: patient.medical_conditions || '',
+                      insurance_info: patient.insurance_info || '',
+                      insurance_number: patient.insurance_number || '',
+                      notes: patient.notes || '',
+                      vip_level: String(patient.vip_level ?? 0),
+                      is_active: patient.is_active !== false,
+                      primary_doctor_id: patient.primary_doctor_id || '',
+                      tags: (patient.tags || []).join(', '),
+                      anticoagulant_use: Boolean(patient.anticoagulant_use),
+                      inr_value: patient.inr_value ? String(patient.inr_value) : '',
+                      bisphosphonate_use: Boolean(patient.bisphosphonate_use),
+                      bp_systolic: patient.bp_systolic ? String(patient.bp_systolic) : '',
+                      bp_diastolic: patient.bp_diastolic ? String(patient.bp_diastolic) : '',
+                      diabetes_hba1c: patient.diabetes_hba1c ? String(patient.diabetes_hba1c) : '',
+                      endocarditis_prophylaxis: Boolean(patient.endocarditis_prophylaxis),
+                      pregnancy_trimester: patient.pregnancy_trimester ? String(patient.pregnancy_trimester) : '',
+                      family_head_id: patient.family_head_id || '',
+                      family_relationship: patient.family_relationship || '',
+                    })
+                  }
+                  setEditModalOpen(true)
+                }}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold bg-sky-50 dark:bg-sky-950/40 text-sky-700 dark:text-sky-300 border border-sky-200 dark:border-sky-800 hover:bg-sky-100 dark:hover:bg-sky-900/60 press-scale min-h-[38px]"
+              >
+                <Edit2 size={14} /> <span>ویرایش پرونده</span>
+              </button>
+            </div>
           </div>
         </div>
       </div>

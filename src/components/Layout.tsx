@@ -591,24 +591,34 @@ function BottomTabBar() {
               <button
                 key={item.path}
                 onClick={() => { h.select(); navigate(item.path) }}
-                className="flex-1 flex flex-col items-center justify-center gap-0.5 transition-all-smooth press-scale"
-                style={{ color: active ? item.color : `color-mix(in srgb, ${item.color} 62%, #94a3b8)` }}
+                className="flex-1 flex flex-col items-center justify-center gap-0.5 transition-all-smooth press-scale group"
+                style={{ color: item.color }}
               >
                 <div
                   className={`relative transition-all duration-300 flex flex-col items-center justify-center ${
                     active
-                      ? 'p-1.5 px-3 rounded-2xl bg-white/90 dark:bg-slate-800/95 border border-white/90 dark:border-white/10 scale-105'
-                      : 'p-1 hover:scale-105'
+                      ? 'p-1.5 px-3 rounded-2xl scale-105'
+                      : 'p-1 px-2 rounded-xl hover:scale-105'
                   }`}
-                  style={active ? { boxShadow: `0 4px 14px color-mix(in srgb, ${item.color} 30%, transparent)` } : undefined}
+                  style={
+                    active
+                      ? {
+                          backgroundColor: `color-mix(in srgb, ${item.color} 18%, white)`,
+                          border: `1.5px solid color-mix(in srgb, ${item.color} 45%, transparent)`,
+                          boxShadow: `0 4px 16px color-mix(in srgb, ${item.color} 35%, transparent), 0 1px 3px rgba(0,0,0,0.06)`,
+                        }
+                      : {
+                          backgroundColor: `color-mix(in srgb, ${item.color} 6%, transparent)`,
+                        }
+                  }
                 >
-                  <Icon size={active ? 26 : 23} strokeWidth={active ? 2.5 : 1.9} />
+                  <Icon size={active ? 26 : 22} strokeWidth={active ? 2.5 : 2} />
                   {(() => {
                     const w = openWork[item.path]
                     if (!w || w.count === 0) return null
                     return (
                       <span
-                        className="absolute -top-1 -left-1 min-w-[16px] h-4 px-1 rounded-full text-white text-[9px] font-bold flex items-center justify-center border border-white dark:border-slate-900 shadow-sm"
+                        className="absolute -top-1 -left-1 min-w-[16px] h-4 px-1 rounded-full text-white text-[9px] font-black flex items-center justify-center border border-white dark:border-slate-900 shadow-sm animate-pulse"
                         style={{ backgroundColor: LEVEL_COLORS[w.level] }}
                         aria-label={`${w.count} کار باز`}
                       >
@@ -618,37 +628,55 @@ function BottomTabBar() {
                   })()}
                 </div>
                 <span
-                  className={`text-[10px] leading-none tracking-tight ${active ? 'font-extrabold' : 'font-medium'}`}
-                  style={{ color: active ? item.color : `color-mix(in srgb, ${item.color} 55%, #94a3b8)` }}
+                  className={`text-[10px] leading-none tracking-tight transition-all ${
+                    active ? 'font-black scale-105' : 'font-bold opacity-85 group-hover:opacity-100'
+                  }`}
+                  style={{ color: item.color }}
                 >
                   {item.label}
                 </span>
               </button>
             )
           })}
-          <button
-            onClick={() => { h.pop(); setMoreOpen(true) }}
-            className={`flex-1 flex flex-col items-center justify-center gap-0.5 transition-all-smooth press-scale ${
-              isMoreActive ? '' : 'text-slate-400 hover:text-slate-600 dark:hover:text-slate-300'
-            }`}
-            style={{ color: isMoreActive && currentMod ? currentMod.color : 'var(--module-color, #64748b)' }}
-          >
-            <div
-              className={`transition-all duration-300 flex flex-col items-center justify-center ${
-                isMoreActive
-                  ? 'p-1.5 px-3 rounded-2xl bg-white/90 dark:bg-slate-800/95 border border-white/90 dark:border-white/10 scale-105'
-                  : 'p-1 hover:scale-105'
-              }`}
-              style={isMoreActive && currentMod ? { boxShadow: `0 4px 14px color-mix(in srgb, ${currentMod.color} 30%, transparent)` } : undefined}
-            >
-              <MoreHorizontal size={isMoreActive ? 26 : 23} strokeWidth={isMoreActive ? 2.5 : 1.9} />
-            </div>
-            <span className={`text-[10px] leading-none tracking-tight ${isMoreActive ? 'font-extrabold' : 'font-medium text-slate-400 dark:text-slate-500'}`}
-              style={isMoreActive && currentMod ? { color: currentMod.color } : undefined}
-            >
-              بیشتر
-            </span>
-          </button>
+          {(() => {
+            const moreColor = '#c026d3' // Distinct Vivid Fuchsia (no two modules share this color)
+            return (
+              <button
+                onClick={() => { h.pop(); setMoreOpen(true) }}
+                className="flex-1 flex flex-col items-center justify-center gap-0.5 transition-all-smooth press-scale group"
+                style={{ color: isMoreActive && currentMod ? currentMod.color : moreColor }}
+              >
+                <div
+                  className={`transition-all duration-300 flex flex-col items-center justify-center ${
+                    isMoreActive
+                      ? 'p-1.5 px-3 rounded-2xl scale-105'
+                      : 'p-1 px-2 rounded-xl hover:scale-105'
+                  }`}
+                  style={
+                    isMoreActive
+                      ? {
+                          backgroundColor: `color-mix(in srgb, ${currentMod?.color || moreColor} 18%, white)`,
+                          border: `1.5px solid color-mix(in srgb, ${currentMod?.color || moreColor} 45%, transparent)`,
+                          boxShadow: `0 4px 16px color-mix(in srgb, ${currentMod?.color || moreColor} 35%, transparent)`,
+                        }
+                      : {
+                          backgroundColor: `color-mix(in srgb, ${moreColor} 6%, transparent)`,
+                        }
+                  }
+                >
+                  <MoreHorizontal size={isMoreActive ? 26 : 22} strokeWidth={isMoreActive ? 2.5 : 2} style={{ color: isMoreActive && currentMod ? currentMod.color : moreColor }} />
+                </div>
+                <span
+                  className={`text-[10px] leading-none tracking-tight transition-all ${
+                    isMoreActive ? 'font-black scale-105' : 'font-bold opacity-85 group-hover:opacity-100'
+                  }`}
+                  style={{ color: isMoreActive && currentMod ? currentMod.color : moreColor }}
+                >
+                  بیشتر
+                </span>
+              </button>
+            )
+          })()}
         </div>
       </nav>
       <MoreDrawer open={moreOpen} onClose={() => setMoreOpen(false)} />

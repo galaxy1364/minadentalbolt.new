@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react'
 import { createPortal } from 'react-dom'
-import { X, AlertCircle, CheckCircle2, Info, Loader2, ChevronRight, ChevronLeft, ChevronDown } from 'lucide-react'
+import { X, AlertCircle, CheckCircle2, Info, Loader2, ChevronRight, ChevronLeft, ChevronDown, Layers } from 'lucide-react'
 import { h } from '../lib/haptics'
 import { chimes } from '../lib/chimes'
 import { toPersianDigits } from '../lib/persianDate'
@@ -471,7 +471,7 @@ export function Tabs({
   }, [quickMenuOpen])
 
   return (
-    <div className={`relative group/tabs ${className}`} ref={containerRef}>
+    <div className={`relative group/tabs ${quickMenuOpen ? 'z-50' : 'z-20'} ${className}`} ref={containerRef}>
       <div className="relative flex items-center gap-1.5 p-1.5 bg-gradient-to-r from-slate-100/90 via-white/80 to-slate-100/90 dark:from-slate-850/90 dark:via-slate-800/90 dark:to-slate-850/90 backdrop-blur-xl rounded-2xl border border-slate-200/80 dark:border-slate-700/80 shadow-xs">
         {/* Scroll Left Button (Rightwards in RTL) */}
         <button
@@ -574,51 +574,64 @@ export function Tabs({
               <ChevronDown size={17} className={`transition-transform duration-200 ${quickMenuOpen ? 'rotate-180' : ''}`} />
             </button>
 
-            {/* Quick Menu Popover */}
+            {/* Quick Menu Popover / Mobile Sheet */}
             {quickMenuOpen && (
-              <div
-                className="absolute left-0 top-full mt-2 w-64 max-h-80 overflow-y-auto dock-scroll p-2 bg-white/95 dark:bg-slate-850/95 backdrop-blur-2xl rounded-2xl shadow-2xl border border-slate-200 dark:border-slate-700 z-50 animate-in fade-in slide-in-from-top-2 duration-150"
-                role="menu"
-              >
-                <div className="px-3 py-1.5 border-b border-slate-100 dark:border-slate-700/60 mb-1.5 flex items-center justify-between">
-                  <span className="text-[11px] font-bold text-slate-500 dark:text-slate-400">
-                    جهش سریع به بخش:
-                  </span>
-                  <span className="text-[10px] text-slate-400 font-mono">
-                    {toPersianDigits(tabs.length)} بخش
-                  </span>
+              <>
+                {/* Click outside backdrop */}
+                <div
+                  className="fixed inset-0 z-40 bg-black/30 sm:bg-black/10 backdrop-blur-2xs"
+                  onClick={() => setQuickMenuOpen(false)}
+                />
+                <div
+                  className="fixed inset-x-3 bottom-24 sm:static sm:absolute sm:left-0 sm:top-full sm:bottom-auto sm:mt-2 sm:w-72 max-h-[72vh] sm:max-h-96 overflow-y-auto dock-scroll p-3 bg-white/98 dark:bg-slate-850/98 backdrop-blur-2xl rounded-3xl sm:rounded-2xl shadow-2xl border-2 border-primary-500/40 dark:border-primary-500/50 z-50 animate-in fade-in slide-in-from-bottom-4 sm:slide-in-from-top-2 duration-200"
+                  role="menu"
+                >
+                  <div className="px-3 py-2 border-b border-slate-100 dark:border-slate-700/60 mb-2 flex items-center justify-between">
+                    <span className="text-xs font-bold text-slate-800 dark:text-slate-200 flex items-center gap-1.5">
+                      <Layers size={14} className="text-primary-600 dark:text-primary-400" />
+                      <span>دسترسی سریع به بخش‌های پرونده:</span>
+                    </span>
+                    <span className="text-[10px] font-mono font-black px-2 py-0.5 rounded-full bg-primary-50 dark:bg-primary-950/40 text-primary-700 dark:text-primary-300">
+                      {toPersianDigits(tabs.length)} بخش
+                    </span>
+                  </div>
+                  <div className="space-y-1">
+                    {tabs.map((tab) => {
+                      const isCurrent = active === tab.key
+                      const theme = (tab.color && colorMap[tab.color]) || defaultTheme
+                      return (
+                        <button
+                          key={tab.key}
+                          type="button"
+                          onClick={() => {
+                            h.select()
+                            onChange(tab.key)
+                            setQuickMenuOpen(false)
+                          }}
+                          className={`w-full flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-xs font-bold transition-all-smooth text-right ${
+                            isCurrent
+                              ? `${theme.activeBg} shadow-xs font-black`
+                              : `text-slate-700 dark:text-slate-200 hover:bg-slate-100/80 dark:hover:bg-slate-800/80`
+                          }`}
+                        >
+                          {tab.icon && (
+                            <span className={`shrink-0 ${isCurrent ? 'text-white' : theme.iconColor}`}>
+                              {tab.icon}
+                            </span>
+                          )}
+                          <span className="truncate flex-1">{tab.label}</span>
+                          {tab.badge !== undefined && (
+                            <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-200 font-mono">
+                              {toPersianDigits(String(tab.badge))}
+                            </span>
+                          )}
+                          {isCurrent && <CheckCircle2 size={14} className="text-white shrink-0" />}
+                        </button>
+                      )
+                    })}
+                  </div>
                 </div>
-                <div className="space-y-1">
-                  {tabs.map((tab) => {
-                    const isCurrent = active === tab.key
-                    const theme = (tab.color && colorMap[tab.color]) || defaultTheme
-                    return (
-                      <button
-                        key={tab.key}
-                        type="button"
-                        onClick={() => {
-                          h.select()
-                          onChange(tab.key)
-                          setQuickMenuOpen(false)
-                        }}
-                        className={`w-full flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-xs font-bold transition-all-smooth text-right ${
-                          isCurrent
-                            ? `${theme.activeBg} shadow-xs font-extrabold`
-                            : `text-slate-700 dark:text-slate-200 hover:bg-slate-100/80 dark:hover:bg-slate-800/80`
-                        }`}
-                      >
-                        {tab.icon && (
-                          <span className={`shrink-0 ${isCurrent ? 'text-white' : theme.iconColor}`}>
-                            {tab.icon}
-                          </span>
-                        )}
-                        <span className="truncate flex-1">{tab.label}</span>
-                        {isCurrent && <CheckCircle2 size={14} className="text-white shrink-0" />}
-                      </button>
-                    )
-                  })}
-                </div>
-              </div>
+              </>
             )}
           </div>
         )}
