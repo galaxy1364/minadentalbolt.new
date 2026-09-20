@@ -460,7 +460,7 @@ export default function Patients() {
   }
 
   return (
-    <div className="space-y-5 max-w-7xl mx-auto w-full px-3 sm:px-6 lg:px-8 py-2 relative" {...ptr.handlers}>
+    <div className="space-y-3.5 w-full px-2 sm:px-4 py-2 relative" {...ptr.handlers}>
       {ptr.pullDistance > 0 && (
         <div className="pull-indicator" style={{ opacity: ptr.isRefreshing ? 1 : ptr.pullProgress, top: -4 }}>
           <div className="flex flex-col items-center gap-1">
@@ -470,77 +470,113 @@ export default function Patients() {
         </div>
       )}
 
-      {/* Header */}
-      <ModuleHeader
-        moduleKey="patients"
-        title="مدیریت پرونده‌های بیماران"
-        subtitle={`${toPersianDigits(filteredPatients.length)} پرونده در این نما`}
-        action={
-          <button
-            onClick={openCreateModal}
-            aria-label="افزودن بیمار جدید"
-            className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-gradient-to-r from-teal-600 to-emerald-600 hover:from-teal-700 hover:to-emerald-700 text-white text-sm font-bold shadow-md hover:shadow-lg transition-all-smooth press-scale"
-          >
-            <Plus size={18} />
-            <span>بیمار جدید</span>
-          </button>
-        }
-      />
+      {/* Modern High-Efficiency Chip Action & Filter Rail */}
+      <div className="flex items-center gap-1.5 overflow-x-auto pb-1 no-scrollbar text-xs font-bold pt-1">
+        {/* Primary CTA: New Patient */}
+        <button
+          type="button"
+          onClick={openCreateModal}
+          aria-label="افزودن بیمار جدید"
+          className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-gradient-to-r from-teal-600 to-emerald-600 hover:from-teal-700 hover:to-emerald-700 text-white text-xs font-extrabold shadow-md hover:shadow-lg transition-all press-scale shrink-0 cursor-pointer"
+        >
+          <Plus size={15} />
+          <span>بیمار جدید</span>
+        </button>
 
-      {/* Clinic Operational & Financial Stats Rail */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-        <div className="p-3.5 rounded-2xl bg-white/90 dark:bg-slate-900/90 backdrop-blur-md border border-slate-200/80 dark:border-slate-800 shadow-xs flex items-center justify-between">
-          <div>
-            <span className="text-[11px] font-bold text-slate-500 dark:text-slate-400 block mb-0.5">کل مراجعین فعال</span>
-            <p className="text-2xl font-black text-slate-900 dark:text-slate-100 tabular-nums">{toPersianDigits(stats.active)}</p>
-          </div>
-          <div className="w-10 h-10 rounded-xl bg-teal-50 dark:bg-teal-950/50 text-teal-600 dark:text-teal-400 flex items-center justify-center">
-            <Users size={20} />
-          </div>
-        </div>
+        <div className="h-5 w-px bg-slate-200 dark:bg-slate-700 shrink-0 mx-0.5" />
 
-        <div className="p-3.5 rounded-2xl bg-white/90 dark:bg-slate-900/90 backdrop-blur-md border border-slate-200/80 dark:border-slate-800 shadow-xs flex items-center justify-between">
-          <div>
-            <span className="text-[11px] font-bold text-slate-500 dark:text-slate-400 block mb-0.5">بیماران ویژه VIP</span>
-            <p className="text-2xl font-black text-amber-600 dark:text-amber-400 tabular-nums">{toPersianDigits(stats.vip)}</p>
-          </div>
-          <div className="w-10 h-10 rounded-xl bg-amber-50 dark:bg-amber-950/50 text-amber-600 dark:text-amber-400 flex items-center justify-center">
-            <Award size={20} />
-          </div>
-        </div>
+        {/* Shortened Filter Chips */}
+        <button
+          type="button"
+          onClick={() => { h.select(); setQuickFilter('all') }}
+          className={`px-3 py-1.5 rounded-xl transition-all whitespace-nowrap flex items-center gap-1.5 press-scale ${
+            quickFilter === 'all'
+              ? 'bg-slate-900 dark:bg-white text-white dark:text-slate-900 shadow-xs'
+              : 'bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 border border-slate-200/80 dark:border-slate-700 hover:bg-slate-50'
+          }`}
+        >
+          <span>همه</span>
+          <span className="text-[10px] opacity-75 tabular-nums">({toPersianDigits(stats.total)})</span>
+        </button>
 
-        <div className="p-3.5 rounded-2xl bg-white/90 dark:bg-slate-900/90 backdrop-blur-md border border-rose-100 dark:border-rose-900/40 shadow-xs flex items-center justify-between">
-          <div>
-            <span className="text-[11px] font-bold text-rose-600 dark:text-rose-400 block mb-0.5">بدهکاران کلینیک</span>
-            <p className="text-2xl font-black text-rose-600 dark:text-rose-400 tabular-nums">{toPersianDigits(stats.debtors)}</p>
-          </div>
-          <div className="w-10 h-10 rounded-xl bg-rose-50 dark:bg-rose-950/50 text-rose-600 dark:text-rose-400 flex items-center justify-center">
-            <Banknote size={20} />
-          </div>
-        </div>
+        <button
+          type="button"
+          onClick={() => { h.select(); setQuickFilter('vip') }}
+          className={`px-3 py-1.5 rounded-xl transition-all whitespace-nowrap flex items-center gap-1.5 press-scale ${
+            quickFilter === 'vip'
+              ? 'bg-violet-600 text-white shadow-xs'
+              : 'bg-white dark:bg-slate-800 text-violet-600 dark:text-violet-400 border border-violet-200/80 dark:border-violet-900/50 hover:bg-violet-50/50'
+          }`}
+        >
+          <span>VIP</span>
+          <span className="text-[10px] opacity-75 tabular-nums">({toPersianDigits(stats.vip)})</span>
+        </button>
 
-        <div className="p-3.5 rounded-2xl bg-white/90 dark:bg-slate-900/90 backdrop-blur-md border border-slate-200/80 dark:border-slate-800 shadow-xs flex items-center justify-between">
-          <div>
-            <span className="text-[11px] font-bold text-slate-500 dark:text-slate-400 block mb-0.5">چک و اقساط در جریان</span>
-            <p className="text-2xl font-black text-indigo-600 dark:text-indigo-400 tabular-nums">{toPersianDigits(stats.withCheques + stats.withPlans)}</p>
-          </div>
-          <div className="w-10 h-10 rounded-xl bg-indigo-50 dark:bg-indigo-950/50 text-indigo-600 dark:text-indigo-400 flex items-center justify-center">
-            <CreditCard size={20} />
-          </div>
-        </div>
+        <button
+          type="button"
+          onClick={() => { h.select(); setQuickFilter('debtors') }}
+          className={`px-3 py-1.5 rounded-xl transition-all whitespace-nowrap flex items-center gap-1.5 press-scale ${
+            quickFilter === 'debtors'
+              ? 'bg-rose-600 text-white shadow-xs'
+              : 'bg-white dark:bg-slate-800 text-rose-600 dark:text-rose-400 border border-rose-200/80 dark:border-rose-900/50 hover:bg-rose-50/50'
+          }`}
+        >
+          {stats.debtors > 0 && <span className="w-1.5 h-1.5 rounded-full bg-rose-500 animate-pulse" />}
+          <span>بدهکاران</span>
+          <span className="text-[10px] opacity-75 tabular-nums">({toPersianDigits(stats.debtors)})</span>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => { h.select(); setQuickFilter('cheques') }}
+          className={`px-3 py-1.5 rounded-xl transition-all whitespace-nowrap flex items-center gap-1.5 press-scale ${
+            quickFilter === 'cheques'
+              ? 'bg-amber-600 text-white shadow-xs'
+              : 'bg-white dark:bg-slate-800 text-amber-700 dark:text-amber-400 border border-amber-200/80 dark:border-amber-900/50 hover:bg-amber-50/50'
+          }`}
+        >
+          <span>چک</span>
+          <span className="text-[10px] opacity-75 tabular-nums">({toPersianDigits(stats.withCheques)})</span>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => { h.select(); setQuickFilter('plans') }}
+          className={`px-3 py-1.5 rounded-xl transition-all whitespace-nowrap flex items-center gap-1.5 press-scale ${
+            quickFilter === 'plans'
+              ? 'bg-indigo-600 text-white shadow-xs'
+              : 'bg-white dark:bg-slate-800 text-indigo-600 dark:text-indigo-400 border border-indigo-200/80 dark:border-indigo-900/50 hover:bg-indigo-50/50'
+          }`}
+        >
+          <span>اقساط</span>
+          <span className="text-[10px] opacity-75 tabular-nums">({toPersianDigits(stats.withPlans)})</span>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => { h.select(); setQuickFilter('archived') }}
+          className={`px-3 py-1.5 rounded-xl transition-all whitespace-nowrap flex items-center gap-1.5 press-scale ${
+            quickFilter === 'archived'
+              ? 'bg-slate-600 text-white shadow-xs'
+              : 'bg-white dark:bg-slate-800 text-slate-500 border border-slate-200/80 dark:border-slate-700 hover:bg-slate-50'
+          }`}
+        >
+          <span>بایگانی</span>
+          <span className="text-[10px] opacity-75 tabular-nums">({toPersianDigits(stats.archived)})</span>
+        </button>
       </div>
 
       {/* Search Bar, Privacy & View Toggles */}
-      <div className="space-y-2.5">
+      <div className="space-y-2">
         <div className="flex items-center gap-2">
           <div className="relative flex-1">
             <Search size={16} className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
             <input
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="جستجو در کلینیک بر اساس نام، تلفن، کد ملی، شماره پرونده..."
+              placeholder="جستجو بر اساس نام، تلفن، کد ملی، شماره پرونده..."
               aria-label="جستجوی بیمار"
-              className="w-full pr-10 pl-3 min-h-[44px] rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-100 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500 shadow-xs placeholder:text-slate-400 dark:placeholder:text-slate-500"
+              className="w-full pr-10 pl-3 min-h-[42px] rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-100 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500 shadow-xs placeholder:text-slate-400 dark:placeholder:text-slate-500"
             />
           </div>
 
@@ -557,7 +593,7 @@ export default function Patients() {
             }}
             aria-label={privacyMode ? 'غیرفعال‌سازی حالت محرمانگی پیشخوان' : 'فعال‌سازی حالت محرمانگی پیشخوان'}
             title={privacyMode ? 'حالت محرمانگی پیشخوان فعال است — کلیک جهت نمایش کامل' : 'حالت محرمانگی پیشخوان (مخفی‌سازی کد ملی و تلفن مراجعین)'}
-            className={`min-w-[44px] min-h-[44px] rounded-xl border transition-all-smooth press-scale shrink-0 flex items-center justify-center shadow-xs ${
+            className={`min-w-[42px] min-h-[42px] rounded-xl border transition-all-smooth press-scale shrink-0 flex items-center justify-center shadow-xs ${
               privacyMode
                 ? 'bg-emerald-50 text-emerald-700 border-emerald-300 dark:bg-emerald-950/40 dark:text-emerald-300 dark:border-emerald-800 ring-2 ring-emerald-500/20'
                 : 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-500 dark:text-slate-400 hover:text-slate-700'
@@ -570,7 +606,7 @@ export default function Patients() {
             onClick={() => { h.tap(); setShowFilters(!showFilters) }}
             aria-label={showFilters ? 'بستن فیلترها' : 'باز کردن فیلترها'}
             aria-pressed={showFilters}
-            className={`min-w-[44px] min-h-[44px] rounded-xl border transition-all-smooth press-scale shrink-0 flex items-center justify-center shadow-xs ${
+            className={`min-w-[42px] min-h-[42px] rounded-xl border transition-all-smooth press-scale shrink-0 flex items-center justify-center shadow-xs ${
               showFilters
                 ? 'bg-teal-50 dark:bg-teal-950/40 border-teal-300 dark:border-teal-700 text-teal-700 dark:text-teal-300'
                 : 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-500 dark:text-slate-400 hover:text-teal-600'
@@ -586,102 +622,20 @@ export default function Patients() {
               onClick={() => handleViewModeChange('grid')}
               aria-label="نمای کارت‌ها"
               title="نمای کارت‌ها (Grid)"
-              className={`p-2 rounded-lg transition-all ${viewMode === 'grid' ? 'bg-white dark:bg-slate-900 text-teal-600 dark:text-teal-400 shadow-xs' : 'text-slate-400 hover:text-slate-600 dark:hover:text-slate-200'}`}
+              className={`p-1.5 rounded-lg transition-all ${viewMode === 'grid' ? 'bg-white dark:bg-slate-900 text-teal-600 dark:text-teal-400 shadow-xs' : 'text-slate-400 hover:text-slate-600 dark:hover:text-slate-200'}`}
             >
-              <LayoutGrid size={17} />
+              <LayoutGrid size={16} />
             </button>
             <button
               type="button"
               onClick={() => handleViewModeChange('table')}
               aria-label="نمای جدول بالینی"
               title="نمای جدول تفصیلی (Table)"
-              className={`p-2 rounded-lg transition-all ${viewMode === 'table' ? 'bg-white dark:bg-slate-900 text-teal-600 dark:text-teal-400 shadow-xs' : 'text-slate-400 hover:text-slate-600 dark:hover:text-slate-200'}`}
+              className={`p-1.5 rounded-lg transition-all ${viewMode === 'table' ? 'bg-white dark:bg-slate-900 text-teal-600 dark:text-teal-400 shadow-xs' : 'text-slate-400 hover:text-slate-600 dark:hover:text-slate-200'}`}
             >
-              <List size={17} />
+              <List size={16} />
             </button>
           </div>
-        </div>
-
-        {/* Quick Reception Status Filters */}
-        <div className="flex items-center gap-1.5 overflow-x-auto pb-1 no-scrollbar text-xs font-bold">
-          <button
-            type="button"
-            onClick={() => { h.select(); setQuickFilter('all') }}
-            className={`px-3 py-1.5 rounded-xl transition-all whitespace-nowrap flex items-center gap-1.5 ${
-              quickFilter === 'all'
-                ? 'bg-slate-900 dark:bg-white text-white dark:text-slate-900 shadow-xs'
-                : 'bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 border border-slate-200/80 dark:border-slate-700 hover:bg-slate-50'
-            }`}
-          >
-            <span>همه مراجعین</span>
-            <span className="text-[10px] opacity-75 tabular-nums">({toPersianDigits(stats.total)})</span>
-          </button>
-
-          <button
-            type="button"
-            onClick={() => { h.select(); setQuickFilter('debtors') }}
-            className={`px-3 py-1.5 rounded-xl transition-all whitespace-nowrap flex items-center gap-1.5 ${
-              quickFilter === 'debtors'
-                ? 'bg-rose-600 text-white shadow-xs'
-                : 'bg-white dark:bg-slate-800 text-rose-600 dark:text-rose-400 border border-rose-200/80 dark:border-rose-900/50 hover:bg-rose-50/50'
-            }`}
-          >
-            {stats.debtors > 0 && <span className="w-1.5 h-1.5 rounded-full bg-rose-500 animate-pulse" />}
-            <span>بدهکاران</span>
-            <span className="text-[10px] opacity-75 tabular-nums">({toPersianDigits(stats.debtors)})</span>
-          </button>
-
-          <button
-            type="button"
-            onClick={() => { h.select(); setQuickFilter('cheques') }}
-            className={`px-3 py-1.5 rounded-xl transition-all whitespace-nowrap flex items-center gap-1.5 ${
-              quickFilter === 'cheques'
-                ? 'bg-amber-600 text-white shadow-xs'
-                : 'bg-white dark:bg-slate-800 text-amber-700 dark:text-amber-400 border border-amber-200/80 dark:border-amber-900/50 hover:bg-amber-50/50'
-            }`}
-          >
-            <span>دارای چک صیادی</span>
-            <span className="text-[10px] opacity-75 tabular-nums">({toPersianDigits(stats.withCheques)})</span>
-          </button>
-
-          <button
-            type="button"
-            onClick={() => { h.select(); setQuickFilter('plans') }}
-            className={`px-3 py-1.5 rounded-xl transition-all whitespace-nowrap flex items-center gap-1.5 ${
-              quickFilter === 'plans'
-                ? 'bg-indigo-600 text-white shadow-xs'
-                : 'bg-white dark:bg-slate-800 text-indigo-600 dark:text-indigo-400 border border-indigo-200/80 dark:border-indigo-900/50 hover:bg-indigo-50/50'
-            }`}
-          >
-            <span>اقساط فعال</span>
-            <span className="text-[10px] opacity-75 tabular-nums">({toPersianDigits(stats.withPlans)})</span>
-          </button>
-
-          <button
-            type="button"
-            onClick={() => { h.select(); setQuickFilter('vip') }}
-            className={`px-3 py-1.5 rounded-xl transition-all whitespace-nowrap flex items-center gap-1.5 ${
-              quickFilter === 'vip'
-                ? 'bg-violet-600 text-white shadow-xs'
-                : 'bg-white dark:bg-slate-800 text-violet-600 dark:text-violet-400 border border-violet-200/80 dark:border-violet-900/50 hover:bg-violet-50/50'
-            }`}
-          >
-            <span>بیماران VIP</span>
-            <span className="text-[10px] opacity-75 tabular-nums">({toPersianDigits(stats.vip)})</span>
-          </button>
-
-          <button
-            type="button"
-            onClick={() => { h.select(); setQuickFilter('archived') }}
-            className={`px-3 py-1.5 rounded-xl transition-all whitespace-nowrap flex items-center gap-1.5 ${
-              quickFilter === 'archived'
-                ? 'bg-slate-600 text-white shadow-xs'
-                : 'bg-white dark:bg-slate-800 text-slate-500 border border-slate-200/80 dark:border-slate-700 hover:bg-slate-50'
-            }`}
-          >
-            <span>بایگانی</span>
-            <span className="text-[10px] opacity-75 tabular-nums">({toPersianDigits(stats.archived)})</span>
-          </button>
         </div>
       </div>
 
@@ -741,22 +695,16 @@ export default function Patients() {
           })()}
         </Card>
       ) : viewMode === 'grid' ? (
-        /* Widescreen Responsive Patient Grid */
-        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5">
+        /* Widescreen Responsive Compact Patient Grid (High Density 1/3 Height) */
+        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
           {filteredPatients.map((patient, idx) => {
             const theme = tileThemes[getHashColor(patient.id)]
             const vipMeta = getVipMeta(patient.vip_level)
-            const age = calculateAge(patient.birth_date)
             const fin = patientFinances.get(patient.id) || { balance: 0, paid: 0, totalCost: 0 }
-            const hasAllergies = !isNegativeValue(patient.allergies)
-            const hasConditions = !isNegativeValue(patient.medical_conditions)
             const activeCheques = patientChequesMap.get(patient.id) || 0
             const activePlans = patientPlansMap.get(patient.id) || 0
             const isDebtor = fin.balance > 0
             const isSettled = fin.totalCost > 0 && fin.balance <= 0
-            const primaryDoctor = patient.primary_doctor_id ? doctorsMap.get(patient.primary_doctor_id) : null
-            const cleanPhone = patient.phone ? patient.phone.replace(/\D/g, '').replace(/^0/, '98') : null
-            const waText = `سلام ${patient.first_name} ${patient.last_name} عزیز،\nپیام از طرف کلینیک دندانپزشکی مینا.\nجهت هماهنگی و پیگیری نوبت با ما در ارتباط باشید.`
 
             const borderStatusClass = isDebtor
               ? 'border-r-4 border-r-rose-500'
@@ -769,255 +717,137 @@ export default function Patients() {
             return (
               <div
                 key={patient.id}
-                className={`relative overflow-hidden flex flex-col justify-between p-4 sm:p-5 rounded-3xl bg-gradient-to-br ${theme.bg} border-2 ${theme.border} shadow-sm hover:shadow-xl transition-all duration-300 group cursor-pointer ${borderStatusClass}`}
-                style={{ animationDelay: `${Math.min(idx, 10) * 25}ms` }}
+                className={`relative overflow-hidden flex flex-col justify-between p-3 rounded-2xl bg-gradient-to-br ${theme.bg} border ${theme.border} shadow-xs hover:shadow-md transition-all duration-200 group cursor-pointer ${borderStatusClass}`}
+                style={{ animationDelay: `${Math.min(idx, 10) * 20}ms` }}
                 onClick={() => { h.tap(); navigate(`/patients/${patient.id}`) }}
               >
-                {/* Breathing Gemini-like dynamic colorful aura */}
-                <div
-                  className={`absolute -top-12 -right-12 w-48 h-48 rounded-full bg-gradient-to-br ${theme.blob} pointer-events-none breathe-slow opacity-40 group-hover:opacity-75 transition-opacity duration-700 blur-2xl`}
-                />
-                <div
-                  className={`absolute -bottom-10 -left-10 w-40 h-40 rounded-full bg-gradient-to-tr ${theme.blob} pointer-events-none breathe-slow opacity-25 group-hover:opacity-50 transition-opacity duration-700 blur-2xl`}
-                  style={{ animationDelay: '-4s' }}
-                />
+                {/* Compact Row 1: Avatar + Name + File Number + Quick Action Icons */}
+                <div className="flex items-center justify-between gap-2 mb-2">
+                  <div className="flex items-center gap-2 min-w-0 flex-1">
+                    <div className={`w-9 h-9 rounded-xl ${patient.avatar_url ? '' : theme.iconBg} text-white font-black text-xs flex items-center justify-center flex-shrink-0 shadow-xs border border-white/60 dark:border-slate-700 overflow-hidden`}>
+                      {patient.avatar_url ? (
+                        <img src={patient.avatar_url} alt="" className="w-full h-full object-cover" />
+                      ) : (
+                        <span>{getInitials(patient)}</span>
+                      )}
+                    </div>
 
-                <div className="relative z-10">
-                  {/* Top Section: Avatar + Name + Dedicated File Number Capsule */}
-                  <div className="flex items-start justify-between gap-3 mb-3.5">
-                    <div className="flex items-center gap-3 min-w-0 flex-1">
-                      {/* Avatar */}
-                      <div className={`w-12 h-12 rounded-2xl ${patient.avatar_url ? '' : theme.iconBg} text-white font-black text-sm flex items-center justify-center flex-shrink-0 shadow-md border border-white/60 dark:border-slate-700 overflow-hidden`}>
-                        {patient.avatar_url ? (
-                          <img src={patient.avatar_url} alt="" className="w-full h-full object-cover" />
-                        ) : (
-                          <span>{getInitials(patient)}</span>
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center gap-1 truncate">
+                        <h3 className={`font-black text-sm truncate ${isDebtor ? 'text-rose-700 dark:text-rose-400' : 'text-slate-900 dark:text-slate-100'}`}>
+                          <HighlightText text={`${patient.first_name} ${patient.last_name}`} query={searchQuery} />
+                        </h3>
+                        {vipMeta.value > 0 && (
+                          <span className="text-xs shrink-0 drop-shadow-xs" title={`سطح ${vipMeta.label}`}>{vipMeta.icon}</span>
                         )}
                       </div>
-
-                      {/* Name & Demographics */}
-                      <div className="min-w-0 flex-1">
-                        <div className="flex items-center gap-1.5 flex-wrap">
-                          <h3 className={`font-black text-base truncate ${isDebtor ? 'text-rose-700 dark:text-rose-400' : 'text-slate-900 dark:text-slate-100'}`}>
-                            <HighlightText text={`${patient.first_name} ${patient.last_name}`} query={searchQuery} />
-                          </h3>
-                          {vipMeta.value > 0 && (
-                            <span className="text-xs shrink-0 drop-shadow-xs" title={`سطح ${vipMeta.label}`}>{vipMeta.icon}</span>
-                          )}
-                          {!patient.is_active && (
-                            <span className="px-1.5 py-0.5 rounded-md text-[10px] font-bold bg-slate-200/80 text-slate-700 dark:bg-slate-800 dark:text-slate-300">
-                              بایگانی
-                            </span>
-                          )}
-                        </div>
-
-                        <div className="flex items-center gap-2 text-xs text-slate-600 dark:text-slate-400 mt-1 flex-wrap">
-                          {age !== null && <span className="font-medium">{toPersianDigits(age)} ساله</span>}
-                          {patient.gender && <span>• {patient.gender === 'male' ? 'آقا' : 'خانم'}</span>}
-                          {patient.blood_type && (
-                            <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-red-100/80 text-red-700 dark:bg-red-950/50 dark:text-red-300">
-                              {patient.blood_type}
-                            </span>
-                          )}
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Dedicated Non-Black Elegant Medical File Number Capsule */}
-                    <div className="shrink-0" onClick={(e) => e.stopPropagation()}>
-                      {patient.file_number ? (
-                        <button
-                          type="button"
-                          onClick={(e) => {
-                            e.stopPropagation()
-                            h.tap()
-                            navigate(`/patients/${patient.id}`)
-                          }}
-                          title="شماره پرونده — کلیک برای مشاهده پرونده"
-                          className={`inline-flex items-center gap-1.5 font-mono font-black text-xs sm:text-sm px-3 py-1.5 rounded-xl ${theme.capsuleBg} ${theme.capsuleText} border ${theme.capsuleBorder} shadow-xs hover:scale-105 transition-all backdrop-blur-md`}
-                          dir="ltr"
-                        >
-                          <FileText size={13} className="shrink-0 opacity-80" />
-                          <span>#<HighlightText text={toPersianDigits(patient.file_number)} query={searchQuery} /></span>
-                        </button>
-                      ) : (
-                        <span className="text-[11px] text-slate-400 italic px-2 py-1 rounded-lg bg-slate-100/60 dark:bg-slate-800/60">بدون پرونده</span>
-                      )}
                     </div>
                   </div>
 
-                  {/* Direct Sterile-Touch Communication Hub (Phone, Call, SMS, WhatsApp) */}
-                  <div className="flex items-center justify-between gap-2 p-2 rounded-2xl bg-white/70 dark:bg-slate-900/60 backdrop-blur-xs border border-slate-200/60 dark:border-slate-800/60 mb-3" onClick={(e) => e.stopPropagation()}>
-                    {/* Phone & National ID text */}
-                    <div className="flex flex-col gap-0.5 min-w-0 text-xs">
-                      {patient.phone ? (
-                        <div className="flex items-center gap-1.5 font-mono font-bold text-slate-800 dark:text-slate-200" dir="ltr">
-                          <Phone size={11} className="text-teal-600 shrink-0" />
-                          <span>{privacyMode ? maskPhoneNumber(patient.phone) : toPersianDigits(patient.phone)}</span>
-                        </div>
-                      ) : (
-                        <span className="text-slate-400 text-[11px]">بدون شماره تماس</span>
-                      )}
-                      {patient.national_id && (
-                        <div className="flex items-center gap-1 font-mono text-[11px] text-slate-500 dark:text-slate-400" dir="ltr">
-                          <Shield size={10} className="text-slate-400 shrink-0" />
-                          <span>{privacyMode ? maskNationalId(patient.national_id) : toPersianDigits(patient.national_id)}</span>
-                        </div>
-                      )}
-                    </div>
+                  {/* Dedicated Compact File Number Capsule + Quick Edit Icons */}
+                  <div className="flex items-center gap-1 shrink-0" onClick={(e) => e.stopPropagation()}>
+                    {patient.file_number && (
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          h.tap()
+                          navigate(`/patients/${patient.id}`)
+                        }}
+                        title="شماره پرونده — کلیک جهت مشاهده"
+                        className={`inline-flex items-center gap-1 font-mono font-extrabold text-[11px] px-2 py-0.5 rounded-lg ${theme.capsuleBg} ${theme.capsuleText} border ${theme.capsuleBorder} backdrop-blur-md hover:scale-105 transition-all`}
+                        dir="ltr"
+                      >
+                        <FileText size={10} className="shrink-0 opacity-80" />
+                        <span>#<HighlightText text={toPersianDigits(patient.file_number)} query={searchQuery} /></span>
+                      </button>
+                    )}
 
-                    {/* 1-Click Interactive Triggers: Call, SMS, WhatsApp */}
-                    <div className="flex items-center gap-1 shrink-0">
-                      {patient.phone && (
-                        <>
-                          <a
-                            href={`tel:${patient.phone}`}
-                            onClick={() => { h.tap(); chimes.playPop() }}
-                            className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-xl bg-teal-500/10 hover:bg-teal-500/20 text-teal-700 dark:text-teal-300 border border-teal-300/40 text-[11px] font-bold transition-all press-scale shadow-xs"
-                            title="تماس مستقیم با بیمار"
-                          >
-                            <PhoneCall size={12} className="text-teal-600 dark:text-teal-400 shrink-0" />
-                            <span className="hidden sm:inline">تماس</span>
-                          </a>
-
-                          <a
-                            href={`sms:${patient.phone}`}
-                            onClick={() => { h.tap(); chimes.playPop() }}
-                            className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-xl bg-sky-500/10 hover:bg-sky-500/20 text-sky-700 dark:text-sky-300 border border-sky-300/40 text-[11px] font-bold transition-all press-scale shadow-xs"
-                            title="ارسال پیامک به بیمار"
-                          >
-                            <MessageSquare size={12} className="text-sky-600 dark:text-sky-400 shrink-0" />
-                            <span className="hidden sm:inline">پیامک</span>
-                          </a>
-                        </>
-                      )}
-
-                      {cleanPhone && (
-                        <a
-                          href={`https://wa.me/${cleanPhone}?text=${encodeURIComponent(waText)}`}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          onClick={() => { h.tap(); chimes.playPop() }}
-                          className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-xl bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-700 dark:text-emerald-300 border border-emerald-300/40 text-[11px] font-bold transition-all press-scale shadow-xs"
-                          title="گفتگو در واتساپ"
-                        >
-                          <MessageCircle size={12} className="text-emerald-600 dark:text-emerald-400 shrink-0" />
-                          <span>واتساپ</span>
-                        </a>
-                      )}
-                    </div>
-                  </div>
-
-                  {/* Doctor & Insurance Meta Row */}
-                  {(primaryDoctor || patient.insurance_info) && (
-                    <div className="flex items-center gap-2 flex-wrap text-xs mb-3" onClick={(e) => e.stopPropagation()}>
-                      {primaryDoctor && (
-                        <div className="inline-flex items-center gap-1 px-2.5 py-1 rounded-xl bg-slate-100/80 dark:bg-slate-800/80 text-slate-700 dark:text-slate-300 border border-slate-200/70 dark:border-slate-700/70 text-[11px] font-medium">
-                          <User size={11} className="text-teal-600 shrink-0" />
-                          <span>پزشک: <strong className="font-bold text-slate-900 dark:text-slate-100">{primaryDoctor.name}</strong></span>
-                          {primaryDoctor.specialty && <span className="text-slate-400 text-[10px]">({primaryDoctor.specialty})</span>}
-                        </div>
-                      )}
-
-                      {patient.insurance_info && (
-                        <div className="inline-flex items-center gap-1 px-2.5 py-1 rounded-xl bg-blue-50/80 dark:bg-blue-950/40 text-blue-700 dark:text-blue-300 border border-blue-200/70 dark:border-blue-800/60 text-[11px] font-semibold">
-                          <Shield size={11} className="text-blue-500 shrink-0" />
-                          <span>بیمه: {patient.insurance_info}</span>
-                          {patient.insurance_number && <span className="font-mono text-[10px]" dir="ltr">({toPersianDigits(patient.insurance_number)})</span>}
-                        </div>
-                      )}
-                    </div>
-                  )}
-
-                  {/* Clinical Alerts Row */}
-                  {(hasAllergies || hasConditions || patient.anticoagulant_use || patient.bisphosphonate_use || patient.pregnancy_trimester) && (
-                    <div className="flex items-center gap-1.5 flex-wrap mb-3" onClick={(e) => e.stopPropagation()}>
-                      {hasAllergies && (
-                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-rose-50 text-rose-700 dark:bg-rose-950/50 dark:text-rose-300 text-[11px] font-bold border border-rose-200 dark:border-rose-900/50">
-                          <AlertCircle size={11} className="text-rose-500 shrink-0" />
-                          <span>حساسیت: {patient.allergies}</span>
-                        </span>
-                      )}
-                      {hasConditions && (
-                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-amber-50 text-amber-800 dark:bg-amber-950/50 dark:text-amber-300 text-[11px] font-bold border border-amber-200 dark:border-amber-900/50">
-                          <Heart size={11} className="text-amber-600 shrink-0" />
-                          <span>بیماری: {patient.medical_conditions}</span>
-                        </span>
-                      )}
-                      {patient.anticoagulant_use && (
-                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-red-100/80 text-red-800 dark:bg-red-950/60 dark:text-red-200 text-[11px] font-bold border border-red-300 dark:border-red-800 animate-pulse">
-                          <AlertCircle size={11} className="text-red-600 shrink-0" />
-                          <span>مصرف ضدانعقاد {patient.inr_value ? `(INR: ${toPersianDigits(patient.inr_value)})` : ''}</span>
-                        </span>
-                      )}
-                      {patient.bisphosphonate_use && (
-                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-purple-50 text-purple-800 dark:bg-purple-950/50 dark:text-purple-300 text-[11px] font-bold border border-purple-200 dark:border-purple-900/50">
-                          <span>بیس‌فسفونات (ریسک استئونکروز)</span>
-                        </span>
-                      )}
-                      {patient.pregnancy_trimester && (
-                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-pink-50 text-pink-800 dark:bg-pink-950/50 dark:text-pink-300 text-[11px] font-bold border border-pink-200 dark:border-pink-900/50">
-                          <span>بارداری سه ماهه {toPersianDigits(patient.pregnancy_trimester)}</span>
-                        </span>
-                      )}
-                    </div>
-                  )}
-
-                  {/* Financial Overview Rail */}
-                  {(isDebtor || isSettled || activeCheques > 0 || activePlans > 0) && (
-                    <div className="flex items-center gap-2 flex-wrap mb-3" onClick={(e) => e.stopPropagation()}>
-                      {isDebtor ? (
-                        <button
-                          type="button"
-                          onClick={(e) => {
-                            e.stopPropagation()
-                            h.tap()
-                            navigate(`/patients/${patient.id}`, { state: { initialTab: 'payments', openPaymentModal: true } })
-                          }}
-                          title="ثبت تسویه و دریافت بدهی بیمار"
-                          className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-rose-50 dark:bg-rose-950/50 text-rose-700 dark:text-rose-300 border border-rose-200 dark:border-rose-800 text-xs font-black shadow-xs hover:bg-rose-100 dark:hover:bg-rose-900/60 transition-colors press-scale"
-                        >
-                          <span className="w-2 h-2 rounded-full bg-rose-500 animate-pulse" />
-                          <Banknote size={13} className="text-rose-600 dark:text-rose-400" />
-                          <span>بدهی: {formatCurrency(fin.balance)} تومان</span>
-                          <span className="text-[10px] underline font-normal mr-1">تسویه</span>
-                        </button>
-                      ) : isSettled ? (
-                        <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-xl bg-emerald-50 dark:bg-emerald-950/50 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800 text-xs font-bold">
-                          <CheckCircle2 size={13} className="text-emerald-600" />
-                          <span>تسویه حساب کامل</span>
-                        </span>
-                      ) : null}
-
-                      {activeCheques > 0 && (
-                        <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-xl bg-amber-50 dark:bg-amber-950/50 text-amber-800 dark:text-amber-300 border border-amber-200 dark:border-amber-800 text-xs font-bold">
-                          <CreditCard size={12} className="text-amber-600" />
-                          <span>{toPersianDigits(activeCheques)} چک صیادی</span>
-                        </span>
-                      )}
-
-                      {activePlans > 0 && (
-                        <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-xl bg-indigo-50 dark:bg-indigo-950/50 text-indigo-800 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800 text-xs font-bold">
-                          <CalendarClock size={12} className="text-indigo-600" />
-                          <span>{toPersianDigits(activePlans)} اقساط فعال</span>
-                        </span>
-                      )}
-                    </div>
-                  )}
-                </div>
-
-                {/* Sterile Action Buttons */}
-                <div className="relative z-10 pt-3 border-t border-slate-200/60 dark:border-slate-800 flex items-center justify-between gap-2 flex-wrap" onClick={(e) => e.stopPropagation()}>
-                  <div className="flex items-center gap-1.5 flex-wrap">
                     <button
                       type="button"
-                      onClick={() => { h.tap(); navigate(`/patients/${patient.id}`) }}
-                      className="flex items-center gap-1 px-3 py-1.5 rounded-xl bg-teal-600 hover:bg-teal-700 text-white text-xs font-bold shadow-xs transition-all-smooth press-scale"
+                      onClick={() => openEditModal(patient)}
+                      title="ویرایش بیمار"
+                      aria-label="ویرایش اطلاعات"
+                      className="p-1 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-white/80 dark:hover:bg-slate-800 transition-colors"
                     >
-                      <span>پرونده بیمار</span>
-                      <ChevronLeft size={14} />
+                      <Edit2 size={13} />
                     </button>
+                    <button
+                      type="button"
+                      onClick={() => handleDelete(patient)}
+                      title="انتقال به بایگانی"
+                      aria-label="انتقال به بایگانی"
+                      className="p-1 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/30 transition-colors"
+                    >
+                      <Archive size={13} />
+                    </button>
+                  </div>
+                </div>
 
+                {/* Compact Row 2: Contact Info & Financial Status Pill */}
+                <div className="flex items-center justify-between gap-1.5 text-xs mb-2" onClick={(e) => e.stopPropagation()}>
+                  {/* Phone + Quick Call / SMS Buttons */}
+                  <div className="flex items-center gap-1.5 min-w-0">
+                    {patient.phone ? (
+                      <div className="flex items-center gap-1 text-[11px] font-mono font-bold text-slate-700 dark:text-slate-300" dir="ltr">
+                        <Phone size={10} className="text-teal-600 shrink-0" />
+                        <span>{privacyMode ? maskPhoneNumber(patient.phone) : toPersianDigits(patient.phone)}</span>
+                      </div>
+                    ) : (
+                      <span className="text-slate-400 text-[10px]">بدون شماره</span>
+                    )}
+
+                    {patient.phone && (
+                      <div className="flex items-center gap-0.5 shrink-0">
+                        <a
+                          href={`tel:${patient.phone}`}
+                          onClick={() => { h.tap(); chimes.playPop() }}
+                          className="p-1 rounded-md bg-teal-500/10 hover:bg-teal-500/20 text-teal-700 dark:text-teal-300 border border-teal-300/30 text-[10px] transition-all press-scale"
+                          title="تماس تلفنی"
+                        >
+                          <PhoneCall size={10} className="text-teal-600 dark:text-teal-400" />
+                        </a>
+                        <a
+                          href={`sms:${patient.phone}`}
+                          onClick={() => { h.tap(); chimes.playPop() }}
+                          className="p-1 rounded-md bg-sky-500/10 hover:bg-sky-500/20 text-sky-700 dark:text-sky-300 border border-sky-300/30 text-[10px] transition-all press-scale"
+                          title="ارسال پیامک"
+                        >
+                          <MessageSquare size={10} className="text-sky-600 dark:text-sky-400" />
+                        </a>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Financial Status Badge */}
+                  <div className="shrink-0">
+                    {isDebtor ? (
+                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg bg-rose-50 dark:bg-rose-950/50 text-rose-700 dark:text-rose-300 border border-rose-200 dark:border-rose-800 text-[10px] font-black">
+                        <span className="w-1.5 h-1.5 rounded-full bg-rose-500 animate-pulse" />
+                        <span>بدهی: {formatCurrency(fin.balance)}</span>
+                      </span>
+                    ) : isSettled ? (
+                      <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-lg bg-emerald-50 dark:bg-emerald-950/50 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800 text-[10px] font-bold">
+                        <CheckCircle2 size={10} className="text-emerald-600" />
+                        <span>تسویه</span>
+                      </span>
+                    ) : activeCheques > 0 ? (
+                      <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-lg bg-amber-50 dark:bg-amber-950/50 text-amber-800 dark:text-amber-300 text-[10px] font-bold">
+                        <CreditCard size={10} className="text-amber-600" />
+                        <span>{toPersianDigits(activeCheques)} چک</span>
+                      </span>
+                    ) : activePlans > 0 ? (
+                      <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-lg bg-indigo-50 dark:bg-indigo-950/50 text-indigo-800 dark:text-indigo-300 text-[10px] font-bold">
+                        <CalendarClock size={10} className="text-indigo-600" />
+                        <span>{toPersianDigits(activePlans)} قسط</span>
+                      </span>
+                    ) : null}
+                  </div>
+                </div>
+
+                {/* Compact Row 3: High-Frequency Tactile Action Buttons */}
+                <div className="pt-1.5 border-t border-slate-200/60 dark:border-slate-800 flex items-center justify-between gap-1.5" onClick={(e) => e.stopPropagation()}>
+                  <div className="flex items-center gap-1">
                     <button
                       type="button"
                       onClick={() => {
@@ -1030,10 +860,10 @@ export default function Patients() {
                           },
                         })
                       }}
-                      className="flex items-center gap-1 px-2.5 py-1.5 rounded-xl bg-white/90 hover:bg-slate-100 dark:bg-slate-800/90 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 border border-slate-200/80 dark:border-slate-700/80 text-xs font-bold transition-all-smooth press-scale shadow-xs"
-                      title="ثبت نوبت جدید"
+                      className="inline-flex items-center gap-1 px-2 py-1 rounded-lg bg-white/90 hover:bg-slate-100 dark:bg-slate-800/90 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 border border-slate-200/80 dark:border-slate-700/80 text-[11px] font-bold transition-all press-scale shadow-2xs"
+                      title="ثبت نوبت سریع"
                     >
-                      <Calendar size={13} className="text-teal-600" />
+                      <Calendar size={11} className="text-teal-600" />
                       <span>نوبت</span>
                     </button>
 
@@ -1043,34 +873,22 @@ export default function Patients() {
                         h.tap()
                         navigate(`/patients/${patient.id}`, { state: { initialTab: 'dental-chart' } })
                       }}
-                      className="flex items-center gap-1 px-2.5 py-1.5 rounded-xl bg-white/90 hover:bg-teal-50 dark:bg-slate-800/90 dark:hover:bg-teal-950/40 text-slate-700 dark:text-slate-200 border border-slate-200/80 dark:border-slate-700/80 text-xs font-bold transition-all-smooth press-scale shadow-xs"
-                      title="مشاهده چارت دندانپزشکی"
+                      className="inline-flex items-center gap-1 px-2 py-1 rounded-lg bg-white/90 hover:bg-teal-50 dark:bg-slate-800/90 dark:hover:bg-teal-950/40 text-slate-700 dark:text-slate-200 border border-slate-200/80 dark:border-slate-700/80 text-[11px] font-bold transition-all press-scale shadow-2xs"
+                      title="چارت دندانپزشکی"
                     >
-                      <Activity size={13} className="text-teal-600" />
+                      <Activity size={11} className="text-teal-600" />
                       <span>چارت</span>
                     </button>
                   </div>
 
-                  <div className="flex items-center gap-1">
-                    <button
-                      type="button"
-                      onClick={() => openEditModal(patient)}
-                      title="ویرایش اطلاعات بیمار"
-                      aria-label="ویرایش اطلاعات"
-                      className="p-1.5 rounded-xl text-slate-400 hover:text-slate-700 hover:bg-white/80 dark:hover:bg-slate-800 transition-colors"
-                    >
-                      <Edit2 size={15} />
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => handleDelete(patient)}
-                      title="انتقال به بایگانی / غیرفعال‌سازی"
-                      aria-label="انتقال به بایگانی"
-                      className="p-1.5 rounded-xl text-slate-400 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/30 transition-colors"
-                    >
-                      <Archive size={15} />
-                    </button>
-                  </div>
+                  <button
+                    type="button"
+                    onClick={() => { h.tap(); navigate(`/patients/${patient.id}`) }}
+                    className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-teal-600 hover:bg-teal-700 text-white text-[11px] font-bold shadow-2xs transition-all press-scale"
+                  >
+                    <span>پرونده</span>
+                    <ChevronLeft size={12} />
+                  </button>
                 </div>
               </div>
             )

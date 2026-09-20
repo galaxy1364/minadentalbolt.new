@@ -223,14 +223,36 @@ export default function Laboratory() {
     loadData()
   }, [loadData])
 
-  // NOTE: no quick-start-from-elsewhere mechanism here (removed one that
-  // briefly existed) — the encounter detail page's own 'ارجاع به
-  // لابراتوار' button was removed as a genuine duplicate of the
-  // treatment wizard's 'ارسال به لابراتوار + مالی' checkbox, which
-  // creates a complete real lab order in one step rather than just
-  // navigating here empty. Left this note rather than silently deleting
-  // the history, since leaving an unwired mechanism behind is exactly
-  // the kind of orphaned-code bug found several times this session.
+  // Auto-fill & auto-launch order wizard from clinical treatments or dental chart handoff
+  useEffect(() => {
+    const s = location.state as Record<string, unknown> | null
+    if (!s) return
+    const handoff = readChartHandoff(s)
+    const patientId = handoff?.patientId || (typeof s.quickStartPatientId === 'string' ? s.quickStartPatientId : '')
+    const toothNumber = handoff?.toothNumber || (typeof s.quickStartToothNumber === 'string' ? s.quickStartToothNumber : '')
+    const doctorId = handoff?.doctorId || (typeof s.quickStartDoctorId === 'string' ? s.quickStartDoctorId : '')
+    const surface = handoff?.surface || (typeof s.quickStartToothSurface === 'string' ? s.quickStartToothSurface : '')
+    const workType = typeof s.quickStartWorkType === 'string' ? s.quickStartWorkType : 'crown'
+    const material = typeof s.quickStartMaterial === 'string' ? s.quickStartMaterial : 'zirconia'
+    const notes = typeof s.quickStartNotes === 'string' ? s.quickStartNotes : ''
+
+    if (patientId || toothNumber || s.openOrderWizard) {
+      setOrderForm((prev) => ({
+        ...prev,
+        patient_id: patientId || prev.patient_id,
+        tooth_number: toothNumber || prev.tooth_number,
+        tooth_surface: surface || prev.tooth_surface,
+        doctor_id: doctorId || prev.doctor_id,
+        work_type: workType || prev.work_type,
+        material: material || prev.material,
+        notes: notes || prev.notes,
+      }))
+      setOrderWizardStep(0)
+      setOrderModalOpen(true)
+      h.success()
+      showToast('info', `سفارش لابراتوار برای دندان ${toothNumber ? toothLabel(toothNumber) : 'بیمار'} آماده تکمیل است`)
+    }
+  }, [location.state])
 
   // ===========================================================================
   // Derived Data

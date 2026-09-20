@@ -589,7 +589,7 @@ export default function Dashboard() {
   // Auto-refresh & view collapses
   const [autoRefresh, setAutoRefresh] = useState(true)
   const [chartsExpanded, setChartsExpanded] = useState(false)
-  const [todayApptsExpanded, setTodayApptsExpanded] = useState(true)
+  const [todayApptsExpanded, setTodayApptsExpanded] = useState(false)
   const [remindersExpanded, setRemindersExpanded] = useState(false)
   const [hubTab, setHubTab] = useState<'alerts' | 'analytics' | 'activity'>('alerts')
 
@@ -1204,16 +1204,21 @@ export default function Dashboard() {
           </div>
           <div className="min-w-0">
             <div className="flex items-center gap-1.5">
-              <span className="text-xs sm:text-sm font-extrabold text-slate-800 dark:text-slate-100 truncate">کلینیک دندانپزشکی مینادنتال</span>
+              <span className="text-xs sm:text-sm font-extrabold text-slate-800 dark:text-slate-100 truncate">مینادنتال</span>
               <span className="text-[10px] font-bold text-violet-700 dark:text-violet-300 bg-violet-50 dark:bg-violet-950/40 border border-violet-200/60 dark:border-violet-800/50 rounded-full px-2 py-0.5 shrink-0">
                 {roleGreeting[role] || roleGreeting.owner}
               </span>
             </div>
             <div className="flex items-center gap-1.5 mt-0.5">
-              <span className="inline-flex items-center gap-1 text-[11px] font-bold text-violet-700 dark:text-violet-300 bg-violet-50/80 dark:bg-violet-950/40 border border-violet-200/60 dark:border-violet-800/50 rounded-lg px-2 py-0.5 shadow-2xs">
+              <button
+                type="button"
+                onClick={() => { h.tap(); navigate('/appointments') }}
+                className="inline-flex items-center gap-1 text-[11px] font-bold text-violet-700 dark:text-violet-300 bg-violet-50/80 dark:bg-violet-950/40 hover:bg-violet-100 dark:hover:bg-violet-900/60 border border-violet-200/60 dark:border-violet-800/50 rounded-lg px-2 py-0.5 shadow-2xs transition-all press-scale cursor-pointer"
+                title="مشاهده تقویم و نوبت‌ها"
+              >
                 <Calendar size={11} className="text-violet-500 shrink-0" />
-                {toJalaliStringPretty(todayStr)}
-              </span>
+                <span>{toJalaliStringPretty(todayStr)}</span>
+              </button>
             </div>
           </div>
         </div>
@@ -1329,32 +1334,6 @@ export default function Dashboard() {
             ariaLabel={`سفارش‌های فعال: ${stats?.activeLabOrders ?? 0}`}
           />
         </div>
-
-        {timeRange === 'today' && (
-          <div className="relative flex items-center justify-end mt-2.5">
-            {editingGoal ? (
-              <div className="flex items-center gap-1.5">
-                <input
-                  autoFocus
-                  type="number"
-                  value={goalDraft}
-                  onChange={(e) => setGoalDraft(e.target.value)}
-                  onKeyDown={(e) => e.key === 'Enter' && saveGoal()}
-                  className="w-16 px-2 py-1 rounded-lg border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-700 text-xs text-center focus:outline-none focus:ring-2 focus:ring-primary-400"
-                />
-                <button onClick={saveGoal} className="text-[11px] font-bold text-primary-600 dark:text-primary-400">ذخیره</button>
-              </div>
-            ) : (
-              <button
-                onClick={() => { setGoalDraft(String(apptGoal)); setEditingGoal(true) }}
-                className="flex items-center gap-1 text-[11px] text-slate-400 dark:text-slate-500 hover:text-primary-500 transition-colors"
-              >
-                <Target size={11} />
-                هدف روزانه نوبت: {toPersianDigits(apptGoal)} (ویرایش)
-              </button>
-            )}
-          </div>
-        )}
       </div>
 
       {/* ═══ Today's Appointments (Interactive Collapsible Card) ═════════════ */}
