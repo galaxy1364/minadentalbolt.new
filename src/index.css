@@ -1232,16 +1232,16 @@ input, textarea, select { font-size: 16px !important; }
   backface-visibility: hidden;
   -webkit-backface-visibility: hidden;
   transition: background 800ms cubic-bezier(0.4, 0, 0.2, 1);
-  background: linear-gradient(160deg, color-mix(in srgb, var(--module-color, #0d9488) 12%, transparent), color-mix(in srgb, var(--module-gradient-from, #14b8a6) 6%, transparent) 50%, color-mix(in srgb, var(--module-gradient-to, #0d9488) 10%, transparent));
+  background: linear-gradient(180deg, #f8fafc 0%, #f1f5f9 100%);
 }
 .dark .module-page-bg {
-  background: linear-gradient(160deg, color-mix(in srgb, var(--module-color, #0d9488) 20%, transparent), color-mix(in srgb, var(--module-gradient-from, #14b8a6) 10%, transparent) 50%, color-mix(in srgb, var(--module-gradient-to, #0d9488) 16%, transparent));
+  background: linear-gradient(180deg, #020617 0%, #0b1120 100%);
 }
 .module-page-blob {
   position: absolute;
   border-radius: 50%;
   filter: blur(85px);
-  opacity: 0.44;
+  opacity: 0.10;
   will-change: transform;
   transform: translate3d(0, 0, 0);
   -webkit-transform: translate3d(0, 0, 0);
@@ -1249,7 +1249,7 @@ input, textarea, select { font-size: 16px !important; }
   -webkit-backface-visibility: hidden;
   transition: background 800ms cubic-bezier(0.4, 0, 0.2, 1), opacity 800ms ease;
 }
-.dark .module-page-blob { opacity: 0.36; filter: blur(95px); }
+.dark .module-page-blob { opacity: 0.12; filter: blur(95px); }
 .module-page-blob-1 {
   width: 65vmax; height: 65vmax;
   top: -25%; right: -20%;

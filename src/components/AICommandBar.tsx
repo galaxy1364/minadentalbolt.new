@@ -407,18 +407,16 @@ export default function AICommandBar() {
            rather than gone. `pointer-events` is dropped with it so a tap
            in that corner reaches the row, not the hidden button.
            It never hides on desktop, where nothing is that cramped. */
-        className={`hidden md:flex fixed bottom-24 left-4 z-40 items-center gap-2 px-4 py-2.5 rounded-full bg-gradient-to-r from-sky-500 to-teal-600 text-white text-sm font-medium shadow-lg hover:shadow-xl transition-all-smooth press-scale ${
-          hidden ? 'opacity-0 translate-y-24 pointer-events-none' : 'opacity-100 translate-y-0'
+        className={`hidden lg:flex fixed bottom-6 left-6 z-30 items-center gap-2 px-3 py-1.5 rounded-xl bg-slate-900/80 hover:bg-slate-900 text-white text-xs font-semibold shadow-md backdrop-blur-md border border-white/10 transition-all-smooth press-scale ${
+          hidden ? 'opacity-0 translate-y-16 pointer-events-none' : 'opacity-100 translate-y-0'
         }`}
         aria-hidden={hidden}
         tabIndex={hidden ? -1 : 0}
         aria-label="دستیار هوشمند"
       >
-        <Sparkles size={16} className="animate-pulse" />
-        جستجو و دستیار
-        {/* A shortcut nobody knows about does not exist, so it is shown
-            on the trigger. Hidden on touch, where there is no keyboard. */}
-        <kbd className="hidden sm:inline text-[10px] px-1.5 py-0.5 rounded bg-white/20 font-mono">Ctrl K</kbd>
+        <Sparkles size={14} className="animate-pulse text-sky-400" />
+        <span>دستیار هوشمند</span>
+        <kbd className="hidden sm:inline text-[9px] px-1.5 py-0.5 rounded bg-white/20 font-mono">Ctrl K</kbd>
       </button>
     )
   }
