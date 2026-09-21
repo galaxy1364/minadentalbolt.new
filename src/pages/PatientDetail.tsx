@@ -2704,66 +2704,90 @@ export default function PatientDetail() {
   // ===========================================================================
 
   const renderLabOrders = () => {
-    if (labOrders.length === 0) {
-      return (
-        <Card className="p-6">
-          <EmptyState
-            icon={<FlaskConical size={32} />}
-            title="سفارشی ثبت نشده"
-            description="هنوز سفارش لابراتوار برای این بیمار ثبت نشده است"
-            action={
-              <Button
-                size="sm"
-                onClick={() => {
-                  h.tap()
-                  navigate('/laboratory', { state: { quickStartPatientId: patient?.id } })
-                }}
-                className="flex items-center gap-1"
-              >
-                <Plus size={14} /> ثبت سفارش جدید لابراتوار
-              </Button>
-            }
-          />
-        </Card>
-      )
-    }
+    const openCount = labOrders.filter(o => o.status !== 'delivered' && o.status !== 'cancelled').length
+    const deliveredCount = labOrders.filter(o => o.status === 'delivered').length
+
     return (
-      <div className="space-y-3">
-        <div className="flex items-center justify-between gap-2 flex-wrap">
-          <h3 className="text-sm font-bold text-slate-800 dark:text-slate-100">سفارش‌های لابراتوار</h3>
-          <Button
-            size="sm"
-            onClick={() => {
-              h.tap()
-              navigate('/laboratory', { state: { quickStartPatientId: patient?.id } })
-            }}
-            className="flex items-center gap-1 text-xs"
-          >
-            <Plus size={14} /> سفارش جدید لابراتوار
-          </Button>
-        </div>
-        {[...labOrders].sort((a, b) => (b.created_at || '').localeCompare(a.created_at || '')).map((o) => (
-          <Card key={o.id} className="p-4">
-            <div className="flex items-start justify-between gap-3 flex-wrap">
-              <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-2 flex-wrap mb-1">
-                  <h4 className="text-sm font-medium text-slate-800">{o.work_type || 'سفارش لابراتوار'}</h4>
-                  <Badge color={o.status === 'delivered' ? 'success' : o.status === 'cancelled' ? 'error' : 'primary'}>
-                    {o.status === 'delivered' ? 'تحویل شده' : o.status === 'cancelled' ? 'لغو شده' : 'در جریان'}
-                  </Badge>
-                </div>
-                <div className="flex items-center gap-3 flex-wrap text-xs text-slate-500">
-                  {o.tooth_number && <span>دندان {toothLabel(o.tooth_number)}</span>}
-                  <span>{toJalaliStringPretty(o.created_at)}</span>
-                  {o.deadline && <span>موعد: {toJalaliStringPretty(o.deadline)}</span>}
-                </div>
-              </div>
-              <div className="text-left">
-                {o.cost != null && <p className="text-sm font-bold text-slate-700">{formatCurrency(o.cost)} تومان</p>}
-              </div>
+      <div className="space-y-4">
+        {/* New Lab Order Button */}
+        <Button
+          variant="secondary"
+          className="w-full h-14 rounded-2xl border-2 border-primary-200 dark:border-primary-800 text-primary-700 dark:text-primary-300 font-bold text-base hover:bg-primary-50 dark:hover:bg-primary-900/30 transition-all shadow-sm"
+          onClick={() => {
+            h.tap()
+            navigate('/laboratory', { state: { quickStartPatientId: patient?.id } })
+          }}
+        >
+          <Plus size={20} className="ml-2" /> سفارش لابراتوار جدید
+        </Button>
+
+        {/* Bento Summary Cards */}
+        {labOrders.length > 0 && (
+          <div className="grid grid-cols-2 gap-3">
+            <div className="bg-white/95 dark:bg-slate-900/90 rounded-2xl p-4 border border-slate-100 dark:border-slate-800 shadow-sm flex flex-col items-center justify-center">
+              <span className="text-xs font-bold text-slate-500 mb-2">سفارش‌های باز</span>
+              <span className="text-3xl font-extrabold text-slate-800 dark:text-slate-100">{toPersianDigits(openCount)}</span>
             </div>
-          </Card>
-        ))}
+            <div className="bg-white/95 dark:bg-slate-900/90 rounded-2xl p-4 border border-slate-100 dark:border-slate-800 shadow-sm flex flex-col items-center justify-center">
+              <span className="text-xs font-bold text-slate-500 mb-2">تحویل‌شده</span>
+              <span className="text-3xl font-extrabold text-slate-800 dark:text-slate-100">{toPersianDigits(deliveredCount)}</span>
+            </div>
+          </div>
+        )}
+
+        {/* List of Orders */}
+        {labOrders.length === 0 ? (
+          <div className="py-8 text-center text-slate-400 text-sm">سفارشی یافت نشد</div>
+        ) : (
+          <div className="space-y-3">
+            {[...labOrders].sort((a, b) => (b.created_at || '').localeCompare(a.created_at || '')).map((o) => {
+              // Map status to badge style
+              let badgeColor = 'bg-slate-100 text-slate-600'
+              let badgeText = 'نامشخص'
+              if (o.status === 'delivered') {
+                badgeColor = 'bg-green-100 text-green-700'
+                badgeText = 'تحویل شده'
+              } else if (o.status === 'cancelled') {
+                badgeColor = 'bg-red-100 text-red-700'
+                badgeText = 'لغو شده'
+              } else if (o.status === 'sent_to_lab') {
+                badgeColor = 'bg-blue-100 text-blue-700'
+                badgeText = 'ارسال شده'
+              } else {
+                badgeColor = 'bg-amber-100 text-amber-700' // در جریان / در حال ساخت
+                badgeText = 'در حال ساخت'
+              }
+
+              return (
+                <div key={o.id} className="bg-white dark:bg-slate-900 rounded-2xl p-4 border border-slate-100 dark:border-slate-800 shadow-sm">
+                  <div className="flex items-start justify-between gap-3">
+                    {/* Left Side: Badges & Delivery */}
+                    <div className="flex flex-col items-start gap-2 shrink-0">
+                      <span className={`px-2.5 py-1 rounded-full text-[11px] font-bold ${badgeColor}`}>
+                        {badgeText}
+                      </span>
+                      {o.deadline && (
+                        <span className="text-[11px] text-slate-500 font-medium whitespace-nowrap">
+                          تحویل: {toJalaliStringPretty(o.deadline)}
+                        </span>
+                      )}
+                    </div>
+                    
+                    {/* Right Side: Titles */}
+                    <div className="flex flex-col items-end text-right min-w-0">
+                      <h4 className="text-sm font-extrabold text-slate-800 dark:text-slate-100 mb-1 truncate max-w-[200px] sm:max-w-full">
+                        {o.work_type || 'سفارش لابراتوار'}{o.tooth_number ? ` (دندان ${toothLabel(o.tooth_number)})` : ''}
+                      </h4>
+                      <p className="text-xs text-slate-500 dark:text-slate-400">
+                        ثبت: {toJalaliStringPretty(o.created_at)}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+        )}
       </div>
     )
   }

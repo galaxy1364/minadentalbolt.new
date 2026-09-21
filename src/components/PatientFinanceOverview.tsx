@@ -1,4 +1,4 @@
-import { useMemo } from 'react'
+import { useMemo, useState } from 'react'
 import {
   CreditCard,
   Banknote,
@@ -75,6 +75,7 @@ export function PatientFinanceOverview({
   allPayments,
   allTreatments,
 }: PatientFinanceOverviewProps) {
+  const [activeChip, setActiveChip] = useState<'all' | 'cheques' | 'installments' | 'payments' | 'treatments'>('all')
   const todayStr = useMemo(() => new Date().toISOString().slice(0, 10), [])
 
   const householdProfile = useMemo(() => {
@@ -146,77 +147,6 @@ export function PatientFinanceOverview({
 
   return (
     <div className="space-y-4" dir="rtl">
-      {/* ── Header & Quick Action Buttons ────────────────────────── */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 pb-2 border-b border-slate-100 dark:border-slate-800">
-        <div className="flex items-center gap-2">
-          <div>
-            <div className="flex items-center gap-2">
-              <p className="text-sm font-bold text-slate-800 dark:text-slate-100">{patientName}</p>
-              {hasMedicalAlerts && (
-                <span className="inline-flex items-center gap-1 text-[10px] font-bold text-red-700 bg-red-100 px-1.5 py-0.5 rounded border border-red-200">
-                  <AlertCircle size={12} className="animate-pulse" />
-                  دارای هشدار پزشکی
-                </span>
-              )}
-            </div>
-            <p className="text-[11px] text-slate-500">مدیریت مالی، چک‌ها و طرح اقساط</p>
-          </div>
-          {!canEdit && (
-            <span
-              className="inline-flex items-center gap-1 text-[10px] font-bold text-amber-700 dark:text-amber-300 bg-amber-50 dark:bg-amber-950/40 px-2 py-0.5 rounded-lg border border-amber-200/60"
-              title="تعرفه‌ها و مبالغ ثبت‌شده فقط توسط مدیر کلینیک قابل تغییر و ویرایش هستند."
-            >
-              <Lock size={11} />
-              <span>ویرایش قیمت: فقط مدیر</span>
-            </span>
-          )}
-        </div>
-
-        <div className="flex items-center gap-1.5 flex-wrap">
-          {onAddPayment && (
-            <button
-              onClick={() => {
-                chimes.playPop()
-                h.tap()
-                onAddPayment()
-              }}
-              className="flex items-center gap-1 px-3 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white text-xs font-bold transition-all-smooth shadow-sm press-scale"
-            >
-              <Plus size={13} />
-              <span>ثبت پرداخت</span>
-            </button>
-          )}
-
-          {onAddCheque && (
-            <button
-              onClick={() => {
-                chimes.playPop()
-                h.tap()
-                onAddCheque()
-              }}
-              className="flex items-center gap-1 px-3 py-1.5 rounded-xl bg-amber-600 hover:bg-amber-700 active:scale-95 text-white text-xs font-bold transition-all-smooth shadow-sm press-scale"
-            >
-              <Banknote size={13} />
-              <span>ثبت چک</span>
-            </button>
-          )}
-
-          {onAddPlan && (
-            <button
-              onClick={() => {
-                chimes.playPop()
-                h.tap()
-                onAddPlan()
-              }}
-              className="flex items-center gap-1 px-3 py-1.5 rounded-xl bg-violet-600 hover:bg-violet-700 active:scale-95 text-white text-xs font-bold transition-all-smooth shadow-sm press-scale"
-            >
-              <CalendarClock size={13} />
-              <span>طرح اقساط</span>
-            </button>
-          )}
-        </div>
-      </div>
-
       {/* ── Household Master Account (حساب مالی خانوادگی) ──────────── */}
       {householdProfile && (
         <div className="p-3.5 rounded-2xl bg-gradient-to-br from-teal-50/80 via-emerald-50/50 to-slate-50 dark:from-teal-950/30 dark:via-emerald-950/20 dark:to-slate-900/40 border border-teal-200/80 dark:border-teal-800/60 shadow-xs">
@@ -300,8 +230,106 @@ export function PatientFinanceOverview({
         <PatientDebtBar patientId={patientId} balance={balance} />
       </div>
 
+      {/* ── Quick Action Buttons (Moved from Header) ────────────── */}
+      <div className="flex items-center gap-2 flex-wrap">
+        {onAddPayment && (
+          <button
+            onClick={() => {
+              chimes.playPop()
+              h.tap()
+              onAddPayment()
+            }}
+            className="flex-1 flex justify-center items-center gap-1.5 px-4 py-3 rounded-2xl bg-emerald-100 text-emerald-800 hover:bg-emerald-200 active:bg-emerald-300 font-bold transition-all shadow-sm"
+          >
+            <Plus size={16} />
+            <span>ثبت پرداخت</span>
+          </button>
+        )}
+        {onAddCheque && (
+          <button
+            onClick={() => {
+              chimes.playPop()
+              h.tap()
+              onAddCheque()
+            }}
+            className="flex-1 flex justify-center items-center gap-1.5 px-4 py-3 rounded-2xl bg-amber-100 text-amber-800 hover:bg-amber-200 active:bg-amber-300 font-bold transition-all shadow-sm"
+          >
+            <Banknote size={16} />
+            <span>ثبت چک</span>
+          </button>
+        )}
+        {onAddPlan && (
+          <button
+            onClick={() => {
+              chimes.playPop()
+              h.tap()
+              onAddPlan()
+            }}
+            className="flex-1 flex justify-center items-center gap-1.5 px-4 py-3 rounded-2xl bg-violet-100 text-violet-800 hover:bg-violet-200 active:bg-violet-300 font-bold transition-all shadow-sm"
+          >
+            <CalendarClock size={16} />
+            <span>طرح اقساط</span>
+          </button>
+        )}
+      </div>
+
+      {/* ── Chip Navigation ─────────────────────────────────────── */}
+      <div className="flex items-center gap-2 overflow-x-auto py-1 -mx-4 px-4 sm:mx-0 sm:px-0 hide-scrollbar scroll-smooth">
+        <button
+          onClick={() => setActiveChip('all')}
+          className={`shrink-0 px-4 py-2 rounded-full text-sm font-bold transition-all ${
+            activeChip === 'all'
+              ? 'bg-slate-800 text-white shadow-md dark:bg-slate-100 dark:text-slate-900'
+              : 'bg-slate-100 text-slate-600 hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-300'
+          }`}
+        >
+          همه تراکنش‌ها
+        </button>
+        <button
+          onClick={() => setActiveChip('payments')}
+          className={`shrink-0 px-4 py-2 rounded-full text-sm font-bold transition-all ${
+            activeChip === 'payments'
+              ? 'bg-slate-800 text-white shadow-md dark:bg-slate-100 dark:text-slate-900'
+              : 'bg-slate-100 text-slate-600 hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-300'
+          }`}
+        >
+          پرداخت‌ها
+        </button>
+        <button
+          onClick={() => setActiveChip('cheques')}
+          className={`shrink-0 px-4 py-2 rounded-full text-sm font-bold transition-all ${
+            activeChip === 'cheques'
+              ? 'bg-slate-800 text-white shadow-md dark:bg-slate-100 dark:text-slate-900'
+              : 'bg-slate-100 text-slate-600 hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-300'
+          }`}
+        >
+          چک‌ها
+        </button>
+        <button
+          onClick={() => setActiveChip('installments')}
+          className={`shrink-0 px-4 py-2 rounded-full text-sm font-bold transition-all ${
+            activeChip === 'installments'
+              ? 'bg-slate-800 text-white shadow-md dark:bg-slate-100 dark:text-slate-900'
+              : 'bg-slate-100 text-slate-600 hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-300'
+          }`}
+        >
+          اقساط
+        </button>
+        <button
+          onClick={() => setActiveChip('treatments')}
+          className={`shrink-0 px-4 py-2 rounded-full text-sm font-bold transition-all ${
+            activeChip === 'treatments'
+              ? 'bg-slate-800 text-white shadow-md dark:bg-slate-100 dark:text-slate-900'
+              : 'bg-slate-100 text-slate-600 hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-300'
+          }`}
+        >
+          درمان‌ها
+        </button>
+      </div>
+
+      <div className="space-y-4">
       {/* ── طرح‌های اقساط بیمار (Installment Plans) ────────────────── */}
-      {myPlans.length > 0 && (
+      {(activeChip === 'all' || activeChip === 'installments') && myPlans.length > 0 && (
         <section id="section-payment-plans" className="space-y-2.5">
           <h4 className="flex items-center gap-1.5 text-xs font-bold text-slate-700 dark:text-slate-200">
             <CalendarClock size={14} className="text-violet-500" />
@@ -433,7 +461,7 @@ export function PatientFinanceOverview({
       )}
 
       {/* ── چک‌ها (Cheques) ─────────────────────────────────────── */}
-      {myCheques.length > 0 && (
+      {(activeChip === 'all' || activeChip === 'cheques') && myCheques.length > 0 && (
         <section id="section-cheques" className="space-y-2">
           <h4 className="flex items-center gap-1.5 text-xs font-bold text-slate-700 dark:text-slate-200">
             <Banknote size={14} className="text-amber-500" />
@@ -539,51 +567,54 @@ export function PatientFinanceOverview({
       )}
 
       {/* ── تاریخچه‌ی پرداخت (Payments History) ──────────────────── */}
-      <section id="section-payments-ledger" className="space-y-2">
-        <h4 className="flex items-center gap-1.5 text-xs font-bold text-slate-700 dark:text-slate-200">
-          <CreditCard size={14} className="text-emerald-500" />
-          <span>تاریخچه‌ی پرداخت‌ها ({toPersianDigits(mine.length)})</span>
-        </h4>
+      {(activeChip === 'all' || activeChip === 'payments') && (
+        <section id="section-payments-ledger" className="space-y-2">
+          <h4 className="flex items-center gap-1.5 text-xs font-bold text-slate-700 dark:text-slate-200">
+            <CreditCard size={14} className="text-emerald-500" />
+            <span>تاریخچه‌ی پرداخت‌ها ({toPersianDigits(mine.length)})</span>
+          </h4>
 
-        {mine.length === 0 ? (
-          <p className="text-xs text-slate-500 px-3 py-4 text-center bg-slate-50 dark:bg-slate-800/40 rounded-xl">
-            هنوز پرداختی ثبت نشده
-          </p>
-        ) : (
-          <div className="space-y-1.5 max-h-[300px] overflow-y-auto pr-0.5">
-            {mine.map((p) => {
-              const a = resolveAttribution(p as never, treatments as never, doctors as never)
-              return (
-                <div key={p.id} className="px-3 py-2 rounded-xl bg-slate-50 dark:bg-slate-800">
-                  <div className="flex items-center justify-between gap-2">
-                    <p className="text-xs font-bold text-slate-800 dark:text-slate-100">
-                      {formatCurrency(p.amount)} ت
+          {mine.length === 0 ? (
+            <p className="text-xs text-slate-500 px-3 py-4 text-center bg-slate-50 dark:bg-slate-800/40 rounded-xl">
+              هنوز پرداختی ثبت نشده
+            </p>
+          ) : (
+            <div className="space-y-1.5 max-h-[300px] overflow-y-auto pr-0.5">
+              {mine.map((p) => {
+                const a = resolveAttribution(p as never, treatments as never, doctors as never)
+                return (
+                  <div key={p.id} className="px-3 py-2 rounded-xl bg-slate-50 dark:bg-slate-800">
+                    <div className="flex items-center justify-between gap-2">
+                      <p className="text-xs font-bold text-slate-800 dark:text-slate-100">
+                        {formatCurrency(p.amount)} ت
+                      </p>
+                      <span
+                        className={`text-[10px] px-2 py-0.5 rounded-full shrink-0 ${
+                          p.status === 'cancelled'
+                            ? 'bg-slate-200 text-slate-500'
+                            : p.status === 'completed'
+                            ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-300'
+                            : 'bg-amber-100 text-amber-700 dark:bg-amber-950/60 dark:text-amber-300'
+                        }`}
+                      >
+                        {p.status === 'cancelled' ? 'لغو شده' : p.status === 'completed' ? 'تکمیل شده' : 'در انتظار'}
+                      </span>
+                    </div>
+                    <p className="text-[10px] text-slate-500 mt-0.5">
+                      {toJalaliStringPretty(p.payment_date)}
+                      {p.payment_method && ` · ${p.payment_method === 'cash' ? 'نقدی' : p.payment_method === 'card' ? 'کارتخوان' : p.payment_method === 'cheque' ? 'چک' : p.payment_method}`}
                     </p>
-                    <span
-                      className={`text-[10px] px-2 py-0.5 rounded-full shrink-0 ${
-                        p.status === 'cancelled'
-                          ? 'bg-slate-200 text-slate-500'
-                          : p.status === 'completed'
-                          ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-300'
-                          : 'bg-amber-100 text-amber-700 dark:bg-amber-950/60 dark:text-amber-300'
-                      }`}
-                    >
-                      {p.status === 'cancelled' ? 'لغو شده' : p.status === 'completed' ? 'تکمیل شده' : 'در انتظار'}
-                    </span>
+                    <p className="text-[10px] text-slate-600 dark:text-slate-300 mt-0.5">{a.label}</p>
                   </div>
-                  <p className="text-[10px] text-slate-500 mt-0.5">
-                    {toJalaliStringPretty(p.payment_date)}
-                    {p.payment_method && ` · ${p.payment_method === 'cash' ? 'نقدی' : p.payment_method === 'card' ? 'کارتخوان' : p.payment_method === 'cheque' ? 'چک' : p.payment_method}`}
-                  </p>
-                  <p className="text-[10px] text-slate-600 dark:text-slate-300 mt-0.5">{a.label}</p>
-                </div>
-              )
-            })}
-          </div>
-        )}
-      </section>
+                )
+              })}
+            </div>
+          )}
+        </section>
+      )}
 
       {/* ── تاریخچه‌ی درمان‌ها (Treatments History) ──────────────────── */}
+      {(activeChip === 'all' || activeChip === 'treatments') && (
       <section className="space-y-2">
         <h4 className="flex items-center gap-1.5 text-xs font-bold text-slate-700 dark:text-slate-200">
           <ShieldAlert size={14} className="text-blue-500" />
@@ -635,6 +666,8 @@ export function PatientFinanceOverview({
           </div>
         )}
       </section>
+      )}
+      </div>
 
       {/* ── Warnings & Notes ──────────────────────────────────── */}
       {mine.some((p) => p.status === 'pending') && (
