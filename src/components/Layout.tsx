@@ -54,9 +54,9 @@ function DarkModeToggle() {
       onClick={() => { h.tap(); const n = !dark; setDark(n); document.documentElement.classList.toggle('dark', n); localStorage.setItem('minadent-dark', String(n)) }}
       aria-label={dark ? 'حالت روشن' : 'حالت تاریک'}
       title={dark ? 'تغییر به حالت روشن' : 'تغییر به حالت شب / تاریک'}
-      className="flex items-center justify-center w-9 h-9 rounded-xl glass border-t border-t-white/90 dark:border-t-white/20 border border-slate-200/60 dark:border-slate-700/60 shadow-md shadow-slate-900/10 text-slate-700 dark:text-amber-400 hover:-translate-y-0.5 active:translate-y-0.5 transition-all press-scale"
+      className="flex items-center justify-center w-11 h-11 min-w-[44px] min-h-[44px] rounded-xl glass border-t border-t-white/90 dark:border-t-white/20 border border-slate-200/60 dark:border-slate-700/60 shadow-md shadow-slate-900/10 text-slate-700 dark:text-amber-400 hover:-translate-y-0.5 active:translate-y-0.5 transition-all press-scale touch-manipulation"
     >
-      {dark ? <Sun size={17} className="drop-shadow-xs" /> : <Moon size={17} className="drop-shadow-xs" />}
+      {dark ? <Sun size={18} className="drop-shadow-xs" /> : <Moon size={18} className="drop-shadow-xs" />}
     </button>
   )
 }
@@ -83,15 +83,15 @@ function PrivacyModeToggle() {
           ? 'حالت محرمانگی پیشخوان فعال است (کد ملی و تلفن ماسک شده) — جهت نمایش کامل کلیک کنید'
           : 'حالت محرمانگی پیشخوان (مخفی‌سازی کد ملی و تلفن در برابر مراجعین)'
       }
-      className={`flex items-center justify-center w-9 h-9 rounded-xl glass border-t border-t-white/90 dark:border-t-white/20 border transition-all press-scale relative shadow-md shadow-slate-900/10 hover:-translate-y-0.5 active:translate-y-0.5 ${
+      className={`flex items-center justify-center w-11 h-11 min-w-[44px] min-h-[44px] rounded-xl glass border-t border-t-white/90 dark:border-t-white/20 border transition-all press-scale relative shadow-md shadow-slate-900/10 hover:-translate-y-0.5 active:translate-y-0.5 touch-manipulation overflow-visible ${
         privacyMode
           ? 'border-emerald-500/60 bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 ring-2 ring-emerald-500/20'
           : 'border-slate-200/60 dark:border-slate-700/60 text-slate-700 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white'
       }`}
     >
-      {privacyMode ? <EyeOff size={17} className="drop-shadow-xs" /> : <Eye size={17} className="drop-shadow-xs" />}
+      {privacyMode ? <EyeOff size={18} className="drop-shadow-xs" /> : <Eye size={18} className="drop-shadow-xs" />}
       {privacyMode && (
-        <span className="absolute -top-0.5 -right-0.5 w-2.5 h-2.5 rounded-full bg-emerald-500 ring-2 ring-white dark:ring-slate-900 animate-pulse" />
+        <span className="absolute -top-1 -right-1 w-3 h-3 rounded-full bg-emerald-500 ring-2 ring-white dark:ring-slate-900 animate-pulse" />
       )}
     </button>
   )
@@ -153,9 +153,15 @@ function UpdateBanner() {
   const autoApply = isAutoApplyEnabled()
 
   return (
-    <div className="px-3 pt-2 animate-in fade-in slide-in-from-top-2 duration-300">
+    <div
+      className="px-3 pt-2 animate-in fade-in slide-in-from-top-2 duration-300"
+      role="status"
+      aria-live="polite"
+      aria-atomic="true"
+      aria-label="به‌روزرسانی جدید موجود است"
+    >
       <div className="flex items-center gap-2.5 px-3.5 py-2.5 rounded-2xl bg-gradient-to-l from-violet-600 via-indigo-600 to-sky-500 text-white shadow-lg border border-white/10">
-        <Sparkles size={16} className="shrink-0 animate-pulse text-amber-300" />
+        <Sparkles size={16} className="shrink-0 animate-pulse text-amber-300" aria-hidden="true" />
         <div className="flex-1 min-w-0">
           <p className="text-xs font-bold leading-tight">
             نسخه‌ی جدیدی موجود است{remoteVersion ? ` (${toPersianDigits(remoteVersion)})` : ''}
@@ -170,7 +176,8 @@ function UpdateBanner() {
           <button
             onClick={async () => { h.confirm(); setUpdating(true); await applyUpdate() }}
             disabled={updating}
-            className="px-3 py-1.5 rounded-xl bg-white/25 hover:bg-white/35 active:bg-white/40 text-xs font-bold transition-all-smooth press-scale disabled:opacity-60 shadow-sm"
+            aria-label="به‌روزرسانی فوری نرم‌افزار"
+            className="px-3 py-2 min-h-[40px] rounded-xl bg-white/25 hover:bg-white/35 active:bg-white/40 text-xs font-bold transition-all-smooth press-scale disabled:opacity-60 shadow-sm touch-manipulation"
           >
             {updating ? 'در حال دریافت...' : 'به‌روزرسانی فوری'}
           </button>
@@ -178,17 +185,18 @@ function UpdateBanner() {
             <button
               onClick={() => { h.tap(); setPaused(true); setCountdown(null) }}
               title="مکث به‌روزرسانی خودکار جهت اتمام کار جاری"
-              className="px-2 py-1.5 rounded-xl bg-white/10 hover:bg-white/20 text-[11px] font-medium"
+              aria-label="مکث به‌روزرسانی خودکار"
+              className="px-2 py-2 min-h-[40px] rounded-xl bg-white/10 hover:bg-white/20 text-[11px] font-medium touch-manipulation"
             >
               مکث
             </button>
           ) : null}
           <button
             onClick={() => { h.cancel(); setDismissed(true) }}
-            aria-label="بعداً"
-            className="p-1 rounded-lg hover:bg-white/20"
+            aria-label="بعداً یادآوری کن"
+            className="p-2 min-h-[40px] min-w-[40px] rounded-lg hover:bg-white/20 flex items-center justify-center touch-manipulation"
           >
-            <X size={14} />
+            <X size={15} />
           </button>
         </div>
       </div>
@@ -231,7 +239,7 @@ function SyncIndicator() {
       onClick={() => { h.tap(); if (hasFailed) navigate('/settings'); else if (isOnline) syncNow() }}
       aria-label={label}
       title={label}
-      className={`relative flex items-center justify-center w-9 h-9 sm:w-10 sm:h-10 rounded-xl glass border-t border-t-white/90 dark:border-t-white/20 border transition-all press-scale hover:-translate-y-0.5 active:translate-y-0.5 shadow-md shadow-slate-900/10 ${
+      className={`relative flex items-center justify-center w-11 h-11 min-w-[44px] min-h-[44px] rounded-xl glass border-t border-t-white/90 dark:border-t-white/20 border transition-all press-scale hover:-translate-y-0.5 active:translate-y-0.5 shadow-md shadow-slate-900/10 touch-manipulation overflow-visible ${
         hasFailed
           ? 'border-rose-400/60 bg-rose-50/80 dark:bg-rose-950/40 text-rose-600 dark:text-rose-400'
           : isOnline
@@ -240,18 +248,18 @@ function SyncIndicator() {
       }`}
     >
       {hasFailed ? (
-        <AlertTriangle size={17} className="drop-shadow-xs animate-pulse" />
+        <AlertTriangle size={18} className="drop-shadow-xs animate-pulse" />
       ) : spinning ? (
-        <RefreshCw size={17} className="animate-spin text-emerald-500 drop-shadow-xs" />
+        <RefreshCw size={18} className="animate-spin text-emerald-500 drop-shadow-xs" />
       ) : isOnline ? (
-        <Wifi size={17} className="drop-shadow-xs" />
+        <Wifi size={18} className="drop-shadow-xs" />
       ) : (
-        <WifiOff size={17} className="drop-shadow-xs" />
+        <WifiOff size={18} className="drop-shadow-xs" />
       )}
 
       {countBadge > 0 && (
         <span
-          className={`absolute -top-1 -right-1 min-w-[15px] h-[15px] px-1 rounded-full text-[9px] font-black flex items-center justify-center border border-white dark:border-slate-900 shadow-xs ${
+          className={`absolute -top-1.5 -right-1.5 min-w-[16px] h-[16px] px-1 rounded-full text-[9px] font-black flex items-center justify-center border border-white dark:border-slate-900 shadow-xs ${
             hasFailed ? 'bg-rose-600 text-white animate-pulse' : 'bg-amber-500 text-white'
           }`}
         >
@@ -422,10 +430,10 @@ function MoreDrawer({ open, onClose }: { open: boolean; onClose: () => void }) {
             </div>
             <button
               onClick={() => { h.cancel(); onClose() }}
-              aria-label="بستن"
-              className="w-8 h-8 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-700 flex items-center justify-center transition-all press-scale"
+              aria-label="بستن پنجره خدمات"
+              className="w-11 h-11 min-w-[44px] min-h-[44px] rounded-full bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-700 flex items-center justify-center transition-all press-scale touch-manipulation"
             >
-              <X size={16} />
+              <X size={18} />
             </button>
           </div>
 
@@ -462,7 +470,7 @@ function MoreDrawer({ open, onClose }: { open: boolean; onClose: () => void }) {
               <button
                 key={cat.id}
                 onClick={() => { h.tap(); setActiveCategory(cat.id as any) }}
-                className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all shrink-0 press-scale ${
+                className={`px-3 py-2 min-h-[40px] rounded-xl text-xs font-bold transition-all shrink-0 press-scale touch-manipulation flex items-center ${
                   activeCategory === cat.id
                     ? 'bg-slate-900 dark:bg-white text-white dark:text-slate-900 shadow-sm'
                     : 'bg-slate-100 dark:bg-slate-800/80 text-slate-600 dark:text-slate-400 hover:bg-slate-200/80 dark:hover:bg-slate-700/80'
@@ -473,8 +481,8 @@ function MoreDrawer({ open, onClose }: { open: boolean; onClose: () => void }) {
             ))}
           </div>
 
-          {/* Modules Grid */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 px-5 pb-4 overflow-y-auto min-h-0 flex-1">
+          {/* Modules Grid — always 2-col on mobile to halve scroll length */}
+          <div className="grid grid-cols-2 gap-2 px-5 pb-4 overflow-y-auto min-h-0 flex-1">
             {filteredModules.length === 0 ? (
               <div className="col-span-full text-center py-12">
                 <Search size={32} className="mx-auto text-slate-300 dark:text-slate-600 mb-2" />
@@ -494,7 +502,7 @@ function MoreDrawer({ open, onClose }: { open: boolean; onClose: () => void }) {
                       navigate(item.path)
                       onClose()
                     }}
-                    className={`card-tactile-3d min-h-[64px] p-3 rounded-2xl border transition-all press-scale text-right flex items-center justify-between gap-3 group ${
+                    className={`card-tactile-3d min-h-[64px] p-3 rounded-2xl border transition-all press-scale text-right flex items-center justify-between gap-2 group touch-manipulation ${
                       active
                         ? 'bg-white dark:bg-slate-800 border-primary-500/60 ring-2 ring-primary-500/20 shadow-md'
                         : 'bg-white/80 dark:bg-slate-800/70 border-slate-200/70 dark:border-slate-700/60 hover:bg-slate-50 dark:hover:bg-slate-800 shadow-xs'
@@ -540,7 +548,7 @@ function MoreDrawer({ open, onClose }: { open: boolean; onClose: () => void }) {
             </div>
             <button
               onClick={() => { h.tap(); setLogoutConfirmOpen(true) }}
-              className="btn-tactile-3d flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold text-rose-600 dark:text-rose-400 bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-900/50 hover:bg-rose-100 transition-all press-scale"
+              className="btn-tactile-3d flex items-center gap-1.5 px-3 py-2 min-h-[40px] rounded-xl text-xs font-bold text-rose-600 dark:text-rose-400 bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-900/50 hover:bg-rose-100 transition-all press-scale touch-manipulation"
             >
               <LogOut size={13} />
               <span>خروج از حساب</span>
@@ -592,8 +600,8 @@ function BottomTabBar() {
 
   return (
     <>
-      <nav className="fixed bottom-0 left-0 right-0 z-40 tab-bar pb-safe sm:bottom-4 sm:left-1/2 sm:-translate-x-1/2 sm:w-[94%] sm:max-w-2xl sm:rounded-3xl sm:pb-0 transition-all duration-300">
-        <div className="flex items-stretch h-[4.5rem] max-w-2xl mx-auto px-1 sm:px-2">
+      <nav className="fixed bottom-0 left-0 right-0 z-40 tab-bar pb-safe sm:bottom-4 sm:left-1/2 sm:-translate-x-1/2 sm:w-[94%] sm:max-w-2xl sm:rounded-3xl sm:pb-0 transition-all duration-300" role="navigation" aria-label="ناوبری اصلی">
+        <div className="flex items-stretch h-[4.75rem] max-w-2xl mx-auto px-1 sm:px-2">
           {visiblePrimary.map((item: ModuleIdentity) => {
             const Icon = item.icon
             const active = isActive(item.path)
@@ -601,7 +609,9 @@ function BottomTabBar() {
               <button
                 key={item.path}
                 onClick={() => { h.select(); navigate(item.path) }}
-                className="flex-1 flex flex-col items-center justify-center gap-0.5 transition-all-smooth press-scale group"
+                aria-label={item.label}
+                aria-current={active ? 'page' : undefined}
+                className="flex-1 flex flex-col items-center justify-center gap-0.5 transition-all-smooth press-scale group min-h-[48px] touch-manipulation"
                 style={{ color: item.color }}
               >
                 <div
@@ -622,13 +632,13 @@ function BottomTabBar() {
                         }
                   }
                 >
-                  <Icon size={active ? 26 : 22} strokeWidth={active ? 2.5 : 2} />
+                  <Icon size={active ? 26 : 23} strokeWidth={active ? 2.5 : 2} />
                   {(() => {
                     const w = openWork[item.path]
                     if (!w || w.count === 0) return null
                     return (
                       <span
-                        className="absolute -top-1 -left-1 min-w-[16px] h-4 px-1 rounded-full text-white text-[9px] font-black flex items-center justify-center border border-white dark:border-slate-900 shadow-sm animate-pulse"
+                        className="absolute -top-1 -left-1 min-w-[17px] h-[17px] px-1 rounded-full text-white text-[10px] font-black flex items-center justify-center border border-white dark:border-slate-900 shadow-sm animate-pulse"
                         style={{ backgroundColor: LEVEL_COLORS[w.level] }}
                         aria-label={`${w.count} کار باز`}
                       >
@@ -638,10 +648,11 @@ function BottomTabBar() {
                   })()}
                 </div>
                 <span
-                  className={`text-[10px] leading-none tracking-tight transition-all ${
+                  className={`tab-bar-label text-[11px] leading-tight tracking-tight transition-all ${
                     active ? 'font-black scale-105' : 'font-bold opacity-85 group-hover:opacity-100'
                   }`}
                   style={{ color: item.color }}
+                  aria-hidden="true"
                 >
                   {item.label}
                 </span>
@@ -653,7 +664,9 @@ function BottomTabBar() {
             return (
               <button
                 onClick={() => { h.pop(); setMoreOpen(true) }}
-                className="flex-1 flex flex-col items-center justify-center gap-0.5 transition-all-smooth press-scale group"
+                aria-label="بخش‌های بیشتر"
+                aria-expanded={moreOpen}
+                className="flex-1 flex flex-col items-center justify-center gap-0.5 transition-all-smooth press-scale group min-h-[48px] touch-manipulation"
                 style={{ color: isMoreActive && currentMod ? currentMod.color : moreColor }}
               >
                 <div
@@ -674,13 +687,14 @@ function BottomTabBar() {
                         }
                   }
                 >
-                  <MoreHorizontal size={isMoreActive ? 26 : 22} strokeWidth={isMoreActive ? 2.5 : 2} style={{ color: isMoreActive && currentMod ? currentMod.color : moreColor }} />
+                  <MoreHorizontal size={isMoreActive ? 26 : 23} strokeWidth={isMoreActive ? 2.5 : 2} style={{ color: isMoreActive && currentMod ? currentMod.color : moreColor }} />
                 </div>
                 <span
-                  className={`text-[10px] leading-none tracking-tight transition-all ${
+                  className={`tab-bar-label text-[11px] leading-tight tracking-tight transition-all ${
                     isMoreActive ? 'font-black scale-105' : 'font-bold opacity-85 group-hover:opacity-100'
                   }`}
                   style={{ color: isMoreActive && currentMod ? currentMod.color : moreColor }}
+                  aria-hidden="true"
                 >
                   بیشتر
                 </span>
@@ -715,11 +729,11 @@ function LogoutButton() {
     <>
       <button
         onClick={() => { h.tap(); setConfirmOpen(true) }}
-        aria-label="خروج"
+        aria-label="خروج از حساب کاربری"
         title={profile?.full_name ? `خروج (${profile.full_name})` : 'خروج از حساب'}
-        className="flex items-center justify-center w-9 h-9 rounded-xl glass border-t border-t-white/90 dark:border-t-white/20 border border-slate-200/60 dark:border-slate-700/60 shadow-md shadow-slate-900/10 text-slate-700 dark:text-slate-300 hover:-translate-y-0.5 active:translate-y-0.5 transition-all press-scale"
+        className="flex items-center justify-center w-11 h-11 min-w-[44px] min-h-[44px] rounded-xl glass border-t border-t-white/90 dark:border-t-white/20 border border-slate-200/60 dark:border-slate-700/60 shadow-md shadow-slate-900/10 text-slate-700 dark:text-slate-300 hover:-translate-y-0.5 active:translate-y-0.5 transition-all press-scale touch-manipulation"
       >
-        <LogOut size={16} className="drop-shadow-xs" />
+        <LogOut size={18} className="drop-shadow-xs" />
       </button>
       <LogoutConfirmModal
         open={confirmOpen}
@@ -741,14 +755,14 @@ function HeaderAlarmButton({ onClick }: { onClick: () => void }) {
         h.pop()
         onClick()
       }}
-      aria-label="مرکز آلارم و هشدارهای بالینی"
+      aria-label={hasUrgent ? `مرکز آلارم — ${toPersianDigits(bundle.total)} هشدار فعال` : 'مرکز آلارم و هشدارهای بالینی'}
       title={hasUrgent ? `${toPersianDigits(bundle.total)} هشدار فعال بالینی و مالی` : 'مرکز آلارم و هشدارها'}
-      className="relative flex items-center justify-center w-9 h-9 rounded-xl glass border-t border-t-white/90 dark:border-t-white/20 border border-slate-200/60 dark:border-slate-700/60 shadow-md shadow-slate-900/10 text-slate-700 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white hover:-translate-y-0.5 active:translate-y-0.5 transition-all press-scale"
+      className="relative flex items-center justify-center w-11 h-11 min-w-[44px] min-h-[44px] rounded-xl glass border-t border-t-white/90 dark:border-t-white/20 border border-slate-200/60 dark:border-slate-700/60 shadow-md shadow-slate-900/10 text-slate-700 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white hover:-translate-y-0.5 active:translate-y-0.5 transition-all press-scale touch-manipulation overflow-visible"
     >
-      <Bell size={17} className={`drop-shadow-xs ${hasUrgent ? 'text-amber-500 animate-pulse' : ''}`} />
+      <Bell size={18} className={`drop-shadow-xs ${hasUrgent ? 'text-amber-500 animate-pulse' : ''}`} />
       {hasUrgent && (
         <span
-          className="absolute -top-1 -right-1 min-w-[17px] h-[17px] px-1 rounded-full bg-red-500 text-white text-[10px] font-bold flex items-center justify-center border-2 border-white dark:border-slate-900 shadow-sm"
+          className="absolute -top-1.5 -right-1.5 min-w-[18px] h-[18px] px-1 rounded-full bg-red-500 text-white text-[10px] font-bold flex items-center justify-center border-2 border-white dark:border-slate-900 shadow-sm"
           aria-hidden="true"
         >
           {bundle.total > 99 ? '+۹۹' : toPersianDigits(bundle.total)}
@@ -832,8 +846,8 @@ function LayoutInner({ children }: { children: React.ReactNode }) {
         <div className="module-page-blob module-page-blob-3" />
         <div className="module-page-blob module-page-blob-4" />
       </div>
-      <header className="sticky top-0 z-40 glass dark:glass border-b border-white/60 dark:border-white/10 pt-safe transition-all-smooth">
-        <div className="flex items-center justify-between px-3.5 h-[56px] max-w-7xl mx-auto w-full">
+      <header className="sticky top-0 z-40 glass dark:glass border-b border-white/60 dark:border-white/10 pt-safe transition-all-smooth" role="banner">
+        <div className="flex items-center justify-between px-3.5 h-[60px] sm:h-[64px] max-w-7xl mx-auto w-full">
           <button
             onClick={() => { h.tap(); navigate('/') }}
             className="flex items-center gap-2 active:opacity-80 transition-opacity press-scale shrink-0"
@@ -859,14 +873,18 @@ function LayoutInner({ children }: { children: React.ReactNode }) {
               }}
               aria-label="دستیار هوشمند بالینی مینادنت"
               title="دستیار هوشمند صوتی و متنی مینادنت"
-              className="relative flex items-center justify-center w-9 h-9 sm:w-10 sm:h-10 rounded-xl glass border-t border-t-white/90 dark:border-t-white/20 border border-sky-400/50 dark:border-sky-500/40 bg-sky-50/70 dark:bg-sky-950/40 text-sky-600 dark:text-sky-400 shadow-md shadow-sky-500/15 hover:-translate-y-0.5 active:translate-y-0.5 transition-all press-scale"
+              className="relative flex items-center justify-center w-11 h-11 min-w-[44px] min-h-[44px] rounded-xl glass border-t border-t-white/90 dark:border-t-white/20 border border-sky-400/50 dark:border-sky-500/40 bg-sky-50/70 dark:bg-sky-950/40 text-sky-600 dark:text-sky-400 shadow-md shadow-sky-500/15 hover:-translate-y-0.5 active:translate-y-0.5 transition-all press-scale touch-manipulation"
             >
-              <Sparkles size={17} className="animate-pulse text-sky-500 drop-shadow-xs" />
+              <Sparkles size={18} className="animate-pulse text-sky-500 drop-shadow-xs" />
             </button>
 
             <HeaderAlarmButton onClick={() => setAlarmCenterOpen(true)} />
-            <SyncIndicator />
-            <DarkModeToggle />
+            {/* SyncIndicator & DarkModeToggle: hidden on mobile to reduce header clutter
+                (5 buttons in ~200px was too cramped for gloved-finger operation) */}
+            <span className="hidden sm:contents">
+              <SyncIndicator />
+              <DarkModeToggle />
+            </span>
             <LogoutButton />
           </div>
         </div>
@@ -874,7 +892,7 @@ function LayoutInner({ children }: { children: React.ReactNode }) {
 
       <UpdateBanner />
 
-      <main className="relative z-[1] flex-1 min-w-0 max-w-full px-3 pt-3 pb-48">
+      <main id="main-content" className="relative z-[1] flex-1 min-w-0 max-w-full px-3 pt-3 pb-[calc(6rem+env(safe-area-inset-bottom,0px))] sm:pb-[calc(6.5rem+env(safe-area-inset-bottom,0px))]" role="main">
         <div key={location.pathname} className="slide-in-right">
           {children}
         </div>

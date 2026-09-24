@@ -422,9 +422,9 @@ input, textarea, select { font-size: 16px !important; }
 .status-pill {
   display: inline-flex;
   align-items: center;
-  padding: 3px 10px;
+  padding: 5px 12px;
   border-radius: 20px;
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 600;
   white-space: nowrap;
 }
@@ -443,7 +443,8 @@ input, textarea, select { font-size: 16px !important; }
 
 /* ── Filter tab ─────────────────────────────────────── */
 .filter-tab {
-  padding: 6px 14px;
+  padding: 10px 16px;
+  min-height: 44px;
   border-radius: 20px;
   font-size: 12px;
   font-weight: 600;
@@ -452,6 +453,10 @@ input, textarea, select { font-size: 16px !important; }
   color: #475569;
   white-space: nowrap;
   transition: all 0.18s ease;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  touch-action: manipulation;
 }
 .filter-tab:active { transform: scale(0.93); }
 .filter-tab.active {
@@ -625,19 +630,24 @@ input, textarea, select { font-size: 16px !important; }
   display: flex;
   padding: 3px;
   background: rgba(241,245,249,0.8);
-  border-radius: 12px;
+  border-radius: 14px;
   gap: 2px;
 }
 .segmented-item {
   flex: 1;
-  padding: 7px 12px;
-  border-radius: 9px;
-  font-size: 12px;
+  padding: 10px 14px;
+  min-height: 40px;
+  border-radius: 11px;
+  font-size: 13px;
   font-weight: 600;
   text-align: center;
   color: #64748b;
   transition: all var(--duration-fast) var(--ease-standard);
   white-space: nowrap;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  touch-action: manipulation;
 }
 .segmented-item.active {
   background: #fff;
@@ -1381,6 +1391,17 @@ input, textarea, select { font-size: 16px !important; }
   .dark .gemini-ambient-card {
     animation: none !important;
     background-color: color-mix(in srgb, var(--module-color, #0d9488) 12%, #1e293b) !important;
+  }
+}
+
+/* ── Ultra-small screens: hide tab labels for touch-first icon-only nav ── */
+@media (max-width: 380px) {
+  .tab-bar-label {
+    display: none !important;
+  }
+  .tab-bar-icon-size {
+    /* Enlarge icons when labels are hidden for easier identification */
+    transform: scale(1.15);
   }
 }
 

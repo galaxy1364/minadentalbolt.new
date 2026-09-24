@@ -36,6 +36,15 @@ async function main() {
     console.error('❌ VERCEL_TOKEN is missing')
     process.exit(1)
   }
+  // Run enterprise gatekeeper checks before triggering deployment
+  import('child_process').then(({ execSync }) => {
+    try {
+      execSync('node scripts/enterprise-gatekeeper.mjs', { stdio: 'inherit', cwd: rootDir })
+    } catch (e) {
+      console.error('🚫 استقرار لغو شد: کدهای پروژه استانداردهای ممیزی اینترپرایز را برآورده نکردند.')
+      process.exit(1)
+    }
+  })
 
   console.log('🚀 Triggering Vercel Production Deployment for main branch...')
 

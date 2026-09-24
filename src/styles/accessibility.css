@@ -1,4 +1,7 @@
-/* accessibility.css - WCAG 2.2 AA Compliance Fixes */
+/* accessibility.css - WCAG 2.2 AA Compliance Fixes
+   NOTE: Global :focus-visible ring is defined in index.css (3px primary-700).
+   This file only extends or overrides for specific contexts.
+*/
 
 /* ============================================================================
    Contrast Fixes for Dark Mode (WCAG 2.2 AA: 4.5:1 for normal text)
@@ -20,10 +23,25 @@
 }
 
 /* ============================================================================
-   Touch Target Sizes (WCAG 2.2 AA: minimum 44x44px)
+   Touch Target Sizes (WCAG 2.2 AA: minimum 44x44px, iOS HIG: 48x48px)
+   Per sterile-touch-ergonomics: 48px minimum for gloved-finger operability
    ============================================================================ */
 
-/* Ensure all interactive elements have minimum touch target */
+/* touch-action: manipulation prevents double-tap zoom on all interactive 
+   elements globally — critical for Android Chrome where a 300ms delay was 
+   added on any tappable element without this property. */
+button,
+[role="button"],
+a[href],
+input[type="button"],
+input[type="submit"],
+input[type="reset"],
+[role="link"] {
+  touch-action: manipulation;
+}
+
+/* Minimum touch targets — WCAG 2.5.8 (Success Criterion 2.5.5 AAA = 44px)
+   We target 44px (WCAG AA) as the floor, 48px for sterile glove contexts */
 button,
 [role="button"],
 input[type="button"],
@@ -34,10 +52,9 @@ a[href],
 select,
 textarea {
   min-height: 44px;
-  min-width: 44px;
 }
 
-/* Exception: icon-only buttons can be smaller but need padding */
+/* Exception: icon-only buttons still respect enclosing min sizing */
 button:has(> svg:only-child),
 [role="button"]:has(> svg:only-child) {
   min-height: 40px;
@@ -46,24 +63,26 @@ button:has(> svg:only-child),
 }
 
 /* ============================================================================
-   Focus Indicators (WCAG 2.2 AA: visible focus)
+   Focus Indicators (WCAG 2.2 SC 2.4.11 — Focus Appearance)
+   Primary ring defined in index.css :focus-visible rule (3px primary-700).
+   Here we only add a context-specific enhancement for form inputs.
    ============================================================================ */
 
-*:focus-visible {
-  outline: 2px solid #38bdf8; /* sky-500 */
-  outline-offset: 2px;
-}
-
-/* Custom focus styles for interactive elements */
-button:focus-visible,
-[role="button"]:focus-visible,
+/* Form inputs get an elevated glow ring for better clinical visibility */
 input:focus-visible,
 select:focus-visible,
-textarea:focus-visible,
-a:focus-visible {
-  outline: 2px solid #38bdf8;
+textarea:focus-visible {
+  outline: 3px solid #0d9488;
   outline-offset: 2px;
-  box-shadow: 0 0 0 4px rgba(56, 189, 248, 0.25);
+  box-shadow: 0 0 0 5px rgba(13, 148, 136, 0.18);
+}
+
+/* Dark mode form input focus */
+.dark input:focus-visible,
+.dark select:focus-visible,
+.dark textarea:focus-visible {
+  outline-color: #2dd4bf;
+  box-shadow: 0 0 0 5px rgba(45, 212, 191, 0.20);
 }
 
 /* ============================================================================
@@ -111,20 +130,24 @@ a:focus-visible {
 }
 
 /* ============================================================================
-   Skip Link for Keyboard Navigation
+   Skip Link for Keyboard Navigation (WCAG 2.4.1)
    ============================================================================ */
 
 .skip-link {
   position: absolute;
-  top: -40px;
+  top: -60px;
+  right: 0;
   left: 0;
   background: #0d9488;
   color: white;
-  padding: 8px 16px;
-  z-index: 1000;
+  padding: 12px 20px;
+  z-index: 10000;
   text-decoration: none;
-  font-weight: 500;
-  border-radius: 0 0 8px 8px;
+  font-weight: 700;
+  font-size: 14px;
+  border-radius: 0 0 12px 12px;
+  text-align: center;
+  transition: top 0.2s ease;
 }
 
 .skip-link:focus {
@@ -144,4 +167,38 @@ a:focus-visible {
   [role="button"] {
     border: 2px solid currentColor !important;
   }
+}
+
+/* ============================================================================
+   iOS 27 / Android — Scroll Behavior
+   ============================================================================ */
+
+/* Prevent rubber-band overscroll on modal/drawer containers */
+.modal-scroll-lock {
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+}
+
+/* Momentum scrolling for all scrollable containers */
+.scroll-touch {
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior-y: contain;
+}
+
+/* ============================================================================
+   Touch Target Enforcement for Filter & Segmented Controls
+   Per sterile-touch-ergonomics: 44px minimum for dental-clinic touchscreens
+   ============================================================================ */
+
+.filter-tab,
+.segmented-item {
+  min-height: 40px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  touch-action: manipulation;
+}
+
+.filter-tab {
+  min-height: 44px;
 }

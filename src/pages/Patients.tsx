@@ -21,6 +21,7 @@ import { scoreFields } from '../lib/fuzzySearch'
 import { calcPatientBalance } from '../lib/finance'
 import { calculateAge } from '../lib/patientUtils'
 import { isNegativeValue } from '../lib/patientAlerts'
+import { MobilePatientsDemo } from '../components/MobilePatientsDemo'
 
 const vipLevels: { value: number; label: string; color: string; icon: string }[] = [
   { value: 0, label: 'عادی', color: 'slate', icon: '' },
@@ -93,6 +94,25 @@ export default function Patients() {
     h.tap()
     setViewMode(mode)
     try { localStorage.setItem('minadent-patients-view', mode) } catch {}
+  }
+
+  const [mobileDemoMode, setMobileDemoMode] = useState<boolean>(() => {
+    try {
+      const stored = localStorage.getItem('minadent-patients-mobile-demo')
+      if (stored !== null) return stored === 'true'
+      return window.innerWidth < 768
+    } catch {
+      return window.innerWidth < 768
+    }
+  })
+
+  const toggleMobileDemo = () => {
+    h.toggle()
+    setMobileDemoMode((prev) => {
+      const next = !prev
+      try { localStorage.setItem('minadent-patients-mobile-demo', String(next)) } catch {}
+      return next
+    })
   }
 
   const [modalOpen, setModalOpen] = useState(false)
@@ -489,7 +509,7 @@ export default function Patients() {
         </div>
       )}
 
-      {/* Top Header Row: Clean Title + Patient Count */}
+      {/* Top Header Row: Clean Title + Patient Count + Mobile Demo Switcher */}
       <div className="flex items-center justify-between gap-2 px-1">
         <div className="flex items-center gap-2">
           <h1 className="text-base sm:text-lg font-black text-slate-900 dark:text-slate-100">پرونده‌های بیماران</h1>
@@ -497,10 +517,37 @@ export default function Patients() {
             {toPersianDigits(filteredPatients.length)} بیمار
           </span>
         </div>
+
+        {/* View Switcher: Mobile First vs Classic Desktop */}
+        <button
+          type="button"
+          onClick={toggleMobileDemo}
+          className={`flex items-center gap-1.5 px-3 py-1.5 min-h-[40px] rounded-xl text-xs font-black transition-all press-scale shadow-xs ${
+            mobileDemoMode
+              ? 'bg-gradient-to-r from-teal-600 to-emerald-600 text-white'
+              : 'bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700'
+          }`}
+          title="تغییر نمای نمایش بین حالت بهینه موبایل و نمای کامل دسکتاپ"
+        >
+          <Sparkles size={14} className={mobileDemoMode ? 'animate-pulse text-amber-300' : 'text-teal-600'} />
+          <span>{mobileDemoMode ? '📱 نمای مخصوص موبایل' : '💻 نمای دسکتاپ'}</span>
+        </button>
       </div>
 
-      {/* 100% Dedicated Horizontal Scrolling Filter Chip Rail (Zero overlap, Zero clashing) */}
-      <div className="flex items-center gap-1.5 overflow-x-auto dock-scroll no-scrollbar py-1 text-xs font-bold -mx-2 px-2">
+      {mobileDemoMode ? (
+        <MobilePatientsDemo
+          patients={patients}
+          patientFinances={patientFinances}
+          patientChequesMap={patientChequesMap}
+          patientPlansMap={patientPlansMap}
+          patientImplantsMap={patientImplantsMap}
+          onOpenCreate={openCreateModal}
+          onOpenEdit={openEditModal}
+        />
+      ) : (
+        <>
+          {/* 100% Dedicated Horizontal Scrolling Filter Chip Rail (Zero overlap, Zero clashing) */}
+          <div className="flex items-center gap-1.5 overflow-x-auto dock-scroll no-scrollbar py-1 text-xs font-bold -mx-2 px-2">
         <button
           type="button"
           onClick={() => { h.select(); setQuickFilter('all') }}
@@ -932,6 +979,8 @@ export default function Patients() {
 
       {/* Sterile dock clearance — prevents floating tab bar from obscuring bottom items */}
       <div className="h-32 sm:h-36" aria-hidden="true" />
+        </>
+      )}
 
       {/* Modal */}
       {modalOpen && (

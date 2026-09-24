@@ -27,7 +27,7 @@ export function ModuleHeader({ moduleKey, title, subtitle, action }: {
       />
       <div className="relative flex items-center gap-3">
         <ModuleIconBadge color={mod.color} size={44}>
-          <Icon size={40} strokeWidth={1.8} />
+          <Icon size={36} strokeWidth={1.8} />
         </ModuleIconBadge>
         <div>
           <h1 className="text-lg font-extrabold text-slate-800 dark:text-slate-100 leading-tight">{title}</h1>
@@ -126,7 +126,7 @@ export function ReorderableStatGrid({ storageKey, items, className = 'flex items
       </div>
       <div className={className}>
         {sorted.map((item, i) => (
-          <div key={item.key} className="relative shrink-0 w-[168px]">
+          <div key={item.key} className="relative shrink-0 w-[min(168px,45vw)]">
             {item.node}
             {editing && (
               <div className="absolute inset-0 flex items-center justify-between px-1 pointer-events-none z-10">

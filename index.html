@@ -4,17 +4,20 @@
   <meta charset="UTF-8" />
   <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
   <link rel="apple-touch-icon" href="/favicon.svg" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0, viewport-fit=cover" />
   <title>مینادنتال — سامانه هوشمند کلینیک دندانپزشکی</title>
   <link href="https://cdn.jsdelivr.net/gh/rastikerdar/vazirmatn@v33.003/Vazirmatn-font-face.css" rel="stylesheet" />
   <link rel="manifest" href="/manifest.json" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
-  <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
   <meta name="apple-mobile-web-app-title" content="مینادنتال" />
+  <meta name="format-detection" content="telephone=no" />
   <meta name="theme-color" content="#8b5cf6" />
 </head>
 <body>
-  <div id="root"></div>
+  <!-- Skip Link (WCAG 2.4.1 — Bypass Blocks) -->
+  <a href="#main-content" class="skip-link" tabindex="0">رفتن به محتوای اصلی</a>
+  <div id="root" role="application" aria-label="سامانه مینادنتال"></div>
   <script type="module" src="/src/main.tsx"></script>
 </body>
 </html>

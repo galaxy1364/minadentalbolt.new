@@ -11,7 +11,7 @@ import { buildDoctorLedger } from '../lib/doctorLedger'
 import { phasePlanProgress, phaseSchedule, validatePhase, nextPhaseNumber, comparePhaseCostToTreatments } from '../lib/phases'
 import { useState, useEffect, useCallback, useMemo } from 'react'
 import { useParams, useNavigate, useLocation } from 'react-router-dom'
-import { ArrowRight, Edit2, Phone, PhoneCall, MessageSquare, MessageCircle, Mail, MapPin, Calendar, CreditCard, Activity, FileText, Image as ImageIcon, Shield, Pill, Smile, Award, AlertCircle, Clock, CheckCircle2, Layers, Plus, Trash2, FileSignature, Printer, Bone, FlaskConical, Stethoscope, Archive as ArchiveIcon, RotateCcw, Sparkles, AlertTriangle, HeartPulse, Users, UserPlus, Link2, Download, CheckSquare, Square, Tags, FileHeart, Camera } from 'lucide-react'
+import { ArrowRight, Edit2, Phone, PhoneCall, MessageSquare, MessageCircle, Mail, MapPin, Calendar, CreditCard, Activity, FileText, Image as ImageIcon, Shield, Pill, Smile, Award, AlertCircle, Clock, CheckCircle2, Layers, Plus, Trash2, FileSignature, Printer, Bone, FlaskConical, Stethoscope, Archive as ArchiveIcon, RotateCcw, Sparkles, AlertTriangle, HeartPulse, Users, UserPlus, Link2, Download, CheckSquare, Square, Tags, FileHeart, Camera, ChevronLeft, ChevronRight, User } from 'lucide-react'
 import { tileThemes, getHashColor } from '../lib/colors'
 import { fetchPatient, updatePatient, fetchTimeline, fetchTreatments, fetchAppointments, fetchPayments, createPayment, fetchToothRecords, createToothRecord, updateToothRecord, fetchPrescriptions, fetchRadiologyImages, updateRadiologyImage, fetchEncounters, fetchDoctors, fetchImplantCases, fetchTreatmentPhases, createTreatmentPhase, updateTreatmentPhase, fetchConsentForms, createConsentForm, updateConsentForm, fetchLabOrders, updateTreatment, fetchCheques, createCheque, updateCheque, fetchPaymentPlans, createPaymentPlan, updatePaymentPlan, fetchAllInstallments, updateInstallment, fetchPerioExams, createPerioExam, updatePerioExam, fetchOrthoExams, createOrthoExam, updateOrthoExam, fetchPatients } from '../lib/api'
 import { toJalaliString, toJalaliStringPretty, formatCurrency, toPersianDigits, formatTime, toEnglishDigits } from '../lib/persianDate'
@@ -191,7 +191,21 @@ export default function PatientDetail() {
   const [loading, setLoading] = useState(true)
 
   // Tab state
-  const [activeTab, setActiveTab] = useState(() => locState.initialTab || 'overview')
+  const initial = locState.initialTab || 'overview'
+  const getInitialMainTab = (tab: string) => {
+    if (['overview'].includes(tab)) return 'overview'
+    if (['appointments'].includes(tab)) return 'appointments'
+    if (['teeth', 'treatments', 'implants', 'perio', 'ortho', 'phases'].includes(tab)) return 'clinical'
+    if (['payments', 'labOrders', 'prescriptions', 'radiology', 'consent', 'insurance', 'documents', 'timeline'].includes(tab)) return 'finance_docs'
+    return 'overview'
+  }
+
+  const [mainTab, setMainTab] = useState<'overview' | 'clinical' | 'appointments' | 'finance_docs'>(getInitialMainTab(initial) as any)
+  const [subView, setSubView] = useState<string | null>(['overview', 'appointments'].includes(initial) ? null : initial)
+  const switchTab = (tab: string) => {
+    setMainTab(getInitialMainTab(tab) as any)
+    setSubView(['overview', 'appointments'].includes(tab) ? null : tab)
+  }
 
   // Tab data
   const [cheques, setCheques] = useState<Cheque[]>([])
@@ -630,8 +644,9 @@ export default function PatientDetail() {
   useEffect(() => {
     if (!patient) return
 
-    if (locState.initialTab && locState.initialTab !== activeTab) {
-      setActiveTab(locState.initialTab)
+    if (locState.initialTab) {
+      setMainTab(getInitialMainTab(locState.initialTab) as any)
+      setSubView(['overview', 'appointments'].includes(locState.initialTab) ? null : locState.initialTab)
     }
 
     if (locState.openPaymentModal) {
@@ -1705,7 +1720,7 @@ export default function PatientDetail() {
                   type="button"
                   onClick={() => {
                     h.tap()
-                    setActiveTab('payments')
+                    switchTab('payments')
                   }}
                   className="flex items-center gap-1 px-2.5 py-1.5 rounded-xl bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800 text-amber-800 dark:text-amber-300 text-xs font-bold hover:bg-amber-100 transition-colors press-scale"
                   title="مشاهده چک‌ها"
@@ -1813,7 +1828,7 @@ export default function PatientDetail() {
                 type="button"
                 onClick={() => {
                   h.tap()
-                  setActiveTab('labOrders')
+                  switchTab('labOrders')
                 }}
                 className="px-2.5 py-1 rounded-xl bg-cyan-600 hover:bg-cyan-700 text-white font-bold text-[10px] shrink-0 transition-colors press-scale"
               >
@@ -1838,7 +1853,7 @@ export default function PatientDetail() {
                     },
                   })
                 }}
-                className="flex items-center justify-center gap-1.5 px-3 py-2.5 rounded-2xl text-xs font-bold bg-gradient-to-r from-teal-600 to-emerald-600 hover:from-teal-700 hover:to-emerald-700 text-white shadow-xs press-scale min-h-[44px]"
+                className="flex items-center justify-center gap-1.5 px-3 py-2.5 rounded-2xl text-xs font-bold bg-gradient-to-r from-teal-600 to-emerald-600 hover:from-teal-700 hover:to-emerald-700 text-white shadow-xs press-scale min-h-[48px]"
               >
                 <Calendar size={15} className="shrink-0" /> <span className="truncate">نوبت جدید</span>
               </button>
@@ -1851,7 +1866,7 @@ export default function PatientDetail() {
                   setScannerInitialCategory('paper_record')
                   setScannerModalOpen(true)
                 }}
-                className="flex items-center justify-center gap-1.5 px-3 py-2.5 rounded-2xl text-xs font-bold bg-gradient-to-r from-sky-600 to-blue-600 hover:from-sky-700 hover:to-blue-700 text-white shadow-xs press-scale min-h-[44px]"
+                className="flex items-center justify-center gap-1.5 px-3 py-2.5 rounded-2xl text-xs font-bold bg-gradient-to-r from-sky-600 to-blue-600 hover:from-sky-700 hover:to-blue-700 text-white shadow-xs press-scale min-h-[48px]"
                 title="عکس‌برداری با دوربین گوشی و اسکن پرونده کاغذی، اسناد یا رادیولوژی"
               >
                 <Camera size={15} className="shrink-0" /> <span className="truncate">اسکن مدارک / رادیولوژی</span>
@@ -1862,9 +1877,9 @@ export default function PatientDetail() {
                 type="button"
                 onClick={() => {
                   h.tap()
-                  setActiveTab('treatments')
+                  switchTab('treatments')
                 }}
-                className="flex items-center justify-center gap-1.5 px-3 py-2.5 rounded-2xl text-xs font-bold bg-gradient-to-r from-violet-600 to-indigo-600 hover:from-violet-700 hover:to-indigo-700 text-white shadow-xs press-scale min-h-[44px]"
+                className="flex items-center justify-center gap-1.5 px-3 py-2.5 rounded-2xl text-xs font-bold bg-gradient-to-r from-violet-600 to-indigo-600 hover:from-violet-700 hover:to-indigo-700 text-white shadow-xs press-scale min-h-[48px]"
               >
                 <Stethoscope size={15} className="shrink-0" /> <span className="truncate">ثبت درمان</span>
               </button>
@@ -1874,9 +1889,9 @@ export default function PatientDetail() {
                 type="button"
                 onClick={() => {
                   h.tap()
-                  setActiveTab('teeth')
+                  switchTab('teeth')
                 }}
-                className="flex items-center justify-center gap-1.5 px-3 py-2.5 rounded-2xl text-xs font-bold bg-white dark:bg-slate-800 text-teal-700 dark:text-teal-300 border border-teal-200 dark:border-teal-800 hover:bg-teal-50 dark:hover:bg-teal-900/60 press-scale shadow-xs min-h-[44px]"
+                className="flex items-center justify-center gap-1.5 px-3 py-2.5 rounded-2xl text-xs font-bold bg-white dark:bg-slate-800 text-teal-700 dark:text-teal-300 border border-teal-200 dark:border-teal-800 hover:bg-teal-50 dark:hover:bg-teal-900/60 press-scale shadow-xs min-h-[48px]"
               >
                 <Smile size={15} className="text-teal-600 shrink-0" /> <span className="truncate">چارت دندان</span>
               </button>
@@ -1888,7 +1903,7 @@ export default function PatientDetail() {
                   h.tap()
                   handleOpenPaymentModal()
                 }}
-                className="flex items-center justify-center gap-1.5 px-3 py-2.5 rounded-2xl text-xs font-bold bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800 hover:bg-emerald-100 dark:hover:bg-emerald-900/60 press-scale shadow-xs min-h-[44px]"
+                className="flex items-center justify-center gap-1.5 px-3 py-2.5 rounded-2xl text-xs font-bold bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800 hover:bg-emerald-100 dark:hover:bg-emerald-900/60 press-scale shadow-xs min-h-[48px]"
               >
                 <CreditCard size={15} className="text-emerald-600 shrink-0" /> <span className="truncate">دریافت وجه</span>
               </button>
@@ -1900,7 +1915,7 @@ export default function PatientDetail() {
                   h.tap()
                   handleOpenChequeModal()
                 }}
-                className="flex items-center justify-center gap-1.5 px-3 py-2.5 rounded-2xl text-xs font-bold bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-300 border border-amber-200 dark:border-amber-800 hover:bg-amber-100 dark:hover:bg-amber-900/60 press-scale shadow-xs min-h-[44px]"
+                className="flex items-center justify-center gap-1.5 px-3 py-2.5 rounded-2xl text-xs font-bold bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-300 border border-amber-200 dark:border-amber-800 hover:bg-amber-100 dark:hover:bg-amber-900/60 press-scale shadow-xs min-h-[48px]"
               >
                 <FileSignature size={15} className="text-amber-600 shrink-0" /> <span className="truncate">ثبت چک صیادی</span>
               </button>
@@ -1918,7 +1933,7 @@ export default function PatientDetail() {
                     },
                   })
                 }}
-                className="flex items-center justify-center gap-1.5 px-3 py-2.5 rounded-2xl text-xs font-bold bg-purple-50 dark:bg-purple-950/40 text-purple-700 dark:text-purple-300 border border-purple-200 dark:border-purple-800 hover:bg-purple-100 dark:hover:bg-purple-900/60 press-scale shadow-xs min-h-[44px]"
+                className="flex items-center justify-center gap-1.5 px-3 py-2.5 rounded-2xl text-xs font-bold bg-purple-50 dark:bg-purple-950/40 text-purple-700 dark:text-purple-300 border border-purple-200 dark:border-purple-800 hover:bg-purple-100 dark:hover:bg-purple-900/60 press-scale shadow-xs min-h-[48px]"
               >
                 <Pill size={15} className="text-purple-600 shrink-0" /> <span className="truncate">صدور نسخه</span>
               </button>
@@ -1928,9 +1943,9 @@ export default function PatientDetail() {
                 type="button"
                 onClick={() => {
                   h.tap()
-                  setActiveTab('labOrders')
+                  switchTab('labOrders')
                 }}
-                className="flex items-center justify-center gap-1.5 px-3 py-2.5 rounded-2xl text-xs font-bold bg-cyan-50 dark:bg-cyan-950/40 text-cyan-700 dark:text-cyan-300 border border-cyan-200 dark:border-cyan-800 hover:bg-cyan-100 dark:hover:bg-cyan-900/60 press-scale shadow-xs min-h-[44px]"
+                className="flex items-center justify-center gap-1.5 px-3 py-2.5 rounded-2xl text-xs font-bold bg-cyan-50 dark:bg-cyan-950/40 text-cyan-700 dark:text-cyan-300 border border-cyan-200 dark:border-cyan-800 hover:bg-cyan-100 dark:hover:bg-cyan-900/60 press-scale shadow-xs min-h-[48px]"
               >
                 <FlaskConical size={15} className="text-cyan-600 shrink-0" /> <span className="truncate">سفارش لابراتوار</span>
               </button>
@@ -1940,9 +1955,9 @@ export default function PatientDetail() {
                 type="button"
                 onClick={() => {
                   h.tap()
-                  setActiveTab('implants')
+                  switchTab('implants')
                 }}
-                className="flex items-center justify-center gap-1.5 px-3 py-2.5 rounded-2xl text-xs font-bold bg-blue-50 dark:bg-blue-950/40 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-800 hover:bg-blue-100 dark:hover:bg-blue-900/60 press-scale shadow-xs min-h-[44px]"
+                className="flex items-center justify-center gap-1.5 px-3 py-2.5 rounded-2xl text-xs font-bold bg-blue-50 dark:bg-blue-950/40 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-800 hover:bg-blue-100 dark:hover:bg-blue-900/60 press-scale shadow-xs min-h-[48px]"
               >
                 <Bone size={15} className="text-blue-600 shrink-0" /> <span className="truncate">پرونده ایمپلنت</span>
               </button>
@@ -1951,7 +1966,7 @@ export default function PatientDetail() {
               <button
                 type="button"
                 onClick={handlePrintFullChart}
-                className="flex items-center justify-center gap-1.5 px-3 py-2.5 rounded-2xl text-xs font-bold bg-indigo-50 dark:bg-indigo-950/40 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800 hover:bg-indigo-100 dark:hover:bg-indigo-900/60 press-scale shadow-xs min-h-[44px]"
+                className="flex items-center justify-center gap-1.5 px-3 py-2.5 rounded-2xl text-xs font-bold bg-indigo-50 dark:bg-indigo-950/40 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800 hover:bg-indigo-100 dark:hover:bg-indigo-900/60 press-scale shadow-xs min-h-[48px]"
               >
                 <Printer size={15} className="text-indigo-600 dark:text-indigo-400 shrink-0" /> <span className="truncate">چاپ پرونده</span>
               </button>
@@ -2002,7 +2017,7 @@ export default function PatientDetail() {
                   }
                   setEditModalOpen(true)
                 }}
-                className="flex items-center justify-center gap-1.5 px-3 py-2.5 rounded-2xl text-xs font-bold bg-sky-50 dark:bg-sky-950/40 text-sky-700 dark:text-sky-300 border border-sky-200 dark:border-sky-800 hover:bg-sky-100 dark:hover:bg-sky-900/60 press-scale min-h-[44px]"
+                className="flex items-center justify-center gap-1.5 px-3 py-2.5 rounded-2xl text-xs font-bold bg-sky-50 dark:bg-sky-950/40 text-sky-700 dark:text-sky-300 border border-sky-200 dark:border-sky-800 hover:bg-sky-100 dark:hover:bg-sky-900/60 press-scale min-h-[48px]"
               >
                 <Edit2 size={15} className="shrink-0" /> <span className="truncate">ویرایش پرونده</span>
               </button>
@@ -2708,29 +2723,49 @@ export default function PatientDetail() {
     const deliveredCount = labOrders.filter(o => o.status === 'delivered').length
 
     return (
-      <div className="space-y-4">
+      <div className="space-y-4 animate-in fade-in slide-in-from-right-4 duration-300">
+        {/* Sub-view Header */}
+        <div className="flex items-center justify-between pb-2 border-b border-slate-100 dark:border-slate-800">
+          <button
+            onClick={() => { h.tap(); setSubView(null) }}
+            className="w-10 h-10 rounded-full flex items-center justify-center bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors min-w-[48px] min-h-[48px]"
+            aria-label="بازگشت"
+          >
+            <ChevronRight size={20} />
+          </button>
+          <div className="flex items-center gap-3">
+            <div className="text-right">
+              <h3 className="text-base font-extrabold text-slate-800 dark:text-slate-100">لابراتوار</h3>
+              <p className="text-[11px] text-slate-500 font-medium">پرونده #{patient?.id.slice(0, 4).toUpperCase()} - {patient?.first_name} {patient?.last_name}</p>
+            </div>
+            <div className="w-10 h-10 rounded-full bg-amber-100 dark:bg-amber-900/30 flex items-center justify-center text-amber-600">
+              <FlaskConical size={20} />
+            </div>
+          </div>
+        </div>
+
         {/* New Lab Order Button */}
         <Button
           variant="secondary"
-          className="w-full h-14 rounded-2xl border-2 border-primary-200 dark:border-primary-800 text-primary-700 dark:text-primary-300 font-bold text-base hover:bg-primary-50 dark:hover:bg-primary-900/30 transition-all shadow-sm"
+          className="w-full min-h-[48px] rounded-2xl border border-blue-200 dark:border-blue-800/50 text-blue-700 dark:text-blue-300 font-bold text-sm bg-white dark:bg-slate-900 hover:bg-blue-50 dark:hover:bg-blue-900/30 transition-all shadow-sm flex items-center justify-center gap-2"
           onClick={() => {
             h.tap()
             navigate('/laboratory', { state: { quickStartPatientId: patient?.id } })
           }}
         >
-          <Plus size={20} className="ml-2" /> سفارش لابراتوار جدید
+          <Plus size={18} /> سفارش لابراتوار جدید
         </Button>
 
         {/* Bento Summary Cards */}
         {labOrders.length > 0 && (
           <div className="grid grid-cols-2 gap-3">
-            <div className="bg-white/95 dark:bg-slate-900/90 rounded-2xl p-4 border border-slate-100 dark:border-slate-800 shadow-sm flex flex-col items-center justify-center">
-              <span className="text-xs font-bold text-slate-500 mb-2">سفارش‌های باز</span>
-              <span className="text-3xl font-extrabold text-slate-800 dark:text-slate-100">{toPersianDigits(openCount)}</span>
+            <div className="bg-white dark:bg-slate-900 rounded-2xl p-4 border border-slate-100 dark:border-slate-800 shadow-sm flex flex-col items-center justify-center min-h-[80px]">
+              <span className="text-[11px] font-bold text-slate-500 mb-1">سفارش‌های باز</span>
+              <span className="text-2xl font-extrabold text-slate-800 dark:text-slate-100">{toPersianDigits(openCount)}</span>
             </div>
-            <div className="bg-white/95 dark:bg-slate-900/90 rounded-2xl p-4 border border-slate-100 dark:border-slate-800 shadow-sm flex flex-col items-center justify-center">
-              <span className="text-xs font-bold text-slate-500 mb-2">تحویل‌شده</span>
-              <span className="text-3xl font-extrabold text-slate-800 dark:text-slate-100">{toPersianDigits(deliveredCount)}</span>
+            <div className="bg-white dark:bg-slate-900 rounded-2xl p-4 border border-slate-100 dark:border-slate-800 shadow-sm flex flex-col items-center justify-center min-h-[80px]">
+              <span className="text-[11px] font-bold text-slate-500 mb-1">تحویل‌شده</span>
+              <span className="text-2xl font-extrabold text-slate-800 dark:text-slate-100">{toPersianDigits(deliveredCount)}</span>
             </div>
           </div>
         )}
@@ -2741,7 +2776,6 @@ export default function PatientDetail() {
         ) : (
           <div className="space-y-3">
             {[...labOrders].sort((a, b) => (b.created_at || '').localeCompare(a.created_at || '')).map((o) => {
-              // Map status to badge style
               let badgeColor = 'bg-slate-100 text-slate-600'
               let badgeText = 'نامشخص'
               if (o.status === 'delivered') {
@@ -2754,34 +2788,29 @@ export default function PatientDetail() {
                 badgeColor = 'bg-blue-100 text-blue-700'
                 badgeText = 'ارسال شده'
               } else {
-                badgeColor = 'bg-amber-100 text-amber-700' // در جریان / در حال ساخت
+                badgeColor = 'bg-amber-100 text-amber-700'
                 badgeText = 'در حال ساخت'
               }
 
               return (
-                <div key={o.id} className="bg-white dark:bg-slate-900 rounded-2xl p-4 border border-slate-100 dark:border-slate-800 shadow-sm">
-                  <div className="flex items-start justify-between gap-3">
-                    {/* Left Side: Badges & Delivery */}
-                    <div className="flex flex-col items-start gap-2 shrink-0">
-                      <span className={`px-2.5 py-1 rounded-full text-[11px] font-bold ${badgeColor}`}>
-                        {badgeText}
+                <div key={o.id} className="bg-white dark:bg-slate-900 rounded-2xl p-4 border border-slate-100 dark:border-slate-800 shadow-sm flex items-start justify-between gap-3">
+                  <div className="flex flex-col items-start gap-2 shrink-0">
+                    <span className={`px-2.5 py-1 rounded-lg text-[11px] font-bold ${badgeColor}`}>
+                      {badgeText}
+                    </span>
+                    {o.deadline && (
+                      <span className="text-[11px] text-slate-500 font-medium whitespace-nowrap">
+                        تحویل: {toJalaliStringPretty(o.deadline)}
                       </span>
-                      {o.deadline && (
-                        <span className="text-[11px] text-slate-500 font-medium whitespace-nowrap">
-                          تحویل: {toJalaliStringPretty(o.deadline)}
-                        </span>
-                      )}
-                    </div>
-                    
-                    {/* Right Side: Titles */}
-                    <div className="flex flex-col items-end text-right min-w-0">
-                      <h4 className="text-sm font-extrabold text-slate-800 dark:text-slate-100 mb-1 truncate max-w-[200px] sm:max-w-full">
-                        {o.work_type || 'سفارش لابراتوار'}{o.tooth_number ? ` (دندان ${toothLabel(o.tooth_number)})` : ''}
-                      </h4>
-                      <p className="text-xs text-slate-500 dark:text-slate-400">
-                        ثبت: {toJalaliStringPretty(o.created_at)}
-                      </p>
-                    </div>
+                    )}
+                  </div>
+                  <div className="flex flex-col items-end text-right min-w-0">
+                    <h4 className="text-sm font-extrabold text-slate-800 dark:text-slate-100 mb-1 truncate max-w-[200px] sm:max-w-full">
+                      {o.work_type || 'سفارش لابراتوار'}{o.tooth_number ? ` (دندان ${toothLabel(o.tooth_number)})` : ''}
+                    </h4>
+                    <p className="text-xs text-slate-500 dark:text-slate-400">
+                      ثبت: {toJalaliStringPretty(o.created_at)}
+                    </p>
                   </div>
                 </div>
               )
@@ -3416,7 +3445,7 @@ export default function PatientDetail() {
       radiologyImages={radiologyImages}
       onUpdateTooth={handleUpdateTooth}
       onAddTreatment={(toothNumber, surface, condition) => {
-        setActiveTab('phases')
+        switchTab('phases')
         openCreatePhase(toothNumber, surface, condition)
       }}
       onAddLabOrder={(toothNumber, surface, condition) => {
@@ -3443,7 +3472,7 @@ export default function PatientDetail() {
       }}
       onViewRadiology={(toothNumber) => {
         setRadToothFilter(toothNumber)
-        setActiveTab('radiology')
+        switchTab('radiology')
       }}
     />
   )
@@ -4786,7 +4815,111 @@ export default function PatientDetail() {
     )
   }
 
+
   // ===========================================================================
+  // Render: Mobile-First Architecture Helpers
+  // ===========================================================================
+
+  const renderQuickActions = () => (
+    <div
+      className="flex items-center gap-3 overflow-x-auto pb-3 pt-1 hide-scrollbar snap-x px-1"
+      role="toolbar"
+      aria-label="اقدامات سریع"
+    >
+      {[
+        { id: 'appointment', label: 'نوبت جدید', icon: Calendar, color: 'text-blue-600 dark:text-blue-400', bg: 'bg-blue-100 dark:bg-blue-900/50', border: 'border-blue-200 dark:border-blue-800' },
+        { id: 'treatment', label: 'ثبت درمان', icon: Stethoscope, color: 'text-emerald-600 dark:text-emerald-400', bg: 'bg-emerald-100 dark:bg-emerald-900/50', border: 'border-emerald-200 dark:border-emerald-800' },
+        { id: 'payment', label: 'دریافت وجه', icon: CreditCard, color: 'text-amber-600 dark:text-amber-400', bg: 'bg-amber-100 dark:bg-amber-900/50', border: 'border-amber-200 dark:border-amber-800' },
+        { id: 'scan', label: 'اسکن مدارک', icon: Camera, color: 'text-sky-600 dark:text-sky-400', bg: 'bg-sky-100 dark:bg-sky-900/50', border: 'border-sky-200 dark:border-sky-800' },
+        { id: 'cheque', label: 'چک صیادی', icon: FileSignature, color: 'text-orange-600 dark:text-orange-400', bg: 'bg-orange-100 dark:bg-orange-900/50', border: 'border-orange-200 dark:border-orange-800' },
+        { id: 'prescription', label: 'صدور نسخه', icon: Pill, color: 'text-purple-600 dark:text-purple-400', bg: 'bg-purple-100 dark:bg-purple-900/50', border: 'border-purple-200 dark:border-purple-800' },
+        { id: 'print', label: 'چاپ پرونده', icon: Printer, color: 'text-indigo-600 dark:text-indigo-400', bg: 'bg-indigo-100 dark:bg-indigo-900/50', border: 'border-indigo-200 dark:border-indigo-800' },
+      ].map(action => (
+        <button
+          key={action.id}
+          className={`flex flex-col items-center gap-1.5 snap-start shrink-0 min-w-[64px] min-h-[72px] pt-2.5 pb-2 px-1 rounded-2xl border ${action.border} ${action.bg} transition-all active:scale-95 press-scale`}
+          onClick={() => {
+            h.tap()
+            if (action.id === 'appointment') { navigate('/appointments', { state: { quickStartPatientId: patient?.id, quickStartDoctorId: patient?.primary_doctor_id, openWizard: true } }) }
+            else if (action.id === 'treatment') { switchTab('treatments') }
+            else if (action.id === 'payment') { handleOpenPaymentModal() }
+            else if (action.id === 'scan') { setScannerInitialCategory('paper_record'); setScannerModalOpen(true) }
+            else if (action.id === 'cheque') { handleOpenChequeModal() }
+            else if (action.id === 'prescription') { switchTab('prescriptions') }
+            else if (action.id === 'print') { handlePrintFullChart() }
+          }}
+          aria-label={action.label}
+        >
+          <action.icon className={action.color} size={22} strokeWidth={2} />
+          <span className={`text-[10px] font-extrabold ${action.color} whitespace-nowrap leading-tight text-center`}>
+            {action.label}
+          </span>
+        </button>
+      ))}
+    </div>
+  )
+
+  const renderMainMenu = () => {
+    const mainTabs = [
+      { id: 'overview', label: 'نمای کلی', icon: User },
+      { id: 'clinical', label: 'بالینی', icon: Stethoscope },
+      { id: 'appointments', label: 'نوبت‌ها', icon: Calendar },
+      { id: 'finance_docs', label: 'مالی', icon: CreditCard },
+    ] as const
+
+    return (
+      <div className="flex w-full border-b border-slate-200/80 dark:border-slate-800/80 overflow-x-auto hide-scrollbar whitespace-nowrap scroll-smooth bg-white/80 dark:bg-slate-900/80 backdrop-blur-sm">
+        {mainTabs.map(t => (
+          <button
+            key={t.id}
+            onClick={() => {
+              h.tap()
+              setMainTab(t.id)
+              setSubView(null)
+            }}
+            className={`flex-1 min-w-[72px] py-2.5 flex flex-col items-center gap-1 text-[11px] font-bold border-b-2 transition-all min-h-[52px] ${
+              mainTab === t.id 
+                ? 'border-primary-500 text-primary-700 dark:text-primary-400 bg-primary-50/60 dark:bg-primary-950/20' 
+                : 'border-transparent text-slate-500 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800/50'
+            }`}
+            aria-label={t.label}
+          >
+            <t.icon size={17} strokeWidth={mainTab === t.id ? 2.5 : 2} />
+            <span>{t.label}</span>
+          </button>
+        ))}
+      </div>
+    )
+  }
+
+  const renderNestedMenu = (items: { id: string, label: string, icon: any, color: string, bg: string }[]) => {
+    return (
+      <div className="rounded-3xl border border-slate-100 dark:border-slate-800 shadow-sm overflow-hidden divide-y divide-slate-100 dark:divide-slate-800">
+        {items.map((item) => (
+          <button
+            key={item.id}
+            onClick={() => {
+              h.tap()
+              setSubView(item.id)
+            }}
+            aria-label={item.label}
+            className="w-full flex items-center gap-3.5 px-4 py-0 min-h-[58px] bg-white dark:bg-slate-900 hover:bg-slate-50/90 dark:hover:bg-slate-800/50 transition-colors active:bg-slate-100 dark:active:bg-slate-800 group"
+          >
+            <div className={`w-10 h-10 rounded-2xl flex items-center justify-center shrink-0 ${item.bg} transition-transform group-active:scale-90`}>
+              <item.icon className={item.color} size={19} strokeWidth={2.2} />
+            </div>
+            <span className="flex-1 text-right text-sm font-bold text-slate-800 dark:text-slate-200 leading-tight">
+              {item.label}
+            </span>
+            <ChevronLeft size={18} className="text-slate-300 dark:text-slate-600 shrink-0 transition-transform group-hover:-translate-x-0.5" />
+          </button>
+        ))}
+      </div>
+    )
+  }
+
+  // ===========================================================================
+
   // Main Render
   // ===========================================================================
 
@@ -4809,7 +4942,7 @@ export default function PatientDetail() {
   const pageTheme = tileThemes[getHashColor(patient.id)]
 
   return (
-    <div className={`relative min-h-screen -m-3 sm:-m-6 p-3 sm:p-6 bg-gradient-to-br ${pageTheme.bg} overflow-hidden space-y-4 transition-all duration-500`}>
+    <div className={`relative min-h-screen -m-3 sm:-m-6 p-3 sm:p-6 pb-24 sm:pb-8 bg-gradient-to-br ${pageTheme.bg} overflow-hidden space-y-4 transition-all duration-500`} style={{ paddingBottom: 'calc(6rem + env(safe-area-inset-bottom))' }}>
       {/* Dynamic Gemini Breathing Aura */}
       <div className={`absolute -top-24 -right-24 w-[32rem] h-[32rem] rounded-full bg-gradient-to-br ${pageTheme.blob} pointer-events-none breathe-slow opacity-65 blur-3xl`} />
       <div className={`absolute top-1/3 -left-28 w-[28rem] h-[28rem] rounded-full bg-gradient-to-tr ${pageTheme.blob} pointer-events-none breathe-slow opacity-55 blur-3xl`} style={{ animationDelay: '-4s' }} />
@@ -4826,72 +4959,114 @@ export default function PatientDetail() {
       {/* Header */}
       {renderHeader()}
 
-      {/* Tabs */}
-      <Tabs tabs={tabs} active={activeTab} onChange={setActiveTab} />
+      {renderQuickActions()}
 
-      {/* Tab Content */}
-      {activeTab === 'overview' && renderOverview()}
-      {activeTab === 'timeline' && renderTimeline()}
-      {activeTab === 'treatments' && renderTreatments()}
-      {activeTab === 'implants' && renderImplants()}
-      {activeTab === 'labOrders' && renderLabOrders()}
-      {activeTab === 'phases' && renderPhases()}
-      {activeTab === 'consent' && renderConsentForms()}
-      {activeTab === 'appointments' && renderAppointments()}
-      {activeTab === 'payments' && renderPayments()}
-      {activeTab === 'teeth' && renderTeethChart()}
-      {activeTab === 'perio' && (
-        <PeriodontalChart
-          patientId={patient.id}
-          patientName={`${patient.first_name} ${patient.last_name}`}
-          doctors={doctors}
-          exam={perioExams[0] || null}
-          patient={patient}
-          onSave={async (teethData, notes, docId) => {
-            const payload = {
-              patient_id: patient.id,
-              doctor_id: docId,
-              exam_date: new Date().toISOString().slice(0, 10),
-              teeth_data: teethData,
-              notes,
-            }
-            if (perioExams[0]) {
-              await updatePerioExam(perioExams[0].id, payload)
-            } else {
-              await createPerioExam(payload)
-            }
-            const updated = await fetchPerioExams(patient.id)
-            setPerioExams(updated)
-          }}
-        />
-      )}
-      {activeTab === 'ortho' && (
-        <OrthodonticChart
-          patientId={patient.id}
-          patientName={`${patient.first_name} ${patient.last_name}`}
-          doctors={doctors}
-          exam={orthoExams[0] || null}
-          patient={patient}
-          onSave={async (examInput) => {
-            if (orthoExams[0]) {
-              await updateOrthoExam(orthoExams[0].id, examInput)
-            } else {
-              await createOrthoExam(examInput)
-            }
-            const updated = await fetchOrthoExams(patient.id)
-            setOrthoExams(updated)
-          }}
-        />
-      )}
-      {activeTab === 'prescriptions' && renderPrescriptions()}
-      {activeTab === 'radiology' && renderRadiology()}
-      {activeTab === 'insurance' && (
-        <div className="space-y-4">
-          {renderInsurance()}
-          <InsurancePanel patientId={id!} />
+      <div className="bg-white/95 dark:bg-slate-900/95 sm:bg-white/80 sm:dark:bg-slate-900/80 sm:backdrop-blur-xl rounded-3xl shadow-sm border border-slate-200/50 dark:border-slate-800/50 overflow-hidden min-h-[500px]">
+        {subView ? (
+           <div className="flex items-center gap-3 px-4 py-3 border-b border-slate-100 dark:border-slate-800 bg-white/98 dark:bg-slate-900/98 sticky top-0 z-10">
+             <button
+               onClick={() => { h.tap(); setSubView(null) }}
+               aria-label="بازگشت به منو"
+               className="w-11 h-11 flex items-center justify-center rounded-2xl bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 active:scale-90 transition-all shrink-0"
+             >
+               <ChevronRight size={22} />
+             </button>
+             <div className="flex-1 min-w-0">
+               <span className="font-extrabold text-base text-slate-800 dark:text-slate-100 block truncate">
+                 {tabs.find(t => t.key === subView)?.label || 'بازگشت'}
+               </span>
+               <span className="text-[11px] text-slate-400 dark:text-slate-500">
+                 {patient?.first_name} {patient?.last_name}
+               </span>
+             </div>
+           </div>
+        ) : (
+          renderMainMenu()
+        )}
+
+        <div className="p-3 sm:p-6">
+          {!subView && mainTab === 'overview' && renderOverview()}
+          {!subView && mainTab === 'appointments' && renderAppointments()}
+          
+          {!subView && mainTab === 'clinical' && renderNestedMenu([
+            { id: 'teeth', label: 'چارت دندان پزشکی (FDI)', icon: Smile, color: 'text-teal-600 dark:text-teal-400', bg: 'bg-teal-100 dark:bg-teal-900/30' },
+            { id: 'treatments', label: 'درمان‌ها و رویه‌های بالینی', icon: Activity, color: 'text-emerald-600 dark:text-emerald-400', bg: 'bg-emerald-100 dark:bg-emerald-900/30' },
+            { id: 'implants', label: 'پرونده ایمپلنت و جراحی', icon: Bone, color: 'text-sky-600 dark:text-sky-400', bg: 'bg-sky-100 dark:bg-sky-900/30' },
+            { id: 'perio', label: 'چارت پریودنتال (پروبینگ PPD)', icon: HeartPulse, color: 'text-rose-600 dark:text-rose-400', bg: 'bg-rose-100 dark:bg-rose-900/30' },
+            { id: 'ortho', label: 'آنالیز ارتودنسی (آنگل و IOTN)', icon: Sparkles, color: 'text-pink-600 dark:text-pink-400', bg: 'bg-pink-100 dark:bg-pink-900/30' },
+            { id: 'phases', label: 'طرح درمان مرحله‌ای و فازبندی', icon: Layers, color: 'text-orange-600 dark:text-orange-400', bg: 'bg-orange-100 dark:bg-orange-900/30' },
+          ])}
+
+          {!subView && mainTab === 'finance_docs' && renderNestedMenu([
+            { id: 'payments', label: 'خلاصه مالی و پرداخت‌ها', icon: CreditCard, color: 'text-amber-600 dark:text-amber-400', bg: 'bg-amber-100 dark:bg-amber-900/30' },
+            { id: 'documents', label: 'اسناد و مدارک پرونده', icon: ArchiveIcon, color: 'text-violet-600 dark:text-violet-400', bg: 'bg-violet-100 dark:bg-violet-900/30' },
+            { id: 'radiology', label: 'رادیولوژی و تصاویر بالینی', icon: ImageIcon, color: 'text-cyan-600 dark:text-cyan-400', bg: 'bg-cyan-100 dark:bg-cyan-900/30' },
+            { id: 'prescriptions', label: 'نسخه‌های دارویی صادرشده', icon: Pill, color: 'text-indigo-600 dark:text-indigo-400', bg: 'bg-indigo-100 dark:bg-indigo-900/30' },
+            { id: 'labOrders', label: 'سفارشات لابراتوار', icon: FlaskConical, color: 'text-fuchsia-600 dark:text-fuchsia-400', bg: 'bg-fuchsia-100 dark:bg-fuchsia-900/30' },
+            { id: 'consent', label: 'فرم‌های رضایت‌نامه آگاهانه', icon: FileSignature, color: 'text-blue-600 dark:text-blue-400', bg: 'bg-blue-100 dark:bg-blue-900/30' },
+            { id: 'insurance', label: 'بیمه درمانی', icon: Shield, color: 'text-slate-600 dark:text-slate-400', bg: 'bg-slate-200 dark:bg-slate-700/40' },
+            { id: 'timeline', label: 'تایم‌لاین بالینی بیمار', icon: Clock, color: 'text-slate-600 dark:text-slate-400', bg: 'bg-slate-200 dark:bg-slate-700/40' },
+          ])}
+
+          {/* Sub Views */}
+          {subView === 'timeline' && renderTimeline()}
+          {subView === 'treatments' && renderTreatments()}
+          {subView === 'implants' && renderImplants()}
+          {subView === 'labOrders' && renderLabOrders()}
+          {subView === 'phases' && renderPhases()}
+          {subView === 'consent' && renderConsentForms()}
+          {subView === 'appointments' && renderAppointments()}
+          {subView === 'payments' && renderPayments()}
+          {subView === 'teeth' && renderTeethChart()}
+          {subView === 'perio' && (
+            <PeriodontalChart
+              patientId={patient.id}
+              patientName={`${patient.first_name} ${patient.last_name}`}
+              doctors={doctors}
+              exam={perioExams[0] || null}
+              patient={patient}
+              onSave={async (teethData, notes, docId) => {
+                const payload = {
+                  patient_id: patient.id,
+                  doctor_id: docId,
+                  exam_date: new Date().toISOString().slice(0, 10),
+                  teeth_data: teethData,
+                  notes,
+                }
+                if (perioExams[0]) {
+                  await updatePerioExam(perioExams[0].id, payload)
+                } else {
+                  await createPerioExam(payload)
+                }
+                const updated = await fetchPerioExams(patient.id)
+                setPerioExams(updated)
+              }}
+            />
+          )}
+          {subView === 'ortho' && (
+            <OrthodonticChart
+              patientId={patient.id}
+              patientName={`${patient.first_name} ${patient.last_name}`}
+              doctors={doctors}
+              exam={orthoExams[0] || null}
+              patient={patient}
+              onSave={async (examInput) => {
+                if (orthoExams[0]) {
+                  await updateOrthoExam(orthoExams[0].id, examInput)
+                } else {
+                  await createOrthoExam(examInput)
+                }
+                const updated = await fetchOrthoExams(patient.id)
+                setOrthoExams(updated)
+              }}
+            />
+          )}
+          {subView === 'prescriptions' && renderPrescriptions()}
+          {subView === 'radiology' && renderRadiology()}
+          {subView === 'insurance' && renderInsurance()}
+          {subView === 'documents' && renderDocuments()}
         </div>
-      )}
-      {activeTab === 'documents' && renderDocuments()}
+      </div>
 
       {/* Modals */}
       {renderEditModal()}

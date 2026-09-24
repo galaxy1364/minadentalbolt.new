@@ -75,7 +75,7 @@ function getCatLabel(cat: string | null) {
 export default function Settings() {
   const { profile } = useAuth()
 
-  const [activeTab, setActiveTab] = useState('general')
+  const [subView, setSubView] = useState('general')
 
   /**
    * MOD-FIX-019: a tab the role cannot open leaves the page blank rather
@@ -84,11 +84,11 @@ export default function Settings() {
    * section this person actually has.
    */
   useEffect(() => {
-    if (activeTab === 'updates') return
-    if (canOpenSettingsSection(profile?.role, activeTab as SettingsSection)) return
+    if (subView === 'updates') return
+    if (canOpenSettingsSection(profile?.role, subView as SettingsSection)) return
     const first = allowedSettingsSections(profile?.role)[0]
-    if (first) setActiveTab(first)
-  }, [profile?.role, activeTab])
+    if (first) setSubView(first)
+  }, [profile?.role, subView])
 
   // MOD-UI-001 — سطح شفازیت فعلی برای نمایش انتخاب جاری در تب ظاهر
   const [materialLevel, setMaterialLevelState] = useState<MaterialLevel>(() => getMaterialLevel())
@@ -678,12 +678,12 @@ export default function Settings() {
           // preferences. Everything else answers to the role.
           t.key === 'updates' || canOpenSettingsSection(profile?.role, t.key as SettingsSection),
         )}
-        active={activeTab}
-        onChange={setActiveTab}
+        active={subView}
+        onChange={setSubView}
       />
 
       {/* General Tab */}
-      {activeTab === 'general' && canOpenSettingsSection(profile?.role, 'general') && (
+      {subView === 'general' && canOpenSettingsSection(profile?.role, 'general') && (
         <Card className="p-5">
           <h2 className="text-base font-bold text-slate-800 mb-4 flex items-center gap-2"><Building2 size={18} className="text-primary-600" /> اطلاعات کلینیک</h2>
           <div className="space-y-3">
@@ -699,7 +699,7 @@ export default function Settings() {
       )}
 
       {/* Doctors & Units Tab */}
-      {activeTab === 'doctors' && canOpenSettingsSection(profile?.role, 'doctors') && (
+      {subView === 'doctors' && canOpenSettingsSection(profile?.role, 'doctors') && (
         <div className="space-y-4">
           <Card className="p-4">
             <div className="flex items-center justify-between mb-3">
@@ -743,7 +743,7 @@ export default function Settings() {
       )}
 
       {/* Procedures Tab */}
-      {activeTab === 'procedures' && canOpenSettingsSection(profile?.role, 'procedures') && (
+      {subView === 'procedures' && canOpenSettingsSection(profile?.role, 'procedures') && (
         <Card className="p-4">
           <h3 className="text-sm font-bold text-slate-800 mb-3 flex items-center gap-2"><ListOrdered size={16} className="text-primary-600" /> کاتالوگ رویه‌های درمانی</h3>
           {renderCrudList(
@@ -767,7 +767,7 @@ export default function Settings() {
       )}
 
       {/* Backup Tab */}
-      {activeTab === 'backup' && canOpenSettingsSection(profile?.role, 'backup') && (
+      {subView === 'backup' && canOpenSettingsSection(profile?.role, 'backup') && (
         <div className="space-y-4">
           <Card className="p-5">
             <h2 className="text-base font-bold text-slate-800 mb-4 flex items-center gap-2"><RefreshCw size={18} className="text-primary-600" /> وضعیت سینک</h2>
@@ -870,20 +870,20 @@ export default function Settings() {
       )}
 
       {/* Error Log Tab */}
-      {activeTab === 'errors' && canOpenSettingsSection(profile?.role, 'errors') && <ErrorLogTab />}
+      {subView === 'errors' && canOpenSettingsSection(profile?.role, 'errors') && <ErrorLogTab />}
 
       {/* Audit Log Tab */}
-      {activeTab === 'audit' && canOpenSettingsSection(profile?.role, 'audit') && <AuditLogTab />}
-      {activeTab === 'rbac' && canOpenSettingsSection(profile?.role, 'rbac') && <RbacMatrixTab />}
+      {subView === 'audit' && canOpenSettingsSection(profile?.role, 'audit') && <AuditLogTab />}
+      {subView === 'rbac' && canOpenSettingsSection(profile?.role, 'rbac') && <RbacMatrixTab />}
 
       {/* Failed Sync Tab */}
-      {activeTab === 'failed_sync' && canOpenSettingsSection(profile?.role, 'failed_sync') && <FailedSyncTab />}
+      {subView === 'failed_sync' && canOpenSettingsSection(profile?.role, 'failed_sync') && <FailedSyncTab />}
 
       {/* Updates Tab */}
-      {activeTab === 'updates' && <UpdatesTab />}
+      {subView === 'updates' && <UpdatesTab />}
 
       {/* Haptics Tab */}
-      {activeTab === 'appearance' && canOpenSettingsSection(profile?.role, 'appearance') && (
+      {subView === 'appearance' && canOpenSettingsSection(profile?.role, 'appearance') && (
         <div className="space-y-4">
           <Card className="p-5">
             <h2 className="text-base font-bold text-slate-800 mb-1 flex items-center gap-2">
@@ -923,7 +923,7 @@ export default function Settings() {
         </div>
       )}
 
-      {activeTab === 'haptics' && canOpenSettingsSection(profile?.role, 'haptics') && (
+      {subView === 'haptics' && canOpenSettingsSection(profile?.role, 'haptics') && (
         <div className="space-y-4">
           <Card className="p-5">
             <h2 className="text-base font-bold text-slate-800 mb-4 flex items-center gap-2"><Vibrate size={18} className="text-primary-600" /> لرزش و بازخورد لمسی</h2>
@@ -986,10 +986,10 @@ export default function Settings() {
           </Card>
         </div>
       )}
-      {activeTab === 'app_lock' && canOpenSettingsSection(profile?.role, 'app_lock') && <AppLockTab />}
+      {subView === 'app_lock' && canOpenSettingsSection(profile?.role, 'app_lock') && <AppLockTab />}
 
       {/* File Number Tab */}
-      {activeTab === 'file_number' && canOpenSettingsSection(profile?.role, 'file_number') && (
+      {subView === 'file_number' && canOpenSettingsSection(profile?.role, 'file_number') && (
         <div className="space-y-4">
           <Card className="p-5">
             <h2 className="text-base font-bold text-slate-800 mb-4 flex items-center gap-2"><Hash size={18} className="text-primary-600" /> پیکربندی شماره پرونده</h2>
@@ -1011,7 +1011,7 @@ export default function Settings() {
       )}
 
       {/* POS Tab */}
-      {activeTab === 'pos' && canOpenSettingsSection(profile?.role, 'pos' as any) && (
+      {subView === 'pos' && canOpenSettingsSection(profile?.role, 'pos' as any) && (
         <div className="space-y-4">
           <Card className="p-4">
             <h2 className="text-base font-bold text-slate-800 mb-4 flex items-center gap-2"><CreditCard size={18} className="text-primary-600" /> پیکربندی اتصال به دستگاه کارتخوان</h2>
@@ -1035,7 +1035,7 @@ export default function Settings() {
       {/* SMS Templates Tab */}
 
       {/* Packages Tab */}
-      {activeTab === 'packages' && canOpenSettingsSection(profile?.role, 'packages') && (
+      {subView === 'packages' && canOpenSettingsSection(profile?.role, 'packages') && (
         <Card className="p-4">
           <h3 className="text-sm font-bold text-slate-800 mb-3 flex items-center gap-2"><Package size={16} className="text-primary-600" /> پکیج‌های درمانی</h3>
           {renderCrudList(
@@ -1056,7 +1056,7 @@ export default function Settings() {
       )}
 
       {/* Categories Tab */}
-      {activeTab === 'categories' && canOpenSettingsSection(profile?.role, 'categories') && (
+      {subView === 'categories' && canOpenSettingsSection(profile?.role, 'categories') && (
         <Card className="p-4">
           <h3 className="text-sm font-bold text-slate-800 mb-3 flex items-center gap-2"><Tag size={16} className="text-primary-600" /> دسته‌بندی‌های انبار</h3>
           {renderCrudList(
