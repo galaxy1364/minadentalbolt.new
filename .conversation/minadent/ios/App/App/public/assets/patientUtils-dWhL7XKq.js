@@ -1,1 +1,0 @@
-function u(l){if(!l)return null;const t=new Date(l);if(isNaN(t.getTime()))return null;const n=new Date;let e=n.getFullYear()-t.getFullYear();const a=n.getMonth()-t.getMonth();return(a<0||a===0&&n.getDate()<t.getDate())&&e--,e>=0&&e<150?e:null}export{u as c};
