@@ -1,0 +1,1 @@
+- [Generating a real signed Android APK from a PWA](pwabuilder-apk-generation.md) — call PWABuilder's cloud API directly instead of manual browser flow; no Android SDK needed.

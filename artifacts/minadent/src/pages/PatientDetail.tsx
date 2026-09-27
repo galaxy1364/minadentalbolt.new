@@ -1,0 +1,5792 @@
+// PatientDetail.tsx - Persian RTL Dental Clinic Patient Detail Page
+import { InsurancePanel } from '../components/InsurancePanel'
+import { PatientFinanceOverview } from '../components/PatientFinanceOverview'
+import { formatSurfaces } from '../lib/toothSurfaces'
+import { PatientDebtBar, PatientChequeRows } from '../components/PatientDebtBar'
+import { toothLabel, toothCode } from '../lib/toothLabel'
+import { buildPrintDocument, escapeHtml } from '../lib/printDocument'
+import { PatientAlerts } from '../components/PatientAlerts'
+import { buildPatientAlerts, alertChips } from '../lib/patientAlerts'
+import { buildDoctorLedger } from '../lib/doctorLedger'
+import { phasePlanProgress, phaseSchedule, validatePhase, nextPhaseNumber, comparePhaseCostToTreatments } from '../lib/phases'
+import { useState, useEffect, useCallback, useMemo } from 'react'
+import { useParams, useNavigate, useLocation } from 'react-router-dom'
+import { ArrowRight, Edit2, Phone, PhoneCall, MessageSquare, MessageCircle, Mail, MapPin, Calendar, CreditCard, Activity, FileText, Image as ImageIcon, Shield, Pill, Smile, Award, AlertCircle, Clock, CheckCircle2, Layers, Plus, Trash2, FileSignature, Printer, Bone, FlaskConical, Stethoscope, Archive as ArchiveIcon, RotateCcw, Sparkles, AlertTriangle, HeartPulse, Users, UserPlus, Link2, Download, CheckSquare, Square, Tags, FileHeart, Camera, ChevronLeft, ChevronRight, User, Search } from 'lucide-react'
+import { tileThemes, getHashColor } from '../lib/colors'
+import { fetchPatient, updatePatient, fetchTimeline, fetchTreatments, fetchAppointments, fetchPayments, createPayment, fetchToothRecords, createToothRecord, updateToothRecord, fetchPrescriptions, fetchRadiologyImages, updateRadiologyImage, fetchEncounters, fetchDoctors, fetchImplantCases, fetchTreatmentPhases, createTreatmentPhase, updateTreatmentPhase, fetchConsentForms, createConsentForm, updateConsentForm, fetchLabOrders, updateTreatment, fetchCheques, createCheque, updateCheque, fetchPaymentPlans, createPaymentPlan, updatePaymentPlan, fetchAllInstallments, updateInstallment, fetchPerioExams, createPerioExam, updatePerioExam, fetchOrthoExams, createOrthoExam, updateOrthoExam, fetchPatients } from '../lib/api'
+import { toJalaliString, toJalaliStringPretty, formatCurrency, toPersianDigits, formatTime, toEnglishDigits } from '../lib/persianDate'
+import { calcPatientBalance, calcFamilyBalance } from '../lib/finance'
+import { buildSchedule } from '../lib/installments'
+import { Patient, Doctor, PatientTimeline, Treatment, Appointment, Payment, ToothRecord, Prescription, RadiologyImage, Encounter, ImplantCase, TreatmentPhase, ConsentForm, LabOrder, Cheque, PerioExam, OrthoExam, OrthoExamInput, PaymentPlan, Installment } from '../types'
+import { Modal, Card, Button, Input, Select, Textarea, Badge, Spinner, EmptyState, Tabs, showToast, Wizard, MultiSelectChips } from '../components/ui'
+import { PersianDateInput } from '../components/PersianDateInput'
+import { calcPlanProgress, groupByTooth, nextStatus } from '../lib/treatmentPlan'
+import { evaluateClinicalPrerequisites, PrerequisiteEvaluation } from '../lib/clinicalPrerequisites'
+import { groupPhasesByPlan, comparePlanOptions, generateComparativePlanPrintData, PlanOptionSummary } from '../lib/alternativePlans'
+import { useConfirmAction } from '../components/ConfirmAction'
+import { h } from '../lib/haptics'
+import { chimes } from '../lib/chimes'
+import { calculateAge } from '../lib/patientUtils'
+import { db } from '../lib/db'
+import type { AuditLogEntry } from '../lib/db'
+import DentalChart from '../components/DentalChart'
+import { CurrencyInput } from '../components/CurrencyInput'
+import { SignatureCanvas } from '../components/SignatureCanvas'
+import { CONSENT_TEMPLATES } from '../lib/consentTemplates'
+import { PeriodontalChart } from '../components/PeriodontalChart'
+import { OrthodonticChart } from '../components/OrthodonticChart'
+import { DentalRadiologyViewer } from '../components/DentalRadiologyViewer'
+import { BeforeAfterViewer } from '../components/BeforeAfterViewer'
+import { resolveFamilyHousehold, FAMILY_RELATIONSHIPS, validateFamilyLinkage } from '../lib/familyLinkage'
+import { computePatientRetentionProfile } from '../lib/patientRecallChurn'
+import { parseRadiologyTeeth, matchesRadiologyTooth, generateRadiologyPortfolioHtml, generateDicomMetadataJson } from '../lib/radiologyExport'
+import { createPatientRadiologyZip, downloadBlob } from '../lib/zipArchive'
+import { buildPatientMedicationGuideDocument } from '../lib/patientMedicationGuide'
+import { usePrivacyMode } from '../lib/privacyMask'
+import { getClinicSetting } from '../lib/clinicSettings'
+import { buildChartHandoff } from '../lib/chartHandoff'
+import { DocumentScannerModal } from '../components/DocumentScannerModal'
+import { patientConcepts, conceptStyle, type PatientConcept } from '../components/patientConcepts'
+
+// ============================================================================
+// Constants
+// ============================================================================
+
+const bloodTypes = ['O-', 'O+', 'A-', 'A+', 'B-', 'B+', 'AB-', 'AB+']
+const genderOptions = [{ value: 'male', label: 'آقا' }, { value: 'female', label: 'خانم' }]
+const vipLevels = [
+  { value: '0', label: 'عادی' },
+  { value: '1', label: 'نقره‌ای' },
+  { value: '2', label: 'طلایی' },
+  { value: '3', label: 'پلاتین' },
+]
+
+// FDI Tooth chart - upper right (18-11), upper left (21-28), lower left (31-38), lower right (41-48)
+// FDI tooth numbering quadrants
+const UPPER_RIGHT = [18, 17, 16, 15, 14, 13, 12, 11]
+const UPPER_LEFT = [21, 22, 23, 24, 25, 26, 27, 28]
+const LOWER_LEFT = [31, 32, 33, 34, 35, 36, 37, 38]
+const LOWER_RIGHT = [48, 47, 46, 45, 44, 43, 42, 41]
+void [UPPER_RIGHT, UPPER_LEFT, LOWER_LEFT, LOWER_RIGHT]
+
+const treatmentStatuses: { value: string; label: string; color: string }[] = [
+  { value: 'planned', label: 'برنامه‌ریزی شده', color: 'slate' },
+  { value: 'in_progress', label: 'در حال انجام', color: 'warning' },
+  { value: 'completed', label: 'تکمیل شده', color: 'success' },
+  { value: 'cancelled', label: 'لغو شده', color: 'error' },
+]
+
+const appointmentStatuses: { value: string; label: string; color: string }[] = [
+  { value: 'scheduled', label: 'زمان‌بندی شده', color: 'slate' },
+  { value: 'confirmed', label: 'تایید شده', color: 'primary' },
+  { value: 'in_chair', label: 'روی صندلی', color: 'warning' },
+  { value: 'completed', label: 'تکمیل شده', color: 'success' },
+  { value: 'cancelled', label: 'لغو شده', color: 'error' },
+  { value: 'no_show', label: 'حضور نداشت', color: 'error' },
+]
+
+const apptTypeLabels: Record<string, string> = {
+  general: 'عمومی',
+  surgery: 'جراحی',
+  cosmetic: 'زیبایی',
+  orthodontics: 'ارتودنسی',
+  implant: 'ایمپلنت',
+  follow_up: 'ویزیت مجدد',
+  checkup: 'معاینه',
+  emergency: 'اورژانس',
+  cleaning: 'جرم‌گیری',
+  extraction: 'کشیدن دندان',
+  root_canal: 'عصب‌کشی',
+  other: 'سایر',
+}
+
+const paymentMethods: { value: string; label: string }[] = [
+  { value: 'cash', label: 'نقدی' },
+  { value: 'card', label: 'کارت' },
+  { value: 'transfer', label: 'انتقال بانکی' },
+  { value: 'cheque', label: 'چک' },
+  { value: 'insurance', label: 'بیمه' },
+]
+
+const paymentStatuses: { value: string; label: string; color: string }[] = [
+  { value: 'completed', label: 'تکمیل شده', color: 'success' },
+  { value: 'pending', label: 'در انتظار', color: 'warning' },
+  { value: 'failed', label: 'ناموفق', color: 'error' },
+]
+
+// MOD-FEAT-019: keys match the event_type values api.ts actually writes.
+// The previous map listed 'appointment', 'treatment', 'payment',
+// 'prescription' and 'encounter' — none of which was ever written by
+// anything, because the timeline had a single writer. Keeping unwritten
+// keys alongside the real ones just invites the next person to pick the
+// wrong one.
+const timelineIcons: Record<string, React.ReactNode> = {
+  patient_created: <Smile size={16} />,
+  appointment_created: <Calendar size={16} />,
+  encounter_created: <FileText size={16} />,
+  treatment_created: <Activity size={16} />,
+  lab_order_created: <FlaskConical size={16} />,
+  implant_case_created: <Bone size={16} />,
+  default: <Clock size={16} />,
+}
+
+// Avatar colors
+const avatarColors = [
+  'from-primary-400 to-primary-600',
+  'from-accent-400 to-accent-600',
+  'from-success-400 to-success-600',
+  'from-warning-400 to-warning-600',
+  'from-secondary-400 to-secondary-600',
+  'from-error-400 to-error-600',
+]
+
+function getAvatarColor(id: string): string {
+  let hash = 0
+  for (let i = 0; i < id.length; i++) hash = id.charCodeAt(i) + ((hash << 5) - hash)
+  return avatarColors[Math.abs(hash) % avatarColors.length]
+}
+
+function getInitials(patient: Patient): string {
+  return ((patient.first_name?.charAt(0) || '') + (patient.last_name?.charAt(0) || '')).trim() || '?'
+}
+
+function getVipLabel(level: number | null): { label: string; color: string } {
+  const v = level ?? 0
+  if (v === 3) return { label: 'پلاتین', color: 'accent' }
+  if (v === 2) return { label: 'طلایی', color: 'warning' }
+  if (v === 1) return { label: 'نقره‌ای', color: 'secondary' }
+  return { label: 'عادی', color: 'slate' }
+}
+
+function OverviewAccordion({ title, icon, accent, children, className = '' }: {
+  title: string
+  icon: React.ReactNode
+  accent: string
+  children: React.ReactNode
+  className?: string
+}) {
+  return (
+    <details className={`group rounded-3xl bg-white/95 dark:bg-slate-900/90 backdrop-blur-xl border border-slate-200/80 dark:border-slate-800 shadow-sm overflow-hidden ${className}`}>
+      <summary className="list-none [&::-webkit-details-marker]:hidden cursor-pointer flex items-center justify-between gap-3 px-5 py-3.5 min-h-[60px] text-sm font-bold text-slate-800 dark:text-slate-100 select-none">
+        <span className="flex items-center gap-2 min-w-0">
+          <span className={`p-2 rounded-xl shrink-0 ${accent}`}>{icon}</span>
+          <span>{title}</span>
+        </span>
+        <ChevronLeft size={17} className="text-slate-400 shrink-0 transition-transform group-open:-rotate-90" />
+      </summary>
+      <div className="px-5 pb-5 pt-1 border-t border-slate-100 dark:border-slate-800">
+        {children}
+      </div>
+    </details>
+  )
+}
+
+// ============================================================================
+// Main Component
+// ============================================================================
+
+export default function PatientDetail() {
+  const { id } = useParams<{ id: string }>()
+  const navigate = useNavigate()
+  const location = useLocation()
+  const locState = (location.state || {}) as {
+    initialTab?: string
+    openPaymentModal?: boolean
+    openChequeModal?: boolean
+    openPlanModal?: boolean
+    focusSection?: string
+  }
+  const { confirmAction, ConfirmActionModal } = useConfirmAction()
+  const { privacyMode, maskNationalId, maskPhoneNumber } = usePrivacyMode()
+
+  const [patient, setPatient] = useState<Patient | null>(null)
+  const [recordHistory, setRecordHistory] = useState<AuditLogEntry[]>([])
+  const [showAllHistory, setShowAllHistory] = useState(false)
+  const [doctors, setDoctors] = useState<Doctor[]>([])
+  const [allPatients, setAllPatients] = useState<Patient[]>([])
+  const [allPayments, setAllPayments] = useState<Payment[]>([])
+  const [allTreatments, setAllTreatments] = useState<Treatment[]>([])
+  const [allImplantCases, setAllImplantCases] = useState<ImplantCase[]>([])
+  const [familyModalOpen, setFamilyModalOpen] = useState(false)
+  const [familyHeadId, setFamilyHeadId] = useState('')
+  const [familyRelationship, setFamilyRelationship] = useState('')
+  const [isHeadToggle, setIsHeadToggle] = useState(false)
+  const [savingFamily, setSavingFamily] = useState(false)
+  const [loading, setLoading] = useState(true)
+
+  // Tab state
+  const initial = locState.initialTab || 'overview'
+  const getInitialMainTab = (tab: string) => {
+    if (['overview'].includes(tab)) return 'overview'
+    if (['appointments'].includes(tab)) return 'appointments'
+    if (['teeth', 'treatments', 'implants', 'perio', 'ortho', 'phases'].includes(tab)) return 'clinical'
+    if (['payments', 'labOrders', 'prescriptions', 'radiology', 'consent', 'insurance', 'documents', 'timeline'].includes(tab)) return 'finance_docs'
+    return 'overview'
+  }
+
+  const [mainTab, setMainTab] = useState<'overview' | 'clinical' | 'appointments' | 'finance_docs'>(getInitialMainTab(initial) as any)
+  const [subView, setSubView] = useState<string | null>(['overview', 'appointments'].includes(initial) ? null : initial)
+  const switchTab = (tab: string) => {
+    setMainTab(getInitialMainTab(tab) as any)
+    setSubView(['overview', 'appointments'].includes(tab) ? null : tab)
+  }
+
+  // Tab data
+  const [cheques, setCheques] = useState<Cheque[]>([])
+  const [timeline, setTimeline] = useState<PatientTimeline[]>([])
+  const [treatments, setTreatments] = useState<Treatment[]>([])
+  const [implantCases, setImplantCases] = useState<ImplantCase[]>([])
+  const [phases, setPhases] = useState<TreatmentPhase[]>([])
+  const [consentForms, setConsentForms] = useState<ConsentForm[]>([])
+  const [perioExams, setPerioExams] = useState<PerioExam[]>([])
+  const [orthoExams, setOrthoExams] = useState<OrthoExam[]>([])
+  const [appointments, setAppointments] = useState<Appointment[]>([])
+  const [payments, setPayments] = useState<Payment[]>([])
+  const [toothRecords, setToothRecords] = useState<ToothRecord[]>([])
+  const [prescriptions, setPrescriptions] = useState<Prescription[]>([])
+  const [radiologyImages, setRadiologyImages] = useState<RadiologyImage[]>([])
+  const [selectedRadImage, setSelectedRadImage] = useState<RadiologyImage | null>(null)
+  const [radToothFilter, setRadToothFilter] = useState<string>('all')
+  const [selectedRadIds, setSelectedRadIds] = useState<Set<string>>(new Set())
+  const [batchTagModalOpen, setBatchTagModalOpen] = useState(false)
+  const [batchToothInput, setBatchToothInput] = useState('')
+  const [batchTypeInput, setBatchTypeInput] = useState('')
+  const [zippingArchive, setZippingArchive] = useState(false)
+  const [zipProgressText, setZipProgressText] = useState('')
+  const [savingBatchRad, setSavingBatchRad] = useState(false)
+  const [compareModalOpen, setCompareModalOpen] = useState(false)
+  const [compareBeforeUrl, setCompareBeforeUrl] = useState<string>('')
+  const [compareAfterUrl, setCompareAfterUrl] = useState<string>('')
+  const [viewingComparison, setViewingComparison] = useState(false)
+  const [encounters, setEncounters] = useState<Encounter[]>([])
+  const [labOrders, setLabOrders] = useState<LabOrder[]>([])
+  const activeLabOrder = useMemo(() => {
+    return labOrders.find((o) => o.status !== 'delivered' && o.status !== 'cancelled') || null
+  }, [labOrders])
+  const [paymentPlans, setPaymentPlans] = useState<PaymentPlan[]>([])
+  const [installments, setInstallments] = useState<Installment[]>([])
+
+  // Document / Paper Record Scanner Modal (دوربین و اسکنر مدارک و رادیولوژی)
+  const [scannerModalOpen, setScannerModalOpen] = useState(false)
+  const [scannerInitialCategory, setScannerInitialCategory] = useState('paper_record')
+  const [docCategoryFilter, setDocCategoryFilter] = useState('all')
+
+  // Direct Financial Operations Modals
+  const [paymentModalOpen, setPaymentModalOpen] = useState(false)
+  const [savingPayment, setSavingPayment] = useState(false)
+  const [paymentForm, setPaymentForm] = useState({
+    amount: '',
+    method: 'card',
+    treatment_id: '',
+    doctor_id: '',
+    notes: '',
+  })
+
+  const [chequeModalOpen, setChequeModalOpen] = useState(false)
+  const [savingCheque, setSavingCheque] = useState(false)
+  const [chequeForm, setChequeForm] = useState({
+    amount: '',
+    bank_name: '',
+    cheque_number: '',
+    sayad_id: '',
+    due_date: new Date().toISOString().slice(0, 10),
+    drawer_name: '',
+    notes: '',
+  })
+
+  const [planModalOpen, setPlanModalOpen] = useState(false)
+  const [savingPlan, setSavingPlan] = useState(false)
+  const [planForm, setPlanForm] = useState({
+    total_amount: '',
+    number_of_installments: 3,
+    start_date: new Date().toISOString().slice(0, 10),
+    notes: '',
+    guarantee_sayad_id: '',
+    guarantee_bank: '',
+    guarantee_cheque_num: '',
+  })
+  
+  const [posConfig, setPosConfig] = useState({ ip: '', port: '', enabled: false })
+
+  // Edit modal
+  const [editModalOpen, setEditModalOpen] = useState(false)
+  const [saving, setSaving] = useState(false)
+
+  // Edit form state
+  const [formData, setFormData] = useState({
+    first_name: '',
+    last_name: '',
+    national_id: '',
+    phone: '',
+    phone2: '',
+    email: '',
+    birth_date: '',
+    gender: '',
+    blood_type: '',
+    address: '',
+    city: '',
+    province: '',
+    postal_code: '',
+    medical_history: '',
+    allergies: '',
+    medications: '',
+    medical_conditions: '',
+    insurance_info: '',
+    insurance_number: '',
+    notes: '',
+    vip_level: '0',
+    is_active: true,
+    primary_doctor_id: '',
+    tags: '',
+    anticoagulant_use: false,
+    inr_value: '',
+    bisphosphonate_use: false,
+    bp_systolic: '',
+    bp_diastolic: '',
+    diabetes_hba1c: '',
+    endocarditis_prophylaxis: false,
+    pregnancy_trimester: '',
+    family_head_id: '',
+    family_relationship: '',
+  })
+
+  // ===========================================================================
+  // Data Fetching
+  // ===========================================================================
+
+  const loadPatient = useCallback(async () => {
+    if (!id) return
+    setLoading(true)
+    try {
+      const [p, docs, all] = await Promise.all([
+        fetchPatient(id),
+        fetchDoctors(),
+        fetchPatients(),
+      ])
+      if (!p) {
+        showToast('error', 'بیمار یافت نشد')
+        navigate('/patients')
+        return
+      }
+      setPatient(p)
+      setDoctors(docs)
+      setAllPatients(all)
+      setFamilyHeadId(p.family_head_id || '')
+      setFamilyRelationship(p.family_relationship || '')
+      setIsHeadToggle(p.family_relationship === 'head')
+      setFormData({
+        first_name: p.first_name || '',
+        last_name: p.last_name || '',
+        national_id: p.national_id || '',
+        phone: p.phone || '',
+        phone2: p.phone2 || '',
+        email: p.email || '',
+        birth_date: p.birth_date || '',
+        gender: p.gender || '',
+        blood_type: p.blood_type || '',
+        address: p.address || '',
+        city: p.city || '',
+        province: p.province || '',
+        postal_code: p.postal_code || '',
+        medical_history: p.medical_history || '',
+        allergies: p.allergies || '',
+        medications: p.medications || '',
+        medical_conditions: p.medical_conditions || '',
+        insurance_info: p.insurance_info || '',
+        insurance_number: p.insurance_number || '',
+        notes: p.notes || '',
+        vip_level: String(p.vip_level ?? 0),
+        is_active: p.is_active,
+        primary_doctor_id: p.primary_doctor_id || '',
+        tags: (p.tags || []).join(', '),
+        anticoagulant_use: Boolean(p.anticoagulant_use),
+        inr_value: p.inr_value != null ? String(p.inr_value) : '',
+        bisphosphonate_use: Boolean(p.bisphosphonate_use),
+        bp_systolic: p.bp_systolic != null ? String(p.bp_systolic) : '',
+        bp_diastolic: p.bp_diastolic != null ? String(p.bp_diastolic) : '',
+        diabetes_hba1c: p.diabetes_hba1c != null ? String(p.diabetes_hba1c) : '',
+        endocarditis_prophylaxis: Boolean(p.endocarditis_prophylaxis),
+        pregnancy_trimester: p.pregnancy_trimester != null ? String(p.pregnancy_trimester) : '',
+        family_head_id: p.family_head_id || '',
+        family_relationship: p.family_relationship || '',
+      })
+    } catch (err) {
+      console.error('Error loading patient:', err)
+      showToast('error', 'خطا در بارگذاری اطلاعات بیمار')
+    } finally {
+      setLoading(false)
+    }
+  }, [id, navigate])
+
+  const loadTabData = useCallback(async () => {
+    if (!id) return
+    try {
+      const [tl, tr, ap, pm, tr_records, pres, radio, enc, implAll, ph, cf, labAll, chq, px, ox, plans, instAll, allPm, allTr] = await Promise.all([
+        fetchTimeline(id),
+        fetchTreatments(undefined, id),
+        fetchAppointments(),
+        fetchPayments(id),
+        fetchToothRecords(id),
+        fetchPrescriptions(id),
+        fetchRadiologyImages(id),
+        fetchEncounters(id),
+        fetchImplantCases(),
+        fetchTreatmentPhases(id),
+        fetchConsentForms(id),
+        fetchLabOrders(),
+        // MOD-FEAT-028: cheques are debt until they clear, so the record
+        // has to be able to say one is in flight and when it is due.
+        fetchCheques(),
+        fetchPerioExams(id),
+        fetchOrthoExams(id),
+        fetchPaymentPlans(id),
+        fetchAllInstallments(),
+        fetchPayments(),
+        fetchTreatments(),
+      ])
+      setTimeline(tl)
+      setCheques(chq.filter((c) => c.patient_id === id))
+      setTreatments(tr)
+      setAppointments(ap.filter((a) => a.patient_id === id))
+      setPayments(pm)
+      setAllPayments(allPm)
+      setAllTreatments(allTr)
+      setAllImplantCases(implAll)
+      setToothRecords(tr_records)
+      setPrescriptions(pres as unknown as Prescription[])
+      setRadiologyImages(radio)
+      setEncounters(enc)
+      setLabOrders(labAll.filter((o) => o.patient_id === id))
+      setImplantCases(implAll.filter((c) => c.patient_id === id))
+      setPhases(ph.sort((a, b) => a.phase_number - b.phase_number))
+      // Archived consent forms stay out of the active list — fully
+      // preserved, restorable, same pattern as radiology/implants/labs.
+      setConsentForms(cf.filter((c) => c.is_active !== false))
+      setPerioExams(px || [])
+      setOrthoExams(ox || [])
+      setPaymentPlans(plans)
+      setInstallments(instAll.filter((i) => i.patient_id === id || plans.some((p) => p.id === i.payment_plan_id)))
+    } catch (err) {
+      console.error('Error loading tab data:', err)
+    }
+  }, [id])
+
+  useEffect(() => {
+    loadPatient()
+  }, [loadPatient])
+
+  // "چه فیلدی از پرونده توسط کی تغییر کرد" — a real data-integrity/
+  // accountability trail per patient, distinct from the clinical
+  // تایم‌لاین (which shows care events like treatments/payments, not
+  // record edits). Reads the same audit_log every mutation already
+  // writes to (via queueOperation -> logAudit), just filtered to this
+  // one patient's own row.
+  useEffect(() => {
+    if (!id) return
+    db.audit_log.where('table_name').equals('patients').and((e) => e.record_id === id).reverse().sortBy('id').then((entries) => {
+      // MOD-FEAT-038: «تاریخچه همیشه همه را نشان دهد». Everything is loaded;
+      // the card shows the latest few and offers the rest on request.
+      setRecordHistory(entries)
+    }).catch(() => {})
+  }, [id])
+
+  useEffect(() => {
+    // Load POS config from Supabase (cross-device) with localStorage fallback
+    getClinicSetting<{ ip: string; port: string; enabled: boolean }>('pos').then((cfg) => {
+      if (cfg && Object.keys(cfg).length > 0) setPosConfig(cfg)
+    })
+  }, [])
+
+  useEffect(() => {
+    loadTabData()
+  }, [loadTabData])
+
+  // ===========================================================================
+  // Handlers
+  // ===========================================================================
+
+  const handleSavePatient = async () => {
+    if (!patient) return
+    if (!formData.first_name.trim() || !formData.last_name.trim()) {
+      showToast('error', 'نام و نام خانوادگی الزامی است')
+      return
+    }
+    setSaving(true)
+    try {
+      const payload = {
+        first_name: formData.first_name.trim(),
+        last_name: formData.last_name.trim(),
+        national_id: formData.national_id || null,
+        phone: formData.phone || null,
+        phone2: formData.phone2 || null,
+        email: formData.email || null,
+        birth_date: formData.birth_date || null,
+        gender: formData.gender || null,
+        blood_type: formData.blood_type || null,
+        address: formData.address || null,
+        city: formData.city || null,
+        province: formData.province || null,
+        postal_code: formData.postal_code || null,
+        medical_history: formData.medical_history || null,
+        allergies: formData.allergies || null,
+        medications: formData.medications || null,
+        medical_conditions: formData.medical_conditions || null,
+        insurance_info: formData.insurance_info || null,
+        insurance_number: formData.insurance_number || null,
+        notes: formData.notes || null,
+        vip_level: Number(formData.vip_level) || 0,
+        is_active: formData.is_active,
+        primary_doctor_id: formData.primary_doctor_id || null,
+        tags: formData.tags ? formData.tags.split(',').map((t) => t.trim()).filter(Boolean) : [],
+        anticoagulant_use: formData.anticoagulant_use || false,
+        inr_value: formData.inr_value ? Number(formData.inr_value) : null,
+        bisphosphonate_use: formData.bisphosphonate_use || false,
+        bp_systolic: formData.bp_systolic ? Number(formData.bp_systolic) : null,
+        bp_diastolic: formData.bp_diastolic ? Number(formData.bp_diastolic) : null,
+        diabetes_hba1c: formData.diabetes_hba1c ? Number(formData.diabetes_hba1c) : null,
+        endocarditis_prophylaxis: formData.endocarditis_prophylaxis || false,
+        pregnancy_trimester: formData.pregnancy_trimester ? Number(formData.pregnancy_trimester) : null,
+        family_head_id: formData.family_head_id || null,
+        family_relationship: formData.family_relationship || null,
+      } as any
+      const updated = await updatePatient(patient.id, payload)
+      setPatient(updated)
+      const refreshedAll = await fetchPatients()
+      setAllPatients(refreshedAll)
+      setEditModalOpen(false)
+      chimes.playSuccess()
+      showToast('success', 'اطلاعات بیمار ویرایش شد')
+    } catch (err) {
+      console.error('Error saving patient:', err)
+      chimes.playWarning()
+      showToast('error', 'خطا در ذخیره اطلاعات')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const handleSaveFamilyLinkage = async () => {
+    if (!patient) return
+    setSavingFamily(true)
+    try {
+      const newRel = isHeadToggle ? 'head' : (familyRelationship || null)
+      const newHeadId = isHeadToggle ? null : (familyHeadId || null)
+
+      const validation = validateFamilyLinkage(patient.id, newHeadId, newRel)
+      if (!validation.valid) {
+        showToast('error', validation.error || 'اطلاعات پیوند خانوادگی نامعتبر است')
+        setSavingFamily(false)
+        return
+      }
+
+      const updated = await updatePatient(patient.id, {
+        family_head_id: newHeadId,
+        family_relationship: newRel,
+      } as any)
+
+      setPatient(updated)
+      const refreshedAll = await fetchPatients()
+      setAllPatients(refreshedAll)
+      setFamilyModalOpen(false)
+      chimes.playSuccess()
+      showToast('success', 'پیوند خانوادگی بیمار با موفقیت به‌روزرسانی شد')
+    } catch (err) {
+      console.error('Error saving family linkage:', err)
+      chimes.playWarning()
+      showToast('error', 'خطا در ذخیره پیوند خانوادگی')
+    } finally {
+      setSavingFamily(false)
+    }
+  }
+
+  const handleUpdateTooth = async (toothNumber: string, data: { is_missing: boolean; is_implant: boolean; notes: string; condition?: string; surfaces?: string }) => {
+    if (!patient) return
+    try {
+      const existing = toothRecords.find((r) => r.tooth_number === toothNumber)
+      const payload: Record<string, any> = {
+        is_missing: data.is_missing,
+        is_implant: data.is_implant,
+        notes: data.notes,
+      }
+      if (data.condition !== undefined) payload.condition = data.condition
+      if (data.surfaces !== undefined) payload.surfaces = data.surfaces
+
+      if (existing) {
+        await updateToothRecord(existing.id, payload as any)
+      } else {
+        await createToothRecord({ patient_id: patient.id, tooth_number: toothNumber, ...payload } as any)
+      }
+      chimes.playSuccess()
+      showToast('success', 'رکورد دندان ذخیره شد')
+      await loadTabData()
+    } catch (err) {
+      chimes.playWarning()
+      showToast('error', 'خطا در ذخیره رکورد دندان')
+    }
+  }
+
+  // ===========================================================================
+  // Helpers
+  // ===========================================================================
+
+  const getDoctorName = (doctorId: string | null) => {
+    if (!doctorId) return 'نامشخص'
+    const doc = doctors.find((d) => d.id === doctorId)
+    return doc ? `دکتر ${doc.name || doc.specialty || 'پزشک'}` : 'نامشخص'
+  }
+
+  // Shared with Dashboard/Billing/Patients (src/lib/finance.ts) so this
+  // number can never silently diverge between pages again.
+  const patientBalance = calcPatientBalance(payments, treatments, implantCases)
+  const familyBalance = calcFamilyBalance(id || '', allPatients, allPayments, allTreatments, allImplantCases)
+  const { paid: totalPaid, totalCost: totalTreatmentCost, balance: patientOwed } = patientBalance
+
+  // COMP-78: the same clinical facts as the floating cards, compressed to
+  // chips beside the name. The cards can be dismissed; these cannot, so a
+  // fact stays visible for the whole visit.
+  const patientAlerts = patient ? buildPatientAlerts(patient, { balance: patientBalance.balance }) : []
+
+  // COMP-127 — which doctor inside this file is owed what. The single
+  // patient balance answers "does this person owe us"; a multi-doctor
+  // clinic settles on "who is owed", which is a different question.
+  const doctorLedger = buildDoctorLedger(treatments, payments, encounters, implantCases)
+  const headerChips = alertChips(patientAlerts)
+
+  // Patient Retention & Churn Risk Profile (CRM)
+  const retentionProfile = useMemo(() => {
+    if (!patient) return null
+    return computePatientRetentionProfile({
+      patient,
+      encounters,
+      appointments: appointments as any,
+      treatments,
+      payments,
+    })
+  }, [patient, encounters, appointments, treatments, payments])
+
+  // Handle direct interactive deep-links (opening payment modals, cheques, or focused sections)
+  useEffect(() => {
+    if (!patient) return
+
+    if (locState.initialTab) {
+      setMainTab(getInitialMainTab(locState.initialTab) as any)
+      setSubView(['overview', 'appointments'].includes(locState.initialTab) ? null : locState.initialTab)
+    }
+
+    if (locState.openPaymentModal) {
+      const bal = patientBalance.balance > 0 ? String(patientBalance.balance) : ''
+      setPaymentForm((prev) => ({ ...prev, amount: bal }))
+      setPaymentModalOpen(true)
+    } else if (locState.openChequeModal) {
+      setChequeModalOpen(true)
+    } else if (locState.openPlanModal) {
+      setPlanModalOpen(true)
+    }
+
+    if (locState.focusSection) {
+      const timer = setTimeout(() => {
+        const el = document.getElementById(locState.focusSection!)
+        if (el) {
+          el.scrollIntoView({ behavior: 'smooth', block: 'center' })
+          el.classList.add('ring-2', 'ring-primary-500', 'ring-offset-2', 'transition-all')
+          setTimeout(() => el.classList.remove('ring-2', 'ring-primary-500', 'ring-offset-2', 'transition-all'), 2500)
+        }
+      }, 350)
+      return () => clearTimeout(timer)
+    }
+    return undefined
+  }, [patient, locState.openPaymentModal, locState.openChequeModal, locState.openPlanModal, locState.focusSection, patientBalance.balance])
+
+  // ── Staged treatment plan (phases) ──────────────────────────────
+  const [phaseModalOpen, setPhaseModalOpen] = useState(false)
+  const [phaseWizardStep, setPhaseWizardStep] = useState(0)
+  const [editingPhase, setEditingPhase] = useState<TreatmentPhase | null>(null)
+  const [savingPhase, setSavingPhase] = useState(false)
+  const phaseStatuses = [
+    { value: 'planned', label: 'برنامه‌ریزی شده', color: 'slate' },
+    { value: 'in_progress', label: 'در حال انجام', color: 'warning' },
+    { value: 'completed', label: 'تکمیل شده', color: 'success' },
+    { value: 'on_hold', label: 'متوقف شده', color: 'error' },
+    { value: 'cancelled', label: 'لغو شده', color: 'error' },
+  ]
+  const [selectedPlanOption, setSelectedPlanOption] = useState<string>('all')
+  const [prereqAlert, setPrereqAlert] = useState<{
+    open: boolean
+    treatment: Treatment | null
+    evalResult: PrerequisiteEvaluation | null
+  }>({ open: false, treatment: null, evalResult: null })
+
+  const [phaseForm, setPhaseForm] = useState({
+    doctor_id: '', title: '', description: '', procedures: '',
+    estimated_cost: '', actual_cost: '', estimated_duration_days: '',
+    status: 'planned', start_date: '', end_date: '',
+    plan_option: 'A', plan_name: '', is_accepted: false,
+  })
+
+  const openCreatePhase = (prefillToothNumber?: string, surface?: string | null, condition?: string | null, defaultOption: string = 'A') => {
+    h.tap()
+    setEditingPhase(null)
+    setPhaseWizardStep(0)
+    setPhaseForm({
+      doctor_id: '', title: prefillToothNumber ? `درمان دندان ${toothCode(prefillToothNumber)}` : '', description: '',
+      procedures: prefillToothNumber ? `دندان ${toothCode(prefillToothNumber)}${surface ? ` سطح ${surface}` : ''}${condition ? ` (${condition})` : ''}` : '',
+      estimated_cost: '', actual_cost: '', estimated_duration_days: '', status: 'planned', start_date: '', end_date: '',
+      plan_option: defaultOption || 'A', plan_name: '', is_accepted: false,
+    })
+    setPhaseModalOpen(true)
+  }
+
+  const openEditPhase = (p: TreatmentPhase) => {
+    setEditingPhase(p)
+    setPhaseWizardStep(0)
+    setPhaseForm({
+      doctor_id: p.doctor_id || '', title: p.title || '', description: p.description || '',
+      procedures: p.procedures || '', estimated_cost: p.estimated_cost != null ? String(p.estimated_cost) : '',
+      actual_cost: p.actual_cost != null ? String(p.actual_cost) : '',
+      estimated_duration_days: p.estimated_duration_days != null ? String(p.estimated_duration_days) : '',
+      status: p.status, start_date: p.start_date || '', end_date: p.end_date || '',
+      plan_option: p.plan_option || 'A', plan_name: p.plan_name || '', is_accepted: !!p.is_accepted,
+    })
+    setPhaseModalOpen(true)
+  }
+
+  const handleAcceptPlanOption = async (optionKey: string) => {
+    h.impact()
+    try {
+      for (const p of phases) {
+        const isThis = (p.plan_option || 'A').toUpperCase() === optionKey.toUpperCase()
+        if (p.is_accepted !== isThis) {
+          await updateTreatmentPhase(p.id, { is_accepted: isThis } as any)
+        }
+      }
+      chimes.playSuccess()
+      showToast('success', `طرح ${optionKey === 'A' ? 'الف' : optionKey === 'B' ? 'ب' : optionKey} به‌عنوان طرح مصوب بیمار انتخاب شد`)
+      if (id) {
+        const updated = await fetchTreatmentPhases(id)
+        setPhases(updated.sort((a, b) => a.phase_number - b.phase_number))
+      }
+    } catch {
+      showToast('error', 'خطا در انتخاب طرح درمان')
+    }
+  }
+
+  const handlePrintComparativePlans = () => {
+    if (!patient || phases.length === 0) return
+    const win = window.open('', '_blank', 'width=850,height=900')
+    if (!win) { showToast('error', 'اجازه‌ی باز کردن پنجره‌ی چاپ داده نشد'); return }
+    const groups = groupPhasesByPlan(phases)
+    const printData = generateComparativePlanPrintData(patient, groups)
+    win.document.write(buildPrintDocument(printData))
+    win.document.close()
+    win.focus()
+  }
+
+  const handlePrereqOverride = async () => {
+    if (!prereqAlert.treatment) return
+    const t = prereqAlert.treatment
+    const next = nextStatus(t.status)
+    h.impact()
+    try {
+      await updateTreatment(t.id, {
+        status: next,
+        prerequisite_override: true,
+        prerequisite_override_reason: 'تأیید بالینی توسط پزشک معالج (Clinical Override)',
+      } as never)
+      chimes.playSuccess()
+      showToast('success', 'تأیید بالینی ثبت و درمان به‌روزرسانی شد')
+      setPrereqAlert({ open: false, treatment: null, evalResult: null })
+      await loadTabData()
+    } catch {
+      showToast('error', 'خطا در ثبت استثناء بالینی')
+    }
+  }
+
+  const handleSavePhase = () => {
+    if (!phaseForm.title.trim()) { showToast('error', 'عنوان فاز الزامی است'); return }
+    if (!id) return
+
+    const isValidDate = (s: string) => {
+      const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(s)
+      if (!m) return false
+      const [, , mm, dd] = m
+      const month = Number(mm), day = Number(dd)
+      return month >= 1 && month <= 12 && day >= 1 && day <= 31
+    }
+    if (phaseForm.start_date && !isValidDate(phaseForm.start_date)) { showToast('error', 'تاریخ شروع نامعتبر است — دوباره از تقویم انتخاب کنید'); return }
+    if (phaseForm.end_date && !isValidDate(phaseForm.end_date)) { showToast('error', 'تاریخ پایان نامعتبر است — دوباره از تقویم انتخاب کنید'); return }
+    const nextNumber = editingPhase ? editingPhase.phase_number : nextPhaseNumber(phases, phaseForm.plan_option || 'A')
+
+    const phaseErrors = validatePhase(
+      {
+        phase_number: nextNumber,
+        title: phaseForm.title,
+        status: phaseForm.status,
+        estimated_cost: phaseForm.estimated_cost ? Number(phaseForm.estimated_cost) : null,
+        actual_cost: phaseForm.actual_cost ? Number(phaseForm.actual_cost) : null,
+        estimated_duration_days: phaseForm.estimated_duration_days ? Number(phaseForm.estimated_duration_days) : null,
+        start_date: phaseForm.start_date || null,
+        end_date: phaseForm.end_date || null,
+        plan_option: phaseForm.plan_option || 'A',
+      },
+      phases.filter((p) => p.id !== editingPhase?.id),
+    )
+    if (phaseErrors.length) { showToast('error', phaseErrors[0]); return }
+
+    const payload = {
+      patient_id: id, doctor_id: phaseForm.doctor_id || null,
+      phase_number: nextNumber, title: phaseForm.title, description: phaseForm.description || null,
+      procedures: phaseForm.procedures || null,
+      estimated_cost: phaseForm.estimated_cost ? Number(phaseForm.estimated_cost) : null,
+      actual_cost: phaseForm.actual_cost ? Number(phaseForm.actual_cost) : null,
+      estimated_duration_days: phaseForm.estimated_duration_days ? Number(phaseForm.estimated_duration_days) : null,
+      status: phaseForm.status, start_date: phaseForm.start_date || null, end_date: phaseForm.end_date || null,
+      plan_option: phaseForm.plan_option || 'A',
+      plan_name: phaseForm.plan_name?.trim() || null,
+      is_accepted: phaseForm.is_accepted,
+    } as any
+    confirmAction({
+      type: editingPhase ? 'edit' : 'create',
+      title: editingPhase ? 'ویرایش فاز درمان' : 'افزودن فاز درمان',
+      fields: [
+        { label: 'گزینه طرح', value: phaseForm.plan_option === 'B' ? 'طرح ب (جایگزین)' : phaseForm.plan_option === 'C' ? 'طرح ج' : 'طرح الف (اصلی)' },
+        { label: 'فاز', value: `${toPersianDigits(nextNumber)} — ${phaseForm.title}`, highlight: true },
+        { label: 'هزینه‌ی تخمینی', value: phaseForm.estimated_cost ? `${formatCurrency(Number(phaseForm.estimated_cost))} ت` : '-' },
+        { label: 'وضعیت', value: phaseStatuses.find((s) => s.value === phaseForm.status)?.label || phaseForm.status },
+      ],
+      confirmLabel: editingPhase ? 'ذخیره' : 'افزودن',
+      onConfirm: async () => {
+        setSavingPhase(true)
+        try {
+          if (editingPhase) await updateTreatmentPhase(editingPhase.id, payload)
+          else await createTreatmentPhase(payload)
+          chimes.playSuccess()
+          showToast('success', editingPhase ? 'ویرایش شد' : 'فاز اضافه شد')
+          setPhaseModalOpen(false)
+          const updated = await fetchTreatmentPhases(id)
+          setPhases(updated.sort((a, b) => a.phase_number - b.phase_number))
+        } catch { chimes.playWarning(); showToast('error', 'خطا در ذخیره') }
+        finally { setSavingPhase(false) }
+      },
+    })
+  }
+
+  const handleDeletePhase = (p: TreatmentPhase) => {
+    h.tap()
+    // Per clinic policy: a treatment phase (real clinical plan history)
+    // is never permanently deleted, only marked cancelled.
+    confirmAction({
+      type: 'status',
+      title: 'لغو فاز درمان',
+      warning: 'این فاز هیچ‌وقت پاک نمی‌شود — فقط به‌عنوان لغو‌شده علامت می‌خورد و در پرونده باقی می‌ماند.',
+      fields: [{ label: 'فاز', value: `${toPersianDigits(p.phase_number)} — ${p.title}`, highlight: true }],
+      confirmLabel: 'تایید لغو',
+      onConfirm: async () => {
+        await updateTreatmentPhase(p.id, { status: 'cancelled' } as any)
+        showToast('success', 'فاز لغو شد — در پرونده باقی ماند')
+        if (id) { const updated = await fetchTreatmentPhases(id); setPhases(updated.sort((a, b) => a.phase_number - b.phase_number)) }
+      },
+    })
+  }
+
+  // ── Consent forms (فرم رضایت‌نامه) ──────────────────────────────
+  const [consentModalOpen, setConsentModalOpen] = useState(false)
+  const [editingConsent, setEditingConsent] = useState<ConsentForm | null>(null)
+  const [savingConsent, setSavingConsent] = useState(false)
+  const [consentForm, setConsentForm] = useState({
+    doctor_id: '',
+    treatment_description: '',
+    risks: '',
+    notes: '',
+    signed_by_patient: false,
+    signature_data: '' as string | null,
+    template_key: '' as string | null,
+  })
+
+  const openCreateConsent = () => {
+    h.tap()
+    setEditingConsent(null)
+    setConsentForm({
+      doctor_id: '',
+      treatment_description: '',
+      risks: '',
+      notes: '',
+      signed_by_patient: false,
+      signature_data: null,
+      template_key: null,
+    })
+    setConsentModalOpen(true)
+  }
+
+  const openEditConsent = (c: ConsentForm) => {
+    setEditingConsent(c)
+    setConsentForm({
+      doctor_id: c.doctor_id || '',
+      treatment_description: c.treatment_description || '',
+      risks: c.risks || '',
+      notes: c.notes || '',
+      signed_by_patient: c.signed_by_patient || false,
+      signature_data: c.signature_data || null,
+      template_key: c.template_key || null,
+    })
+    setConsentModalOpen(true)
+  }
+
+  const handleApplyConsentTemplate = (templateId: string) => {
+    const t = CONSENT_TEMPLATES.find((tpl) => tpl.id === templateId)
+    if (!t) return
+    setConsentForm((prev) => ({
+      ...prev,
+      template_key: t.id,
+      treatment_description: t.treatmentDescription,
+      risks: t.risks,
+      notes: t.notes,
+    }))
+    showToast('info', `قالب «${t.title}» بارگذاری شد`)
+  }
+
+  const handleSaveConsent = () => {
+    if (!consentForm.treatment_description.trim()) { showToast('error', 'شرح درمان الزامی است'); return }
+    if (!id) return
+    const isSigned = consentForm.signed_by_patient || Boolean(consentForm.signature_data)
+    const payload = {
+      patient_id: id,
+      doctor_id: consentForm.doctor_id || null,
+      treatment_description: consentForm.treatment_description,
+      risks: consentForm.risks || null,
+      notes: consentForm.notes || null,
+      signed_by_patient: isSigned,
+      signature_data: consentForm.signature_data || null,
+      template_key: consentForm.template_key || null,
+      signed_at: isSigned ? new Date().toISOString() : null,
+    } as any
+    confirmAction({
+      type: editingConsent ? 'edit' : 'create',
+      title: editingConsent ? 'ویرایش فرم رضایت‌نامه' : 'فرم رضایت‌نامه‌ی جدید',
+      fields: [
+        { label: 'شرح درمان', value: consentForm.treatment_description, highlight: true },
+        { label: 'وضعیت امضا', value: isSigned ? 'دارای امضای دیجیتال' : 'امضا نشده' },
+      ],
+      confirmLabel: editingConsent ? 'ذخیره' : 'ثبت',
+      onConfirm: async () => {
+        setSavingConsent(true)
+        try {
+          if (editingConsent) await updateConsentForm(editingConsent.id, payload)
+          else await createConsentForm(payload)
+          chimes.playSuccess()
+          showToast('success', editingConsent ? 'ویرایش شد' : 'ثبت شد')
+          setConsentModalOpen(false)
+          if (id) setConsentForms((await fetchConsentForms(id)).filter((c) => c.is_active !== false))
+        } catch { chimes.playWarning(); showToast('error', 'خطا در ذخیره') }
+        finally { setSavingConsent(false) }
+      },
+    })
+  }
+
+  const handleDeleteConsent = (c: ConsentForm) => {
+    h.tap()
+    // Per clinic policy: a signed consent form is a legal/medical
+    // document (proof of informed consent) — never permanently deleted,
+    // only archived (restorable, hidden from the active list).
+    confirmAction({
+      type: 'status',
+      title: 'آرشیو فرم رضایت‌نامه',
+      warning: 'این فرم هیچ‌وقت پاک نمی‌شود — فقط از لیست فعال مخفی می‌شود و در سوابق قانونی/پزشکی باقی می‌ماند.',
+      fields: [{ label: 'شرح درمان', value: c.treatment_description || '-', highlight: true }],
+      confirmLabel: 'تایید آرشیو',
+      onConfirm: async () => {
+        await updateConsentForm(c.id, { is_active: false } as any)
+        showToast('success', 'فرم آرشیو شد')
+        if (id) setConsentForms((await fetchConsentForms(id)).filter((cf) => cf.is_active !== false))
+      },
+    })
+  }
+
+  // ── Direct Financial Operations (عملیات مستقیم مالی پرونده) ─────
+
+  const handleOpenPaymentModal = () => {
+    setPaymentForm({
+      amount: '',
+      method: 'card',
+      treatment_id: treatments[0]?.id || '',
+      doctor_id: patient?.primary_doctor_id || doctors[0]?.id || '',
+      notes: '',
+    })
+    setPaymentModalOpen(true)
+  }
+
+  const handleSavePayment = async () => {
+    if (!id || !patient) return
+    const numAmount = Number(paymentForm.amount)
+    if (!numAmount || numAmount <= 0) {
+      showToast('error', 'مبلغ پرداختی باید بیشتر از صفر باشد')
+      return
+    }
+    setSavingPayment(true)
+    try {
+      await createPayment({
+        clinic_id: '',
+        patient_id: id,
+        encounter_id: null,
+        implant_case_id: null,
+        amount: numAmount,
+        payment_method: paymentForm.method,
+        status: 'completed',
+        payment_date: new Date().toISOString().slice(0, 10),
+        notes: paymentForm.notes.trim() || null,
+        treatment_id: paymentForm.treatment_id || null,
+        doctor_id: paymentForm.doctor_id || null,
+        reference: null,
+        created_by: null,
+      })
+      h.confirm()
+      chimes.playSuccess()
+      showToast('success', 'پرداخت با موفقیت ثبت و در پرونده اعمال شد')
+      setPaymentModalOpen(false)
+      loadTabData()
+    } catch (err) {
+      console.error(err)
+      chimes.playWarning()
+      showToast('error', 'خطا در ثبت پرداخت')
+    } finally {
+      setSavingPayment(false)
+    }
+  }
+
+  const handleSendToPos = async () => {
+    const numAmount = Number(paymentForm.amount)
+    if (!numAmount || numAmount <= 0) {
+      showToast('error', 'مبلغ پرداختی باید بیشتر از صفر باشد')
+      return
+    }
+    
+    h.tap()
+    showToast('success', 'در حال ارسال به دستگاه کارتخوان...')
+    setSavingPayment(true)
+    
+    // Simulate network delay
+    await new Promise(r => setTimeout(r, 2000))
+    
+    try {
+      await createPayment({
+        clinic_id: '',
+        patient_id: id!,
+        encounter_id: null,
+        implant_case_id: null,
+        amount: numAmount,
+        payment_method: 'card', // PC-POS is always card
+        status: 'completed',
+        payment_date: new Date().toISOString().slice(0, 10),
+        notes: (paymentForm.notes.trim() ? paymentForm.notes.trim() + ' - ' : '') + 'پرداخت از طریق PC-POS',
+        treatment_id: paymentForm.treatment_id || null,
+        doctor_id: paymentForm.doctor_id || null,
+        reference: null,
+        created_by: null,
+      })
+      h.success()
+      chimes.playSuccess()
+      showToast('success', 'تراکنش با موفقیت در کارتخوان انجام و در پرونده ثبت شد')
+      setPaymentModalOpen(false)
+      loadTabData()
+    } catch (err) {
+      console.error(err)
+      chimes.playWarning()
+      showToast('error', 'خطا در ثبت پرداخت در سیستم')
+    } finally {
+      setSavingPayment(false)
+    }
+  }
+
+  const handleOpenChequeModal = () => {
+    setChequeForm({
+      amount: '',
+      bank_name: '',
+      cheque_number: '',
+      sayad_id: '',
+      due_date: new Date().toISOString().slice(0, 10),
+      drawer_name: `${patient?.first_name || ''} ${patient?.last_name || ''}`.trim(),
+      notes: '',
+    })
+    setChequeModalOpen(true)
+  }
+
+  const handleSaveCheque = async () => {
+    if (!id || !patient) return
+    const numAmount = Number(chequeForm.amount)
+    if (!numAmount || numAmount <= 0) {
+      showToast('error', 'مبلغ چک باید بیشتر از صفر باشد')
+      return
+    }
+    if (!chequeForm.bank_name.trim()) {
+      showToast('error', 'نام بانک صادرکننده الزامی است')
+      return
+    }
+    if (!chequeForm.due_date) {
+      showToast('error', 'تاریخ سررسید چک الزامی است')
+      return
+    }
+    const cleanSayad = toEnglishDigits(chequeForm.sayad_id).replace(/\D/g, '')
+    if (cleanSayad && cleanSayad.length !== 16) {
+      showToast('error', 'شناسه صیادی باید دقیقاً ۱۶ رقم باشد')
+      return
+    }
+    setSavingCheque(true)
+    try {
+      await createCheque({
+        clinic_id: '',
+        patient_id: id,
+        amount: numAmount,
+        bank_name: chequeForm.bank_name.trim(),
+        branch: null,
+        cheque_number: chequeForm.cheque_number.trim() || null,
+        account_number: null,
+        issue_date: new Date().toISOString().slice(0, 10),
+        due_date: chequeForm.due_date,
+        payee_name: chequeForm.drawer_name.trim() || `${patient.first_name} ${patient.last_name}`,
+        sayad_id: cleanSayad || null,
+        status: 'pending',
+        purpose: 'payment',
+        payment_plan_id: null,
+        installment_id: null,
+        notes: chequeForm.notes.trim() || null,
+        created_by: null,
+      })
+      h.confirm()
+      chimes.playSuccess()
+      showToast('success', 'چک صیادی با موفقیت ثبت شد')
+      setChequeModalOpen(false)
+      loadTabData()
+    } catch (err) {
+      console.error(err)
+      chimes.playWarning()
+      showToast('error', 'خطا در ثبت چک صیادی')
+    } finally {
+      setSavingCheque(false)
+    }
+  }
+
+  const handleOpenPlanModal = () => {
+    setPlanForm({
+      total_amount: '',
+      number_of_installments: 3,
+      start_date: new Date().toISOString().slice(0, 10),
+      notes: '',
+      guarantee_sayad_id: '',
+      guarantee_bank: '',
+      guarantee_cheque_num: '',
+    })
+    setPlanModalOpen(true)
+  }
+
+  const handleSavePlan = async () => {
+    if (!id || !patient) return
+    const numTotal = Number(planForm.total_amount)
+    if (!numTotal || numTotal <= 0) {
+      showToast('error', 'مبلغ کل طرح اقساط باید بیشتر از صفر باشد')
+      return
+    }
+    const numInstallments = Math.max(2, Math.min(24, Number(planForm.number_of_installments) || 2))
+    const cleanSayad = toEnglishDigits(planForm.guarantee_sayad_id).replace(/\D/g, '')
+    if (cleanSayad && cleanSayad.length !== 16) {
+      showToast('error', 'شناسه صیادی چک ضمانت باید ۱۶ رقم باشد')
+      return
+    }
+
+    setSavingPlan(true)
+    try {
+      const schedule = buildSchedule(numTotal, numInstallments, planForm.start_date)
+      const guaranteeCheque = (cleanSayad || planForm.guarantee_bank) ? {
+        clinic_id: '',
+        bank_name: planForm.guarantee_bank.trim() || 'بانک مرکزی',
+        branch: null,
+        cheque_number: planForm.guarantee_cheque_num.trim() || null,
+        account_number: null,
+        issue_date: new Date().toISOString().slice(0, 10),
+        due_date: schedule[schedule.length - 1]?.due_date || planForm.start_date,
+        payee_name: `${patient.first_name} ${patient.last_name}`,
+        sayad_id: cleanSayad || null,
+        status: 'pending',
+        notes: 'چک تضمین طرح اقساط',
+        patient_id: id,
+        installment_id: null,
+        created_by: null,
+      } : undefined
+
+      await createPaymentPlan(
+        {
+          clinic_id: '',
+          patient_id: id,
+          encounter_id: null,
+          total_amount: numTotal,
+          installment_count: numInstallments,
+          status: 'active',
+          start_date: planForm.start_date,
+          notes: planForm.notes.trim() || null,
+          created_by: null,
+        },
+        schedule.map((s) => ({
+          clinic_id: '',
+          patient_id: id,
+          payment_plan_id: '',
+          installment_number: s.installment_number,
+          amount: s.amount,
+          due_date: s.due_date,
+          payment_date: null,
+          status: 'pending',
+          reminder_sent: false,
+          notes: null,
+        })),
+        guaranteeCheque
+      )
+      h.confirm()
+      chimes.playSuccess()
+      showToast('success', 'طرح اقساط با موفقیت ثبت شد')
+      setPlanModalOpen(false)
+      loadTabData()
+    } catch (err) {
+      console.error(err)
+      chimes.playWarning()
+      showToast('error', 'خطا در ثبت طرح اقساط')
+    } finally {
+      setSavingPlan(false)
+    }
+  }
+
+  const handlePayInstallment = (installment: Installment, _plan: PaymentPlan) => {
+    if (!id || !installment.id) return
+    confirmAction({
+      type: 'create',
+      title: 'تسویه و پرداخت قسط',
+      fields: [
+        { label: 'شماره قسط', value: toPersianDigits(installment.installment_number ?? 1), highlight: true },
+        { label: 'مبلغ قسط', value: `${formatCurrency(installment.amount || 0)} ت`, highlight: true },
+        { label: 'تاریخ موعد', value: toJalaliStringPretty(installment.due_date) },
+      ],
+      confirmLabel: 'تایید دریافت وجه قسط',
+      onConfirm: async () => {
+        try {
+          await updateInstallment(installment.id, {
+            status: 'paid',
+            payment_date: new Date().toISOString().slice(0, 10),
+          })
+          await createPayment({
+            clinic_id: '',
+            patient_id: id,
+            encounter_id: null,
+            implant_case_id: null,
+            treatment_id: null,
+            doctor_id: null,
+            reference: null,
+            created_by: null,
+            amount: installment.amount || 0,
+            payment_method: 'card',
+            status: 'completed',
+            payment_date: new Date().toISOString().slice(0, 10),
+            notes: `پرداخت قسط شماره ${installment.installment_number} (طرح اقساط)`,
+          })
+          h.confirm()
+          chimes.playSuccess()
+          showToast('success', `قسط شماره ${toPersianDigits(installment.installment_number ?? 1)} وصول و در حساب بیمار اعمال شد`)
+          loadTabData()
+        } catch (err) {
+          console.error(err)
+          chimes.playWarning()
+          showToast('error', 'خطا در ثبت تسویه قسط')
+        }
+      },
+    })
+  }
+
+  const handleClearCheque = (cheque: any) => {
+    if (!id || !cheque.id) return
+    confirmAction({
+      type: 'edit',
+      title: 'ثبت وصول چک صیادی',
+      fields: [
+        { label: 'بانک و سریال', value: `${cheque.bank_name || 'بانک'} — سریال ${cheque.cheque_number || '-'}` },
+        { label: 'مبلغ چک', value: `${formatCurrency(cheque.amount || 0)} ت`, highlight: true },
+        { label: 'تاریخ سررسید', value: toJalaliStringPretty(cheque.due_date) },
+      ],
+      confirmLabel: 'تایید وصول چک',
+      onConfirm: async () => {
+        try {
+          await updateCheque(cheque.id, {
+            status: 'cleared',
+          })
+          await createPayment({
+            clinic_id: '',
+            patient_id: id,
+            encounter_id: null,
+            implant_case_id: null,
+            treatment_id: null,
+            doctor_id: null,
+            reference: null,
+            created_by: null,
+            amount: cheque.amount || 0,
+            payment_method: 'cheque',
+            status: 'completed',
+            payment_date: new Date().toISOString().slice(0, 10),
+            notes: `وصول چک صیادی ${cheque.bank_name || ''} - شماره ${cheque.cheque_number || ''}`,
+          })
+          h.confirm()
+          chimes.playSuccess()
+          showToast('success', 'چک صیادی با موفقیت وصول شد و در حساب بیمار منظور گردید')
+          loadTabData()
+        } catch (err) {
+          console.error(err)
+          chimes.playWarning()
+          showToast('error', 'خطا در ثبت وصول چک')
+        }
+      },
+    })
+  }
+
+  const handleBounceCheque = (cheque: any) => {
+    if (!cheque.id) return
+    confirmAction({
+      type: 'status',
+      title: 'ثبت برگشت چک صیادی',
+      warning: 'این چک به عنوان برگشتی علامت‌گذاری شده و در آلارم‌های کلینیک نمایش داده می‌شود.',
+      fields: [
+        { label: 'بانک و سریال', value: `${cheque.bank_name || 'بانک'} — سریال ${cheque.cheque_number || '-'}` },
+        { label: 'مبلغ چک', value: `${formatCurrency(cheque.amount || 0)} ت`, highlight: true },
+      ],
+      confirmLabel: 'ثبت برگشت چک',
+      onConfirm: async () => {
+        try {
+          await updateCheque(cheque.id, {
+            status: 'bounced',
+          })
+          h.warning()
+          chimes.playAlarm()
+          showToast('error', 'چک به عنوان برگشتی علامت‌گذاری شد')
+          loadTabData()
+        } catch (err) {
+          console.error(err)
+          showToast('error', 'خطا در ثبت برگشت چک')
+        }
+      },
+    })
+  }
+
+  // Full patient-chart print — everything an insurance submission or a
+  // legal/records request needs in one document: demographics, every
+  // treatment with which doctor did it and when, every implant case
+  // (surgeon vs prosthesis doctor shown separately, since they can
+  // differ), lab work, and the full financial picture. Reuses the exact
+  // print-window pattern already established for consent forms.
+  const handlePrintFullChart = () => {
+    if (!patient) return
+    const doctorName = (id: string | null) => id ? (doctors.find((d) => d.id === id)?.name || '—') : '—'
+    const win = window.open('', '_blank', 'width=800,height=900')
+    if (!win) { showToast('error', 'اجازه‌ی باز کردن پنجره‌ی چاپ داده نشد'); return }
+
+    const sortedTreatments = [...treatments].sort((a, b) => (b.created_at || '').localeCompare(a.created_at || ''))
+    const sortedImplants = [...implantCases].sort((a, b) => (b.created_at || '').localeCompare(a.created_at || ''))
+    const sortedPayments = [...payments].filter((p) => p.status === 'completed').sort((a, b) => (b.payment_date || '').localeCompare(a.payment_date || ''))
+    const totalPaid = sortedPayments.reduce((s, p) => s + (p.amount || 0), 0)
+
+    const rows = (items: string) => items || `<tr><td colspan="5" style="text-align:center;color:#94a3b8;padding:10px;">موردی ثبت نشده</td></tr>`
+
+    // MOD-FIX-011: the shell supplies the back / print / share controls.
+    // Inside an installed PWA this window is the entire screen, so a
+    // document with no controls of its own leaves no way back.
+    const chartTitle = `پرونده‌ی کامل بیمار — ${patient.first_name} ${patient.last_name}`
+    const chartStyles = `
+        body { font-family: Tahoma, Arial, sans-serif; padding: 28px; color: #1e293b; line-height: 1.7; font-size: 13px; }
+        .header { text-align: center; border-bottom: 2px solid #0d9488; padding-bottom: 14px; margin-bottom: 20px; }
+        .header h1 { color: #0d9488; margin: 0 0 4px; font-size: 20px; }
+        .header p { margin: 0; color: #64748b; font-size: 12px; }
+        .meta-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 4px 24px; margin-bottom: 20px; font-size: 12.5px; background: #f8fafc; padding: 12px 16px; border-radius: 8px; }
+        .section { margin-bottom: 22px; page-break-inside: avoid; }
+        .section h2 { font-size: 14px; color: #0d9488; border-bottom: 1px solid #cbd5e1; padding-bottom: 4px; margin-bottom: 8px; }
+        table { width: 100%; border-collapse: collapse; font-size: 12px; }
+        th { background: #f1f5f9; text-align: right; padding: 6px 8px; font-weight: bold; color: #475569; }
+        td { padding: 6px 8px; border-bottom: 1px solid #e2e8f0; }
+        .balance-box { display: flex; justify-content: space-between; background: #f0fdfa; border: 1px solid #99f6e4; border-radius: 8px; padding: 12px 16px; margin-top: 8px; font-size: 13px; }
+        .balance-box b { color: #0d9488; }
+        .footer { margin-top: 30px; text-align: center; color: #94a3b8; font-size: 11px; }
+        @media print { body { padding: 10px; } .section { page-break-inside: avoid; } }
+      `
+    const chartBody = `
+        <div class="header"><h1>کلینیک دندانپزشکی مینا</h1><p>پرونده‌ی کامل بیمار — تاریخ چاپ: ${toJalaliStringPretty(new Date().toISOString())}</p></div>
+
+        <div class="meta-grid">
+          <span><b>نام:</b> ${patient.first_name} ${patient.last_name}</span>
+          <span><b>شماره پرونده:</b> ${patient.file_number || '—'}</span>
+          <span><b>تلفن:</b> ${patient.phone || '—'}</span>
+          <span><b>کد ملی:</b> ${patient.national_id || '—'}</span>
+        </div>
+
+        <div class="section">
+          <h2>سوابق درمانی (${sortedTreatments.length} مورد)</h2>
+          <table>
+            <thead><tr><th>تاریخ</th><th>دندان</th><th>رویه</th><th>پزشک انجام‌دهنده</th><th>هزینه</th></tr></thead>
+            <tbody>${rows(sortedTreatments.map((t) => `<tr><td>${toJalaliStringPretty(t.created_at)}</td><td>${t.tooth_number ? toothLabel(t.tooth_number) : '—'}</td><td>${t.procedure_name || '—'}</td><td>دکتر ${doctorName(t.doctor_id)}</td><td>${formatCurrency(t.total_price || 0)} ت</td></tr>`).join(''))}</tbody>
+          </table>
+        </div>
+
+        <div class="section">
+          <h2>سفارش‌های لابراتوار (${labOrders.length} مورد)</h2>
+          <table>
+            <thead><tr><th>تاریخ ثبت</th><th>دندان</th><th>نوع کار</th><th>وضعیت</th></tr></thead>
+            <tbody>${rows([...labOrders].sort((a, b) => (b.created_at || '').localeCompare(a.created_at || '')).map((o) => `<tr><td>${toJalaliStringPretty(o.created_at)}</td><td>${o.tooth_number ? toothLabel(o.tooth_number) : '—'}</td><td>${o.work_type || '—'}</td><td>${o.status === 'delivered' ? 'تحویل شده' : o.status === 'cancelled' ? 'لغو شده' : 'در جریان'}</td></tr>`).join(''))}</tbody>
+          </table>
+        </div>
+
+        <div class="section">
+          <h2>موارد ایمپلنت (${sortedImplants.length} مورد)</h2>
+          <table>
+            <thead><tr><th>تاریخ جراحی</th><th>دندان</th><th>پزشک جراح</th><th>پزشک پروتز</th><th>هزینه</th></tr></thead>
+            <tbody>${rows(sortedImplants.map((c) => `<tr><td>${c.surgery_date ? toJalaliStringPretty(c.surgery_date) : '—'}</td><td>${c.tooth_number ? toothLabel(c.tooth_number) : '—'}</td><td>دکتر ${doctorName(c.doctor_id)}</td><td>دکتر ${doctorName(c.prosthesis_doctor_id)}</td><td>${formatCurrency(c.total_cost || 0)} ت</td></tr>`).join(''))}</tbody>
+          </table>
+        </div>
+
+        <div class="section">
+          <h2>سوابق پرداخت (${sortedPayments.length} مورد)</h2>
+          <table>
+            <thead><tr><th>تاریخ</th><th>روش</th><th>مبلغ</th></tr></thead>
+            <tbody>${rows(sortedPayments.map((p) => `<tr><td>${toJalaliStringPretty(p.payment_date)}</td><td>${p.payment_method}</td><td>${formatCurrency(p.amount)} ت</td></tr>`).join(''))}</tbody>
+          </table>
+          <div class="balance-box">
+            <span>مجموع هزینه‌ی درمان و ایمپلنت: <b>${formatCurrency(totalTreatmentCost)} ت</b></span>
+            <span>مجموع پرداختی: <b>${formatCurrency(totalPaid)} ت</b></span>
+            <span>مانده‌حساب: <b>${formatCurrency(patientOwed)} ت</b></span>
+          </div>
+        </div>
+
+        <div class="footer">این سند به‌صورت خودکار از سامانه‌ی مدیریت کلینیک دندانپزشکی مینا تولید شده است.</div>
+      `
+    // Plain-text summary for «ارسال برای بیمار». Deliberately short: a
+    // whole chart pasted into a message is unreadable, and a patient
+    // record is not something to scatter across chat apps by default.
+    const shareText = [
+      `کلینیک دندانپزشکی مینا`,
+      `بیمار: ${patient.first_name} ${patient.last_name}`,
+      `پرونده: ${patient.file_number || '—'}`,
+      `تعداد درمان: ${toPersianDigits(sortedTreatments.length)}`,
+      `مانده‌حساب: ${formatCurrency(patientOwed)} ت`,
+    ].join('\n')
+
+    win.document.write(buildPrintDocument({ title: chartTitle, styles: chartStyles, bodyHtml: chartBody, shareText }))
+    win.document.close()
+    win.focus()
+  }
+
+  const handlePrintPhases = () => {
+    if (!patient || phases.length === 0) return
+    const win = window.open('', '_blank', 'width=800,height=800')
+    if (!win) { showToast('error', 'اجازه‌ی باز کردن پنجره‌ی چاپ داده نشد'); return }
+
+    const phaseStyles = `
+      body { font-family: Tahoma, Arial, sans-serif; padding: 32px; color: #1e293b; line-height: 1.7; font-size: 13px; }
+      .header { text-align: center; border-bottom: 2px solid #0d9488; padding-bottom: 14px; margin-bottom: 24px; }
+      .header h1 { color: #0d9488; margin: 0 0 4px; font-size: 22px; }
+      .header p { margin: 0; color: #64748b; font-size: 13px; }
+      .info-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px 24px; margin-bottom: 24px; font-size: 13px; background: #f8fafc; padding: 16px; border-radius: 8px; border: 1px solid #e2e8f0; }
+      table { width: 100%; border-collapse: collapse; font-size: 13px; margin-bottom: 16px; }
+      th, td { border: 1px solid #cbd5e1; padding: 10px 12px; text-align: right; }
+      th { background: #f1f5f9; color: #334155; font-weight: bold; width: 30%; }
+      .phase-title { font-weight: bold; font-size: 14px; color: #0f172a; margin-top: 24px; margin-bottom: 8px; }
+      .cost-summary { margin-top: 24px; text-align: left; padding: 16px; background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 8px; font-weight: bold; color: #166534; font-size: 15px; }
+    `
+
+    const prog = phasePlanProgress(phases)
+    const totalEstimated = prog.estimatedCost
+
+    let phasesHtml = ''
+    const sortedPhases = [...phases].sort((a, b) => a.phase_number - b.phase_number)
+
+    sortedPhases.forEach(p => {
+      phasesHtml += `
+        <div class="phase-title">فاز ${toPersianDigits(p.phase_number)}: ${escapeHtml(p.title || 'بدون عنوان')}</div>
+        <table>
+          <tr>
+            <th>شرح درمان‌ها</th>
+            <td>${escapeHtml(p.procedures || '—').replace(/\\n/g, '<br/>')}</td>
+          </tr>
+          ${p.description ? `<tr><th>توضیحات تکمیلی</th><td>${escapeHtml(p.description).replace(/\\n/g, '<br/>')}</td></tr>` : ''}
+          <tr>
+            <th>هزینه برآوردی فاز</th>
+            <td>${p.estimated_cost ? formatCurrency(p.estimated_cost) + ' تومان' : 'ثبت نشده'}</td>
+          </tr>
+        </table>
+      `
+    })
+
+    const shareText = [
+      'پیش‌فاکتور طرح درمان مرحله‌ای',
+      `بیمار: ${patient.first_name} ${patient.last_name}`,
+      `هزینه برآوردی کل: ${formatCurrency(totalEstimated)} تومان`
+    ].join('\\n')
+
+    const bodyHtml = `
+      <div class="header">
+        <h1>پیش‌فاکتور طرح درمان مرحله‌ای</h1>
+        <p>کلینیک دندانپزشکی مینا</p>
+      </div>
+      <div class="info-grid">
+        <div><strong>نام بیمار:</strong> ${patient.first_name} ${patient.last_name}</div>
+        <div><strong>شماره پرونده:</strong> ${patient.file_number || '—'}</div>
+        <div><strong>تاریخ صدور:</strong> ${toJalaliStringPretty(new Date().toISOString())}</div>
+      </div>
+      
+      ${phasesHtml}
+      
+      <div class="cost-summary">
+        جمع کل هزینه‌های برآوردی طرح درمان: ${formatCurrency(totalEstimated)} تومان
+      </div>
+      <p style="margin-top: 24px; color: #64748b; font-size: 11px; text-align: justify; line-height: 1.8;">
+        <strong>توجه:</strong> هزینه‌های مندرج در این پیش‌فاکتور طرح درمان صرفاً جنبه برآوردی داشته و با توجه به شرایط کلینیکی حین کار، نوع مواد مصرفی انتخابی و همچنین تغییرات احتمالی تعرفه‌ها، ممکن است تغییر یابد.
+      </p>
+    `
+
+    win.document.write(buildPrintDocument({ title: 'طرح درمان مرحله‌ای', styles: phaseStyles, bodyHtml, shareText }))
+    win.document.close()
+    win.focus()
+  }
+
+  const handlePrintConsent = (c: ConsentForm) => {
+    const doc = doctors.find((d) => d.id === c.doctor_id)
+    const win = window.open('', '_blank', 'width=650,height=850')
+    if (!win) { showToast('error', 'اجازه‌ی باز کردن پنجره‌ی چاپ داده نشد'); return }
+    const consentStyles = `
+        body { font-family: Tahoma, Arial, sans-serif; padding: 32px; color: #1e293b; line-height: 1.9; }
+        .header { text-align: center; border-bottom: 2px solid #0d9488; padding-bottom: 16px; margin-bottom: 24px; }
+        .header h1 { color: #0d9488; margin: 0 0 4px; font-size: 22px; }
+        .meta { display: flex; justify-content: space-between; margin-bottom: 20px; font-size: 13px; color: #475569; }
+        .section { margin-bottom: 20px; }
+        .section h2 { font-size: 14px; color: #0d9488; margin-bottom: 6px; }
+        .section p { font-size: 13px; margin: 0; white-space: pre-wrap; }
+        .sign-row { display: flex; justify-content: space-between; margin-top: 60px; font-size: 13px; }
+        .sign-box { width: 45%; border-top: 1px solid #94a3b8; padding-top: 6px; text-align: center; color: #64748b; }
+        @media print { body { padding: 12px; } }
+      `
+    const consentBody = `
+        <div class="header"><h1>کلینیک دندانپزشکی مینا</h1><p>فرم رضایت‌نامه‌ی آگاهانه‌ی درمان</p></div>
+        <div class="meta">
+          <span><b>بیمار:</b> ${patient ? `${patient.first_name} ${patient.last_name}` : '-'}</span>
+          <span><b>پزشک:</b> ${doc ? `دکتر ${doc.name || doc.specialty}` : '-'}</span>
+          <span><b>تاریخ:</b> ${toJalaliStringPretty(c.created_at)}</span>
+        </div>
+        <div class="section"><h2>شرح درمان</h2><p>${c.treatment_description || '-'}</p></div>
+        ${c.risks ? `<div class="section"><h2>خطرات و عوارض احتمالی</h2><p>${c.risks}</p></div>` : ''}
+        ${c.notes ? `<div class="section"><h2>یادداشت</h2><p>${c.notes}</p></div>` : ''}
+        <div class="section"><p>اینجانب با آگاهی کامل از شرح درمان و خطرات احتمالی ذکرشده در بالا، رضایت خود را برای انجام این درمان اعلام می‌کنم.</p></div>
+        <div class="sign-row">
+          <div class="sign-box">
+            ${c.signature_data ? `<img src="${c.signature_data}" style="max-height: 55px; margin: 0 auto 6px; display: block;" />` : ''}
+            امضای بیمار / ولی بیمار
+          </div>
+          <div class="sign-box">امضا و مهر پزشک</div>
+        </div>
+      `
+    win.document.write(buildPrintDocument({ title: 'فرم رضایت‌نامه', styles: consentStyles, bodyHtml: consentBody }))
+    win.document.close()
+    win.focus()
+  }
+
+  // ===========================================================================
+  // Render: Patient Header
+  // ===========================================================================
+
+  const renderHeader = () => {
+    if (!patient) return null
+    const theme = tileThemes[getHashColor(patient.id)]
+    const age = calculateAge(patient.birth_date)
+    const vipMeta = getVipLabel(patient.vip_level)
+    const hasAllergies = patient.allergies && patient.allergies.trim().length > 0
+    const hasConditions = patient.medical_conditions && patient.medical_conditions.trim().length > 0
+    const hasMedications = patient.medications && patient.medications.trim().length > 0
+
+    return (
+      <div>
+        <div className={`rounded-3xl bg-white/90 dark:bg-slate-900/90 backdrop-blur-xl border-2 ${theme.border} p-4 sm:p-5 shadow-lg transition-all space-y-3`}>
+          {!patient.is_active && (
+            <div className="p-2.5 rounded-xl bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 flex items-center justify-between gap-2 flex-wrap text-xs">
+              <div className="flex items-center gap-2 text-amber-800 dark:text-amber-200">
+                <ArchiveIcon size={14} className="shrink-0 text-amber-600" />
+                <span>این پرونده در وضعیت <strong>بایگانی‌شده (راکد)</strong> قرار دارد و در جستجوهای عادی نمایش داده نمی‌شود.</span>
+              </div>
+              <Button
+                size="sm"
+                variant="secondary"
+                onClick={async () => {
+                  h.tap()
+                  try {
+                    const updated = await updatePatient(patient.id, { is_active: true } as any)
+                    setPatient(updated)
+                    chimes.playSuccess()
+                    showToast('success', 'پرونده با موفقیت از بایگانی خارج و فعال شد')
+                  } catch {
+                    chimes.playWarning()
+                    showToast('error', 'خطا در فعال‌سازی پرونده')
+                  }
+                }}
+                className="text-xs flex items-center gap-1 bg-white dark:bg-slate-800 border-amber-300 hover:bg-amber-100 py-1 px-2.5"
+              >
+                <RotateCcw size={12} /> بازگردانی به فعال
+              </Button>
+            </div>
+          )}
+
+          {/* ═══ Tier 1: Identity & Financial Bento Row ═══ */}
+          <div className="flex items-start justify-between gap-3 flex-wrap sm:flex-nowrap [&>*:last-child]:mt-1.5 sm:[&>*:last-child]:mt-0">
+            {/* Patient Profile & Demographics */}
+            <div className="flex items-center gap-3.5 min-w-0 flex-1">
+              <div
+                className={`w-14 h-14 sm:w-16 sm:h-16 rounded-2xl overflow-hidden ${patient.avatar_url ? '' : theme.iconBg} flex items-center justify-center text-white font-black text-xl sm:text-2xl shrink-0 shadow-md border-2 border-white/80 dark:border-slate-700`}
+              >
+                {patient.avatar_url ? <img src={patient.avatar_url} alt="" className="w-full h-full object-cover" /> : getInitials(patient)}
+              </div>
+              <div className="min-w-0 flex-1">
+                {/* Full Patient Name + Non-Black Medical File Number Capsule */}
+                <div className="flex items-center gap-2 flex-wrap">
+                  <h1 className="text-base sm:text-xl font-black text-slate-900 dark:text-white tracking-tight leading-snug break-words">
+                    {patient.first_name} {patient.last_name}
+                  </h1>
+                  {patient.file_number ? (
+                    <span
+                      className={`raised-surface inline-flex items-center gap-1.5 font-mono text-xs sm:text-sm font-black px-3.5 py-1.5 rounded-xl ${theme.capsuleBg} ${theme.capsuleText} border ${theme.capsuleBorder} tracking-wider backdrop-blur-md`}
+                      dir="ltr"
+                      title="شماره پرونده بالینی بیمار"
+                    >
+                      <FileText size={13} className="opacity-80 shrink-0" />
+                      <span>#{toPersianDigits(patient.file_number)}</span>
+                    </span>
+                  ) : (
+                    <span className="font-mono text-[11px] font-medium px-2.5 py-1 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-500 border border-slate-200 dark:border-slate-700">
+                      شناسه: {toPersianDigits(patient.id.slice(0, 6))}
+                    </span>
+                  )}
+                  {vipMeta.label !== 'عادی' && (
+                    <Badge color={vipMeta.color}>{vipMeta.label}</Badge>
+                  )}
+                  {!patient.is_active && <Badge color="error">بایگانی</Badge>}
+                  {headerChips.map((chip) => (
+                    <Badge key={chip} color="error">{chip}</Badge>
+                  ))}
+                </div>
+
+                {/* Demographics & Direct 1-Click Communication Hub */}
+                <div className="flex items-center gap-2.5 flex-wrap text-xs text-slate-500 dark:text-slate-400 mt-1.5">
+                  {age !== null && <span className="font-medium">{toPersianDigits(age)} ساله</span>}
+                  {patient.gender && <span>{patient.gender === 'male' ? '• آقا' : '• خانم'}</span>}
+                  {patient.blood_type && (
+                    <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md text-[10px] font-bold bg-rose-100/80 text-rose-700 dark:bg-rose-950/50 dark:text-rose-300">
+                      <span className="w-1.5 h-1.5 rounded-full bg-rose-500" />
+                      {patient.blood_type}
+                    </span>
+                  )}
+                  {patient.national_id && (
+                    <span className="font-mono text-[11px] text-slate-500" dir="ltr">
+                      کد ملی: {maskNationalId(patient.national_id)}
+                    </span>
+                  )}
+                  {patient.phone && (
+                    <div className="raised-surface inline-flex items-center gap-1.5 p-1 rounded-xl bg-teal-50 dark:bg-slate-800/90 border border-teal-200/80 dark:border-slate-700 text-xs">
+                      <span className="font-mono font-bold text-slate-800 dark:text-slate-200 px-1.5" dir="ltr">
+                        {privacyMode ? maskPhoneNumber(patient.phone) : toPersianDigits(patient.phone)}
+                      </span>
+                      <a
+                        href={`tel:${patient.phone}`}
+                        onClick={() => { h.tap(); chimes.playPop() }}
+                        className="raised-surface icon-blink inline-flex items-center gap-1 px-2 py-1 min-h-[40px] rounded-lg bg-teal-100 hover:bg-teal-200 text-teal-700 dark:bg-teal-950/40 dark:text-teal-300 text-[11px] font-bold press-scale"
+                        title="تماس تلفنی مستقیم با بیمار"
+                      >
+                        <PhoneCall size={11} className="text-teal-600" />
+                        <span>تماس</span>
+                      </a>
+                      <a
+                        href={`sms:${patient.phone}`}
+                        onClick={() => { h.tap(); chimes.playPop() }}
+                        className="raised-surface icon-blink inline-flex items-center gap-1 px-2 py-1 min-h-[40px] rounded-lg bg-sky-100 hover:bg-sky-200 text-sky-700 dark:bg-sky-950/40 dark:text-sky-300 text-[11px] font-bold press-scale"
+                        title="ارسال پیامک به بیمار"
+                      >
+                        <MessageSquare size={11} className="text-sky-600" />
+                        <span>پیامک</span>
+                      </a>
+                      <a
+                        href={`https://wa.me/${patient.phone.replace(/\D/g, '').replace(/^0/, '98')}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        onClick={() => { h.tap(); chimes.playPop() }}
+                        className="raised-surface icon-blink inline-flex items-center gap-1 px-2 py-1 min-h-[40px] rounded-lg bg-emerald-100 hover:bg-emerald-200 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300 text-[11px] font-bold press-scale"
+                        title="گفتگو در واتساپ"
+                      >
+                        <MessageCircle size={11} className="text-emerald-600" />
+                        <span>واتساپ</span>
+                      </a>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            {/* Quick Financial Bento Pod (RTL Left) */}
+            <div className="flex items-center gap-2 shrink-0 self-start sm:self-center flex-wrap">
+              {cheques.length > 0 && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    h.tap()
+                    switchTab('payments')
+                  }}
+                  className="raised-surface icon-blink flex items-center gap-1 px-2.5 py-1.5 min-h-[44px] rounded-xl bg-amber-100 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800 text-amber-800 dark:text-amber-300 text-xs font-bold hover:bg-amber-100 press-scale"
+                  title="مشاهده چک‌ها"
+                >
+                  <FileSignature size={13} className="text-amber-600" />
+                  <span>{toPersianDigits(cheques.length)} چک</span>
+                </button>
+              )}
+
+              {patientBalance.balance > 0 ? (
+                <div className="raised-surface flex items-center gap-2 px-3 py-1.5 rounded-2xl bg-rose-100 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-800 text-rose-900 dark:text-rose-200 text-xs">
+                  <CreditCard size={14} className="text-rose-600 dark:text-rose-400 shrink-0" />
+                  <div>
+                    <span className="text-[10px] text-rose-500 block leading-none">بدهی بیمار</span>
+                    <span className="font-extrabold">{formatCurrency(patientBalance.balance)} ت</span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      h.tap()
+                      handleOpenPaymentModal()
+                    }}
+                    className="raised-surface px-2.5 py-1 min-h-[44px] rounded-xl bg-amber-700 hover:bg-amber-800 text-white font-bold text-[11px] press-scale"
+                  >
+                    تسویه
+                  </button>
+                </div>
+              ) : (
+                <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-2xl bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800 text-emerald-800 dark:text-emerald-300 text-xs font-bold">
+                  <CheckCircle2 size={14} className="text-emerald-600" />
+                  <span>تسویه حساب</span>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* ═══ Tier 2: Quick Clinical Notes & Medical Warnings Rail ═══ */}
+          {patient.notes && (
+            <div className="text-xs text-amber-900 dark:text-amber-200 bg-amber-50 dark:bg-amber-950/40 border-r-4 border-amber-500 px-3 py-1.5 rounded-xl font-medium inline-flex items-center gap-1.5 max-w-full">
+              <FileText size={12} className="text-amber-600 shrink-0" />
+              <span className="truncate">«{patient.notes}»</span>
+            </div>
+          )}
+
+          {(hasAllergies || hasConditions || hasMedications || patient.anticoagulant_use || patient.bisphosphonate_use || patient.endocarditis_prophylaxis || (patient.bp_systolic != null && patient.bp_systolic >= 140) || (patient.diabetes_hba1c != null && patient.diabetes_hba1c >= 7) || (patient.pregnancy_trimester != null && patient.pregnancy_trimester > 0)) && (
+            <div className="flex items-center gap-1.5 overflow-x-auto py-1 scrollbar-none text-[11px]">
+              {hasAllergies && (
+                <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-rose-50 dark:bg-rose-950/50 text-rose-700 dark:text-rose-300 border border-rose-200 dark:border-rose-800 shrink-0 font-bold">
+                  <AlertCircle size={11} className="text-rose-600" /> حساسیت: {patient.allergies}
+                </span>
+              )}
+              {hasConditions && (
+                <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-amber-50 dark:bg-amber-950/50 text-amber-700 dark:text-amber-300 border border-amber-200 dark:border-amber-800 shrink-0 font-bold">
+                  <AlertCircle size={11} className="text-amber-600" /> بیماری: {patient.medical_conditions}
+                </span>
+              )}
+              {hasMedications && (
+                <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-sky-50 dark:bg-sky-950/50 text-sky-700 dark:text-sky-300 border border-sky-200 dark:border-sky-800 shrink-0 font-medium">
+                  <Pill size={11} className="text-sky-600" /> دارو: {patient.medications}
+                </span>
+              )}
+              {patient.anticoagulant_use && (
+                <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-red-100 dark:bg-red-950/60 text-red-800 dark:text-red-200 border border-red-300 shrink-0 font-bold animate-pulse">
+                  <AlertTriangle size={11} className="text-red-600" /> ضد انعقاد {patient.inr_value ? `(INR: ${toPersianDigits(patient.inr_value)})` : ''}
+                </span>
+              )}
+              {patient.bisphosphonate_use && (
+                <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-purple-50 dark:bg-purple-950/60 text-purple-800 dark:text-purple-200 border border-purple-300 shrink-0 font-bold">
+                  <AlertTriangle size={11} className="text-purple-600" /> مصرف بیس‌فسفونات (خطر ONJ)
+                </span>
+              )}
+              {patient.endocarditis_prophylaxis && (
+                <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-amber-100 dark:bg-amber-950/60 text-amber-800 dark:text-amber-200 border border-amber-300 shrink-0 font-bold">
+                  <HeartPulse size={11} className="text-amber-600" /> اندوکاردیت (پروفیلاکسی)
+                </span>
+              )}
+              {patient.bp_systolic != null && patient.bp_systolic >= 140 && (
+                <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-amber-50 dark:bg-amber-950/50 text-amber-800 dark:text-amber-300 border border-amber-300 shrink-0 font-medium">
+                  <Activity size={11} className="text-amber-600" /> فشار خون: {toPersianDigits(patient.bp_systolic)}/{toPersianDigits(patient.bp_diastolic || 90)}
+                </span>
+              )}
+              {patient.diabetes_hba1c != null && patient.diabetes_hba1c >= 7 && (
+                <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-amber-50 dark:bg-amber-950/50 text-amber-800 dark:text-amber-300 border border-amber-300 shrink-0 font-medium">
+                  <Activity size={11} className="text-amber-600" /> دیابت (HbA1c: {toPersianDigits(patient.diabetes_hba1c)}٪)
+                </span>
+              )}
+            </div>
+          )}
+
+          {/* Active Lab Order Ribbon */}
+          {activeLabOrder && (
+            <div className="p-2.5 rounded-2xl bg-cyan-50/90 dark:bg-cyan-950/40 border border-cyan-200 dark:border-cyan-800 text-cyan-950 dark:text-cyan-200 flex items-center justify-between gap-2 text-xs">
+              <div className="flex items-center gap-2 min-w-0">
+                <FlaskConical size={14} className="text-cyan-600 shrink-0" />
+                <span className="font-bold truncate">
+                  سفارش فعال لابراتوار: {activeLabOrder.work_type || 'پروتز/روکش'}
+                  {activeLabOrder.tooth_number ? ` (دندان ${toothLabel(activeLabOrder.tooth_number)})` : ''}
+                </span>
+                <span className="text-[11px] text-cyan-700 dark:text-cyan-300 hidden sm:inline">
+                  وضعیت: {activeLabOrder.status === 'in_progress' ? 'در حال ساخت' : activeLabOrder.status === 'sent' ? 'ارسال‌شده به لابراتوار' : activeLabOrder.status}
+                  {activeLabOrder.deadline ? ` — موعد: ${toJalaliStringPretty(activeLabOrder.deadline)}` : ''}
+                </span>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  h.tap()
+                  switchTab('labOrders')
+                }}
+                className="px-2.5 py-1 rounded-xl bg-cyan-600 hover:bg-cyan-700 text-white font-bold text-[10px] shrink-0 transition-colors press-scale"
+              >
+                پیگیری کارتابل
+              </button>
+            </div>
+          )}
+
+          {/* ═══ Tier 3: One-Stop All Clinical & Administrative Actions (Structured Bento Grid) ═══ */}
+          <div className="pt-3 border-t border-slate-100 dark:border-slate-800/80">
+            <div className="patient-action-grid grid grid-cols-4 gap-2.5 [&>button]:w-full [&>button]:min-w-0 [&>button]:min-h-[72px] [&>button]:px-1.5 [&>button]:flex-col sm:[&>button]:flex-row [&>button>span]:whitespace-normal [&>button>span]:break-words [&>button>span]:leading-tight">
+              {/* New Appointment */}
+              <button
+                type="button"
+                onClick={() => {
+                  h.tap()
+                  navigate('/appointments', {
+                    state: {
+                      quickStartPatientId: patient.id,
+                      quickStartDoctorId: patient.primary_doctor_id,
+                      openWizard: true,
+                    },
+                  })
+                }}
+                className="appointment-primary icon-blink flex items-center justify-center gap-1.5 px-3 py-2.5 rounded-2xl text-xs font-bold press-scale min-h-[72px]"
+              >
+                <patientConcepts.appointments.icon size={19} className="shrink-0" /> <span className="truncate">نوبت جدید</span>
+              </button>
+
+              {/* Document & Paper Chart Camera Scanner */}
+              <button
+                type="button"
+                onClick={() => {
+                  h.tap()
+                  setScannerInitialCategory('paper_record')
+                  setScannerModalOpen(true)
+                }}
+                className="raised-surface icon-blink flex items-center justify-center gap-1.5 px-3 py-2.5 rounded-2xl text-xs font-bold bg-gradient-to-r from-sky-600 to-blue-600 text-white press-scale min-h-[48px]"
+                title="عکس‌برداری با دوربین گوشی و اسکن پرونده کاغذی، اسناد یا رادیولوژی"
+              >
+                <Camera size={15} className="shrink-0" /> <span className="truncate">اسکن مدارک / رادیولوژی</span>
+              </button>
+
+              {/* Visit / Treatment */}
+              <button
+                type="button"
+                onClick={() => {
+                  h.tap()
+                  switchTab('treatments')
+                }}
+                className="flex items-center justify-center gap-1.5 px-3 py-2.5 rounded-2xl text-xs font-bold bg-gradient-to-r from-violet-600 to-indigo-600 hover:from-violet-700 hover:to-indigo-700 text-white shadow-xs press-scale min-h-[48px]"
+              >
+                <Stethoscope size={15} className="shrink-0" /> <span className="truncate">ثبت درمان</span>
+              </button>
+
+              {/* Dental Chart (FDI) */}
+              <button
+                type="button"
+                onClick={() => {
+                  h.tap()
+                  switchTab('teeth')
+                }}
+                className="flex items-center justify-center gap-1.5 px-3 py-2.5 rounded-2xl text-xs font-bold bg-white dark:bg-slate-800 text-teal-700 dark:text-teal-300 border border-teal-200 dark:border-teal-800 hover:bg-teal-50 dark:hover:bg-teal-900/60 press-scale shadow-xs min-h-[48px]"
+              >
+                <patientConcepts.directory.icon size={19} className="text-teal-700 shrink-0" /> <span className="truncate">چارت دندان</span>
+              </button>
+
+              {/* Payment */}
+              <button
+                type="button"
+                onClick={() => {
+                  h.tap()
+                  handleOpenPaymentModal()
+                }}
+                className="raised-surface icon-blink flex items-center justify-center gap-1.5 px-3 py-2.5 rounded-2xl text-xs font-bold bg-amber-100 dark:bg-amber-950/40 text-amber-800 dark:text-amber-300 border border-amber-200 dark:border-amber-800 press-scale min-h-[48px]"
+              >
+                <patientConcepts.plans.icon size={19} className="text-amber-700 shrink-0" /> <span className="truncate">دریافت وجه</span>
+              </button>
+
+              {/* Sayad Cheque */}
+              <button
+                type="button"
+                onClick={() => {
+                  h.tap()
+                  handleOpenChequeModal()
+                }}
+                className="flex items-center justify-center gap-1.5 px-3 py-2.5 rounded-2xl text-xs font-bold bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-300 border border-amber-200 dark:border-amber-800 hover:bg-amber-100 dark:hover:bg-amber-900/60 press-scale shadow-xs min-h-[48px]"
+              >
+                <patientConcepts.plans.icon size={19} className="text-amber-700 shrink-0" /> <span className="truncate">ثبت چک صیادی</span>
+              </button>
+
+              {/* Prescription */}
+              <button
+                type="button"
+                onClick={() => {
+                  h.tap()
+                  navigate('/prescriptions', {
+                    state: {
+                      quickStartPatientId: patient.id,
+                      quickStartDoctorId: patient.primary_doctor_id,
+                      quickStartToothNumber: 'general',
+                    },
+                  })
+                }}
+                className="flex items-center justify-center gap-1.5 px-3 py-2.5 rounded-2xl text-xs font-bold bg-purple-50 dark:bg-purple-950/40 text-purple-700 dark:text-purple-300 border border-purple-200 dark:border-purple-800 hover:bg-purple-100 dark:hover:bg-purple-900/60 press-scale shadow-xs min-h-[48px]"
+              >
+                <Pill size={15} className="text-purple-600 shrink-0" /> <span className="truncate">صدور نسخه</span>
+              </button>
+
+              {/* Lab Order */}
+              <button
+                type="button"
+                onClick={() => {
+                  h.tap()
+                  switchTab('labOrders')
+                }}
+                className="flex items-center justify-center gap-1.5 px-3 py-2.5 rounded-2xl text-xs font-bold bg-cyan-50 dark:bg-cyan-950/40 text-cyan-700 dark:text-cyan-300 border border-cyan-200 dark:border-cyan-800 hover:bg-cyan-100 dark:hover:bg-cyan-900/60 press-scale shadow-xs min-h-[48px]"
+              >
+                <patientConcepts.lab.icon size={19} className="text-cyan-700 shrink-0" /> <span className="truncate">سفارش لابراتوار</span>
+              </button>
+
+              {/* Implant Case */}
+              <button
+                type="button"
+                onClick={() => {
+                  h.tap()
+                  switchTab('implants')
+                }}
+                className="flex items-center justify-center gap-1.5 px-3 py-2.5 rounded-2xl text-xs font-bold bg-blue-50 dark:bg-blue-950/40 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-800 hover:bg-blue-100 dark:hover:bg-blue-900/60 press-scale shadow-xs min-h-[48px]"
+              >
+                <patientConcepts.implants.icon size={19} className="text-indigo-700 shrink-0" /> <span className="truncate">پرونده ایمپلنت</span>
+              </button>
+
+              {/* Print Record */}
+              <button
+                type="button"
+                onClick={handlePrintFullChart}
+                className="flex items-center justify-center gap-1.5 px-3 py-2.5 rounded-2xl text-xs font-bold bg-indigo-50 dark:bg-indigo-950/40 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800 hover:bg-indigo-100 dark:hover:bg-indigo-900/60 press-scale shadow-xs min-h-[48px]"
+              >
+                <Printer size={15} className="text-indigo-600 dark:text-indigo-400 shrink-0" /> <span className="truncate">چاپ پرونده</span>
+              </button>
+
+              {/* Edit File */}
+              <button
+                type="button"
+                onClick={() => {
+                  h.tap()
+                  chimes.playPop()
+                  if (patient) {
+                    setFormData({
+                      first_name: patient.first_name || '',
+                      last_name: patient.last_name || '',
+                      national_id: patient.national_id || '',
+                      phone: patient.phone || '',
+                      phone2: patient.phone2 || '',
+                      email: patient.email || '',
+                      birth_date: patient.birth_date || '',
+                      gender: patient.gender || '',
+                      blood_type: patient.blood_type || '',
+                      address: patient.address || '',
+                      city: patient.city || '',
+                      province: patient.province || '',
+                      postal_code: patient.postal_code || '',
+                      medical_history: patient.medical_history || '',
+                      allergies: patient.allergies || '',
+                      medications: patient.medications || '',
+                      medical_conditions: patient.medical_conditions || '',
+                      insurance_info: patient.insurance_info || '',
+                      insurance_number: patient.insurance_number || '',
+                      notes: patient.notes || '',
+                      vip_level: String(patient.vip_level ?? 0),
+                      is_active: patient.is_active !== false,
+                      primary_doctor_id: patient.primary_doctor_id || '',
+                      tags: (patient.tags || []).join(', '),
+                      anticoagulant_use: Boolean(patient.anticoagulant_use),
+                      inr_value: patient.inr_value ? String(patient.inr_value) : '',
+                      bisphosphonate_use: Boolean(patient.bisphosphonate_use),
+                      bp_systolic: patient.bp_systolic ? String(patient.bp_systolic) : '',
+                      bp_diastolic: patient.bp_diastolic ? String(patient.bp_diastolic) : '',
+                      diabetes_hba1c: patient.diabetes_hba1c ? String(patient.diabetes_hba1c) : '',
+                      endocarditis_prophylaxis: Boolean(patient.endocarditis_prophylaxis),
+                      pregnancy_trimester: patient.pregnancy_trimester ? String(patient.pregnancy_trimester) : '',
+                      family_head_id: patient.family_head_id || '',
+                      family_relationship: patient.family_relationship || '',
+                    })
+                  }
+                  setEditModalOpen(true)
+                }}
+                className="flex items-center justify-center gap-1.5 px-3 py-2.5 rounded-2xl text-xs font-bold bg-sky-50 dark:bg-sky-950/40 text-sky-700 dark:text-sky-300 border border-sky-200 dark:border-sky-800 hover:bg-sky-100 dark:hover:bg-sky-900/60 press-scale min-h-[48px]"
+              >
+                <Edit2 size={15} className="shrink-0" /> <span className="truncate">ویرایش پرونده</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  // ===========================================================================
+  // Render: Tabs
+  // ===========================================================================
+
+  const tabs = [
+    { key: 'overview', label: 'نمای کلی', icon: <FileText size={16} />, color: 'blue' },
+    { key: 'timeline', label: 'تایم‌لاین', icon: <Clock size={16} />, color: 'cyan' },
+    { key: 'treatments', label: 'درمان‌ها', icon: <Activity size={16} />, color: 'emerald' },
+    { key: 'implants', label: 'ایمپلنت', icon: <Bone size={16} />, color: 'purple' },
+    { key: 'labOrders', label: 'لابراتوار', icon: <FlaskConical size={16} />, color: 'amber' },
+    { key: 'phases', label: 'طرح درمان مرحله‌ای', icon: <Layers size={16} />, color: 'indigo' },
+    { key: 'consent', label: 'فرم رضایت‌نامه', icon: <FileSignature size={16} />, color: 'violet' },
+    { key: 'appointments', label: 'نوبت‌ها', icon: <Calendar size={16} />, color: 'teal' },
+    { key: 'payments', label: 'پرداخت‌ها', icon: <CreditCard size={16} />, color: 'emerald' },
+    { key: 'teeth', label: 'نمودار دندان‌ها', icon: <Smile size={16} />, color: 'teal' },
+    { key: 'perio', label: 'چارت پریودنتال', icon: <Activity size={16} />, color: 'rose' },
+    { key: 'ortho', label: 'آنالیز ارتودنسی', icon: <Sparkles size={16} />, color: 'purple' },
+    { key: 'prescriptions', label: 'نسخه‌ها', icon: <Pill size={16} />, color: 'emerald' },
+    { key: 'radiology', label: 'رادیولوژی', icon: <ImageIcon size={16} />, color: 'blue' },
+    { key: 'insurance', label: 'بیمه', icon: <Shield size={16} />, color: 'amber' },
+    { key: 'documents', label: 'اسناد', icon: <FileText size={16} />, color: 'indigo' },
+  ]
+
+  // ===========================================================================
+  // Render: Overview Tab
+  // ===========================================================================
+
+  const renderOverview = () => {
+    if (!patient) return null
+    const age = calculateAge(patient.birth_date)
+    return (
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
+        {/* Personal Info */}
+        <OverviewAccordion title="اطلاعات شخصی بیمار" icon={<FileText size={16} />} accent="bg-sky-50 dark:bg-sky-950/50 text-sky-600 dark:text-sky-400">
+          <div className="flex items-center justify-end gap-2 mb-3">
+            <button
+              type="button"
+              onClick={() => {
+                h.tap()
+                setEditModalOpen(true)
+              }}
+              className="text-xs text-primary-600 dark:text-primary-400 hover:text-primary-700 font-bold flex items-center gap-1 px-2.5 py-1 rounded-xl bg-primary-50 dark:bg-primary-950/40 border border-primary-100 dark:border-primary-900/50 transition-colors press-scale"
+            >
+              <Edit2 size={12} />
+              <span>ویرایش</span>
+            </button>
+          </div>
+          <div className="space-y-1">
+            <InfoRow label="نام کامل" value={`${patient.first_name} ${patient.last_name}`} />
+            <InfoRow label="کد ملی" value={patient.national_id ? maskNationalId(patient.national_id) : '-'} dir="ltr" />
+            <InfoRow label="تاریخ تولد" value={patient.birth_date ? toJalaliStringPretty(patient.birth_date) : '-'} />
+            {age !== null && <InfoRow label="سن" value={`${toPersianDigits(age)} سال`} />}
+            <InfoRow label="جنسیت" value={patient.gender === 'male' ? 'آقا' : patient.gender === 'female' ? 'خانم' : '-'} />
+            <InfoRow label="گروه خونی" value={patient.blood_type || '-'} />
+          </div>
+        </OverviewAccordion>
+
+        {/* Contact */}
+        <OverviewAccordion title="اطلاعات تماس و ارتباطی" icon={<Phone size={16} />} accent="bg-teal-50 dark:bg-teal-950/50 text-teal-600 dark:text-teal-400">
+          <div className="flex items-center justify-end gap-2 mb-3">
+            {patient.phone && (
+              <a
+                href={`tel:${patient.phone}`}
+                onClick={() => { h.tap(); chimes.playPop() }}
+                className="text-xs text-teal-600 dark:text-teal-400 hover:text-teal-700 font-bold flex items-center gap-1 px-2.5 py-1 rounded-xl bg-teal-50 dark:bg-teal-950/40 border border-teal-100 dark:border-teal-900/50 transition-colors press-scale"
+              >
+                <PhoneCall size={12} />
+                <span>تماس مستقیم</span>
+              </a>
+            )}
+          </div>
+          <div className="space-y-1">
+            <InfoRow label="تلفن همراه" value={patient.phone ? maskPhoneNumber(patient.phone) : '-'} dir="ltr" icon={<Phone size={12} />} />
+            <InfoRow label="شماره منزل / ثابت" value={patient.phone2 ? maskPhoneNumber(patient.phone2) : '-'} dir="ltr" />
+            <InfoRow label="ایمیل" value={patient.email || '-'} dir="ltr" icon={<Mail size={12} />} />
+            <InfoRow label="استان" value={patient.province || '-'} />
+            <InfoRow label="شهر" value={patient.city || '-'} />
+            <InfoRow label="آدرس سکونت" value={patient.address || '-'} icon={<MapPin size={12} />} />
+            <InfoRow label="کد پستی" value={patient.postal_code ? toPersianDigits(patient.postal_code) : '-'} dir="ltr" />
+          </div>
+        </OverviewAccordion>
+
+        {/* Medical History */}
+        <OverviewAccordion title="سوابق پزشکی و غربالگری سلامت" icon={<Activity size={16} />} accent="bg-rose-50 dark:bg-rose-950/50 text-rose-600 dark:text-rose-400">
+          <div className="flex items-center justify-end gap-2 mb-3">
+            <button
+              type="button"
+              onClick={() => {
+                h.tap()
+                setEditModalOpen(true)
+              }}
+              className="text-xs text-rose-600 dark:text-rose-400 hover:text-rose-700 font-bold flex items-center gap-1 px-2.5 py-1 rounded-xl bg-rose-50 dark:bg-rose-950/40 border border-rose-100 dark:border-rose-900/50 transition-colors press-scale"
+            >
+              <FileHeart size={12} />
+              <span>ویرایش سوابق</span>
+            </button>
+          </div>
+          <div className="space-y-1">
+            <InfoRow
+              label="تاریخچه پزشکی"
+              value={patient.medical_history ? (
+                <span>{patient.medical_history}</span>
+              ) : (
+                <span className="text-[11px] text-slate-400 dark:text-slate-500 font-normal">فاقد سوابق جراحی یا بستری قبلی</span>
+              )}
+            />
+            <InfoRow
+              label="حساسیت‌ها"
+              value={patient.allergies ? (
+                <span className="text-rose-600 dark:text-rose-400 font-bold">{patient.allergies}</span>
+              ) : (
+                <span className="inline-flex items-center gap-1 text-[11px] font-bold text-emerald-700 dark:text-emerald-300 bg-emerald-50 dark:bg-emerald-950/40 px-2 py-0.5 rounded-lg border border-emerald-200/60 dark:border-emerald-800/40">
+                  <CheckCircle2 size={11} className="text-emerald-600" /> فاقد حساسیت دارویی گزارش‌شده
+                </span>
+              )}
+            />
+            <InfoRow
+              label="داروهای مصرفی"
+              value={patient.medications ? (
+                <span className="text-sky-700 dark:text-sky-300 font-semibold">{patient.medications}</span>
+              ) : (
+                <span className="text-[11px] text-slate-400 dark:text-slate-500 font-normal">عدم مصرف داروی مزمن</span>
+              )}
+            />
+            <InfoRow
+              label="بیماری‌های زمینه‌ای"
+              value={patient.medical_conditions ? (
+                <span className="text-amber-600 dark:text-amber-400 font-bold">{patient.medical_conditions}</span>
+              ) : (
+                <span className="inline-flex items-center gap-1 text-[11px] font-bold text-emerald-700 dark:text-emerald-300 bg-emerald-50 dark:bg-emerald-950/40 px-2 py-0.5 rounded-lg border border-emerald-200/60 dark:border-emerald-800/40">
+                  <CheckCircle2 size={11} className="text-emerald-600" /> بدون بیماری سیستمیک ثبت‌شده
+                </span>
+              )}
+            />
+            {patient.anticoagulant_use && (
+              <InfoRow
+                label="داروی ضد انعقاد"
+                value={`بله ${patient.inr_value ? `(شاخص INR: ${toPersianDigits(patient.inr_value)})` : ''}`}
+                icon={<AlertTriangle size={12} className="text-error-500" />}
+              />
+            )}
+            {patient.bisphosphonate_use && (
+              <InfoRow
+                label="مصرف بیس‌فسفونات"
+                value="بله (خطر استئونکروز فک / ONJ)"
+                icon={<AlertTriangle size={12} className="text-error-500" />}
+              />
+            )}
+            {patient.endocarditis_prophylaxis && (
+              <InfoRow
+                label="پروفیلاکسی اندوکاردیت"
+                value="نیاز به آنتی‌بیوتیک پیشگیرانه قبل از پروسیجر"
+                icon={<HeartPulse size={12} className="text-warning-500" />}
+              />
+            )}
+            {patient.bp_systolic != null && (
+              <InfoRow
+                label="فشار خون ثبت‌شده"
+                value={`${toPersianDigits(patient.bp_systolic)} / ${toPersianDigits(patient.bp_diastolic || 0)} mmHg`}
+                icon={<Activity size={12} className="text-primary-500" />}
+              />
+            )}
+            {patient.diabetes_hba1c != null && (
+              <InfoRow
+                label="شاخص قند خون HbA1c"
+                value={`${toPersianDigits(patient.diabetes_hba1c)} درصد`}
+                icon={<Activity size={12} className="text-primary-500" />}
+              />
+            )}
+            {patient.pregnancy_trimester != null && patient.pregnancy_trimester > 0 && (
+              <InfoRow
+                label="وضعیت بارداری"
+                value={`سه‌ماهه ${toPersianDigits(patient.pregnancy_trimester)}`}
+                icon={<AlertCircle size={12} className="text-pink-500" />}
+              />
+            )}
+          </div>
+        </OverviewAccordion>
+
+        {/* Insurance & Summary */}
+        <OverviewAccordion title="بیمه و خلاصه پرونده" icon={<Shield size={16} />} accent="bg-purple-50 dark:bg-purple-950/50 text-purple-600 dark:text-purple-400">
+          <div className="flex items-center justify-end gap-2 mb-3">
+            <Badge color={getVipLabel(patient.vip_level).color}>{getVipLabel(patient.vip_level).label}</Badge>
+          </div>
+          <div className="space-y-1">
+            <InfoRow label="اطلاعات بیمه" value={patient.insurance_info || '-'} />
+            <InfoRow label="شماره بیمه" value={patient.insurance_number ? toPersianDigits(patient.insurance_number) : '-'} dir="ltr" />
+            <InfoRow label="پزشک اصلی" value={getDoctorName(patient.primary_doctor_id)} />
+            <InfoRow label="سطح VIP" value={getVipLabel(patient.vip_level).label} />
+            <InfoRow label="تاریخ تشکیل پرونده" value={toJalaliStringPretty(patient.created_at)} />
+            <div className="pt-3 mt-3 border-t border-slate-100 dark:border-slate-800">
+              <div className="grid grid-cols-2 gap-2.5">
+                <div className="p-3 rounded-2xl bg-gradient-to-br from-emerald-50 to-teal-50 dark:from-emerald-950/30 dark:to-teal-950/20 border border-emerald-200/60 dark:border-emerald-800/40 text-center">
+                  <p className="text-[11px] font-semibold text-emerald-800 dark:text-emerald-300 mb-0.5">پرداختی کل بیمار</p>
+                  <p className="text-sm sm:text-base font-black text-emerald-700 dark:text-emerald-400 font-mono">{formatCurrency(totalPaid)} ت</p>
+                </div>
+                <div className="p-3 rounded-2xl bg-gradient-to-br from-sky-50 to-blue-50 dark:from-sky-950/30 dark:to-blue-950/20 border border-sky-200/60 dark:border-sky-800/40 text-center">
+                  <p className="text-[11px] font-semibold text-sky-800 dark:text-sky-300 mb-0.5">کل هزینه درمان‌ها</p>
+                  <p className="text-sm sm:text-base font-black text-sky-700 dark:text-sky-400 font-mono">{formatCurrency(totalTreatmentCost)} ت</p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </OverviewAccordion>
+
+        {/* Family & Household Linkage Card */}
+        {(() => {
+          const fam = resolveFamilyHousehold(patient, allPatients)
+          return (
+            <OverviewAccordion title="اعضای خانواده و پرونده‌های متصل" icon={<Users size={16} />} accent="bg-teal-50 dark:bg-teal-900/30 text-teal-600 dark:text-teal-400" className="lg:col-span-2">
+              <div className="flex items-center justify-between gap-2 mb-3">
+                <div className="flex items-center gap-2">
+                  <div>
+                    <h3 className="text-sm font-bold text-slate-700 dark:text-slate-200 flex items-center gap-2">
+                      {fam.members.length > 0 && (
+                        <Badge color={fam.isHead ? 'accent' : 'primary'}>
+                          {fam.isHead ? 'سرپرست خانواده' : `وابسته (${toPersianDigits(fam.members.length)} عضو مرتبط)`}
+                        </Badge>
+                      )}
+                    </h3>
+                  </div>
+                </div>
+                <Button
+                  size="sm"
+                  variant="secondary"
+                  onClick={() => {
+                    h.tap()
+                    setFamilyHeadId(patient.family_head_id || '')
+                    setFamilyRelationship(patient.family_relationship || '')
+                    setIsHeadToggle(patient.family_relationship === 'head')
+                    setFamilyModalOpen(true)
+                  }}
+                  className="text-xs flex items-center gap-1.5"
+                >
+                  <Link2 size={14} /> مدیریت پیوند خانوادگی
+                </Button>
+              </div>
+
+              {fam.members.length === 0 ? (
+                <div className="p-3.5 rounded-2xl bg-slate-50 dark:bg-slate-800/50 border border-dashed border-slate-200 dark:border-slate-700 flex flex-col sm:flex-row items-center justify-between gap-3">
+                  <div className="flex items-center gap-2 text-xs font-semibold text-slate-600 dark:text-slate-300">
+                    <Users size={16} className="text-slate-400 shrink-0" />
+                    <span>عدم اتصال به سرپرست یا پرونده‌های خانوادگی</span>
+                  </div>
+                  <Button
+                    size="sm"
+                    variant="primary"
+                    onClick={() => {
+                      h.tap()
+                      setFamilyHeadId(patient.family_head_id || '')
+                      setFamilyRelationship(patient.family_relationship || '')
+                      setIsHeadToggle(patient.family_relationship === 'head')
+                      setFamilyModalOpen(true)
+                    }}
+                    className="text-xs shrink-0 flex items-center gap-1.5"
+                  >
+                    <UserPlus size={14} /> اتصال به خانواده / تعیین سرپرست
+                  </Button>
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
+                  {fam.members.map(({ patient: m, relationshipLabel }) => (
+                    <div
+                      key={m.id}
+                      className="p-3 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 flex items-center justify-between gap-2.5 hover:border-primary-400 dark:hover:border-primary-600 transition-all-smooth"
+                    >
+                      <div className="flex items-center gap-2.5 min-w-0">
+                        <div
+                          className={`w-10 h-10 rounded-xl bg-gradient-to-br ${getAvatarColor(m.id)} flex items-center justify-center text-white font-bold text-xs shrink-0`}
+                        >
+                          {getInitials(m)}
+                        </div>
+                        <div className="min-w-0">
+                          <div className="flex items-center gap-1.5">
+                            <span className="text-xs font-bold text-slate-800 dark:text-slate-100 truncate">
+                              {m.first_name} {m.last_name}
+                            </span>
+                            <Badge color={m.id === fam.headPatient?.id ? 'accent' : 'secondary'}>
+                              {relationshipLabel}
+                            </Badge>
+                          </div>
+                          <div className="flex items-center gap-2 text-[11px] text-slate-400 mt-0.5">
+                            <span>پرونده: {m.file_number || '—'}</span>
+                            {m.phone && <span>• {toPersianDigits(m.phone)}</span>}
+                          </div>
+                        </div>
+                      </div>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        onClick={() => {
+                          h.tap()
+                          navigate(`/patients/${m.id}`)
+                        }}
+                        className="shrink-0 p-1.5 text-primary-600 hover:bg-primary-50 dark:hover:bg-primary-950/40"
+                        title="مشاهده پرونده"
+                      >
+                        <ArrowRight size={16} />
+                      </Button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </OverviewAccordion>
+          )
+        })()}
+
+        {/* Notes */}
+        {patient.notes && (
+          <OverviewAccordion title="یادداشت‌ها" icon={<FileText size={16} />} accent="bg-amber-50 dark:bg-amber-950/40 text-amber-600 dark:text-amber-400" className="lg:col-span-2">
+            <p className="text-sm text-slate-600 whitespace-pre-wrap">{patient.notes}</p>
+          </OverviewAccordion>
+        )}
+
+        {/* Record change history — accountability trail (who edited
+            THIS patient's own record, not clinical/care events) */}
+        {recordHistory.length > 0 && (
+          <OverviewAccordion title="تغییرات پرونده" icon={<Clock size={16} />} accent="bg-sky-50 dark:bg-sky-950/40 text-sky-600 dark:text-sky-400" className="lg:col-span-2">
+            <h3 className="text-sm font-bold text-slate-700 mb-3">
+              <span className="text-xs font-normal text-slate-400 mr-1.5">({toPersianDigits(recordHistory.length)})</span>
+            </h3>
+            <div className="space-y-2">
+              {(showAllHistory ? recordHistory : recordHistory.slice(0, 8)).map((entry) => (
+                <div key={entry.id} className="flex items-center justify-between gap-2 text-xs">
+                  <span className="text-slate-600">{entry.summary}</span>
+                  <span className="text-slate-400 shrink-0">{entry.actor_name || 'ناشناس'} — {toJalaliStringPretty(entry.created_at.slice(0, 10))}</span>
+                </div>
+              ))}
+            </div>
+            {/* Nothing is hidden for good. The cap is only a first screen;
+                a record edited 300 times still has all 300 one tap away. */}
+            {recordHistory.length > 8 && (
+              <button
+                type="button"
+                onClick={() => setShowAllHistory((v) => !v)}
+                className="mt-2 text-xs font-bold text-primary-600"
+              >
+                {showAllHistory ? 'نمایش کمتر' : `نمایش همه‌ی ${toPersianDigits(recordHistory.length)} مورد`}
+              </button>
+            )}
+          </OverviewAccordion>
+        )}
+      </div>
+    )
+  }
+
+  // ===========================================================================
+  // Render: Timeline Tab
+  // ===========================================================================
+
+  const renderTimeline = () => {
+    if (timeline.length === 0) {
+      return (
+        <Card className="p-6">
+          <EmptyState icon={<Clock size={32} />} title="رویدادی ثبت نشده" description="تایم‌لاین این بیمار خالی است" />
+        </Card>
+      )
+    }
+    return (
+      <Card className="p-4 md:p-6">
+        <div className="relative">
+          {/* Timeline line */}
+          <div className="absolute right-5 top-0 bottom-0 w-px bg-slate-200" />
+          <div className="space-y-4">
+            {timeline.map((event) => (
+              <div key={event.id} className="relative flex items-start gap-3 pr-2">
+                {/* Icon */}
+                <div className="w-10 h-10 rounded-xl bg-primary-100 text-primary-600 flex items-center justify-center flex-shrink-0 z-10">
+                  {timelineIcons[event.event_type] || timelineIcons.default}
+                </div>
+                {/* Content */}
+                <div className="flex-1 min-w-0 pb-2">
+                  <div className="flex items-center justify-between gap-2 flex-wrap">
+                    <h4 className="text-sm font-medium text-slate-800">{event.title || 'رویداد'}</h4>
+                    <span className="text-xs text-slate-400">{toJalaliStringPretty(event.event_date)}</span>
+                  </div>
+                  {event.description && (
+                    <p className="text-xs text-slate-500 mt-1">{event.description}</p>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </Card>
+    )
+  }
+
+  // ===========================================================================
+  // Render: Treatments Tab
+  // ===========================================================================
+
+  /**
+   * MOD-FEAT-001 — replaces what was a flat chronological list.
+   *
+   * Direct request: "patient comes once with 40 problems, record them
+   * all, then work through them session by session and know what's done
+   * and what's left." The data model already supported that (treatments
+   * carry planned/in_progress/completed), but nothing surfaced it — you
+   * couldn't see progress, remaining cost, or what was outstanding per
+   * tooth without reading every row.
+   *
+   * Grouped by tooth because that's the dentist's unit of work, with
+   * unfinished teeth sorted first, and a one-tap status advance so
+   * marking work done during a session doesn't require opening a form.
+   */
+  const renderTreatments = () => {
+    if (treatments.length === 0) {
+      return (
+        <Card className="p-6">
+          <EmptyState
+            icon={<Activity size={32} />}
+            title="درمانی ثبت نشده"
+            description="هنوز درمانی برای این بیمار ثبت نشده است"
+            action={
+              <Button
+                size="sm"
+                onClick={() => {
+                  h.tap()
+                  navigate('/treatments', { state: { quickStartPatientId: patient?.id, mode: 'visit' } })
+                }}
+                className="flex items-center gap-1"
+              >
+                <Plus size={14} /> ثبت درمان / ویزیت جدید
+              </Button>
+            }
+          />
+        </Card>
+      )
+    }
+
+    const progress = calcPlanProgress(treatments)
+    const groups = groupByTooth(treatments)
+
+    const advanceStatus = async (t: Treatment) => {
+      const next = nextStatus(t.status)
+      if (next === t.status) return
+
+      // Validate clinical prerequisites before advancing
+      if (!t.prerequisite_override && (next === 'completed' || next === 'in_progress')) {
+        const evalRes = evaluateClinicalPrerequisites(t, treatments)
+        if (!evalRes.allowed) {
+          chimes.playWarning()
+          setPrereqAlert({ open: true, treatment: t, evalResult: evalRes })
+          return
+        }
+      }
+
+      h.tap()
+      try {
+        await updateTreatment(t.id, { status: next } as never)
+        showToast('success', next === 'completed' ? 'به‌عنوان انجام‌شده ثبت شد' : 'در حال انجام ثبت شد')
+        await loadTabData()
+      } catch {
+        showToast('error', 'خطا در به‌روزرسانی')
+      }
+    }
+
+    return (
+      <div className="space-y-4">
+        <Card className="p-5">
+          <div className="flex items-center justify-between mb-3 flex-wrap gap-2">
+            <div className="flex items-center gap-2">
+              <h3 className="text-sm font-bold text-slate-800 dark:text-slate-100">پیشرفت طرح درمان</h3>
+              <span className="text-sm font-bold text-primary-700 dark:text-primary-400">
+                ({toPersianDigits(progress.completed)} از {toPersianDigits(progress.total)} کار انجام‌شده)
+              </span>
+            </div>
+            <Button
+              size="sm"
+              onClick={() => {
+                h.tap()
+                navigate('/treatments', { state: { quickStartPatientId: patient?.id, mode: 'visit' } })
+              }}
+              className="flex items-center gap-1 text-xs"
+            >
+              <Plus size={14} /> ثبت درمان جدید
+            </Button>
+          </div>
+
+          <div
+            className="h-2.5 rounded-full bg-slate-100 overflow-hidden"
+            role="progressbar"
+            aria-valuenow={progress.percent}
+            aria-valuemin={0}
+            aria-valuemax={100}
+            aria-label={`پیشرفت طرح درمان: ${progress.percent} درصد`}
+          >
+            <div
+              className="h-full bg-primary-700 rounded-full transition-all-smooth"
+              style={{ width: `${progress.percent}%` }}
+            />
+          </div>
+
+          <div className="grid grid-cols-3 gap-2 mt-4 text-center">
+            <div>
+              <p className="text-xs text-slate-500 mb-0.5">انجام‌شده</p>
+              <p className="text-sm font-bold text-success-700">{formatCurrency(progress.completedValue)} ت</p>
+            </div>
+            <div>
+              <p className="text-xs text-slate-500 mb-0.5">باقی‌مانده</p>
+              <p className="text-sm font-bold text-warning-700">{formatCurrency(progress.remainingValue)} ت</p>
+            </div>
+            <div>
+              <p className="text-xs text-slate-500 mb-0.5">کل طرح</p>
+              <p className="text-sm font-bold text-slate-700">{formatCurrency(progress.totalValue)} ت</p>
+            </div>
+          </div>
+        </Card>
+
+        {groups.map((group) => (
+          <Card key={group.tooth} className={`p-4 ${group.allDone ? 'opacity-70' : ''}`}>
+            <div className="flex items-center justify-between mb-3 flex-wrap gap-2">
+              <h4 className="text-sm font-bold text-slate-800 flex items-center gap-2">
+                {group.tooth === 'عمومی' ? 'درمان‌های عمومی' : `دندان ${toothLabel(group.tooth)}`}
+                {group.allDone && <CheckCircle2 size={16} className="text-success-600" />}
+              </h4>
+              {!group.allDone && (
+                <Badge color="warning">{toPersianDigits(group.remainingCount)} کار مانده</Badge>
+              )}
+            </div>
+
+            <div className="space-y-2">
+              {group.treatments.map((t) => {
+                const statusMeta = treatmentStatuses.find((s) => s.value === t.status) || treatmentStatuses[0]
+                const isDone = t.status === 'completed'
+                return (
+                  <div key={t.id} className="flex items-center gap-3 p-3 rounded-xl bg-slate-50">
+                    <button
+                      onClick={() => advanceStatus(t)}
+                      disabled={isDone}
+                      aria-label={isDone ? 'انجام شده' : `ثبت پیشرفت برای ${t.procedure_name || 'درمان'}`}
+                      className={`shrink-0 w-7 h-7 rounded-full border-2 flex items-center justify-center transition-all-smooth ${
+                        isDone
+                          ? 'bg-success-600 border-success-600 text-white'
+                          : 'border-slate-300 hover:border-primary-600 hover:bg-primary-50'
+                      }`}
+                    >
+                      {isDone && <CheckCircle2 size={16} />}
+                    </button>
+                    <div className="flex-1 min-w-0">
+                      <p className={`text-sm font-medium ${isDone ? 'text-slate-400 line-through' : 'text-slate-800'}`}>
+                        {t.procedure_name || t.description || 'درمان'}
+                      </p>
+                      <div className="flex items-center gap-2 flex-wrap mt-0.5">
+                        <Badge color={statusMeta.color}>{statusMeta.label}</Badge>
+                        {t.total_price != null && (
+                          <span className="text-xs text-slate-500">{formatCurrency(t.total_price)} ت</span>
+                        )}
+                      </div>
+                      {/* MOD-FEAT-038: «تاریخچه کارهای بیمار به همراه دیتیل
+                          دقیق شماره دندان و تاریخ و قیمت و نام پزشک». The row
+                          had the procedure, the status and the price; the
+                          date, the doctor and the surfaces were on the record
+                          and never shown. A history that cannot say who did
+                          it or when is a list, not a history. */}
+                      <p className="text-[11px] text-slate-500 mt-1">
+                        {toJalaliStringPretty(String(t.created_at).slice(0, 10))}
+                        {t.doctor_id && ` · ${getDoctorName(t.doctor_id)}`}
+                        {t.tooth_surface && ` · سطح ${formatSurfaces(t.tooth_surface)}`}
+                      </p>
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+          </Card>
+        ))}
+      </div>
+    )
+  }
+
+  // ===========================================================================
+  // Render: Implant Cases Tab — this data was already being loaded (used
+  // for balance calculation and the full-chart print feature) but had no
+  // actual tab to view it from inside the patient's own file, meaning
+  // staff had to leave this page and re-search for the patient over in
+  // the separate Implants module just to see their implant history.
+  // ===========================================================================
+
+  const renderImplants = () => {
+    if (implantCases.length === 0) {
+      return (
+        <Card className="p-6">
+          <EmptyState
+            icon={<Bone size={32} />}
+            title="موردی ثبت نشده"
+            description="هنوز پرونده‌ی ایمپلنتی برای این بیمار ثبت نشده است"
+            action={
+              <Button
+                size="sm"
+                onClick={() => {
+                  h.tap()
+                  navigate('/implants', { state: { quickStartPatientId: patient?.id } })
+                }}
+                className="flex items-center gap-1"
+              >
+                <Plus size={14} /> تشکیل پرونده ایمپلنت جدید
+              </Button>
+            }
+          />
+        </Card>
+      )
+    }
+    return (
+      <div className="space-y-3">
+        <div className="flex items-center justify-between gap-2 flex-wrap">
+          <h3 className="text-sm font-bold text-slate-800 dark:text-slate-100">پرونده‌های ایمپلنت</h3>
+          <Button
+            size="sm"
+            onClick={() => {
+              h.tap()
+              navigate('/implants', { state: { quickStartPatientId: patient?.id } })
+            }}
+            className="flex items-center gap-1 text-xs"
+          >
+            <Plus size={14} /> پرونده ایمپلنت جدید
+          </Button>
+        </div>
+        {[...implantCases].sort((a, b) => (b.created_at || '').localeCompare(a.created_at || '')).map((c) => (
+          <Card key={c.id} className="p-4">
+            <div className="flex items-start justify-between gap-3 flex-wrap">
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-2 flex-wrap mb-1">
+                  <h4 className="text-sm font-medium text-slate-800">
+                    دندان {c.tooth_number ? toothLabel(c.tooth_number) : '—'} — {c.brand || 'برند نامشخص'}
+                  </h4>
+                  {!c.is_active && <Badge color="slate">بایگانی‌شده</Badge>}
+                </div>
+                <div className="flex items-center gap-3 flex-wrap text-xs text-slate-500">
+                  <span>جراح: {getDoctorName(c.doctor_id)}</span>
+                  {c.prosthesis_doctor_id && c.prosthesis_doctor_id !== c.doctor_id && (
+                    <span>پروتز: {getDoctorName(c.prosthesis_doctor_id)}</span>
+                  )}
+                  {c.surgery_date && <span>تاریخ جراحی: {toJalaliStringPretty(c.surgery_date)}</span>}
+                </div>
+                {(c.bone_graft || c.sinus_lift) && (
+                  <div className="flex gap-1.5 mt-1.5">
+                    {c.bone_graft && <Badge color="warning">پودر استخوانی</Badge>}
+                    {c.sinus_lift && <Badge color="accent">سینوس لیفت</Badge>}
+                  </div>
+                )}
+              </div>
+              <div className="text-left">
+                {c.total_cost != null && <p className="text-sm font-bold text-slate-700">{formatCurrency(c.total_cost)} تومان</p>}
+                {c.paid_amount != null && <p className="text-xs text-success-600">پرداخت‌شده: {formatCurrency(c.paid_amount)}</p>}
+              </div>
+            </div>
+          </Card>
+        ))}
+      </div>
+    )
+  }
+
+  // ===========================================================================
+  // Render: Lab Orders Tab — same gap as implants: loaded for the print
+  // feature already, but never viewable from inside the patient's own
+  // file otherwise.
+  // ===========================================================================
+
+  const renderLabOrders = () => {
+    const openCount = labOrders.filter(o => o.status !== 'delivered' && o.status !== 'cancelled').length
+    const deliveredCount = labOrders.filter(o => o.status === 'delivered').length
+
+    return (
+      <div className="space-y-4 animate-in fade-in slide-in-from-right-4 duration-300">
+        {/* Sub-view Header */}
+        <div className="flex items-center justify-between pb-2 border-b border-slate-100 dark:border-slate-800">
+          <button
+            onClick={() => { h.tap(); setSubView(null) }}
+            className="w-10 h-10 rounded-full flex items-center justify-center bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors min-w-[48px] min-h-[48px]"
+            aria-label="بازگشت"
+          >
+            <ChevronRight size={20} />
+          </button>
+          <div className="flex items-center gap-3">
+            <div className="text-right">
+              <h3 className="text-base font-extrabold text-slate-800 dark:text-slate-100">لابراتوار</h3>
+              <p className="text-[11px] text-slate-500 font-medium">پرونده #{patient?.id.slice(0, 4).toUpperCase()} - {patient?.first_name} {patient?.last_name}</p>
+            </div>
+            <div className="w-10 h-10 rounded-full bg-amber-100 dark:bg-amber-900/30 flex items-center justify-center text-amber-600">
+              <FlaskConical size={20} />
+            </div>
+          </div>
+        </div>
+
+        {/* New Lab Order Button */}
+        <Button
+          variant="secondary"
+          className="w-full min-h-[48px] rounded-2xl border border-blue-200 dark:border-blue-800/50 text-blue-700 dark:text-blue-300 font-bold text-sm bg-white dark:bg-slate-900 hover:bg-blue-50 dark:hover:bg-blue-900/30 transition-all shadow-sm flex items-center justify-center gap-2"
+          onClick={() => {
+            h.tap()
+            navigate('/laboratory', { state: { quickStartPatientId: patient?.id } })
+          }}
+        >
+          <Plus size={18} /> سفارش لابراتوار جدید
+        </Button>
+
+        {/* Bento Summary Cards */}
+        {labOrders.length > 0 && (
+          <div className="grid grid-cols-2 gap-3">
+            <div className="bg-white dark:bg-slate-900 rounded-2xl p-4 border border-slate-100 dark:border-slate-800 shadow-sm flex flex-col items-center justify-center min-h-[80px]">
+              <span className="text-[11px] font-bold text-slate-500 mb-1">سفارش‌های باز</span>
+              <span className="text-2xl font-extrabold text-slate-800 dark:text-slate-100">{toPersianDigits(openCount)}</span>
+            </div>
+            <div className="bg-white dark:bg-slate-900 rounded-2xl p-4 border border-slate-100 dark:border-slate-800 shadow-sm flex flex-col items-center justify-center min-h-[80px]">
+              <span className="text-[11px] font-bold text-slate-500 mb-1">تحویل‌شده</span>
+              <span className="text-2xl font-extrabold text-slate-800 dark:text-slate-100">{toPersianDigits(deliveredCount)}</span>
+            </div>
+          </div>
+        )}
+
+        {/* List of Orders */}
+        {labOrders.length === 0 ? (
+          <div className="py-8 text-center text-slate-400 text-sm">سفارشی یافت نشد</div>
+        ) : (
+          <div className="space-y-3">
+            {[...labOrders].sort((a, b) => (b.created_at || '').localeCompare(a.created_at || '')).map((o) => {
+              let badgeColor = 'bg-slate-100 text-slate-600'
+              let badgeText = 'نامشخص'
+              if (o.status === 'delivered') {
+                badgeColor = 'bg-green-100 text-green-700'
+                badgeText = 'تحویل شده'
+              } else if (o.status === 'cancelled') {
+                badgeColor = 'bg-red-100 text-red-700'
+                badgeText = 'لغو شده'
+              } else if (o.status === 'sent_to_lab') {
+                badgeColor = 'bg-blue-100 text-blue-700'
+                badgeText = 'ارسال شده'
+              } else {
+                badgeColor = 'bg-amber-100 text-amber-700'
+                badgeText = 'در حال ساخت'
+              }
+
+              return (
+                <div key={o.id} className="bg-white dark:bg-slate-900 rounded-2xl p-4 border border-slate-100 dark:border-slate-800 shadow-sm flex items-start justify-between gap-3">
+                  <div className="flex flex-col items-start gap-2 shrink-0">
+                    <span className={`px-2.5 py-1 rounded-lg text-[11px] font-bold ${badgeColor}`}>
+                      {badgeText}
+                    </span>
+                    {o.deadline && (
+                      <span className="text-[11px] text-slate-500 font-medium whitespace-nowrap">
+                        تحویل: {toJalaliStringPretty(o.deadline)}
+                      </span>
+                    )}
+                  </div>
+                  <div className="flex flex-col items-end text-right min-w-0">
+                    <h4 className="text-sm font-extrabold text-slate-800 dark:text-slate-100 mb-1 truncate max-w-[200px] sm:max-w-full">
+                      {o.work_type || 'سفارش لابراتوار'}{o.tooth_number ? ` (دندان ${toothLabel(o.tooth_number)})` : ''}
+                    </h4>
+                    <p className="text-xs text-slate-500 dark:text-slate-400">
+                      ثبت: {toJalaliStringPretty(o.created_at)}
+                    </p>
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+        )}
+      </div>
+    )
+  }
+
+  // ===========================================================================
+  // Render: Staged Treatment Plan (Phases) Tab
+  // ===========================================================================
+
+  const renderPhases = () => {
+    const todayStr = new Date().toISOString().slice(0, 10)
+    const planGroups = groupPhasesByPlan(phases)
+    const hasMultiplePlans = planGroups.length > 1
+
+    const activeGroup =
+      selectedPlanOption !== 'all' && selectedPlanOption !== 'compare'
+        ? planGroups.find((g) => g.optionKey.toUpperCase() === selectedPlanOption.toUpperCase()) || planGroups[0]
+        : null
+
+    const displayedPhases = activeGroup ? activeGroup.phases : phases
+
+    const prog = phasePlanProgress(displayedPhases)
+    const totalEstimated = prog.estimatedCost
+    const totalActual = prog.actualCost
+    const completedCount = prog.completed
+    const costCheck = comparePhaseCostToTreatments(displayedPhases, treatments)
+
+    const comparison = hasMultiplePlans ? comparePlanOptions(planGroups[0], planGroups[1] || null) : null
+
+    return (
+      <div className="space-y-4">
+        {/* Header and Actions */}
+        <div className="flex items-center justify-between flex-wrap gap-2">
+          <div>
+            <div className="flex items-center gap-2">
+              <p className="text-sm font-bold text-slate-800 dark:text-slate-100">
+                طرح درمان مرحله‌ای و گزینه‌های جایگزین
+              </p>
+              {hasMultiplePlans && (
+                <Badge color="primary">
+                  {toPersianDigits(planGroups.length)} گزینه درمانی
+                </Badge>
+              )}
+            </div>
+            <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+              {prog.total > 0
+                ? `${toPersianDigits(completedCount)} از ${toPersianDigits(prog.total)} فاز تکمیل شده — ${toPersianDigits(prog.percent)}٪`
+                : 'هنوز فازی تعریف نشده'}
+            </p>
+          </div>
+          <div className="flex items-center gap-2 flex-wrap">
+            {hasMultiplePlans && (
+              <Button variant="secondary" size="sm" onClick={handlePrintComparativePlans}>
+                <Printer size={14} className="inline ml-1" /> چاپ مقایسه گزینه‌ها
+              </Button>
+            )}
+            {phases.length > 0 && (
+              <Button variant="secondary" size="sm" onClick={handlePrintPhases}>
+                <Printer size={14} className="inline ml-1" /> چاپ پیش‌فاکتور
+              </Button>
+            )}
+            <Button
+              variant="primary"
+              size="sm"
+              onClick={() =>
+                openCreatePhase(
+                  undefined,
+                  selectedPlanOption !== 'all' && selectedPlanOption !== 'compare' ? selectedPlanOption : 'A',
+                )
+              }
+            >
+              <Plus size={14} className="inline ml-1" /> افزودن فاز
+            </Button>
+          </div>
+        </div>
+
+        {/* Alternative Plan Selector Tabs */}
+        {hasMultiplePlans && (
+          <div className="flex items-center gap-1.5 p-1.5 rounded-xl bg-slate-100 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 flex-wrap">
+            <button
+              onClick={() => setSelectedPlanOption('all')}
+              className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all-smooth ${
+                selectedPlanOption === 'all'
+                  ? 'bg-white dark:bg-slate-700 text-primary-700 dark:text-primary-300 shadow-sm'
+                  : 'text-slate-600 dark:text-slate-400 hover:text-slate-900'
+              }`}
+            >
+              همه فازها ({toPersianDigits(phases.length)})
+            </button>
+            {planGroups.map((grp) => (
+              <button
+                key={grp.optionKey}
+                onClick={() => setSelectedPlanOption(grp.optionKey)}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all-smooth ${
+                  selectedPlanOption === grp.optionKey
+                    ? 'bg-white dark:bg-slate-700 text-primary-700 dark:text-primary-300 shadow-sm'
+                    : 'text-slate-600 dark:text-slate-400 hover:text-slate-900'
+                }`}
+              >
+                <span>{grp.title}</span>
+                {grp.isAccepted && (
+                  <span className="w-2 h-2 rounded-full bg-success-500 inline-block" title="طرح مصوب بیمار" />
+                )}
+              </button>
+            ))}
+            <button
+              onClick={() => setSelectedPlanOption('compare')}
+              className={`flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-bold transition-all-smooth ${
+                selectedPlanOption === 'compare'
+                  ? 'bg-primary-600 text-white shadow-sm'
+                  : 'text-primary-700 dark:text-primary-400 hover:bg-primary-50 dark:hover:bg-primary-950/40'
+              }`}
+            >
+              <Sparkles size={12} />
+              <span>مقایسه هوشمند طرح‌ها (A vs B)</span>
+            </button>
+          </div>
+        )}
+
+        {/* Plan Acceptance Banner if single option active */}
+        {activeGroup && (
+          <div className="flex items-center justify-between p-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/60 flex-wrap gap-2">
+            <div className="flex items-center gap-2">
+              <span className="font-bold text-xs text-slate-800 dark:text-slate-200">{activeGroup.title}:</span>
+              {activeGroup.isAccepted ? (
+                <Badge color="success">✓ طرح مورد تأیید و انتخاب‌شده بیمار</Badge>
+              ) : (
+                <Badge color="secondary">گزینه پیشنهادی (منتظر تصمیم بیمار)</Badge>
+              )}
+            </div>
+            {!activeGroup.isAccepted && (
+              <Button
+                variant="primary"
+                size="sm"
+                onClick={() => handleAcceptPlanOption(activeGroup.optionKey)}
+              >
+                <CheckCircle2 size={14} className="inline ml-1" />
+                تأیید و انتخاب به عنوان طرح رسمی بیمار
+              </Button>
+            )}
+          </div>
+        )}
+
+        {/* Comparative Side-by-Side View */}
+        {selectedPlanOption === 'compare' && comparison && (
+          <div className="space-y-3">
+            {comparison.savingsMessage && (
+              <div className="p-3 rounded-xl bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-200 dark:border-emerald-800 text-xs text-emerald-800 dark:text-emerald-300 font-bold flex items-center gap-2">
+                <Sparkles size={16} className="text-emerald-600" />
+                <span>تحلیل اقتصادی: {comparison.savingsMessage}</span>
+              </div>
+            )}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {planGroups.map((grp) => (
+                <Card
+                  key={grp.optionKey}
+                  className={`p-4 space-y-3 ${
+                    grp.isAccepted ? 'border-2 border-success-500 shadow-md' : 'border border-slate-200 dark:border-slate-700'
+                  }`}
+                >
+                  <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 pb-2">
+                    <div>
+                      <h4 className="font-extrabold text-sm text-slate-800 dark:text-slate-100">{grp.title}</h4>
+                      <p className="text-xs text-slate-500 mt-0.5">{toPersianDigits(grp.phases.length)} فاز اجرایی</p>
+                    </div>
+                    {grp.isAccepted ? (
+                      <Badge color="success">✓ مصوب بیمار</Badge>
+                    ) : (
+                      <Button
+                        variant="secondary"
+                        size="sm"
+                        onClick={() => handleAcceptPlanOption(grp.optionKey)}
+                      >
+                        انتخاب این طرح
+                      </Button>
+                    )}
+                  </div>
+
+                  <div className="space-y-1.5">
+                    {grp.phases.map((ph) => (
+                      <div
+                        key={ph.id}
+                        className="p-2 rounded-lg bg-slate-50 dark:bg-slate-800/80 text-xs flex items-center justify-between"
+                      >
+                        <div>
+                          <span className="font-bold text-slate-700 dark:text-slate-300">
+                            فاز {toPersianDigits(ph.phase_number)}: {ph.title}
+                          </span>
+                          {ph.estimated_duration_days && (
+                            <span className="text-[10px] text-slate-400 block">
+                              طول دوره: {toPersianDigits(ph.estimated_duration_days)} روز
+                            </span>
+                          )}
+                        </div>
+                        <span className="font-extrabold text-slate-800 dark:text-slate-100">
+                          {ph.estimated_cost ? `${formatCurrency(ph.estimated_cost)} ت` : '-'}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+
+                  <div className="pt-2 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between font-extrabold text-xs">
+                    <span>مجموع برآورد هزینه:</span>
+                    <span className="text-sm font-black text-primary-700 dark:text-primary-400">
+                      {formatCurrency(grp.progress.estimatedCost)} ت
+                    </span>
+                  </div>
+                </Card>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Cost summary */}
+        {selectedPlanOption !== 'compare' && displayedPhases.length > 0 && (
+          <div className="grid grid-cols-2 gap-2.5">
+            <Card className="p-3">
+              <p className="text-[11px] text-slate-400">هزینه‌ی تخمینی کل</p>
+              <p className="text-base font-extrabold text-primary-700">{formatCurrency(totalEstimated)} ت</p>
+            </Card>
+            <Card className="p-3">
+              <p className="text-[11px] text-slate-400">هزینه‌ی واقعی تا الان</p>
+              <p className="text-base font-extrabold text-slate-700 dark:text-slate-200">{formatCurrency(totalActual)} ت</p>
+            </Card>
+          </div>
+        )}
+
+        {selectedPlanOption !== 'compare' && displayedPhases.length > 0 && !costCheck.ok && (
+          <p className="text-xs text-amber-700">
+            <AlertTriangle size={13} className="inline-block ml-1" /> {costCheck.message} ({formatCurrency(Math.abs(costCheck.difference))} ت اختلاف)
+          </p>
+        )}
+
+        {/* Phase Cards */}
+        {selectedPlanOption !== 'compare' && displayedPhases.length === 0 ? (
+          <EmptyState
+            icon={<Layers size={40} />}
+            title="فاز درمانی ثبت نشده"
+            description="برای طرح‌های درمانی چندمرحله‌ای فازها را اینجا تعریف کنید"
+          />
+        ) : selectedPlanOption !== 'compare' ? (
+          <div className="relative space-y-3">
+            {displayedPhases.map((p, i) => {
+              const meta = phaseStatuses.find((s) => s.value === p.status) || phaseStatuses[0]
+              const doc = doctors.find((d) => d.id === p.doctor_id)
+              const planLabel = p.plan_option === 'B' ? 'طرح ب (جایگزین)' : p.plan_option === 'C' ? 'طرح ج' : 'طرح الف'
+              return (
+                <div key={p.id} className="relative flex gap-3">
+                  <div className="flex flex-col items-center">
+                    <div
+                      className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-extrabold shrink-0 ${
+                        p.status === 'completed'
+                          ? 'bg-success-500 text-white'
+                          : p.status === 'in_progress'
+                            ? 'bg-warning-400 text-white'
+                            : 'bg-slate-200 text-slate-500'
+                      }`}
+                    >
+                      {p.status === 'completed' ? <CheckCircle2 size={16} /> : toPersianDigits(p.phase_number)}
+                    </div>
+                    {i < displayedPhases.length - 1 && (
+                      <div className="w-0.5 flex-1 bg-slate-200 dark:bg-slate-700 my-1" />
+                    )}
+                  </div>
+                  {(() => {
+                    const sched = phaseSchedule(p, todayStr)
+                    if (sched.timing === 'overdue') {
+                      return <Badge color="error">{toPersianDigits(Math.abs(sched.daysRemaining ?? 0))} روز تأخیر</Badge>
+                    }
+                    if (sched.timing === 'due_today') return <Badge color="warning">امروز موعد</Badge>
+                    return null
+                  })()}
+                  <Card className="flex-1 p-3.5 mb-1">
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="min-w-0">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <p className="text-sm font-bold text-slate-800 dark:text-slate-100 truncate">
+                            فاز {toPersianDigits(p.phase_number)}: {p.title}
+                          </p>
+                          <Badge color="secondary">{planLabel}</Badge>
+                          {p.is_accepted && <Badge color="success">مصوب بیمار</Badge>}
+                        </div>
+                        {p.description && (
+                          <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">{p.description}</p>
+                        )}
+                        {doc && <p className="text-[11px] text-slate-400 mt-1">دکتر {doc.name}</p>}
+                      </div>
+                      <Badge color={meta.color}>{meta.label}</Badge>
+                    </div>
+                    <div className="flex items-center gap-3 mt-2 flex-wrap text-[11px] text-slate-500 dark:text-slate-400">
+                      {p.estimated_cost != null && <span>هزینه تخمینی: {formatCurrency(p.estimated_cost)} ت</span>}
+                      {p.estimated_duration_days != null && (
+                        <span>مدت: {toPersianDigits(p.estimated_duration_days)} روز</span>
+                      )}
+                    </div>
+                    <div className="flex gap-2 mt-2.5 pt-2.5 border-t border-slate-100 dark:border-slate-700">
+                      <button onClick={() => openEditPhase(p)} className="text-xs text-primary-600 hover:underline">
+                        ویرایش
+                      </button>
+                      <button onClick={() => handleDeletePhase(p)} className="text-xs text-error-500 hover:underline">
+                        لغو
+                      </button>
+                    </div>
+                  </Card>
+                </div>
+              )
+            })}
+          </div>
+        ) : null}
+      </div>
+    )
+  }
+
+  // ===========================================================================
+  // Render: Consent Forms Tab
+  // ===========================================================================
+
+  const renderConsentForms = () => (
+    <div className="space-y-4">
+      <div className="flex items-center justify-between">
+        <div>
+          <p className="text-sm font-bold text-slate-800 dark:text-slate-100">فرم‌های رضایت‌نامه</p>
+          <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+            {consentForms.length > 0 ? `${toPersianDigits(consentForms.filter((c) => c.signed_by_patient).length)} از ${toPersianDigits(consentForms.length)} امضا شده` : 'هنوز فرمی ثبت نشده'}
+          </p>
+        </div>
+        <Button variant="primary" size="sm" onClick={openCreateConsent}><Plus size={14} className="inline ml-1" /> فرم جدید</Button>
+      </div>
+
+      {consentForms.length === 0 ? (
+        <EmptyState icon={<FileSignature size={40} />} title="فرم رضایت‌نامه ثبت نشده" description="پیش از درمان‌های جراحی یا پرخطر (ایمپلنت، کشیدن، جراحی) رضایت آگاهانه‌ی بیمار را اینجا ثبت و چاپ کنید" />
+      ) : (
+        <div className="space-y-2">
+          {consentForms.map((c) => {
+            const doc = doctors.find((d) => d.id === c.doctor_id)
+            return (
+              <Card key={c.id} className="p-3.5">
+                <div className="flex items-start justify-between gap-2">
+                  <div className="min-w-0 flex-1">
+                    <p className="text-sm font-bold text-slate-800 dark:text-slate-100 truncate">{c.treatment_description}</p>
+                    <p className="text-[11px] text-slate-400 mt-0.5">{doc ? `دکتر ${doc.name || doc.specialty}` : 'بدون پزشک'} — {toJalaliStringPretty(c.created_at)}</p>
+                    {c.signature_data && (
+                      <div className="mt-2 inline-flex items-center gap-2 px-2 py-1 rounded-lg bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700">
+                        <img src={c.signature_data} alt="امضا" className="h-6 max-w-[80px] object-contain" />
+                        <span className="text-[10px] text-success-600 dark:text-success-400 font-bold">دارای امضای دیجیتال</span>
+                      </div>
+                    )}
+                  </div>
+                  <Badge color={c.signed_by_patient || c.signature_data ? 'success' : 'warning'}>{c.signed_by_patient || c.signature_data ? 'امضا شده' : 'امضا نشده'}</Badge>
+                </div>
+                <div className="flex gap-2 mt-2.5 pt-2.5 border-t border-slate-100 dark:border-slate-700">
+                  <button onClick={() => handlePrintConsent(c)} className="flex items-center gap-1 text-xs text-primary-600 hover:underline"><Printer size={12} /> چاپ</button>
+                  <button onClick={() => openEditConsent(c)} className="text-xs text-slate-500 hover:underline">ویرایش</button>
+                  <button onClick={() => handleDeleteConsent(c)} className="text-xs text-error-500 hover:underline">آرشیو</button>
+                </div>
+              </Card>
+            )
+          })}
+        </div>
+      )}
+    </div>
+  )
+
+  // ===========================================================================
+  // Render: Appointments Tab
+  // ====================================================================================
+
+  const renderAppointments = () => {
+    const handleNewAppointment = () => {
+      navigate('/appointments', {
+        state: {
+          quickStartPatientId: patient?.id,
+          quickStartDoctorId: patient?.primary_doctor_id,
+          openWizard: true,
+        },
+      })
+    }
+
+    if (appointments.length === 0) {
+      return (
+        <Card className="p-6 text-center">
+          <EmptyState
+            icon={<Calendar size={32} />}
+            title="نوبتی ثبت نشده"
+            description="برای این بیمار هنوز نوبتی ثبت نشده است"
+            action={
+              <Button size="sm" variant="primary" onClick={handleNewAppointment} className="appointment-primary flex items-center gap-1.5 mt-2">
+                <Calendar size={14} /> ثبت اولین نوبت
+              </Button>
+            }
+          />
+        </Card>
+      )
+    }
+    const now = new Date().toISOString().slice(0, 10)
+    const upcoming = appointments.filter((a) => a.date >= now).sort((a, b) => a.date.localeCompare(b.date))
+    const past = appointments.filter((a) => a.date < now).sort((a, b) => b.date.localeCompare(a.date))
+    return (
+      <div className="space-y-4">
+        <div className="flex items-center justify-between gap-3">
+          <h3 className="text-sm font-bold text-slate-700">نوبت‌های بیمار</h3>
+          <Button
+            size="sm"
+            variant="primary"
+            onClick={handleNewAppointment}
+            className="appointment-primary flex items-center gap-1.5 text-xs"
+          >
+            <Calendar size={14} /> نوبت جدید برای این بیمار
+          </Button>
+        </div>
+
+        {upcoming.length > 0 && (
+          <div>
+            <h3 className="text-xs font-semibold text-slate-500 mb-2">نوبت‌های آینده ({upcoming.length})</h3>
+            <div className="space-y-2">
+              {upcoming.map((a) => {
+                const statusMeta = appointmentStatuses.find((s) => s.value === a.status) || appointmentStatuses[0]
+                const doc = doctors.find((d) => d.id === a.doctor_id)
+                const typeName = (a.type && apptTypeLabels[a.type]) || a.type || 'ویزیت'
+                return (
+                  <Card key={a.id} className="p-3 hover:border-primary-200 transition-colors">
+                    <div className="flex items-center justify-between gap-3 flex-wrap">
+                      <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 rounded-xl bg-primary-50 text-primary-600 flex items-center justify-center shrink-0">
+                          <Calendar size={18} />
+                        </div>
+                        <div>
+                          <div className="flex items-center gap-2">
+                            <p className="text-sm font-medium text-slate-800">{toJalaliStringPretty(a.date)}</p>
+                            <span className="text-xs px-2 py-0.5 rounded-full bg-slate-100 text-slate-600 font-medium">
+                              {typeName}
+                            </span>
+                          </div>
+                          <div className="flex items-center gap-2 mt-0.5 text-xs text-slate-500">
+                            <span>{formatTime(a.start_time)} - {formatTime(a.end_time)}</span>
+                            {doc && (
+                              <>
+                                <span>•</span>
+                                <span className="text-primary-600 font-medium">دکتر {doc.name || doc.specialty}</span>
+                              </>
+                            )}
+                            {a.notes && (
+                              <>
+                                <span>•</span>
+                                <span className="text-slate-400 truncate max-w-xs">{a.notes}</span>
+                              </>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                      <Badge color={statusMeta.color}>{statusMeta.label}</Badge>
+                    </div>
+                  </Card>
+                )
+              })}
+            </div>
+          </div>
+        )}
+        {past.length > 0 && (
+          <div>
+            <h3 className="text-xs font-semibold text-slate-400 mb-2">نوبت‌های گذشته ({past.length})</h3>
+            <div className="space-y-2">
+              {past.map((a) => {
+                const statusMeta = appointmentStatuses.find((s) => s.value === a.status) || appointmentStatuses[0]
+                const doc = doctors.find((d) => d.id === a.doctor_id)
+                const typeName = (a.type && apptTypeLabels[a.type]) || a.type || 'ویزیت'
+                return (
+                  <Card key={a.id} className="p-3 opacity-75">
+                    <div className="flex items-center justify-between gap-3 flex-wrap">
+                      <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 rounded-xl bg-slate-100 text-slate-500 flex items-center justify-center shrink-0">
+                          <Calendar size={18} />
+                        </div>
+                        <div>
+                          <div className="flex items-center gap-2">
+                            <p className="text-sm font-medium text-slate-700">{toJalaliStringPretty(a.date)}</p>
+                            <span className="text-xs px-2 py-0.5 rounded-full bg-slate-100 text-slate-500">
+                              {typeName}
+                            </span>
+                          </div>
+                          <div className="flex items-center gap-2 mt-0.5 text-xs text-slate-400">
+                            <span>{formatTime(a.start_time)} - {formatTime(a.end_time)}</span>
+                            {doc && (
+                              <>
+                                <span>•</span>
+                                <span>دکتر {doc.name || doc.specialty}</span>
+                              </>
+                            )}
+                            {a.notes && (
+                              <>
+                                <span>•</span>
+                                <span className="truncate max-w-xs">{a.notes}</span>
+                              </>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                      <Badge color={statusMeta.color}>{statusMeta.label}</Badge>
+                    </div>
+                  </Card>
+                )
+              })}
+            </div>
+          </div>
+        )}
+      </div>
+    )
+  }
+
+  // ===========================================================================
+  // Render: Payments Tab
+  // ===========================================================================
+
+  /** Per-doctor account inside this one file. Only shown once more than
+   * one party is involved — on a single-doctor file the table would just
+   * repeat the summary below it. */
+  const renderDoctorLedger = () => {
+    if (doctorLedger.rows.length < 2) return null
+    const fmt = (n: number) => `${formatCurrency(n)} ت`
+    return (
+      <Card className="p-4">
+        <h3 className="text-sm font-bold text-slate-700 mb-3 flex items-center gap-2">
+          <Stethoscope size={16} /> خلاصه حساب پزشکان معالج
+        </h3>
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="text-slate-500 text-xs">
+                <th className="text-right font-medium pb-2">پزشک</th>
+                <th className="text-left font-medium pb-2">هزینه</th>
+                <th className="text-left font-medium pb-2">پرداختی</th>
+                <th className="text-left font-medium pb-2">مانده</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-100">
+              {doctorLedger.rows.map((row) => (
+                <tr key={row.doctorId ?? 'unattributed'}>
+                  <td className="py-2 text-right">
+                    {row.doctorId === null
+                      ? <span className="text-slate-500">نامشخص</span>
+                      : getDoctorName(row.doctorId)}
+                  </td>
+                  <td className="py-2 text-left" dir="ltr">{fmt(row.cost)}</td>
+                  <td className="py-2 text-left" dir="ltr">{fmt(row.paid)}</td>
+                  <td className={`py-2 text-left font-bold ${row.balance > 0 ? 'text-error-600' : 'text-slate-700'}`} dir="ltr">
+                    {fmt(row.balance)}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+            <tfoot>
+              <tr className="border-t-2 border-slate-200 font-bold">
+                <td className="pt-2 text-right">مجموع</td>
+                <td className="pt-2 text-left" dir="ltr">{fmt(doctorLedger.totals.cost)}</td>
+                <td className="pt-2 text-left" dir="ltr">{fmt(doctorLedger.totals.paid)}</td>
+                <td className="pt-2 text-left" dir="ltr">{fmt(doctorLedger.totals.balance)}</td>
+              </tr>
+            </tfoot>
+          </table>
+        </div>
+        {doctorLedger.hasUnattributed && (
+          // Said out loud rather than hidden: a payment with no encounter
+          // cannot be tied to a doctor, and spreading it across them
+          // would produce a table that balances and is wrong.
+          <p className="mt-3 text-xs text-amber-700">
+            <AlertTriangle size={13} className="inline-block ml-1" /> بخشی از پرداخت‌ها به هیچ ویزیتی وصل نیست، پس قابل انتساب به پزشک نبود و در ردیف «نامشخص» آمده.
+          </p>
+        )}
+      </Card>
+    )
+  }
+
+  /**
+   * MOD-FEAT-038 | یک تاریخچه‌ی پرداخت، نه دو
+   *
+   * MOD-FEAT-031 built the patient's financial overview and stopped
+   * short of this tab because it already had its own payment list —
+   * putting both here would have been two views of one thing. The right
+   * fix was never "add a third"; it was to let the hand-rolled list go.
+   *
+   * What this tab had that the overview did not was the per-doctor
+   * ledger, so that stays. What the overview has that this list never
+   * did is which tooth and which doctor each payment was for, and the
+   * cheques — which is exactly the detail Mehdi asked the history to
+   * carry.
+   */
+  const renderPayments = () => {
+    return (
+      <div className="space-y-4">
+        <div className="grid grid-cols-2 gap-3">
+          <button onClick={() => paymentPlans.length ? document.getElementById('section-payment-plans')?.scrollIntoView({ behavior: 'smooth' }) : handleOpenPlanModal()} style={conceptStyle('plans')} className="patient-tile rounded-2xl p-4 text-right flex items-center gap-3 text-amber-800 dark:text-amber-300">
+            <patientConcepts.plans.icon size={24} /><span className="font-black text-sm">اقساط و طرح‌های پرداخت<br/><small className="font-medium">{toPersianDigits(paymentPlans.length)} طرح</small></span>
+          </button>
+          <button onClick={() => cheques.length ? document.getElementById('section-cheques')?.scrollIntoView({ behavior: 'smooth' }) : handleOpenChequeModal()} style={conceptStyle('plans')} className="patient-tile rounded-2xl p-4 text-right flex items-center gap-3 text-amber-800 dark:text-amber-300">
+            <patientConcepts.plans.icon size={24} /><span className="font-black text-sm">چک‌های صیادی<br/><small className="font-medium">{toPersianDigits(cheques.length)} چک</small></span>
+          </button>
+        </div>
+        {renderDoctorLedger()}
+        <Card className="p-4">
+          <PatientFinanceOverview
+            hasMedicalAlerts={!!patient?.allergies || !!patient?.medical_conditions}
+            patientId={patient!.id}
+            patientName={`${patient!.first_name} ${patient!.last_name}`}
+            payments={payments}
+            treatments={treatments}
+            currentPatient={patient ?? undefined}
+            allPatients={allPatients}
+            allPayments={allPayments}
+            allTreatments={allTreatments}
+            doctors={doctors as never}
+            implantCases={implantCases}
+            cheques={cheques as never}
+            paymentPlans={paymentPlans}
+            installments={installments}
+            onAddPayment={handleOpenPaymentModal}
+            onAddCheque={handleOpenChequeModal}
+            onAddPlan={handleOpenPlanModal}
+            onPayInstallment={handlePayInstallment}
+            onClearCheque={handleClearCheque}
+            onBounceCheque={handleBounceCheque}
+          />
+        </Card>
+      </div>
+    )
+  }
+
+  // ===========================================================================
+  // Render: Teeth Chart Tab
+  // ===========================================================================
+
+  const renderTeethChart = () => (
+    <DentalChart
+      toothRecords={toothRecords}
+      treatments={treatments}
+      radiologyImages={radiologyImages}
+      onUpdateTooth={handleUpdateTooth}
+      onAddTreatment={(toothNumber, surface, condition) => {
+        switchTab('phases')
+        openCreatePhase(toothNumber, surface, condition)
+      }}
+      onAddLabOrder={(toothNumber, surface, condition) => {
+        if (!patient) return
+        const handoff = buildChartHandoff('lab', {
+          toothNumber,
+          surface,
+          condition,
+          patientId: patient.id,
+          doctorId: patient.primary_doctor_id,
+        })
+        if (handoff) navigate(handoff.path, { state: handoff.state })
+      }}
+      onAddImplantCase={(toothNumber, surface, condition) => {
+        if (!patient) return
+        const handoff = buildChartHandoff('implant', {
+          toothNumber,
+          surface,
+          condition,
+          patientId: patient.id,
+          doctorId: patient.primary_doctor_id,
+        })
+        if (handoff) navigate(handoff.path, { state: handoff.state })
+      }}
+      onViewRadiology={(toothNumber) => {
+        setRadToothFilter(toothNumber)
+        switchTab('radiology')
+      }}
+    />
+  )
+
+  // ===========================================================================
+  // Render: Prescriptions Tab
+  // ===========================================================================
+
+  const renderPrescriptions = () => {
+    const handleNewPrescription = () => {
+      navigate('/prescriptions', {
+        state: {
+          quickStartPatientId: patient?.id,
+          quickStartDoctorId: patient?.primary_doctor_id,
+          quickStartToothNumber: 'general',
+        },
+      })
+    }
+
+    const handlePrintPrescription = (pres: any) => {
+      const doc = doctors.find((d) => d.id === pres.doctor_id)
+      const win = window.open('', '_blank')
+      if (!win) {
+        showToast('error', 'امکان باز کردن پنجره چاپ وجود ندارد — پاپ‌آپ مرورگر را فعال کنید')
+        return
+      }
+      const meds = pres.medications
+      let medList: { name: string; dose?: string; frequency?: string }[] = []
+      if (Array.isArray(meds)) {
+        medList = meds.map((m: any) => typeof m === 'string' ? { name: m } : { name: m.name || '', dose: m.dose, frequency: m.frequency })
+      } else if (meds && typeof meds === 'object') {
+        medList = ((meds as any).items || Object.values(meds)).map((m: any) => typeof m === 'string' ? { name: m } : { name: m?.name || '', dose: m?.dose, frequency: m?.frequency })
+      }
+
+      const rxStyles = `
+        body { font-family: system-ui, -apple-system, sans-serif; direction: rtl; padding: 24px; color: #1e293b; line-height: 1.6; }
+        .header { border-bottom: 2px solid #0284c7; padding-bottom: 12px; margin-bottom: 20px; display: flex; justify-content: space-between; align-items: center; }
+        .header h1 { font-size: 18px; margin: 0; color: #0284c7; }
+        .meta { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; font-size: 13px; margin-bottom: 16px; background: #f8fafc; padding: 12px; border-radius: 8px; }
+        table { width: 100%; border-collapse: collapse; margin-top: 16px; }
+        th, td { border: 1px solid #cbd5e1; padding: 8px 12px; text-align: right; font-size: 13px; }
+        th { background: #f1f5f9; font-weight: bold; }
+        .footer { margin-top: 40px; padding-top: 16px; border-top: 1px dashed #cbd5e1; display: flex; justify-content: space-between; font-size: 12px; color: #64748b; }
+        .notes { margin-top: 16px; padding: 10px; background: #f8fafc; border-radius: 6px; font-size: 12px; }
+      `
+      const rxBody = `
+        <div class="header">
+          <h1>نسخه دارویی کلینیک دندانپزشکی مینا</h1>
+          <span>تاریخ: ${toJalaliStringPretty(pres.created_at)}</span>
+        </div>
+        <div class="meta">
+          <div><b>نام بیمار:</b> ${patient ? `${patient.first_name} ${patient.last_name}` : '—'}</div>
+          <div><b>پزشک معالج:</b> ${doc ? `دکتر ${doc.name || doc.specialty || 'پزشک'}` : '—'}</div>
+          <div><b>کد پرونده:</b> ${patient?.file_number || '—'}</div>
+          <div><b>کد ملی:</b> ${patient?.national_id || '—'}</div>
+        </div>
+        <table>
+          <thead>
+            <tr>
+              <th>ردیف</th>
+              <th>نام دارو</th>
+              <th>دوز / مشخصات</th>
+              <th>دستور مصرف</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${medList.map((m, idx) => `
+              <tr>
+                <td>${toPersianDigits(idx + 1)}</td>
+                <td>${m.name || '—'}</td>
+                <td>${m.dose || '—'}</td>
+                <td>${m.frequency || '—'}</td>
+              </tr>
+            `).join('')}
+          </tbody>
+        </table>
+        ${pres.notes ? `<div class="notes"><b>توضیحات و دستورات پزشک:</b> ${pres.notes}</div>` : ''}
+        <div class="footer">
+          <span>کلینیک دندانپزشکی مینا</span>
+          <span>مهر و امضای پزشک معالج</span>
+        </div>
+      `
+      win.document.write(buildPrintDocument({ title: `نسخه دارویی — ${patient?.first_name} ${patient?.last_name}`, styles: rxStyles, bodyHtml: rxBody }))
+      win.document.close()
+      win.focus()
+    }
+
+    const handlePrintPatientGuide = (pres: any) => {
+      if (!patient) return
+      h.tap()
+      chimes.playPop()
+      const doc = doctors.find((d) => d.id === pres.doctor_id)
+      const meds = pres.medications
+      let medList: { name: string; dose?: string; frequency?: string }[] = []
+      if (Array.isArray(meds)) {
+        medList = meds.map((m: any) => typeof m === 'string' ? { name: m } : { name: m.name || '', dose: m.dose, frequency: m.frequency })
+      } else if (meds && typeof meds === 'object') {
+        medList = ((meds as any).items || Object.values(meds)).map((m: any) => typeof m === 'string' ? { name: m } : { name: m?.name || '', dose: m?.dose, frequency: m?.frequency })
+      }
+
+      const win = window.open('', '_blank', 'width=750,height=900')
+      if (!win) {
+        showToast('error', 'اجازه‌ی باز کردن پنجره‌ی چاپ داده نشد — لطفاً مسدودکننده پاپ‌آپ را غیرفعال کنید')
+        return
+      }
+      const guideDoc = buildPatientMedicationGuideDocument({
+        patientName: `${patient.first_name} ${patient.last_name}`,
+        doctorName: doc ? `دکتر ${doc.name || doc.specialty || 'پزشک'}` : 'پزشک کلینیک',
+        createdDate: pres.created_at,
+        medications: medList,
+        notes: pres.notes || undefined,
+      })
+      win.document.write(guideDoc)
+      win.document.close()
+      win.focus()
+    }
+
+    if (prescriptions.length === 0) {
+      return (
+        <Card className="p-6 text-center">
+          <EmptyState
+            icon={<Pill size={32} />}
+            title="نسخه‌ای ثبت نشده"
+            description="برای این بیمار هنوز نسخه‌ای ثبت نشده است"
+            action={
+              <Button size="sm" variant="primary" onClick={handleNewPrescription} className="flex items-center gap-1.5 mt-2">
+                <Pill size={14} /> ثبت اولین نسخه
+              </Button>
+            }
+          />
+        </Card>
+      )
+    }
+    return (
+      <div className="space-y-3">
+        <div className="flex items-center justify-between gap-3">
+          <h3 className="text-sm font-bold text-slate-700">نسخه‌های دارویی بیمار ({prescriptions.length})</h3>
+          <Button
+            size="sm"
+            variant="primary"
+            onClick={handleNewPrescription}
+            className="flex items-center gap-1.5 text-xs"
+          >
+            <Pill size={14} /> ثبت نسخه جدید
+          </Button>
+        </div>
+
+        <div className="space-y-2">
+          {prescriptions.map((p) => {
+            const pres = p as any
+            const doctor = doctors.find((d) => d.id === pres.doctor_id)
+            const meds = pres.medications
+            let medList: string[] = []
+            if (Array.isArray(meds)) {
+              medList = meds.map((m: any) => typeof m === 'string' ? m : m.name || '')
+            } else if (meds && typeof meds === 'object') {
+              medList = Object.values(meds).map((m: any) => typeof m === 'string' ? m : m?.name || '')
+            }
+            return (
+              <Card key={pres.id} className="p-4 hover:border-primary-200 transition-colors">
+                <div className="flex items-center justify-between gap-3 mb-2 flex-wrap">
+                  <div className="flex items-center gap-2">
+                    <div className="w-9 h-9 rounded-xl bg-primary-50 text-primary-600 flex items-center justify-center">
+                      <Pill size={16} />
+                    </div>
+                    <div>
+                      <p className="text-sm font-medium text-slate-800">نسخه دارویی</p>
+                      <p className="text-xs text-slate-500">{doctor ? `دکتر ${doctor.name || doctor.specialty || 'پزشک'}` : 'نامشخص'} - {toJalaliStringPretty(pres.created_at)}</p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      onClick={() => handlePrintPrescription(pres)}
+                      className="text-xs text-slate-500 hover:text-primary-600 flex items-center gap-1"
+                    >
+                      <Printer size={13} /> چاپ نسخه
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      onClick={() => handlePrintPatientGuide(pres)}
+                      className="text-xs text-teal-600 hover:text-teal-700 flex items-center gap-1"
+                      title="چاپ برگه راهنمای دارویی و مراقبت‌های پس از درمان بیمار"
+                    >
+                      <FileHeart size={13} /> راهنمای بیمار
+                    </Button>
+                    <Badge color={pres.status === 'active' ? 'success' : 'slate'}>{pres.status === 'active' ? 'فعال' : pres.status}</Badge>
+                  </div>
+                </div>
+                {medList.length > 0 && (
+                  <div className="flex items-center gap-1.5 flex-wrap mt-2">
+                    {medList.map((m, i) => m && (
+                      <span key={i} className="px-2 py-1 rounded-md bg-slate-100 text-slate-700 text-xs font-medium">{m}</span>
+                    ))}
+                  </div>
+                )}
+                {pres.notes && <p className="text-xs text-slate-500 mt-2 bg-slate-50 p-2 rounded-lg">{pres.notes}</p>}
+              </Card>
+            )
+          })}
+        </div>
+      </div>
+    )
+  }
+
+  // ===========================================================================
+  // Render: Radiology Tab
+  // ===========================================================================
+
+  const renderRadiology = () => {
+    if (radiologyImages.length === 0) {
+      return (
+        <Card className="p-6">
+          <EmptyState icon={<ImageIcon size={32} />} title="تصویر رادیولوژی ثبت نشده" description="برای این بیمار تصویر رادیولوژی ثبت نشده است" />
+        </Card>
+      )
+    }
+
+    const distinctTeeth = Array.from(
+      new Set(radiologyImages.flatMap((img) => parseRadiologyTeeth(img.tooth_number)))
+    ).sort()
+    const filteredImages = radToothFilter === 'all'
+      ? radiologyImages
+      : radiologyImages.filter((img) => matchesRadiologyTooth(img.tooth_number, radToothFilter))
+
+    const validImagesWithUrl = radiologyImages.filter((img) => Boolean(img.image_url))
+
+    const handlePrintRadiologyPortfolio = () => {
+      if (!patient || radiologyImages.length === 0) return
+      h.tap()
+      chimes.playPop()
+      const html = generateRadiologyPortfolioHtml({ patient, images: radiologyImages })
+      const win = window.open('', '_blank', 'width=900,height=1000')
+      if (!win) {
+        showToast('error', 'پنجره چاپ مسدود شد — لطفاً پاپ‌آپ مرورگر را مجاز کنید')
+        return
+      }
+      win.document.write(html)
+      win.document.close()
+      win.focus()
+    }
+
+    const handleDownloadDicomMetadata = () => {
+      if (!patient || radiologyImages.length === 0) return
+      h.tap()
+      chimes.playSuccess()
+      const dicomData = generateDicomMetadataJson({ patient, images: radiologyImages })
+      const blob = new Blob([JSON.stringify(dicomData, null, 2)], { type: 'application/json' })
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `DICOM-Metadata-${patient.file_number || patient.id}.json`
+      document.body.appendChild(a)
+      a.click()
+      document.body.removeChild(a)
+      URL.revokeObjectURL(url)
+      showToast('success', 'فایل متادیتای DICOM صادر و دانلود شد')
+    }
+
+    const handleToggleRadSelect = (imgId: string) => {
+      h.tap()
+      setSelectedRadIds((prev) => {
+        const next = new Set(prev)
+        if (next.has(imgId)) next.delete(imgId)
+        else next.add(imgId)
+        return next
+      })
+    }
+
+    const handleSelectAllRad = () => {
+      h.tap()
+      if (selectedRadIds.size === filteredImages.length) {
+        setSelectedRadIds(new Set())
+      } else {
+        setSelectedRadIds(new Set(filteredImages.map((i) => i.id)))
+      }
+    }
+
+    const handleDownloadZip = async (onlySelected = false) => {
+      if (!patient) return
+      const targetImages = onlySelected
+        ? radiologyImages.filter((img) => selectedRadIds.has(img.id))
+        : radiologyImages
+      if (targetImages.length === 0) {
+        showToast('error', 'تصویری برای خروجی انتخاب نشده است')
+        return
+      }
+      h.tap()
+      chimes.playPop()
+      setZippingArchive(true)
+      setZipProgressText('در حال آماده‌سازی بسته فشرده ZIP...')
+      try {
+        const blob = await createPatientRadiologyZip({
+          patient,
+          images: targetImages,
+          includeDicomJson: true,
+          includeHtmlPortfolio: true,
+          onProgress: (_curr, _tot, msg) => setZipProgressText(msg),
+        })
+        const filename = `Radiology_${patient.file_number || patient.id}_${patient.last_name || 'Patient'}.zip`
+        downloadBlob(blob, filename)
+        chimes.playSuccess()
+        showToast('success', `آرشیو ZIP با موفقیت تولید و دانلود شد (${toPersianDigits(targetImages.length)} تصویر)`)
+      } catch (err) {
+        console.error('Error generating radiology zip:', err)
+        showToast('error', 'خطا در فشرده‌سازی و دانلود آرشیو ZIP')
+      } finally {
+        setZippingArchive(false)
+        setZipProgressText('')
+      }
+    }
+
+    const handleApplyBatchTag = async () => {
+      if (selectedRadIds.size === 0) return
+      if (!batchToothInput.trim() && !batchTypeInput.trim()) {
+        showToast('error', 'حداقل یکی از موارد شماره دندان یا نوع تصویر را وارد فرمایید')
+        return
+      }
+      setSavingBatchRad(true)
+      try {
+        const promises: Promise<any>[] = []
+        for (const radId of Array.from(selectedRadIds)) {
+          const patch: Partial<RadiologyImage> = {}
+          if (batchToothInput.trim()) patch.tooth_number = batchToothInput.trim()
+          if (batchTypeInput.trim()) patch.image_type = batchTypeInput.trim()
+          promises.push(updateRadiologyImage(radId, patch as any))
+        }
+        await Promise.all(promises)
+        chimes.playSuccess()
+        showToast('success', `برچسب‌های ${toPersianDigits(selectedRadIds.size)} تصویر با موفقیت به‌روزرسانی شد`)
+        setBatchTagModalOpen(false)
+        setSelectedRadIds(new Set())
+        await loadTabData()
+      } catch (err) {
+        console.error('Error updating batch radiology:', err)
+        showToast('error', 'خطا در به‌روزرسانی دسته‌ای تصاویر')
+      } finally {
+        setSavingBatchRad(false)
+      }
+    }
+
+    return (
+      <div className="space-y-4">
+        {/* Controls & Filter Bar */}
+        <div className="flex items-center justify-between gap-3 flex-wrap bg-white dark:bg-slate-900 p-3 rounded-2xl border border-slate-100 dark:border-slate-800 shadow-sm">
+          <div className="flex items-center gap-1.5 flex-wrap">
+            <span className="text-xs font-bold text-slate-500 ml-1">فیلتر دندان:</span>
+            <button
+              onClick={() => {
+                h.tap()
+                setRadToothFilter('all')
+              }}
+              className={`px-3 py-1.5 rounded-xl text-xs font-medium transition-all-smooth press-scale ${
+                radToothFilter === 'all'
+                  ? 'bg-primary-600 text-white shadow-sm'
+                  : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200'
+              }`}
+            >
+              همه تصاویر ({toPersianDigits(radiologyImages.length)})
+            </button>
+            {distinctTeeth.map((t) => (
+              <button
+                key={t}
+                onClick={() => {
+                  h.tap()
+                  setRadToothFilter(t)
+                }}
+                className={`px-3 py-1.5 rounded-xl text-xs font-medium transition-all-smooth press-scale ${
+                  radToothFilter === t
+                    ? 'bg-primary-600 text-white shadow-sm'
+                    : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200'
+                }`}
+              >
+                دندان {toothLabel(t)}
+              </button>
+            ))}
+
+            {filteredImages.length > 0 && (
+              <button
+                onClick={handleSelectAllRad}
+                className="px-2.5 py-1.5 rounded-xl text-xs font-medium bg-slate-50 dark:bg-slate-800/60 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-700 hover:bg-slate-100 flex items-center gap-1 mr-2"
+                title={selectedRadIds.size === filteredImages.length ? 'لغو انتخاب همه' : 'انتخاب همه تصاویر جاری'}
+              >
+                {selectedRadIds.size === filteredImages.length ? <CheckSquare size={13} className="text-primary-600" /> : <Square size={13} />}
+                <span>{selectedRadIds.size === filteredImages.length ? 'لغو انتخاب همه' : 'انتخاب همه'}</span>
+              </button>
+            )}
+          </div>
+
+          <div className="flex items-center gap-2 flex-wrap">
+            <Button
+              size="sm"
+              variant="primary"
+              onClick={() => {
+                h.tap()
+                chimes.playPop()
+                setScannerInitialCategory('radiology')
+                setScannerModalOpen(true)
+              }}
+              className="flex items-center gap-1.5 text-xs font-bold"
+              title="عکس‌برداری با دوربین یا آپلود فایل رادیولوژی و ذخیره لوکال"
+            >
+              <Camera size={14} /> اسکن و افزودن گرافی
+            </Button>
+            <Button
+              size="sm"
+              variant="secondary"
+              onClick={handlePrintRadiologyPortfolio}
+              className="flex items-center gap-1.5 text-xs font-medium"
+              title="چاپ و خروجی کامل شناسنامه گرافی‌های بیمار"
+            >
+              <Printer size={14} /> شناسنامه رادیولوژی
+            </Button>
+            <Button
+              size="sm"
+              variant="secondary"
+              onClick={handleDownloadDicomMetadata}
+              className="flex items-center gap-1.5 text-xs font-medium"
+              title="صادرات داده‌های ساخت‌یافته استاندارد DICOM"
+            >
+              <Download size={14} /> متادیتا DICOM
+            </Button>
+            <Button
+              size="sm"
+              variant="secondary"
+              disabled={zippingArchive}
+              onClick={() => handleDownloadZip(false)}
+              className="flex items-center gap-1.5 text-xs font-medium text-emerald-700 dark:text-emerald-400 border-emerald-200 dark:border-emerald-800/60 bg-emerald-50 dark:bg-emerald-950/40 hover:bg-emerald-100"
+              title="دانلود کامل تمام گرافی‌ها، متادیتا و گزارش در قالب یک فایل فشرده ZIP"
+            >
+              {zippingArchive ? <Spinner size={14} /> : <ArchiveIcon size={14} />}
+              دانلود کامل ZIP
+            </Button>
+            {validImagesWithUrl.length >= 2 && (
+              <Button
+                size="sm"
+                variant="primary"
+                onClick={() => {
+                  h.tap()
+                  chimes.playPop()
+                  if (!compareBeforeUrl && validImagesWithUrl[0]?.image_url) {
+                    setCompareBeforeUrl(validImagesWithUrl[0].image_url)
+                  }
+                  if (!compareAfterUrl && validImagesWithUrl[1]?.image_url) {
+                    setCompareAfterUrl(validImagesWithUrl[1].image_url)
+                  }
+                  setCompareModalOpen(true)
+                }}
+                className="flex items-center gap-1.5 text-xs font-medium"
+              >
+                <Sparkles size={14} className="text-amber-300" /> مقایسه قبل و بعد درمان
+              </Button>
+            )}
+          </div>
+        </div>
+
+        {/* Progress Alert for ZIP Archive */}
+        {zippingArchive && (
+          <div className="flex items-center gap-2 p-3 bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800 rounded-xl text-xs text-emerald-800 dark:text-emerald-200 animate-pulse">
+            <Spinner size={16} />
+            <span className="font-medium">{zipProgressText || 'در حال بسته‌بندی فایل ZIP...'}</span>
+          </div>
+        )}
+
+        {/* Sticky Batch Actions Bar */}
+        {selectedRadIds.size > 0 && (
+          <div className="sticky top-20 z-20 flex items-center justify-between gap-3 p-3.5 rounded-2xl bg-slate-900/95 text-white shadow-xl backdrop-blur-md border border-slate-700/60 flex-wrap">
+            <div className="flex items-center gap-2">
+              <span className="w-2.5 h-2.5 rounded-full bg-primary-400 animate-pulse" />
+              <span className="text-xs font-bold">
+                {toPersianDigits(selectedRadIds.size)} تصویر انتخاب شده
+              </span>
+            </div>
+            <div className="flex items-center gap-2 flex-wrap">
+              <Button
+                size="sm"
+                variant="secondary"
+                className="text-xs !bg-slate-800 !text-slate-100 hover:!bg-slate-700 border-slate-600 flex items-center gap-1.5"
+                onClick={() => {
+                  setBatchToothInput('')
+                  setBatchTypeInput('')
+                  setBatchTagModalOpen(true)
+                }}
+              >
+                <Tags size={14} /> برچسب‌گذاری دسته‌ای
+              </Button>
+              <Button
+                size="sm"
+                variant="primary"
+                disabled={zippingArchive}
+                onClick={() => handleDownloadZip(true)}
+                className="text-xs flex items-center gap-1.5"
+              >
+                {zippingArchive ? <Spinner size={14} /> : <Download size={14} />}
+                دانلود ZIP انتخابی
+              </Button>
+              <Button
+                size="sm"
+                variant="ghost"
+                className="text-xs !text-slate-300 hover:!text-white hover:!bg-slate-800"
+                onClick={() => setSelectedRadIds(new Set())}
+              >
+                لغو انتخاب
+              </Button>
+            </div>
+          </div>
+        )}
+
+        {/* Images Grid */}
+        {filteredImages.length === 0 ? (
+          <Card className="p-6">
+            <EmptyState
+              icon={<ImageIcon size={32} />}
+              title="تصویری برای این دندان یافت نشد"
+              description={`برای دندان ${toothLabel(radToothFilter)} تصویری ثبت نشده است`}
+              action={
+                <Button size="sm" variant="ghost" onClick={() => setRadToothFilter('all')}>
+                  نمایش همه تصاویر
+                </Button>
+              }
+            />
+          </Card>
+        ) : (
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
+            {filteredImages.map((img) => {
+              const isSelected = selectedRadIds.has(img.id)
+              return (
+                <Card
+                  key={img.id}
+                  className={`p-3 cursor-pointer transition-all-smooth press-scale group relative ${
+                    isSelected ? 'ring-2 ring-primary-500 border-primary-500 bg-primary-50/10' : 'hover:border-primary-400 dark:hover:border-primary-600'
+                  }`}
+                  onClick={() => setSelectedRadImage(img)}
+                >
+                  <div className="aspect-square rounded-xl bg-slate-100 dark:bg-slate-800 flex items-center justify-center mb-2 overflow-hidden relative group">
+                    {/* Selection Checkbox */}
+                    <div
+                      className="absolute top-2 right-2 z-10"
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        handleToggleRadSelect(img.id)
+                      }}
+                    >
+                      <button
+                        type="button"
+                        className={`w-6 h-6 rounded-lg flex items-center justify-center transition-all ${
+                          isSelected
+                            ? 'bg-primary-600 text-white shadow-sm'
+                            : 'bg-black/50 text-white/90 hover:bg-black/70'
+                        }`}
+                        title={isSelected ? 'لغو انتخاب' : 'انتخاب تصویر جهت عملیات دسته‌ای'}
+                      >
+                        {isSelected ? <CheckSquare size={14} /> : <Square size={14} />}
+                      </button>
+                    </div>
+
+                    {img.image_url ? (
+                      <img src={img.image_url} alt={img.description || 'رادیولوژی'} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" />
+                    ) : (
+                      <ImageIcon size={32} className="text-slate-300" />
+                    )}
+                    <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center text-white text-xs font-medium">
+                      بررسی تشخیصی <Search size={14} className="mr-1" />
+                    </div>
+                  </div>
+                  <div className="space-y-1">
+                    {img.image_type && <Badge color="primary">{img.image_type}</Badge>}
+                    {img.tooth_number && (
+                      <p className="text-xs text-slate-700 dark:text-slate-300 font-medium">
+                        دندان {parseRadiologyTeeth(img.tooth_number).map((t) => toothLabel(t)).join('، ')}
+                      </p>
+                    )}
+                    {img.taken_at && <p className="text-xs text-slate-400">{toJalaliStringPretty(img.taken_at)}</p>}
+                    {img.description && <p className="text-xs text-slate-500 truncate">{img.description}</p>}
+                  </div>
+                </Card>
+              )
+            })}
+          </div>
+        )}
+
+        {/* Batch Tag Modal */}
+        {batchTagModalOpen && (
+          <Modal
+            open={batchTagModalOpen}
+            onClose={() => setBatchTagModalOpen(false)}
+            title={`برچسب‌گذاری دسته‌ای (${toPersianDigits(selectedRadIds.size)} تصویر)`}
+            size="md"
+          >
+            <div className="p-4 space-y-4">
+              <p className="text-xs text-slate-500">
+                مشخصات زیر بر روی تمامی {toPersianDigits(selectedRadIds.size)} تصویر انتخاب‌شده اعمال خواهد شد:
+              </p>
+
+              <div>
+                <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">
+                  شماره دندان یا دندان‌ها (اختیاری):
+                </label>
+                <Input
+                  value={batchToothInput}
+                  onChange={(v) => setBatchToothInput(v)}
+                  placeholder="مثال: 16 یا 14, 15, 16"
+                  dir="ltr"
+                />
+                <span className="text-[11px] text-slate-400 mt-1 block">
+                  می‌توانید چند شماره دندان را با کاما جدا نمایید.
+                </span>
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">
+                  نوع تصویر (اختیاری):
+                </label>
+                <Select
+                  value={batchTypeInput}
+                  onChange={(v) => setBatchTypeInput(v)}
+                  options={[
+                    { value: '', label: 'بدون تغییر' },
+                    { value: 'periapical', label: 'پری‌اپیکال' },
+                    { value: 'bitewing', label: 'بایت‌وینگ' },
+                    { value: 'panoramic', label: 'پانورامیک' },
+                    { value: 'cephalometric', label: 'سفالومتریک' },
+                    { value: 'cbct', label: 'CBCT' },
+                    { value: 'intraoral', label: 'اینتراورال (عکس داخل دهانی)' },
+                  ]}
+                />
+              </div>
+
+              <div className="flex items-center justify-end gap-2 pt-3 border-t border-slate-100 dark:border-slate-800">
+                <Button variant="ghost" size="sm" onClick={() => setBatchTagModalOpen(false)}>
+                  انصراف
+                </Button>
+                <Button
+                  variant="primary"
+                  size="sm"
+                  disabled={savingBatchRad}
+                  onClick={handleApplyBatchTag}
+                  className="flex items-center gap-1.5"
+                >
+                  {savingBatchRad ? <Spinner size={14} /> : <Tags size={14} />}
+                  اعمال برچسب‌ها بر روی تصاویر
+                </Button>
+              </div>
+            </div>
+          </Modal>
+        )}
+
+        {/* Diagnostic Viewer Modal */}
+        {selectedRadImage && selectedRadImage.image_url && (
+          <Modal
+            open={Boolean(selectedRadImage)}
+            onClose={() => setSelectedRadImage(null)}
+            title={`نمایشگر تشخیصی — دندان ${selectedRadImage.tooth_number ? parseRadiologyTeeth(selectedRadImage.tooth_number).map((t) => toothLabel(t)).join('، ') : '-'}`}
+            size="lg"
+          >
+            <div className="p-1">
+              <DentalRadiologyViewer
+                imageUrl={selectedRadImage.image_url}
+                title={`${patient?.first_name} ${patient?.last_name} — ${selectedRadImage.image_type || 'رادیولوژی'}`}
+                toothNumber={selectedRadImage.tooth_number}
+                onClose={() => setSelectedRadImage(null)}
+              />
+            </div>
+          </Modal>
+        )}
+
+        {/* Before / After Comparison Setup Modal */}
+        {compareModalOpen && (
+          <Modal
+            open={compareModalOpen}
+            onClose={() => setCompareModalOpen(false)}
+            title="انتخاب تصاویر جهت مقایسه قبل و بعد"
+            size="lg"
+          >
+            <div className="p-4 space-y-4">
+              <p className="text-xs text-slate-500">
+                تصویر وضعیت اولیه (قبل) و وضعیت نهایی (بعد) را جهت بررسی تطبیقی انتخاب فرمایید:
+              </p>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {/* Select Before Image */}
+                <div className="space-y-2 p-3 rounded-xl bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700">
+                  <span className="text-xs font-bold text-slate-700 dark:text-slate-200">۱. تصویر قبل از درمان (Before):</span>
+                  <div className="grid grid-cols-3 gap-2 max-h-48 overflow-y-auto p-1">
+                    {validImagesWithUrl.map((img) => {
+                      const isSelected = compareBeforeUrl === img.image_url
+                      return (
+                        <div
+                          key={`before-${img.id}`}
+                          onClick={() => setCompareBeforeUrl(img.image_url || '')}
+                          className={`aspect-square rounded-lg border-2 overflow-hidden cursor-pointer relative ${
+                            isSelected ? 'border-primary-500 ring-2 ring-primary-300' : 'border-slate-200 hover:border-slate-300'
+                          }`}
+                        >
+                          <img src={img.image_url!} alt="" className="w-full h-full object-cover" />
+                          {img.tooth_number && (
+                            <span className="absolute bottom-0 right-0 left-0 bg-black/60 text-white text-[9px] text-center">
+                              {toothLabel(img.tooth_number)}
+                            </span>
+                          )}
+                        </div>
+                      )
+                    })}
+                  </div>
+                </div>
+
+                {/* Select After Image */}
+                <div className="space-y-2 p-3 rounded-xl bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700">
+                  <span className="text-xs font-bold text-slate-700 dark:text-slate-200">۲. تصویر بعد از درمان (After):</span>
+                  <div className="grid grid-cols-3 gap-2 max-h-48 overflow-y-auto p-1">
+                    {validImagesWithUrl.map((img) => {
+                      const isSelected = compareAfterUrl === img.image_url
+                      return (
+                        <div
+                          key={`after-${img.id}`}
+                          onClick={() => setCompareAfterUrl(img.image_url || '')}
+                          className={`aspect-square rounded-lg border-2 overflow-hidden cursor-pointer relative ${
+                            isSelected ? 'border-success-500 ring-2 ring-success-300' : 'border-slate-200 hover:border-slate-300'
+                          }`}
+                        >
+                          <img src={img.image_url!} alt="" className="w-full h-full object-cover" />
+                          {img.tooth_number && (
+                            <span className="absolute bottom-0 right-0 left-0 bg-black/60 text-white text-[9px] text-center">
+                              {toothLabel(img.tooth_number)}
+                            </span>
+                          )}
+                        </div>
+                      )
+                    })}
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-100 dark:border-slate-800">
+                <Button variant="ghost" size="sm" onClick={() => setCompareModalOpen(false)}>
+                  انصراف
+                </Button>
+                <Button
+                  variant="primary"
+                  size="sm"
+                  disabled={!compareBeforeUrl || !compareAfterUrl || compareBeforeUrl === compareAfterUrl}
+                  onClick={() => {
+                    setCompareModalOpen(false)
+                    setViewingComparison(true)
+                  }}
+                  className="flex items-center gap-1.5"
+                >
+                  <Sparkles size={14} /> شروع مقایسه بالینی
+                </Button>
+              </div>
+            </div>
+          </Modal>
+        )}
+
+        {/* Fullscreen Interactive Before/After Comparison Tool */}
+        {viewingComparison && compareBeforeUrl && compareAfterUrl && (
+          <BeforeAfterViewer
+            beforeUrl={compareBeforeUrl}
+            afterUrl={compareAfterUrl}
+            title={`مقایسه قبل و بعد درمان — ${patient?.first_name || ''} ${patient?.last_name || ''}`}
+            procedureName={radToothFilter !== 'all' ? `دندان ${toothLabel(radToothFilter)}` : undefined}
+            onClose={() => setViewingComparison(false)}
+          />
+        )}
+      </div>
+    )
+  }
+
+  // ===========================================================================
+  // Render: Insurance Tab
+  // ===========================================================================
+
+  const renderInsurance = () => {
+    if (!patient) return null
+    const hasInsurance = patient.insurance_info || patient.insurance_number
+    if (!hasInsurance) {
+      return (
+        <Card className="p-6">
+          <EmptyState icon={<Shield size={32} />} title="اطلاعات بیمه ثبت نشده" description="برای این بیمار اطلاعات بیمه‌ای ثبت نشده است" />
+        </Card>
+      )
+    }
+    return (
+      <Card className="p-4">
+        <h3 className="text-sm font-bold text-slate-700 mb-3 flex items-center gap-2">
+          <Shield size={16} /> اطلاعات بیمه
+        </h3>
+        <div className="space-y-2">
+          <InfoRow label="نام بیمه" value={patient.insurance_info || '-'} />
+          <InfoRow label="شماره بیمه" value={patient.insurance_number ? toPersianDigits(patient.insurance_number) : '-'} dir="ltr" />
+          <InfoRow label="اعتبار بیمه" value={patient.insurance_info || '-'} />
+        </div>
+      </Card>
+    )
+  }
+
+  // ===========================================================================
+  // Render: Documents Tab (اسناد، پرونده‌های کاغذی و تصاویر بالینی)
+  // ===========================================================================
+
+  const renderDocuments = () => {
+    // Active scanned documents & images
+    const activeScannedImages = radiologyImages.filter((img) => img.is_active !== false)
+    
+    // Filtered by category
+    const filteredDocs = docCategoryFilter === 'all'
+      ? activeScannedImages
+      : docCategoryFilter === 'paper_record'
+      ? activeScannedImages.filter((img) => img.image_type === 'paper_record' || !img.image_type)
+      : docCategoryFilter === 'radiology'
+      ? activeScannedImages.filter((img) => img.image_type === 'radiology' || img.image_type === 'periapical' || img.image_type === 'opg' || img.image_type === 'cbct')
+      : docCategoryFilter === 'consent'
+      ? activeScannedImages.filter((img) => img.image_type === 'consent')
+      : docCategoryFilter === 'lab_report'
+      ? activeScannedImages.filter((img) => img.image_type === 'lab_report')
+      : activeScannedImages
+
+    const getDocCategoryMeta = (type: string | null) => {
+      switch (type) {
+        case 'paper_record':
+          return { label: 'پرونده کاغذی', icon: <FileText size={14} />, color: 'bg-amber-50 text-amber-800 border-amber-200 dark:bg-amber-950/40 dark:text-amber-300 dark:border-amber-800' }
+        case 'radiology':
+        case 'periapical':
+        case 'opg':
+        case 'cbct':
+          return { label: 'رادیولوژی', icon: <ImageIcon size={14} />, color: 'bg-blue-50 text-blue-800 border-blue-200 dark:bg-blue-950/40 dark:text-blue-300 dark:border-blue-800' }
+        case 'consent':
+          return { label: 'رضایت‌نامه دستی', icon: <FileSignature size={14} />, color: 'bg-purple-50 text-purple-800 border-purple-200 dark:bg-purple-950/40 dark:text-purple-300 dark:border-purple-800' }
+        case 'lab_report':
+          return { label: 'آزمایش / لابراتوار', icon: <FlaskConical size={14} />, color: 'bg-emerald-50 text-emerald-800 border-emerald-200 dark:bg-emerald-950/40 dark:text-emerald-300 dark:border-emerald-800' }
+        case 'clinical_photo':
+          return { label: 'فتوگرافی بالینی', icon: <Camera size={14} />, color: 'bg-teal-50 text-teal-800 border-teal-200 dark:bg-teal-950/40 dark:text-teal-300 dark:border-teal-800' }
+        default:
+          return { label: 'سند بالینی', icon: <FileText size={14} />, color: 'bg-slate-50 text-slate-700 border-slate-200 dark:bg-slate-800 dark:text-slate-300 dark:border-slate-700' }
+      }
+    }
+
+    const handleDownloadDoc = (e: React.MouseEvent, img: RadiologyImage) => {
+      e.stopPropagation()
+      if (!img.image_url) return
+      h.tap()
+      chimes.playPop()
+      const a = document.createElement('a')
+      a.href = img.image_url
+      a.download = `doc-${patient?.file_number || patient?.id}-${img.image_type || 'scan'}-${img.id.slice(0, 6)}.jpg`
+      document.body.appendChild(a)
+      a.click()
+      document.body.removeChild(a)
+      showToast('info', 'تصویر سند روی حافظه دستگاه ذخیره شد')
+    }
+
+    const handleArchiveDoc = (e: React.MouseEvent, img: RadiologyImage) => {
+      e.stopPropagation()
+      h.tap()
+      confirmAction({
+        type: 'status',
+        title: 'آرشیو کردن تصویر سند',
+        warning: 'این تصویر هیچ‌وقت از بین نمی‌رود و در دیتابیس لوکال کلینیک باقی می‌ماند، اما از این لیست مخفی می‌شود.',
+        fields: [
+          { label: 'شرح سند', value: img.description || 'بدون شرح', highlight: true },
+          { label: 'تاریخ ثبت', value: img.taken_at ? toJalaliStringPretty(img.taken_at) : '—' },
+        ],
+        confirmLabel: 'تایید آرشیو',
+        onConfirm: async () => {
+          try {
+            await updateRadiologyImage(img.id, { is_active: false } as any)
+            chimes.playSuccess()
+            showToast('success', 'تصویر سند به بایگانی منتقل شد')
+            await loadTabData()
+          } catch {
+            chimes.playWarning()
+            showToast('error', 'خطا در بایگانی سند')
+          }
+        },
+      })
+    }
+
+    return (
+      <div className="space-y-4">
+        {/* Controls & Scanner Action Header */}
+        <div className="flex items-center justify-between gap-3 flex-wrap bg-white dark:bg-slate-900 p-4 rounded-3xl border border-slate-100 dark:border-slate-800 shadow-sm">
+          <div>
+            <h3 className="text-sm sm:text-base font-black text-slate-900 dark:text-slate-50 flex items-center gap-2">
+              <Camera size={18} className="text-primary-600 dark:text-primary-400" />
+              <span>اسناد، سوابق کاغذی و عکس‌های رادیولوژی</span>
+            </h3>
+            <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+              عکس‌برداری با دوربین گوشی یا تبلت، ذخیره در دیتابیس محلی دستگاه و سینک خودکار شبکه
+            </p>
+          </div>
+
+          <div className="flex items-center gap-2 flex-wrap">
+            <Button
+              size="sm"
+              variant="primary"
+              onClick={() => {
+                h.tap()
+                chimes.playPop()
+                setScannerInitialCategory('paper_record')
+                setScannerModalOpen(true)
+              }}
+              className="flex items-center gap-1.5 text-xs font-bold"
+            >
+              <Camera size={14} /> اسکن یا عکاسی سند جدید
+            </Button>
+          </div>
+        </div>
+
+        {/* Category Filter Pills */}
+        <div className="flex items-center gap-1.5 overflow-x-auto pb-1 scrollbar-none">
+          {[
+            { key: 'all', label: 'همه اسناد', count: activeScannedImages.length },
+            { key: 'paper_record', label: 'پرونده کاغذی', count: activeScannedImages.filter((i) => i.image_type === 'paper_record' || !i.image_type).length },
+            { key: 'radiology', label: 'رادیولوژی و گرافی', count: activeScannedImages.filter((i) => i.image_type === 'radiology' || i.image_type === 'periapical' || i.image_type === 'opg' || i.image_type === 'cbct').length },
+            { key: 'consent', label: 'رضایت‌نامه دستی', count: activeScannedImages.filter((i) => i.image_type === 'consent').length },
+            { key: 'lab_report', label: 'آزمایش و لابراتوار', count: activeScannedImages.filter((i) => i.image_type === 'lab_report').length },
+          ].map((cat) => (
+            <button
+              key={cat.key}
+              type="button"
+              onClick={() => {
+                h.tap()
+                setDocCategoryFilter(cat.key)
+              }}
+              className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all-smooth press-scale shrink-0 ${
+                docCategoryFilter === cat.key
+                  ? 'bg-primary-600 text-white shadow-xs'
+                  : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200'
+              }`}
+            >
+              <span>{cat.label}</span>
+              <span className="font-mono text-[11px] mr-1.5 opacity-80">({toPersianDigits(cat.count)})</span>
+            </button>
+          ))}
+        </div>
+
+        {/* Scanned Documents Grid */}
+        {filteredDocs.length === 0 ? (
+          <Card className="p-8 text-center">
+            <EmptyState
+              icon={<Camera size={40} className="text-primary-500" />}
+              title="هیچ سند یا عکسی ثبت نشده است"
+              description="با دوربین گوشی یا تبلت از پرونده کاغذی، عکس‌های رادیولوژی یا برگه‌های آزمایش عکس بگیرید تا مستقیماً به پرونده متصل و در تمام دستگاه‌ها سینک شود."
+              action={
+                <Button
+                  size="sm"
+                  variant="primary"
+                  onClick={() => {
+                    h.tap()
+                    setScannerInitialCategory('paper_record')
+                    setScannerModalOpen(true)
+                  }}
+                  className="flex items-center gap-1.5"
+                >
+                  <Camera size={14} /> عکس‌برداری با دوربین
+                </Button>
+              }
+            />
+          </Card>
+        ) : (
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3.5">
+            {filteredDocs.map((img) => {
+              const meta = getDocCategoryMeta(img.image_type)
+              return (
+                <div
+                  key={img.id}
+                  onClick={() => {
+                    h.tap()
+                    setSelectedRadImage(img)
+                  }}
+                  className="group relative flex flex-col p-3 rounded-2xl bg-white dark:bg-slate-850 border border-slate-200/80 dark:border-slate-700/80 shadow-xs hover:shadow-md transition-all-smooth cursor-pointer press-scale overflow-hidden"
+                >
+                  {/* Image Thumbnail Container */}
+                  <div className="relative aspect-[4/3] rounded-xl overflow-hidden bg-slate-950 flex items-center justify-center mb-2.5">
+                    {img.image_url ? (
+                      <img
+                        src={img.image_url}
+                        alt={img.description || 'Document'}
+                        className="w-full h-full object-contain group-hover:scale-105 transition-transform duration-500"
+                        loading="lazy"
+                      />
+                    ) : (
+                      <FileText size={32} className="text-slate-600" />
+                    )}
+
+                    {/* Category Capsule on Image */}
+                    <div className="absolute top-2 right-2">
+                      <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-lg border text-[10px] font-bold backdrop-blur-md shadow-xs ${meta.color}`}>
+                        <span>{meta.icon}</span>
+                        <span>{meta.label}</span>
+                      </span>
+                    </div>
+
+                    {/* Tooth Number Capsule if present */}
+                    {img.tooth_number && (
+                      <div className="absolute bottom-2 right-2">
+                        <span className="inline-flex items-center px-2 py-0.5 rounded-md bg-black/70 text-white font-mono text-[10px] font-bold">
+                          دندان {toothLabel(img.tooth_number)}
+                        </span>
+                      </div>
+                    )}
+
+                    {/* Date on Image */}
+                    {img.taken_at && (
+                      <div className="absolute bottom-2 left-2">
+                        <span className="inline-flex items-center px-2 py-0.5 rounded-md bg-black/70 text-slate-200 font-mono text-[10px]">
+                          {toJalaliString(img.taken_at)}
+                        </span>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Title & Notes */}
+                  <div className="flex-1 min-w-0">
+                    <h4 className="text-xs sm:text-sm font-bold text-slate-800 dark:text-slate-100 truncate mb-1">
+                      {img.description || meta.label}
+                    </h4>
+                    {img.notes && (
+                      <p className="text-[11px] text-slate-500 dark:text-slate-400 line-clamp-2 leading-relaxed">
+                        {img.notes}
+                      </p>
+                    )}
+                  </div>
+
+                  {/* Action Buttons Bar */}
+                  <div className="flex items-center justify-between pt-2.5 mt-2 border-t border-slate-100 dark:border-slate-800/80 text-xs">
+                    <span className="text-[10px] text-primary-600 dark:text-primary-400 font-bold group-hover:underline">
+                      مشاهده و بزرگنمایی
+                    </span>
+
+                    <div className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
+                      <button
+                        type="button"
+                        onClick={(e) => handleDownloadDoc(e, img)}
+                        className="p-1.5 rounded-lg text-slate-500 hover:text-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700/60 transition-colors"
+                        title="دانلود و ذخیره یک نسخه روی حافظه گوشی"
+                      >
+                        <Download size={14} />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={(e) => handleArchiveDoc(e, img)}
+                        className="p-1.5 rounded-lg text-rose-500 hover:text-rose-700 hover:bg-rose-50 dark:hover:bg-rose-950/30 transition-colors"
+                        title="آرشیو سند"
+                      >
+                        <Trash2 size={14} />
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+        )}
+
+        {/* Encounters & Prescriptions Clinical Paper Trail */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-3 pt-2">
+          {encounters.length > 0 && (
+            <Card className="p-4">
+              <h3 className="text-xs sm:text-sm font-bold text-slate-700 dark:text-slate-200 mb-3 flex items-center justify-between">
+                <span>سوابق مراجعات و ویزیت‌ها</span>
+                <span className="font-mono text-xs opacity-70">{toPersianDigits(encounters.length)} مورد</span>
+              </h3>
+              <div className="space-y-2 max-h-56 overflow-y-auto pr-1">
+                {encounters.map((e) => (
+                  <div key={e.id} className="flex items-center justify-between gap-3 p-2.5 rounded-xl border border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-800/40">
+                    <div>
+                      <p className="text-xs font-bold text-slate-800 dark:text-slate-200">{e.chief_complaint || 'ویزیت عمومی'}</p>
+                      <p className="text-[11px] text-slate-400 font-mono mt-0.5">{toJalaliStringPretty(e.encounter_date)}</p>
+                    </div>
+                    <Badge color={e.status === 'completed' ? 'success' : 'warning'}>
+                      {e.status === 'completed' ? 'تکمیل شده' : e.status === 'in_progress' ? 'در حال انجام' : e.status}
+                    </Badge>
+                  </div>
+                ))}
+              </div>
+            </Card>
+          )}
+
+          {prescriptions.length > 0 && (
+            <Card className="p-4">
+              <h3 className="text-xs sm:text-sm font-bold text-slate-700 dark:text-slate-200 mb-3 flex items-center justify-between">
+                <span>نسخه‌های دارویی صادرشده</span>
+                <span className="font-mono text-xs opacity-70">{toPersianDigits(prescriptions.length)} نسخه</span>
+              </h3>
+              <div className="space-y-2 max-h-56 overflow-y-auto pr-1">
+                {prescriptions.map((p) => (
+                  <div key={p.id} className="flex items-center justify-between gap-3 p-2.5 rounded-xl border border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-800/40">
+                    <div>
+                      <p className="text-xs font-bold text-slate-800 dark:text-slate-200">
+                        {typeof p.medications === 'string' ? p.medications : p.notes || 'نسخه دارویی'}
+                      </p>
+                      <p className="text-[11px] text-slate-400 font-mono mt-0.5">{toJalaliStringPretty(p.created_at)}</p>
+                    </div>
+                    <Pill size={14} className="text-primary-500 shrink-0" />
+                  </div>
+                ))}
+              </div>
+            </Card>
+          )}
+        </div>
+      </div>
+    )
+  }
+
+  // ===========================================================================
+  // Render: Edit Modal
+  // ===========================================================================
+
+  const renderEditModal = () => {
+    return (
+      <Modal open={editModalOpen} onClose={() => setEditModalOpen(false)} title="ویرایش بیمار" size="full">
+        <div className="space-y-4">
+          <div>
+            <h4 className="text-xs font-bold text-slate-500 mb-3 uppercase tracking-wider">اطلاعات شخصی</h4>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+              <Input label="نام" value={formData.first_name} onChange={(v) => setFormData((p) => ({ ...p, first_name: v }))} />
+              <Input label="نام خانوادگی" value={formData.last_name} onChange={(v) => setFormData((p) => ({ ...p, last_name: v }))} />
+              <Input label="کد ملی" value={formData.national_id} onChange={(v) => setFormData((p) => ({ ...p, national_id: v }))} dir="ltr" />
+              <Input label="تلفن" value={formData.phone} onChange={(v) => setFormData((p) => ({ ...p, phone: v }))} dir="ltr" />
+              <Input label="شماره منزل" value={formData.phone2} onChange={(v) => setFormData((p) => ({ ...p, phone2: v }))} dir="ltr" />
+              <Input label="ایمیل" type="email" value={formData.email} onChange={(v) => setFormData((p) => ({ ...p, email: v }))} dir="ltr" />
+              <PersianDateInput label="تاریخ تولد" value={formData.birth_date} onChange={(v) => setFormData((p) => ({ ...p, birth_date: v }))} />
+              <Select label="جنسیت" value={formData.gender} onChange={(v) => setFormData((p) => ({ ...p, gender: v }))} options={genderOptions} placeholder="انتخاب کنید" />
+              <Select label="گروه خونی" value={formData.blood_type} onChange={(v) => setFormData((p) => ({ ...p, blood_type: v }))} options={bloodTypes.map((b) => ({ value: b, label: b }))} placeholder="انتخاب کنید" />
+            </div>
+          </div>
+
+          <div>
+            <h4 className="text-xs font-bold text-slate-500 mb-3 uppercase tracking-wider">آدرس</h4>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+              <Input label="استان" value={formData.province} onChange={(v) => setFormData((p) => ({ ...p, province: v }))} />
+              <Input label="شهر" value={formData.city} onChange={(v) => setFormData((p) => ({ ...p, city: v }))} />
+              <Input label="کد پستی" value={formData.postal_code} onChange={(v) => setFormData((p) => ({ ...p, postal_code: v }))} dir="ltr" />
+              <Input label="آدرس" value={formData.address} onChange={(v) => setFormData((p) => ({ ...p, address: v }))} className="md:col-span-3" />
+            </div>
+          </div>
+
+          <div>
+            <h4 className="text-xs font-bold text-slate-500 mb-3 uppercase tracking-wider">اطلاعات پزشکی</h4>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              <Textarea label="تاریخچه پزشکی" value={formData.medical_history} onChange={(v) => setFormData((p) => ({ ...p, medical_history: v }))} rows={2} />
+              <MultiSelectChips 
+                label="حساسیت‌ها" 
+                options={['پنی‌سیلین', 'داروی بی‌حسی', 'لاتکس', 'آسپرین', 'کدئین', 'ایبوپروفن']}
+                value={formData.allergies} 
+                onChange={(v) => setFormData((p) => ({ ...p, allergies: v }))} 
+              />
+              <Textarea label="داروهای مصرفی" value={formData.medications} onChange={(v) => setFormData((p) => ({ ...p, medications: v }))} rows={2} />
+              <MultiSelectChips 
+                label="بیماری‌های زمینه‌ای" 
+                options={['دیابت', 'فشار خون بالا', 'بیماری قلبی', 'بارداری', 'تیروئید', 'آسم', 'هپاتیت', 'تشنج/صرع']}
+                value={formData.medical_conditions} 
+                onChange={(v) => setFormData((p) => ({ ...p, medical_conditions: v }))} 
+              />
+            </div>
+            <div className="mt-3 p-3.5 rounded-2xl bg-rose-50/60 dark:bg-rose-950/20 border border-rose-200/70 dark:border-rose-900/50 space-y-3">
+              <h4 className="text-xs font-bold text-rose-800 dark:text-rose-300 flex items-center gap-1.5">
+                <AlertCircle size={14} className="text-rose-600" />
+                غربالگری بالینی و عوامل پرخطر دندانپزشکی (استاندارد ADA / نظام پزشکی)
+              </h4>
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                <div className="space-y-1.5 p-2.5 rounded-xl bg-white/80 dark:bg-slate-800/80 border border-rose-100 dark:border-rose-900/40">
+                  <label className="flex items-center gap-2 cursor-pointer text-xs font-bold text-slate-700 dark:text-slate-200">
+                    <input
+                      type="checkbox"
+                      checked={Boolean(formData.anticoagulant_use)}
+                      onChange={(e) => setFormData((p) => ({ ...p, anticoagulant_use: e.target.checked }))}
+                      className="w-4 h-4 rounded text-rose-600 focus:ring-rose-400"
+                    />
+                    مصرف داروی ضد انعقاد
+                  </label>
+                  <Input
+                    label="آخرین مقدار INR"
+                    value={formData.inr_value}
+                    onChange={(v) => setFormData((p) => ({ ...p, inr_value: v }))}
+                    placeholder="مثال: ۲.۵"
+                    dir="ltr"
+                  />
+                </div>
+
+                <div className="space-y-1.5 p-2.5 rounded-xl bg-white/80 dark:bg-slate-800/80 border border-rose-100 dark:border-rose-900/40">
+                  <label className="flex items-center gap-2 cursor-pointer text-xs font-bold text-slate-700 dark:text-slate-200">
+                    <input
+                      type="checkbox"
+                      checked={Boolean(formData.bisphosphonate_use)}
+                      onChange={(e) => setFormData((p) => ({ ...p, bisphosphonate_use: e.target.checked }))}
+                      className="w-4 h-4 rounded text-rose-600 focus:ring-rose-400"
+                    />
+                    مصرف بیس‌فسفونات‌ها
+                  </label>
+                  <p className="text-[11px] text-slate-500">خطر استئونکروز فک (ONJ) در جراحی</p>
+                </div>
+
+                <div className="space-y-1.5 p-2.5 rounded-xl bg-white/80 dark:bg-slate-800/80 border border-rose-100 dark:border-rose-900/40">
+                  <label className="flex items-center gap-2 cursor-pointer text-xs font-bold text-slate-700 dark:text-slate-200">
+                    <input
+                      type="checkbox"
+                      checked={Boolean(formData.endocarditis_prophylaxis)}
+                      onChange={(e) => setFormData((p) => ({ ...p, endocarditis_prophylaxis: e.target.checked }))}
+                      className="w-4 h-4 rounded text-rose-600 focus:ring-rose-400"
+                    />
+                    ریسک اندوکاردیت
+                  </label>
+                  <p className="text-[11px] text-slate-500">نیاز به پروفیلاکسی آنتی‌بیوتیک</p>
+                </div>
+
+                <div className="space-y-1.5 p-2.5 rounded-xl bg-white/80 dark:bg-slate-800/80 border border-rose-100 dark:border-rose-900/40">
+                  <div className="grid grid-cols-2 gap-2">
+                    <Input
+                      label="فشار سیستول"
+                      value={formData.bp_systolic}
+                      onChange={(v) => setFormData((p) => ({ ...p, bp_systolic: v }))}
+                      placeholder="۱۲۰"
+                      dir="ltr"
+                    />
+                    <Input
+                      label="فشار دیاستول"
+                      value={formData.bp_diastolic}
+                      onChange={(v) => setFormData((p) => ({ ...p, bp_diastolic: v }))}
+                      placeholder="۸۰"
+                      dir="ltr"
+                    />
+                  </div>
+                </div>
+
+                <div className="space-y-1.5 p-2.5 rounded-xl bg-white/80 dark:bg-slate-800/80 border border-rose-100 dark:border-rose-900/40">
+                  <Input
+                    label="دیابت: شاخص HbA1c (%)"
+                    value={formData.diabetes_hba1c}
+                    onChange={(v) => setFormData((p) => ({ ...p, diabetes_hba1c: v }))}
+                    placeholder="مثال: ۷.۲"
+                    dir="ltr"
+                  />
+                </div>
+
+                <div className="space-y-1.5 p-2.5 rounded-xl bg-white/80 dark:bg-slate-800/80 border border-rose-100 dark:border-rose-900/40">
+                  <Select
+                    label="وضعیت بارداری"
+                    value={formData.pregnancy_trimester}
+                    onChange={(v) => setFormData((p) => ({ ...p, pregnancy_trimester: v }))}
+                    options={[
+                      { value: '', label: 'عدم بارداری / نامشخص' },
+                      { value: '1', label: 'سه‌ماهه اول (ترایمستر ۱)' },
+                      { value: '2', label: 'سه‌ماهه دوم (ترایمستر ۲)' },
+                      { value: '3', label: 'سه‌ماهه سوم (ترایمستر ۳)' },
+                    ]}
+                  />
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div>
+            <h4 className="text-xs font-bold text-slate-500 mb-3 uppercase tracking-wider">بیمه و دسته‌بندی</h4>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+              <Input label="اطلاعات بیمه" value={formData.insurance_info} onChange={(v) => setFormData((p) => ({ ...p, insurance_info: v }))} />
+              <Input label="شماره بیمه" value={formData.insurance_number} onChange={(v) => setFormData((p) => ({ ...p, insurance_number: v }))} dir="ltr" />
+              <Select label="سطح VIP" value={formData.vip_level} onChange={(v) => setFormData((p) => ({ ...p, vip_level: v }))} options={vipLevels} />
+              <Select label="پزشک اصلی" value={formData.primary_doctor_id} onChange={(v) => setFormData((p) => ({ ...p, primary_doctor_id: v }))} options={doctors.map((d) => ({ value: d.id, label: `دکتر ${d.name || d.specialty || 'پزشک'}` }))} placeholder="بدون پزشک اصلی" />
+              <Input label="برچسب‌ها" value={formData.tags} onChange={(v) => setFormData((p) => ({ ...p, tags: v }))} placeholder="برچسب۱, برچسب۲" />
+              <div className="flex items-end gap-2">
+                <label className="flex items-center gap-2 text-xs font-medium text-slate-600 cursor-pointer pb-2">
+                  <input type="checkbox" checked={formData.is_active} onChange={(e) => setFormData((p) => ({ ...p, is_active: e.target.checked }))} className="w-4 h-4 rounded text-primary-600" />
+                  بیمار فعال
+                </label>
+              </div>
+            </div>
+          </div>
+
+          <div>
+            <h4 className="text-xs font-bold text-slate-500 mb-3 uppercase tracking-wider">سرپرست و پیوند خانوادگی</h4>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              <Select
+                label="سرپرست خانواده"
+                value={formData.family_head_id}
+                onChange={(v) => setFormData((p) => ({ ...p, family_head_id: v }))}
+                options={[
+                  { value: '', label: 'بدون سرپرست (یا خود بیمار سرپرست است)' },
+                  ...allPatients.filter((p) => p.id !== patient?.id).map((p) => ({
+                    value: p.id,
+                    label: `${p.first_name} ${p.last_name} (${p.file_number ? `پرونده: ${p.file_number}` : 'بدون پرونده'})`,
+                  })),
+                ]}
+                placeholder="انتخاب سرپرست..."
+              />
+              <Select
+                label="نسبت با سرپرست / نقش خانوادگی"
+                value={formData.family_relationship}
+                onChange={(v) => setFormData((p) => ({ ...p, family_relationship: v }))}
+                options={[
+                  { value: '', label: 'تعیین نشده' },
+                  ...FAMILY_RELATIONSHIPS.map((r) => ({ value: r.value, label: r.label })),
+                ]}
+                placeholder="انتخاب نسبت..."
+              />
+            </div>
+          </div>
+
+          <Textarea label="یادداشت" value={formData.notes} onChange={(v) => setFormData((p) => ({ ...p, notes: v }))} />
+
+          <div className="flex gap-2 justify-end pt-2 border-t border-slate-100">
+            <Button variant="secondary" onClick={() => setEditModalOpen(false)}>انصراف</Button>
+            <Button variant="primary" onClick={handleSavePatient} disabled={saving}>
+              {saving ? <Spinner size={16} /> : 'ذخیره تغییرات'}
+            </Button>
+          </div>
+        </div>
+      </Modal>
+    )
+  }
+
+  // ===========================================================================
+  // Render: Tooth Record Modal
+  // ===========================================================================
+
+  // ===========================================================================
+  // Helper Component
+  // ===========================================================================
+
+  const InfoRow = ({ label, value, dir, icon }: { label: string; value: React.ReactNode; dir?: string; icon?: React.ReactNode }) => {
+    const isDash = value === '-' || value === null || value === undefined || value === ''
+    return (
+      <div className="flex items-center justify-between gap-2 py-1.5 border-b border-slate-100/60 dark:border-slate-800/40 last:border-0">
+        <span className="text-xs font-medium text-slate-500 dark:text-slate-400 flex items-center gap-1.5 flex-shrink-0">
+          {icon && <span className="opacity-70">{icon}</span>}
+          {label}
+        </span>
+        {isDash ? (
+          <span className="text-[11px] font-medium px-2 py-0.5 rounded-lg bg-slate-100/80 dark:bg-slate-800/60 text-slate-400 dark:text-slate-500">
+            ثبت نشده
+          </span>
+        ) : (
+          <span className="text-xs font-semibold text-slate-800 dark:text-slate-200 text-left truncate max-w-[240px] sm:max-w-[320px]" dir={dir}>
+            {value}
+          </span>
+        )}
+      </div>
+    )
+  }
+
+
+  // ===========================================================================
+  // Render: Mobile-First Architecture Helpers
+  // ===========================================================================
+
+  const renderMainMenu = () => {
+    const mainTabs = [
+      { id: 'overview', label: 'نمای کلی', concept: 'directory' },
+      { id: 'clinical', label: 'بالینی', concept: 'clinical' },
+      { id: 'appointments', label: 'نوبت‌ها', concept: 'appointments' },
+      { id: 'finance_docs', label: 'مالی', concept: 'plans' },
+    ] as const
+
+    return (
+      <div className="grid grid-cols-4 gap-1.5 p-2 border-b border-slate-200/80 dark:border-slate-800/80 bg-teal-50/30 dark:bg-slate-900/80" dir="rtl">
+        {mainTabs.map(t => {
+          const Icon = patientConcepts[t.concept].icon
+          return (
+          <button
+            key={t.id}
+            style={conceptStyle(t.concept)}
+            onClick={() => {
+              h.tap()
+              setMainTab(t.id)
+              setSubView(null)
+            }}
+            className={`patient-tile min-w-0 rounded-2xl py-2.5 flex flex-col items-center gap-1.5 text-[11px] sm:text-sm font-bold min-h-[76px] ${patientConcepts[t.concept].color} ${mainTab === t.id ? 'ring-2 ring-current ring-offset-2' : 'opacity-85'}`}
+            aria-label={t.label}
+          >
+            <span className="concept-icon icon-blink w-9 h-9 rounded-xl flex items-center justify-center"><Icon size={20} /></span>
+            <span>{t.label}</span>
+          </button>
+        )})}
+      </div>
+    )
+  }
+
+  const renderNestedMenu = (items: { id: string, label: string, icon: any, color: string, bg: string }[]) => {
+    return (
+      <div className="grid grid-cols-2 gap-2.5" dir="rtl">
+        {items.map((item) => {
+          const concept: PatientConcept = item.id === 'teeth' ? 'directory' : item.id === 'implants' ? 'implants' : item.id === 'labOrders' ? 'lab' : item.id === 'payments' ? 'plans' : item.id === 'perio' ? 'perio' : 'clinical'
+          const Icon = ['teeth', 'implants', 'labOrders', 'payments', 'perio'].includes(item.id) ? patientConcepts[concept].icon : item.icon
+          return (
+          <button
+            key={item.id}
+            style={conceptStyle(concept)}
+            onClick={() => {
+              h.tap()
+              setSubView(item.id)
+            }}
+            aria-label={item.label}
+            className="patient-tile w-full min-w-0 flex items-center gap-2 sm:gap-3 px-2.5 sm:px-4 py-3 min-h-[84px] rounded-2xl group"
+          >
+            <div className={`concept-icon w-10 h-10 rounded-2xl flex items-center justify-center shrink-0 ${patientConcepts[concept].color} transition-transform group-active:scale-90`}>
+              <Icon size={22} strokeWidth={2} />
+            </div>
+            <span className="flex-1 min-w-0 text-right text-xs sm:text-sm font-bold text-slate-800 dark:text-slate-200 leading-snug">
+              {item.label}
+            </span>
+            <ChevronLeft size={16} className="text-slate-400 dark:text-slate-500 shrink-0 transition-transform group-hover:-translate-x-0.5" />
+          </button>
+        )})}
+      </div>
+    )
+  }
+
+  // ===========================================================================
+
+  // Main Render
+  // ===========================================================================
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center py-20">
+        <Spinner size={32} />
+      </div>
+    )
+  }
+
+  if (!patient) {
+    return (
+      <Card className="p-6">
+        <EmptyState icon={<AlertCircle size={32} />} title="بیمار یافت نشد" />
+      </Card>
+    )
+  }
+
+  const pageTheme = tileThemes[getHashColor(patient.id)]
+
+  return (
+    <div className={`relative min-h-screen p-2.5 sm:p-5 pb-24 sm:pb-8 bg-gradient-to-br ${pageTheme.bg} overflow-hidden space-y-4 rounded-3xl transition-all duration-500`} style={{ paddingBottom: 'calc(6rem + env(safe-area-inset-bottom))' }}>
+      {/* Dynamic Gemini Breathing Aura */}
+      <div className={`absolute -top-24 -right-24 w-[32rem] h-[32rem] rounded-full bg-gradient-to-br ${pageTheme.blob} pointer-events-none breathe-slow opacity-65 blur-3xl`} />
+      <div className={`absolute top-1/3 -left-28 w-[28rem] h-[28rem] rounded-full bg-gradient-to-tr ${pageTheme.blob} pointer-events-none breathe-slow opacity-55 blur-3xl`} style={{ animationDelay: '-4s' }} />
+      <div className={`absolute bottom-10 right-1/4 w-[26rem] h-[26rem] rounded-full bg-gradient-to-tl ${pageTheme.blob} pointer-events-none breathe-slow opacity-50 blur-3xl`} style={{ animationDelay: '-2s' }} />
+
+      <div className="relative z-10 space-y-4">
+        {/* Floating clinical and financial alerts. Rendered above the header
+            rather than inside it: the whole point is that they interrupt
+            regardless of how far down the file has been scrolled. */}
+        <div id="medical-alerts">
+          <PatientAlerts patient={patient} balance={{ balance: patientBalance.balance }} />
+        </div>
+
+      {/* Header */}
+      {renderHeader()}
+
+      <div className="module-surface sm:backdrop-blur-xl rounded-3xl overflow-hidden min-h-[500px]">
+        {subView ? (
+           <div className="flex items-center gap-3 px-4 py-3 border-b border-slate-100 dark:border-slate-800 bg-white/98 dark:bg-slate-900/98 sticky top-[calc(60px+env(safe-area-inset-top,0px))] sm:top-[calc(64px+env(safe-area-inset-top,0px))] z-30 shadow-md backdrop-blur-xl">
+             <button
+               onClick={() => {
+                 h.tap()
+                 setSubView(null)
+                 window.scrollTo({ top: 0, left: 0, behavior: 'instant' })
+               }}
+               aria-label="بازگشت به منو"
+               className="w-12 h-12 min-w-[48px] min-h-[48px] flex items-center justify-center rounded-2xl bg-white dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-800 dark:text-slate-100 shadow-sm border border-slate-200/80 dark:border-slate-700/80 active:scale-90 transition-all btn-tactile-3d shrink-0"
+             >
+               <ChevronRight size={24} strokeWidth={2.5} />
+             </button>
+             <div className="flex-1 min-w-0">
+               <span className="font-black text-base text-slate-900 dark:text-slate-100 block truncate">
+                 {tabs.find(t => t.key === subView)?.label || 'بازگشت'}
+               </span>
+               <span className="text-[11px] font-bold text-slate-400 dark:text-slate-500">
+                 {patient?.first_name} {patient?.last_name}
+               </span>
+             </div>
+           </div>
+        ) : (
+          renderMainMenu()
+        )}
+
+        <div className="p-3 sm:p-6">
+          {!subView && mainTab === 'overview' && renderOverview()}
+          {!subView && mainTab === 'appointments' && renderAppointments()}
+          
+          {!subView && mainTab === 'clinical' && renderNestedMenu([
+            { id: 'teeth', label: 'چارت دندان‌پزشکی', icon: Smile, color: 'text-teal-600 dark:text-teal-400', bg: 'bg-teal-100 dark:bg-teal-900/30' },
+            { id: 'treatments', label: 'درمان‌ها و رویه‌های بالینی', icon: Activity, color: 'text-emerald-600 dark:text-emerald-400', bg: 'bg-emerald-100 dark:bg-emerald-900/30' },
+            { id: 'implants', label: 'پرونده ایمپلنت و جراحی', icon: patientConcepts.implants.icon, color: patientConcepts.implants.color, bg: 'bg-indigo-100 dark:bg-indigo-900/30' },
+            { id: 'perio', label: 'چارت پریودنتال', icon: HeartPulse, color: 'text-rose-600 dark:text-rose-400', bg: 'bg-rose-100 dark:bg-rose-900/30' },
+            { id: 'ortho', label: 'آنالیز ارتودنسی', icon: Sparkles, color: 'text-pink-600 dark:text-pink-400', bg: 'bg-pink-100 dark:bg-pink-900/30' },
+            { id: 'phases', label: 'طرح درمان مرحله‌ای و فازبندی', icon: Layers, color: 'text-orange-600 dark:text-orange-400', bg: 'bg-orange-100 dark:bg-orange-900/30' },
+          ])}
+
+          {!subView && mainTab === 'finance_docs' && renderNestedMenu([
+            { id: 'payments', label: 'خلاصه مالی و پرداخت‌ها', icon: CreditCard, color: 'text-amber-600 dark:text-amber-400', bg: 'bg-amber-100 dark:bg-amber-900/30' },
+            { id: 'documents', label: 'اسناد و مدارک پرونده', icon: ArchiveIcon, color: 'text-violet-600 dark:text-violet-400', bg: 'bg-violet-100 dark:bg-violet-900/30' },
+            { id: 'radiology', label: 'رادیولوژی و تصاویر بالینی', icon: ImageIcon, color: 'text-cyan-600 dark:text-cyan-400', bg: 'bg-cyan-100 dark:bg-cyan-900/30' },
+            { id: 'prescriptions', label: 'نسخه‌های دارویی صادرشده', icon: Pill, color: 'text-indigo-600 dark:text-indigo-400', bg: 'bg-indigo-100 dark:bg-indigo-900/30' },
+            { id: 'labOrders', label: 'سفارشات لابراتوار', icon: patientConcepts.lab.icon, color: patientConcepts.lab.color, bg: 'bg-cyan-100 dark:bg-cyan-900/30' },
+            { id: 'consent', label: 'فرم‌های رضایت‌نامه آگاهانه', icon: FileSignature, color: 'text-blue-600 dark:text-blue-400', bg: 'bg-blue-100 dark:bg-blue-900/30' },
+            { id: 'insurance', label: 'بیمه درمانی', icon: Shield, color: 'text-slate-600 dark:text-slate-400', bg: 'bg-slate-200 dark:bg-slate-700/40' },
+            { id: 'timeline', label: 'تایم‌لاین بالینی بیمار', icon: Clock, color: 'text-slate-600 dark:text-slate-400', bg: 'bg-slate-200 dark:bg-slate-700/40' },
+          ])}
+
+          {/* Sub Views */}
+          {subView === 'timeline' && renderTimeline()}
+          {subView === 'treatments' && renderTreatments()}
+          {subView === 'implants' && renderImplants()}
+          {subView === 'labOrders' && renderLabOrders()}
+          {subView === 'phases' && renderPhases()}
+          {subView === 'consent' && renderConsentForms()}
+          {subView === 'appointments' && renderAppointments()}
+          {subView === 'payments' && renderPayments()}
+          {subView === 'teeth' && renderTeethChart()}
+          {subView === 'perio' && (
+            <PeriodontalChart
+              patientId={patient.id}
+              patientName={`${patient.first_name} ${patient.last_name}`}
+              doctors={doctors}
+              exam={perioExams[0] || null}
+              patient={patient}
+              onSave={async (teethData, notes, docId) => {
+                const payload = {
+                  patient_id: patient.id,
+                  doctor_id: docId,
+                  exam_date: new Date().toISOString().slice(0, 10),
+                  teeth_data: teethData,
+                  notes,
+                }
+                if (perioExams[0]) {
+                  await updatePerioExam(perioExams[0].id, payload)
+                } else {
+                  await createPerioExam(payload)
+                }
+                const updated = await fetchPerioExams(patient.id)
+                setPerioExams(updated)
+              }}
+            />
+          )}
+          {subView === 'ortho' && (
+            <OrthodonticChart
+              patientId={patient.id}
+              patientName={`${patient.first_name} ${patient.last_name}`}
+              doctors={doctors}
+              exam={orthoExams[0] || null}
+              patient={patient}
+              onSave={async (examInput) => {
+                if (orthoExams[0]) {
+                  await updateOrthoExam(orthoExams[0].id, examInput)
+                } else {
+                  await createOrthoExam(examInput)
+                }
+                const updated = await fetchOrthoExams(patient.id)
+                setOrthoExams(updated)
+              }}
+            />
+          )}
+          {subView === 'prescriptions' && renderPrescriptions()}
+          {subView === 'radiology' && renderRadiology()}
+          {subView === 'insurance' && renderInsurance()}
+          {subView === 'documents' && renderDocuments()}
+        </div>
+      </div>
+
+      {/* Modals */}
+      {renderEditModal()}
+
+      {/* Phase Wizard */}
+      <Wizard
+        open={phaseModalOpen}
+        onClose={() => setPhaseModalOpen(false)}
+        title={editingPhase ? 'ویرایش فاز درمان' : 'افزودن فاز درمان'}
+        step={phaseWizardStep}
+        onStepChange={setPhaseWizardStep}
+        onFinish={handleSavePhase}
+        saving={savingPhase}
+        steps={[
+          {
+            label: 'عنوان، طرح و پزشک',
+            validate: () => (!phaseForm.title.trim() ? 'عنوان فاز الزامی است' : null),
+            content: (
+              <>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  <Select
+                    label="گزینه طرح درمان *"
+                    value={phaseForm.plan_option}
+                    onChange={(v) => setPhaseForm({ ...phaseForm, plan_option: v })}
+                    options={[
+                      { value: 'A', label: 'طرح الف (پیشنهاد اصلی / استاندارد)' },
+                      { value: 'B', label: 'طرح ب (جایگزین / محافظه‌کارانه)' },
+                      { value: 'C', label: 'طرح ج (اقتصادی / موقت)' },
+                    ]}
+                  />
+                  <Input
+                    label="عنوان اختصاصی طرح (اختیاری)"
+                    value={phaseForm.plan_name}
+                    onChange={(v) => setPhaseForm({ ...phaseForm, plan_name: v })}
+                    placeholder="مثلاً: ایمپلنت و پروتز ثابت"
+                  />
+                </div>
+                <Input label="عنوان فاز *" value={phaseForm.title} onChange={(v) => setPhaseForm({ ...phaseForm, title: v })} placeholder="مثلاً: کشیدن دندان‌های آسیب‌دیده" />
+                <Select label="پزشک مسئول" value={phaseForm.doctor_id} onChange={(v) => setPhaseForm({ ...phaseForm, doctor_id: v })} options={doctors.filter((d) => d.is_active).map((d) => ({ value: d.id, label: `دکتر ${d.name || d.specialty || 'پزشک'}` }))} placeholder="انتخاب پزشک..." />
+                <Textarea label="توضیحات" value={phaseForm.description} onChange={(v) => setPhaseForm({ ...phaseForm, description: v })} placeholder="جزئیات این فاز" rows={2} />
+                <div className="flex items-center gap-2 pt-1">
+                  <input
+                    type="checkbox"
+                    id="phase_is_accepted"
+                    checked={phaseForm.is_accepted}
+                    onChange={(e) => setPhaseForm({ ...phaseForm, is_accepted: e.target.checked })}
+                    className="rounded border-slate-300 text-primary-600 focus:ring-primary-500"
+                  />
+                  <label htmlFor="phase_is_accepted" className="text-xs text-slate-700 dark:text-slate-300 select-none cursor-pointer">
+                    این طرح مورد تأیید و انتخاب بیمار است (طرح مصوب)
+                  </label>
+                </div>
+              </>
+            ),
+          },
+          {
+            label: 'رویه‌ها و هزینه',
+            validate: () => (!phaseForm.procedures.trim() ? 'رویه‌های این فاز الزامی است' : null),
+            content: (
+              <>
+                <Textarea label="رویه‌های این فاز *" value={phaseForm.procedures} onChange={(v) => setPhaseForm({ ...phaseForm, procedures: v })} placeholder="مثلاً: کشیدن دندان ۱۶، ۱۷" rows={2} />
+                <div className="grid grid-cols-2 gap-3">
+                  <CurrencyInput label="هزینه‌ی تخمینی (ت)" value={phaseForm.estimated_cost} onChange={(v) => setPhaseForm({ ...phaseForm, estimated_cost: v })} />
+                  <CurrencyInput label="هزینه‌ی واقعی (ت)" value={phaseForm.actual_cost} onChange={(v) => setPhaseForm({ ...phaseForm, actual_cost: v })} />
+                </div>
+                <Input label="مدت تخمینی (روز)" type="number" value={phaseForm.estimated_duration_days} onChange={(v) => setPhaseForm({ ...phaseForm, estimated_duration_days: v })} placeholder="30" />
+              </>
+            ),
+          },
+          {
+            label: 'زمان‌بندی و وضعیت',
+            content: (
+              <>
+                <div className="grid grid-cols-2 gap-3">
+                  <PersianDateInput label="تاریخ شروع" value={phaseForm.start_date} onChange={(v) => setPhaseForm({ ...phaseForm, start_date: v })} />
+                  <PersianDateInput label="تاریخ پایان" value={phaseForm.end_date} onChange={(v) => setPhaseForm({ ...phaseForm, end_date: v })} />
+                </div>
+                <Select label="وضعیت" value={phaseForm.status} onChange={(v) => setPhaseForm({ ...phaseForm, status: v })} options={phaseStatuses.map((s) => ({ value: s.value, label: s.label }))} />
+              </>
+            ),
+          },
+        ]}
+      />
+
+      {/* Clinical Prerequisite Validation Alert Modal */}
+      {prereqAlert.open && prereqAlert.treatment && prereqAlert.evalResult && (
+        <Modal
+          open={prereqAlert.open}
+          onClose={() => setPrereqAlert({ open: false, treatment: null, evalResult: null })}
+          title="هشدار ایمنی پیش‌نیاز بالینی (Clinical Safety Prerequisite)"
+          size="md"
+        >
+          <div className="space-y-4 text-right">
+            <div className="p-4 rounded-xl border border-amber-300 bg-amber-50 dark:bg-amber-950/30 dark:border-amber-800/60 flex items-start gap-3">
+              <div className="p-2 rounded-lg bg-amber-100 dark:bg-amber-900/50 text-amber-700 dark:text-amber-300 shrink-0">
+                <AlertTriangle size={20} />
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-bold text-amber-900 dark:text-amber-200">
+                  {prereqAlert.evalResult.ruleTitle || 'پیش‌نیاز بالینی رعایت نشده است'}
+                </p>
+                <p className="text-xs text-amber-800 dark:text-amber-300 mt-1 leading-relaxed">
+                  {prereqAlert.evalResult.message}
+                </p>
+                {prereqAlert.evalResult.missingStep && (
+                  <div className="mt-2 text-xs font-bold text-amber-950 dark:text-amber-100 flex items-center gap-1">
+                    <span>گام مفقوده یا ناتمام:</span>
+                    <Badge color="warning">{prereqAlert.evalResult.missingStep}</Badge>
+                  </div>
+                )}
+                {prereqAlert.evalResult.recommendation && (
+                  <p className="text-[11px] text-amber-700 dark:text-amber-400 mt-2 italic">
+                    توصیه بالینی: {prereqAlert.evalResult.recommendation}
+                  </p>
+                )}
+              </div>
+            </div>
+
+            <p className="text-xs text-slate-500 leading-relaxed">
+              جهت رعایت پروتکل‌های ADA CDT و راهنماهای بالینی، پیش از تکمیل این رویه باید مراحل پیش‌نیاز انجام و تأیید شوند. در صورت صلاحدید علمی دندانپزشک، امکان اعمال استثناء بالینی وجود دارد.
+            </p>
+
+            <div className="flex items-center justify-end gap-2 pt-3 border-t border-slate-100 dark:border-slate-800">
+              <Button
+                variant="secondary"
+                size="sm"
+                onClick={() => setPrereqAlert({ open: false, treatment: null, evalResult: null })}
+              >
+                انصراف و اصلاح توالی درمان
+              </Button>
+              {prereqAlert.evalResult.canOverride && (
+                <Button
+                  variant="primary"
+                  size="sm"
+                  onClick={handlePrereqOverride}
+                >
+                  <Shield size={14} className="inline ml-1" />
+                  تأیید پزشک معالج (Clinical Override)
+                </Button>
+              )}
+            </div>
+          </div>
+        </Modal>
+      )}
+
+      {ConfirmActionModal}
+
+      {/* Consent Form Modal */}
+      <Modal open={consentModalOpen} onClose={() => setConsentModalOpen(false)} title={editingConsent ? 'ویرایش فرم رضایت‌نامه' : 'فرم رضایت‌نامه‌ی جدید'} size="lg">
+        <div className="space-y-3.5">
+          {/* Pre-made Templates */}
+          <div>
+            <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1.5">
+              قالب‌های استاندارد رضایت آگاهانه (انتخاب سریع):
+            </label>
+            <div className="flex flex-wrap gap-1.5">
+              {CONSENT_TEMPLATES.map((tpl) => (
+                <button
+                  key={tpl.id}
+                  type="button"
+                  onClick={() => handleApplyConsentTemplate(tpl.id)}
+                  className={`px-2.5 py-1.5 rounded-xl text-xs font-medium transition-all-smooth press-scale border ${
+                    consentForm.template_key === tpl.id
+                      ? 'bg-primary-600 text-white border-primary-600 shadow-sm'
+                      : 'bg-slate-50 dark:bg-slate-800/80 text-slate-700 dark:text-slate-200 border-slate-200 dark:border-slate-700 hover:border-primary-400 dark:hover:border-primary-600'
+                  }`}
+                >
+                  {tpl.title}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <Select label="پزشک معالج" value={consentForm.doctor_id} onChange={(v) => setConsentForm({ ...consentForm, doctor_id: v })} options={doctors.filter((d) => d.is_active).map((d) => ({ value: d.id, label: `دکتر ${d.name || d.specialty || 'پزشک'}` }))} placeholder="انتخاب پزشک..." />
+          <Textarea label="شرح درمان *" value={consentForm.treatment_description} onChange={(v) => setConsentForm({ ...consentForm, treatment_description: v })} placeholder="مثلاً: جراحی ایمپلنت دندان ۱۶ همراه با پیوند استخوان" rows={3} />
+          <Textarea label="خطرات و عوارض احتمالی" value={consentForm.risks} onChange={(v) => setConsentForm({ ...consentForm, risks: v })} placeholder="خطرات این درمان را برای بیمار توضیح دهید" rows={3} />
+          <Textarea label="یادداشت و دستورات مراقبتی" value={consentForm.notes} onChange={(v) => setConsentForm({ ...consentForm, notes: v })} placeholder="یادداشت اضافی" rows={2} />
+
+          {/* Digital Signature Pad */}
+          <div className="pt-2 border-t border-slate-100 dark:border-slate-700">
+            <SignatureCanvas
+              value={consentForm.signature_data}
+              onChange={(data) => {
+                setConsentForm((prev) => ({
+                  ...prev,
+                  signature_data: data,
+                  signed_by_patient: Boolean(data),
+                }))
+              }}
+              label="امضای دیجیتال بیمار در مطب (لمسی با قلم یا انگشت)"
+            />
+            <label className="flex items-center gap-2 cursor-pointer mt-2.5 p-2 rounded-xl bg-slate-50 dark:bg-slate-800/60 text-xs text-slate-600 dark:text-slate-300">
+              <input
+                type="checkbox"
+                checked={consentForm.signed_by_patient}
+                onChange={(e) => setConsentForm({ ...consentForm, signed_by_patient: e.target.checked })}
+                className="w-4 h-4 rounded accent-primary-600"
+              />
+              <span>تایید امضای بیمار به‌صورت فیزیکی روی نسخه چاپی</span>
+            </label>
+          </div>
+
+          <div className="flex justify-end gap-2 pt-2 border-t border-slate-100 dark:border-slate-700">
+            <Button variant="secondary" onClick={() => setConsentModalOpen(false)}>انصراف</Button>
+            <Button variant="primary" onClick={handleSaveConsent} disabled={savingConsent}>{savingConsent ? <Spinner size={16} /> : editingConsent ? 'ذخیره' : 'ثبت'}</Button>
+          </div>
+        </div>
+      </Modal>
+
+      {/* Direct Payment Modal (ثبت پرداخت مستقیم در پرونده) */}
+      <Modal
+        open={paymentModalOpen}
+        onClose={() => setPaymentModalOpen(false)}
+        title="ثبت دریافت وجه / پرداخت جدید"
+        size="md"
+      >
+        <div className="space-y-3.5">
+          <CurrencyInput
+            label="مبلغ پرداختی (تومان) *"
+            value={paymentForm.amount}
+            onChange={(v) => setPaymentForm({ ...paymentForm, amount: v })}
+          />
+
+          <div className="grid grid-cols-2 gap-3">
+            <Select
+              label="روش پرداخت"
+              value={paymentForm.method}
+              onChange={(v) => setPaymentForm({ ...paymentForm, method: v })}
+              options={paymentMethods}
+            />
+            <Select
+              label="پزشک معالج"
+              value={paymentForm.doctor_id}
+              onChange={(v) => setPaymentForm({ ...paymentForm, doctor_id: v })}
+              options={doctors.filter((d) => d.is_active).map((d) => ({
+                value: d.id,
+                label: `دکتر ${d.name || d.specialty || 'پزشک'}`,
+              }))}
+              placeholder="انتخاب پزشک..."
+            />
+          </div>
+
+          {treatments.length > 0 && (
+            <Select
+              label="مربوط به درمان (اختیاری)"
+              value={paymentForm.treatment_id}
+              onChange={(v) => setPaymentForm({ ...paymentForm, treatment_id: v })}
+              options={[
+                { value: '', label: 'پرداخت عمومی (بدون انتساب مستقیم به درمان)' },
+                ...treatments.map((t) => ({
+                  value: t.id,
+                  label: `${t.procedure_name || 'درمان'}${t.tooth_number ? ` — ${toothLabel(t.tooth_number)}` : ''} (${formatCurrency(t.total_price || 0)} ت)`,
+                })),
+              ]}
+            />
+          )}
+
+          <Textarea
+            label="توضیحات و بابت پرداخت"
+            value={paymentForm.notes}
+            onChange={(v) => setPaymentForm({ ...paymentForm, notes: v })}
+            placeholder="مثلاً: بیعانه درمان روکش، پرداخت نقدی، کارتخوان مطب..."
+            rows={2}
+          />
+
+          <div className="flex justify-between items-center pt-2 border-t border-slate-100 dark:border-slate-700">
+            <div>
+              {posConfig.enabled && (
+                <Button variant="secondary" onClick={handleSendToPos} disabled={savingPayment} className="text-primary-600 border-primary-200 bg-primary-50 hover:bg-primary-100 dark:bg-primary-900/20 dark:border-primary-800">
+                  <CreditCard size={16} className="inline ml-1" /> ارسال به کارتخوان
+                </Button>
+              )}
+            </div>
+            <div className="flex gap-2">
+              <Button variant="secondary" onClick={() => setPaymentModalOpen(false)}>
+                انصراف
+              </Button>
+              <Button
+                variant="primary"
+                onClick={handleSavePayment}
+                disabled={savingPayment}
+              >
+                {savingPayment ? <Spinner size={16} /> : 'ثبت پرداخت'}
+              </Button>
+            </div>
+          </div>
+        </div>
+      </Modal>
+
+      {/* Direct Cheque Modal (ثبت دریافت چک صیادی) */}
+      <Modal
+        open={chequeModalOpen}
+        onClose={() => setChequeModalOpen(false)}
+        title="ثبت دریافت چک صیادی بنفش"
+        size="md"
+      >
+        <div className="space-y-3.5">
+          <CurrencyInput
+            label="مبلغ چک (تومان) *"
+            value={chequeForm.amount}
+            onChange={(v) => setChequeForm({ ...chequeForm, amount: v })}
+          />
+
+          <div className="grid grid-cols-2 gap-3">
+            <Input
+              label="نام بانک صادرکننده *"
+              value={chequeForm.bank_name}
+              onChange={(v) => setChequeForm({ ...chequeForm, bank_name: v })}
+              placeholder="مثلاً: ملت، صادرات، ملی، پاسارگاد"
+            />
+            <Input
+              label="شماره سریال چک"
+              value={chequeForm.cheque_number}
+              onChange={(v) => setChequeForm({ ...chequeForm, cheque_number: v })}
+              placeholder="شماره برگ چک"
+            />
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            <Input
+              label="شناسه صیادی (۱۶ رقم بنفش)"
+              value={chequeForm.sayad_id}
+              onChange={(v) => setChequeForm({ ...chequeForm, sayad_id: v })}
+              placeholder="۱۶ رقم بدون خط فاصله"
+            />
+            <PersianDateInput
+              label="تاریخ سررسید چک *"
+              value={chequeForm.due_date}
+              onChange={(v) => setChequeForm({ ...chequeForm, due_date: v })}
+            />
+          </div>
+
+          <Input
+            label="نام صاحب حساب / صادرکننده"
+            value={chequeForm.drawer_name}
+            onChange={(v) => setChequeForm({ ...chequeForm, drawer_name: v })}
+            placeholder="نام و نام خانوادگی صادرکننده"
+          />
+
+          <Textarea
+            label="توضیحات و بابت"
+            value={chequeForm.notes}
+            onChange={(v) => setChequeForm({ ...chequeForm, notes: v })}
+            placeholder="مثلاً: بابت جراحی ایمپلنت و پروتز..."
+            rows={2}
+          />
+
+          <div className="flex justify-end gap-2 pt-2 border-t border-slate-100 dark:border-slate-700">
+            <Button variant="secondary" onClick={() => setChequeModalOpen(false)}>
+              انصراف
+            </Button>
+            <Button
+              variant="primary"
+              onClick={handleSaveCheque}
+              disabled={savingCheque}
+            >
+              {savingCheque ? <Spinner size={16} /> : 'ثبت چک صیادی'}
+            </Button>
+          </div>
+        </div>
+      </Modal>
+
+      {/* Direct Payment Plan Modal (تعریف طرح اقساط) */}
+      <Modal
+        open={planModalOpen}
+        onClose={() => setPlanModalOpen(false)}
+        title="تعریف طرح اقساط درمان"
+        size="lg"
+      >
+        <div className="space-y-4">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+            <CurrencyInput
+              label="مبلغ کل طرح اقساط (تومان) *"
+              value={planForm.total_amount}
+              onChange={(v) => setPlanForm({ ...planForm, total_amount: v })}
+            />
+            <Input
+              label="تعداد اقساط (ماهانه) *"
+              type="number"
+              value={String(planForm.number_of_installments)}
+              onChange={(v) => setPlanForm({ ...planForm, number_of_installments: parseInt(v) || 2 })}
+            />
+            <PersianDateInput
+              label="تاریخ اولین سررسید *"
+              value={planForm.start_date}
+              onChange={(v) => setPlanForm({ ...planForm, start_date: v })}
+            />
+          </div>
+
+          {/* Real-time calculated installment schedule preview */}
+          {Number(planForm.total_amount) > 0 && planForm.number_of_installments >= 2 && (
+            <div className="p-3.5 rounded-2xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700">
+              <p className="text-xs font-bold text-slate-700 dark:text-slate-300 mb-2">
+                پیش‌نمایش جدول سررسید اقساط ماهانه شمسی:
+              </p>
+              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2">
+                {buildSchedule(Number(planForm.total_amount), planForm.number_of_installments, planForm.start_date).map((row) => (
+                  <div
+                    key={row.installment_number}
+                    className="p-2.5 rounded-xl bg-white dark:bg-slate-800 border border-slate-100 dark:border-slate-700 shadow-2xs text-xs"
+                  >
+                    <div className="flex justify-between items-center text-slate-500 dark:text-slate-400 font-medium">
+                      <span>قسط {toPersianDigits(row.installment_number)}</span>
+                      <span>{toJalaliStringPretty(row.due_date)}</span>
+                    </div>
+                    <p className="font-extrabold text-primary-600 dark:text-primary-400 mt-1">
+                      {formatCurrency(row.amount)} <span className="text-[10px] font-normal">ت</span>
+                    </p>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Guarantee Cheque Section */}
+          <div className="p-3.5 rounded-2xl bg-amber-50/70 dark:bg-amber-950/20 border border-amber-200/80 dark:border-amber-800/40 space-y-3">
+            <p className="text-xs font-bold text-amber-900 dark:text-amber-300">
+              مشخصات چک تضمین صیادی (ضمانت پرداخت اقساط):
+            </p>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+              <Input
+                label="بانک صادرکننده چک ضمانت"
+                value={planForm.guarantee_bank}
+                onChange={(v) => setPlanForm({ ...planForm, guarantee_bank: v })}
+                placeholder="مثلاً: پاسارگاد"
+              />
+              <Input
+                label="شناسه صیادی چک ضمانت (۱۶ رقم)"
+                value={planForm.guarantee_sayad_id}
+                onChange={(v) => setPlanForm({ ...planForm, guarantee_sayad_id: v })}
+                placeholder="۱۶ رقم شناسه بنفش"
+              />
+              <Input
+                label="شماره سریال چک ضمانت"
+                value={planForm.guarantee_cheque_num}
+                onChange={(v) => setPlanForm({ ...planForm, guarantee_cheque_num: v })}
+                placeholder="سریال چک"
+              />
+            </div>
+          </div>
+
+          <Textarea
+            label="توضیحات طرح اقساط"
+            value={planForm.notes}
+            onChange={(v) => setPlanForm({ ...planForm, notes: v })}
+            placeholder="مثلاً: اقساط ایمپلنت ۳ واحد فک بالا..."
+            rows={2}
+          />
+
+          <div className="flex justify-end gap-2 pt-2 border-t border-slate-100 dark:border-slate-700">
+            <Button variant="secondary" onClick={() => setPlanModalOpen(false)}>
+              انصراف
+            </Button>
+            <Button
+              variant="primary"
+              onClick={handleSavePlan}
+              disabled={savingPlan}
+            >
+              {savingPlan ? <Spinner size={16} /> : 'ثبت و فعال‌سازی طرح اقساط'}
+            </Button>
+          </div>
+        </div>
+      </Modal>
+
+      {/* Family Linkage Modal */}
+      <Modal
+        open={familyModalOpen}
+        onClose={() => setFamilyModalOpen(false)}
+        title="مدیریت پیوند خانوادگی و سرپرست"
+        size="md"
+      >
+        <div className="space-y-4">
+          <div className="p-3 rounded-xl bg-teal-50 dark:bg-teal-950/30 border border-teal-200 dark:border-teal-800 text-xs text-teal-800 dark:text-teal-200">
+            با اتصال پرونده‌های اعضای یک خانواده، امکان مشاهده پرونده‌ها با یک کلیک و ارجاع سریع فراهم می‌گردد.
+          </div>
+
+          <div className="space-y-3">
+            <label className="flex items-center gap-2.5 p-3 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={isHeadToggle}
+                onChange={(e) => {
+                  setIsHeadToggle(e.target.checked)
+                  if (e.target.checked) {
+                    setFamilyHeadId('')
+                    setFamilyRelationship('head')
+                  } else {
+                    setFamilyRelationship('')
+                  }
+                }}
+                className="w-4 h-4 rounded text-primary-600 focus:ring-primary-400"
+              />
+              <div>
+                <span className="text-xs font-bold text-slate-800 dark:text-slate-100">
+                  این بیمار سرپرست خانواده است (Head of Household)
+                </span>
+                <p className="text-[11px] text-slate-400 mt-0.5">
+                  سایر اعضای خانواده می‌توانند به عنوان وابسته به این پرونده متصل شوند.
+                </p>
+              </div>
+            </label>
+
+            {!isHeadToggle && (
+              <>
+                <Select
+                  label="انتخاب سرپرست خانواده از بین بیماران"
+                  value={familyHeadId}
+                  onChange={(v) => setFamilyHeadId(v)}
+                  options={[
+                    { value: '', label: 'بدون سرپرست (مستقل)' },
+                    ...allPatients
+                      .filter((p) => p.id !== patient.id)
+                      .map((p) => ({
+                        value: p.id,
+                        label: `${p.first_name} ${p.last_name} (${p.file_number ? `پرونده: ${p.file_number}` : 'بدون پرونده'}${p.phone ? ` - ${p.phone}` : ''})`,
+                      })),
+                  ]}
+                  placeholder="سرپرست خانواده را انتخاب کنید..."
+                />
+
+                <Select
+                  label="نسبت بیمار با سرپرست"
+                  value={familyRelationship}
+                  onChange={(v) => setFamilyRelationship(v)}
+                  options={FAMILY_RELATIONSHIPS.filter((r) => r.value !== 'head').map((r) => ({
+                    value: r.value,
+                    label: r.label,
+                  }))}
+                  placeholder="انتخاب نسبت خانوادگی..."
+                />
+              </>
+            )}
+          </div>
+
+          <div className="flex justify-end gap-2 pt-3 border-t border-slate-100 dark:border-slate-700">
+            <Button variant="secondary" onClick={() => setFamilyModalOpen(false)}>
+              انصراف
+            </Button>
+            <Button
+              variant="primary"
+              onClick={handleSaveFamilyLinkage}
+              disabled={savingFamily}
+            >
+              {savingFamily ? <Spinner size={16} /> : 'ذخیره پیوند خانوادگی'}
+            </Button>
+          </div>
+        </div>
+      </Modal>
+
+      {/* Edit Patient Modal with Full Clinical Triage Screening */}
+      <Modal
+        open={editModalOpen}
+        onClose={() => setEditModalOpen(false)}
+        title="ویرایش پرونده و اطلاعات بیمار"
+        size="full"
+      >
+        <div className="space-y-4 max-h-[80vh] overflow-y-auto p-1">
+          {/* File number badge */}
+          <div className="patient-file-badge flex items-center gap-3 p-3.5 rounded-2xl bg-teal-50/70 dark:bg-teal-950/30 border border-teal-200 dark:border-teal-800">
+            <div className="w-10 h-10 rounded-xl bg-teal-600 text-white flex items-center justify-center font-bold">
+              <FileText size={20} />
+            </div>
+            <div>
+              <span className="text-[11px] font-bold text-teal-800 dark:text-teal-300">شماره پرونده بالینی بیمار:</span>
+              <p className="text-base font-extrabold text-teal-900 dark:text-teal-100 font-mono">
+                {patient?.file_number || 'بدون شماره پرونده'}
+              </p>
+            </div>
+          </div>
+
+          <div>
+            <h4 className="text-xs font-bold text-slate-500 mb-3 uppercase tracking-wider">اطلاعات هویتی و تماس</h4>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+              <Input label="نام *" value={formData.first_name} onChange={(v) => setFormData((p) => ({ ...p, first_name: v }))} placeholder="نام" />
+              <Input label="نام خانوادگی *" value={formData.last_name} onChange={(v) => setFormData((p) => ({ ...p, last_name: v }))} placeholder="نام خانوادگی" />
+              <Input label="کد ملی" value={formData.national_id} onChange={(v) => setFormData((p) => ({ ...p, national_id: v }))} placeholder="کد ملی ده‌رقمی" dir="ltr" />
+              <Input label="تلفن همراه *" value={formData.phone} onChange={(v) => setFormData((p) => ({ ...p, phone: v }))} placeholder="09xxxxxxxxx" dir="ltr" />
+              <Input label="تلفن ثابت یا منزل" value={formData.phone2} onChange={(v) => setFormData((p) => ({ ...p, phone2: v }))} placeholder="شماره تماس دوم" dir="ltr" />
+              <Input label="پست الکترونیکی (ایمیل)" type="email" value={formData.email} onChange={(v) => setFormData((p) => ({ ...p, email: v }))} placeholder="name@domain.com" dir="ltr" />
+              <PersianDateInput label="تاریخ تولد" value={formData.birth_date} onChange={(v) => setFormData((p) => ({ ...p, birth_date: v }))} />
+              <Select label="جنسیت" value={formData.gender} onChange={(v) => setFormData((p) => ({ ...p, gender: v }))} options={[{ value: 'male', label: 'آقا' }, { value: 'female', label: 'خانم' }]} placeholder="انتخاب جنسیت" />
+              <Select label="گروه خونی" value={formData.blood_type} onChange={(v) => setFormData((p) => ({ ...p, blood_type: v }))} options={['O-', 'O+', 'A-', 'A+', 'B-', 'B+', 'AB-', 'AB+'].map((bt) => ({ value: bt, label: bt }))} placeholder="انتخاب گروه خونی" />
+            </div>
+          </div>
+
+          <div>
+            <h4 className="text-xs font-bold text-slate-500 mb-3 uppercase tracking-wider">نشانی و سکونت</h4>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+              <Input label="استان" value={formData.province} onChange={(v) => setFormData((p) => ({ ...p, province: v }))} placeholder="استان" />
+              <Input label="شهر" value={formData.city} onChange={(v) => setFormData((p) => ({ ...p, city: v }))} placeholder="شهر" />
+              <Input label="کد پستی" value={formData.postal_code} onChange={(v) => setFormData((p) => ({ ...p, postal_code: v }))} placeholder="کد پستی" dir="ltr" />
+              <Input label="نشانی کامل منزل / محل کار" value={formData.address} onChange={(v) => setFormData((p) => ({ ...p, address: v }))} placeholder="آدرس دقیق..." className="md:col-span-3" />
+            </div>
+          </div>
+
+          <div>
+            <h4 className="text-xs font-bold text-slate-500 mb-3 uppercase tracking-wider">سوابق پزشکی و دارویی</h4>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              <Textarea label="تاریخچه پزشکی" value={formData.medical_history} onChange={(v) => setFormData((p) => ({ ...p, medical_history: v }))} placeholder="سابقه جراحی، بستری و..." rows={2} />
+              <Textarea label="حساسیت‌ها و آلرژی‌ها" value={formData.allergies} onChange={(v) => setFormData((p) => ({ ...p, allergies: v }))} placeholder="پنی‌سیلین، لاتکس، بی‌حسی، غذا..." rows={2} />
+              <Textarea label="داروهای در حال مصرف" value={formData.medications} onChange={(v) => setFormData((p) => ({ ...p, medications: v }))} placeholder="آسپرین، لوزارتان، متفورمین و..." rows={2} />
+              <Textarea label="بیماری‌های زمینه‌ای" value={formData.medical_conditions} onChange={(v) => setFormData((p) => ({ ...p, medical_conditions: v }))} placeholder="فشار خون، دیابت، قلبی، آسم..." rows={2} />
+            </div>
+          </div>
+
+          {/* Clinical Triage & High-Risk Factors (استاندارد بین‌المللی ADA CDT / نظام پزشکی) */}
+          <div className="p-4 rounded-2xl bg-rose-50/60 dark:bg-rose-950/20 border border-rose-200/80 dark:border-rose-900/50 space-y-3">
+            <h4 className="text-xs font-bold text-rose-800 dark:text-rose-300 flex items-center gap-1.5">
+              <AlertCircle size={15} className="text-rose-600" />
+              غربالگری بالینی، تریاژ و عوامل پرخطر دندانپزشکی (Clinical Triage & Risk Markers)
+            </h4>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+              <div className="space-y-1.5 p-3 rounded-xl bg-white/90 dark:bg-slate-850/90 border border-rose-100 dark:border-rose-900/40">
+                <label className="flex items-center gap-2 cursor-pointer text-xs font-bold text-slate-700 dark:text-slate-200">
+                  <input
+                    type="checkbox"
+                    checked={Boolean(formData.anticoagulant_use)}
+                    onChange={(e) => setFormData((p) => ({ ...p, anticoagulant_use: e.target.checked }))}
+                    className="w-4 h-4 rounded text-rose-600 focus:ring-rose-400"
+                  />
+                  مصرف داروی ضد انعقاد (وارفارین/پلاویکس)
+                </label>
+                <Input
+                  label="آخرین مقدار شاخص INR"
+                  value={formData.inr_value}
+                  onChange={(v) => setFormData((p) => ({ ...p, inr_value: v }))}
+                  placeholder="مثال: ۲.۵"
+                  dir="ltr"
+                />
+              </div>
+
+              <div className="space-y-1.5 p-3 rounded-xl bg-white/90 dark:bg-slate-850/90 border border-rose-100 dark:border-rose-900/40">
+                <label className="flex items-center gap-2 cursor-pointer text-xs font-bold text-slate-700 dark:text-slate-200">
+                  <input
+                    type="checkbox"
+                    checked={Boolean(formData.bisphosphonate_use)}
+                    onChange={(e) => setFormData((p) => ({ ...p, bisphosphonate_use: e.target.checked }))}
+                    className="w-4 h-4 rounded text-rose-600 focus:ring-rose-400"
+                  />
+                  مصرف بیس‌فسفونات‌ها
+                </label>
+                <p className="text-[11px] text-slate-500 leading-relaxed">ریسک استئونکروز فک (ONJ) در کشیدن و ایمپلنت</p>
+              </div>
+
+              <div className="space-y-1.5 p-3 rounded-xl bg-white/90 dark:bg-slate-850/90 border border-rose-100 dark:border-rose-900/40">
+                <label className="flex items-center gap-2 cursor-pointer text-xs font-bold text-slate-700 dark:text-slate-200">
+                  <input
+                    type="checkbox"
+                    checked={Boolean(formData.endocarditis_prophylaxis)}
+                    onChange={(e) => setFormData((p) => ({ ...p, endocarditis_prophylaxis: e.target.checked }))}
+                    className="w-4 h-4 rounded text-rose-600 focus:ring-rose-400"
+                  />
+                  ریسک اندوکاردیت عفونی
+                </label>
+                <p className="text-[11px] text-slate-500 leading-relaxed">ضرورت مصرف آنتی‌بیوتیک پروفیلاکسی ۱ ساعت پیش از کار</p>
+              </div>
+
+              <div className="space-y-1.5 p-3 rounded-xl bg-white/90 dark:bg-slate-850/90 border border-rose-100 dark:border-rose-900/40">
+                <div className="grid grid-cols-2 gap-2">
+                  <Input
+                    label="فشار سیستول (mmHg)"
+                    value={formData.bp_systolic}
+                    onChange={(v) => setFormData((p) => ({ ...p, bp_systolic: v }))}
+                    placeholder="۱۲۰"
+                    dir="ltr"
+                  />
+                  <Input
+                    label="فشار دیاستول (mmHg)"
+                    value={formData.bp_diastolic}
+                    onChange={(v) => setFormData((p) => ({ ...p, bp_diastolic: v }))}
+                    placeholder="۸۰"
+                    dir="ltr"
+                  />
+                </div>
+              </div>
+
+              <div className="space-y-1.5 p-3 rounded-xl bg-white/90 dark:bg-slate-850/90 border border-rose-100 dark:border-rose-900/40">
+                <Input
+                  label="قند خون سه‌ماهه (HbA1c ٪)"
+                  value={formData.diabetes_hba1c}
+                  onChange={(v) => setFormData((p) => ({ ...p, diabetes_hba1c: v }))}
+                  placeholder="مثال: ۶.۸"
+                  dir="ltr"
+                />
+                <p className="text-[11px] text-slate-500">کنترل التیام زخم و استئواینتگریشن ایمپلنت</p>
+              </div>
+
+              <div className="space-y-1.5 p-3 rounded-xl bg-white/90 dark:bg-slate-850/90 border border-rose-100 dark:border-rose-900/40">
+                <Select
+                  label="سه‌ماهه بارداری"
+                  value={formData.pregnancy_trimester}
+                  onChange={(v) => setFormData((p) => ({ ...p, pregnancy_trimester: v }))}
+                  options={[
+                    { value: '', label: 'باردار نیست / نامشخص' },
+                    { value: '1', label: 'سه‌ماهه اول (محدودیت دارو و رادیولوژی)' },
+                    { value: '2', label: 'سه‌ماهه دوم (ایمن‌ترین زمان درمان)' },
+                    { value: '3', label: 'سه‌ماهه سوم (احتیاط وضعیت خوابیده یونیت)' },
+                  ]}
+                />
+              </div>
+            </div>
+          </div>
+
+          <div>
+            <h4 className="text-xs font-bold text-slate-500 mb-3 uppercase tracking-wider">تنظیمات پرونده و پزشک اولیه</h4>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+              <Select
+                label="پزشک معالج اصلی"
+                value={formData.primary_doctor_id}
+                onChange={(v) => setFormData((p) => ({ ...p, primary_doctor_id: v }))}
+                options={doctors.filter((d) => d.is_active).map((d) => ({ value: d.id, label: `دکتر ${d.name || d.specialty || 'پزشک'}` }))}
+                placeholder="انتخاب پزشک معالج..."
+              />
+              <Select
+                label="سطح VIP بیمار"
+                value={formData.vip_level}
+                onChange={(v) => setFormData((p) => ({ ...p, vip_level: v }))}
+                options={[
+                  { value: '0', label: 'عادی' },
+                  { value: '1', label: 'نقره‌ای' },
+                  { value: '2', label: 'طلایی' },
+                  { value: '3', label: 'پلاتین' },
+                ]}
+              />
+              <Input
+                label="برچسب‌ها (با ویرگول جدا کنید)"
+                value={formData.tags}
+                onChange={(v) => setFormData((p) => ({ ...p, tags: v }))}
+                placeholder="ایمپلنت، ارتودنسی، ارجاعی..."
+              />
+              <Textarea
+                label="یادداشت‌های اختصاصی پرونده"
+                value={formData.notes}
+                onChange={(v) => setFormData((p) => ({ ...p, notes: v }))}
+                placeholder="توضیحات اختصاصی برای پذیرش و منشی..."
+                className="md:col-span-3"
+                rows={2}
+              />
+            </div>
+          </div>
+
+          <div className="flex justify-end gap-2 pt-4 border-t border-slate-100 dark:border-slate-800">
+            <Button variant="secondary" onClick={() => setEditModalOpen(false)}>
+              انصراف
+            </Button>
+            <Button variant="primary" onClick={handleSavePatient} disabled={saving}>
+              {saving ? <Spinner size={16} /> : 'ذخیره تغییرات پرونده'}
+            </Button>
+          </div>
+        </div>
+      </Modal>
+
+      {/* Document & Paper Chart Scanner Modal */}
+      {patient && (
+        <DocumentScannerModal
+          open={scannerModalOpen}
+          onClose={() => setScannerModalOpen(false)}
+          patientId={patient.id}
+          patientName={`${patient.first_name} ${patient.last_name}`}
+          initialCategory={scannerInitialCategory}
+          onSuccess={async () => {
+            await loadTabData()
+          }}
+        />
+      )}
+      </div>
+    </div>
+  )
+}

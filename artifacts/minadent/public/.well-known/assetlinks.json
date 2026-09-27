@@ -1,0 +1,8 @@
+[{
+      "relation": ["delegate_permission/common.handle_all_urls"],
+      "target": {
+        "namespace": "android_app",
+        "package_name": "com.minadent.app",
+        "sha256_cert_fingerprints": ["22:F9:A7:52:89:37:F1:C6:DE:66:22:1C:88:BC:C0:00:20:D7:B6:02:5F:6A:BC:52:2C:A4:41:EF:CD:B5:5B:9A"]
+      }
+    }]

@@ -1,60 +1,19 @@
 {
-  "name": "minadent",
-  "private": true,
-  "version": "1.235.40",
-  "type": "module",
-  "engines": {
-    "node": ">=22"
-  },
+  "name": "workspace",
+  "version": "0.0.0",
+  "license": "MIT",
   "scripts": {
-    "predev": "node scripts/sync-version.mjs",
-    "dev": "vite",
-    "gatekeeper": "node scripts/enterprise-gatekeeper.mjs",
-    "prebuild": "node scripts/enterprise-gatekeeper.mjs && node scripts/sync-version.mjs",
-    "build": "tsc && vite build",
-    "bump": "node scripts/sync-version.mjs --bump-patch",
-    "bump:minor": "node scripts/sync-version.mjs --bump-minor",
-    "sync-version": "node scripts/sync-version.mjs",
-    "preview": "vite preview",
-    "test": "vitest run",
-    "test:watch": "vitest",
-    "verify": "node scripts/enterprise-gatekeeper.mjs && node scripts/sync-version.mjs && tsc --noEmit && vitest run && vite build",
-    "deploy": "node scripts/deploy-vercel.mjs",
-    "e2e": "playwright test",
-    "e2e:ui": "playwright test --ui",
-    "e2e:install": "playwright install --with-deps chromium",
-    "unverified": "node scripts/unverified.mjs"
+    "preinstall": "sh -c 'rm -f package-lock.json yarn.lock; case \"$npm_config_user_agent\" in pnpm/*) ;; *) echo \"Use pnpm instead\" >&2; exit 1 ;; esac'",
+    "build": "pnpm run typecheck && pnpm -r --if-present run build",
+    "typecheck:libs": "tsc --build",
+    "typecheck": "pnpm run typecheck:libs && pnpm -r --filter \"./artifacts/**\" --filter \"./scripts\" --if-present run typecheck"
   },
+  "private": true,
   "dependencies": {
-    "@capacitor/core": "^8.5.2",
-    "@supabase/supabase-js": "^2.45.4",
-    "@zxing/library": "^0.21.3",
-    "dexie": "^4.4.4",
-    "dexie-react-hooks": "^4.4.0",
-    "jalaali-js": "^2.0.1",
-    "lucide-react": "^0.441.0",
-    "react": "^18.3.1",
-    "react-dom": "^18.3.1",
-    "react-router-dom": "^6.26.2",
-    "recharts": "^2.12.7"
+    "@replit/connectors-sdk": "^0.4.3"
   },
   "devDependencies": {
-    "@capacitor/android": "^8.5.2",
-    "@capacitor/cli": "^8.5.2",
-    "@capacitor/ios": "^8.5.2",
-    "@playwright/test": "^1.62.1",
-    "@testing-library/react": "^16.3.3",
-    "@testing-library/user-event": "^14.6.6",
-    "@types/react": "^18.3.5",
-    "@types/react-dom": "^18.3.0",
-    "@vitejs/plugin-react": "^4.3.1",
-    "autoprefixer": "^10.4.20",
-    "jsdom": "^30.0.1",
-    "postcss": "^8.4.45",
-    "sharp": "^0.35.3",
-    "tailwindcss": "^3.4.10",
-    "typescript": "^5.5.4",
-    "vite": "^5.4.3",
-    "vitest": "^2.1.9"
+    "prettier": "^3.9.6",
+    "typescript": "~5.9.3"
   }
 }

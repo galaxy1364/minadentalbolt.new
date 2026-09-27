@@ -1,0 +1,28 @@
+kind = "web"
+previewPath = "/"
+title = "مینادنت"
+description = "نرم‌افزار مدیریت کلینیک دندانپزشکی مینادنت — پرونده بیماران، نوبت‌دهی، صندوق و مالی، انبار و کاردکس، و گزارش‌ها. اپلیکیشن واقعی و از قبل موجود که با کد اصلی خودش وارد شده و در حال ممیزی و بهبود ظاهری است."
+version = "1.0.0"
+id = "artifacts/minadent"
+router = "path"
+
+[[services]]
+name = "web"
+paths = [ "/" ]
+localPort = 19231
+
+[services.development]
+run = "pnpm --filter @workspace/minadent run dev"
+
+[services.production]
+build = [ "pnpm", "--filter", "@workspace/minadent", "run", "build" ]
+serve = "static"
+publicDir = "artifacts/minadent/dist/public"
+
+[[services.production.rewrites]]
+from = "/*"
+to = "/index.html"
+
+[services.env]
+PORT = "19231"
+BASE_PATH = "/"

@@ -1,19 +1,52 @@
-node_modules/
-dist/
+# See https://docs.github.com/en/get-started/getting-started-with-git/ignoring-files for more about ignoring files.
+
+# compiled output
+dist
+tmp
+out-tsc
+*.tsbuildinfo
+.expo
+.expo-shared
+
+# dependencies
+node_modules
+
+# IDEs and editors
+/.idea
+.project
+.classpath
+.c9/
+*.launch
+.settings/
+*.sublime-workspace
+
+# IDE - VSCode
+.vscode/*
+!.vscode/settings.json
+!.vscode/tasks.json
+!.vscode/launch.json
+!.vscode/extensions.json
+
+# misc
+/.sass-cache
+/connect.lock
+/coverage
+/libpeerconnection.log
+npm-debug.log
+yarn-error.log
+testem.log
+/typings
+
+# System Files
 .DS_Store
-*.local
+Thumbs.db
 
-# Never commit secrets — see MOD-SEC-002
-.env
-.env.local
+.cursor/rules/nx-rules.mdc
+.github/instructions/nx.instructions.md
 
-# Playwright
-test-results/
-playwright-report/
+# Replit
+.cache/
+.local/
 
-# E2E credentials — never commit
-.env.e2e
-
-# Temp scripts
-run_migration.js
-supabase/.temp/
+# Android APK signing key — must never be committed
+artifacts/minadent/.apk-signing/
