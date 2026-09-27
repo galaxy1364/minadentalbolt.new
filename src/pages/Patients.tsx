@@ -2,10 +2,10 @@ import { useState, useEffect, useCallback, useMemo } from 'react'
 import { PatientDebtBar } from '../components/PatientDebtBar'
 import { useNavigate } from 'react-router-dom'
 import { Plus, Search, Edit2, Phone, PhoneCall, Filter, Users, Award, AlertCircle, Smile, FileText, User, Heart, Shield, MapPin, Archive, Calendar, MessageSquare, MessageCircle, Eye, EyeOff, Banknote, CalendarClock, ChevronLeft, CreditCard, CheckCircle2, Check, LayoutGrid, List, Sparkles, Activity, Printer, FlaskConical } from 'lucide-react'
-import { fetchPatients, createPatient, updatePatient, fetchDoctors, fetchPayments, fetchTreatments, fetchImplantCases, peekNextFileNumber, fetchCheques, fetchPaymentPlans, fetchLabOrders } from '../lib/api'
+import { fetchPatients, createPatient, updatePatient, fetchDoctors, fetchPayments, fetchTreatments, fetchImplantCases, peekNextFileNumber, fetchCheques, fetchPaymentPlans, fetchLabOrders, fetchAllInstallments } from '../lib/api'
 import { useDataRefresh } from '../lib/realtimeSync'
 import { toJalaliStringPretty, formatCurrency, toPersianDigits } from '../lib/persianDate'
-import { Patient, Doctor, Payment, Treatment, ImplantCase, Cheque, PaymentPlan, LabOrder } from '../types'
+import { Patient, Doctor, Payment, Treatment, ImplantCase, Cheque, PaymentPlan, LabOrder, Installment } from '../types'
 import { Modal, Card, Button, Input, Select, Textarea, Spinner, EmptyState, showToast, HighlightText, SkeletonList } from '../components/ui'
 import { recordAuditLog } from '../lib/auditLogger'
 import { usePrivacyMode } from '../lib/privacyMask'
@@ -69,6 +69,7 @@ export default function Patients() {
   const [cheques, setCheques] = useState<Cheque[]>([])
   const [paymentPlans, setPaymentPlans] = useState<PaymentPlan[]>([])
   const [labOrders, setLabOrders] = useState<LabOrder[]>([])
+  const [installments, setInstallments] = useState<Installment[]>([])
   const [loading, setLoading] = useState(true)
 
   const [searchQuery, setSearchQuery] = useState('')
@@ -107,7 +108,7 @@ export default function Patients() {
   const loadData = useCallback(async () => {
     setLoading(true)
     try {
-      const [pats, docs, pays, trts, implCases, chqs, plans, labs] = await Promise.all([
+      const [pats, docs, pays, trts, implCases, chqs, plans, labs, insts] = await Promise.all([
         fetchPatients(),
         fetchDoctors(),
         fetchPayments(),
@@ -116,6 +117,7 @@ export default function Patients() {
         fetchCheques(),
         fetchPaymentPlans(),
         fetchLabOrders(),
+        fetchAllInstallments(),
       ])
       setPatients(pats)
       setDoctors(docs)
@@ -125,13 +127,14 @@ export default function Patients() {
       setCheques(chqs)
       setPaymentPlans(plans)
       setLabOrders(labs)
+      setInstallments(insts)
     } catch { showToast('error', 'خطا در بارگذاری بیماران') }
     finally { setLoading(false) }
   }, [])
 
   useEffect(() => { loadData() }, [loadData])
 
-  useDataRefresh(['patients', 'payments', 'treatments', 'implant_cases', 'cheques', 'payment_plans', 'lab_orders'], loadData)
+  useDataRefresh(['patients', 'payments', 'treatments', 'implant_cases', 'cheques', 'payment_plans', 'installments', 'lab_orders'], loadData)
 
   const patientFinances = useMemo(() => {
     const map = new Map<string, { balance: number; paid: number; totalCost: number }>()
@@ -497,6 +500,12 @@ export default function Patients() {
         patientPlansMap={patientPlansMap}
         patientImplantsMap={patientImplantsMap}
         patientLabOrdersMap={patientLabOrdersMap}
+        cheques={cheques}
+        installments={installments}
+        paymentPlans={paymentPlans}
+        labOrders={labOrders}
+        treatments={treatments}
+        payments={payments}
         onOpenCreate={openCreateModal}
         onOpenEdit={openEditModal}
       />

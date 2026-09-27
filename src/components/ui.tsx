@@ -643,9 +643,11 @@ export function Tabs({
             isDragging ? 'cursor-grabbing' : 'cursor-grab'
           }`}
         >
-          {tabs.map((tab) => {
+          {tabs.map((tab, index) => {
             const isCurrent = active === tab.key
-            const theme = (tab.color && colorMap[tab.color]) || defaultTheme
+            const theme = (tab.color && colorMap[tab.color]) || colorMap[
+              ['teal', 'blue', 'violet', 'amber', 'rose', 'emerald', 'cyan', 'orange', 'fuchsia', 'lime'][index % 10]
+            ] || defaultTheme
 
             return (
               <button

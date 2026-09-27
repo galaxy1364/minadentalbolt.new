@@ -747,9 +747,9 @@ function LogoutButton() {
         onClick={() => { h.tap(); setConfirmOpen(true) }}
         aria-label="خروج از حساب کاربری"
         title={profile?.full_name ? `خروج (${profile.full_name})` : 'خروج از حساب'}
-        className="header-icon-control header-icon-exit flex items-center justify-center w-11 h-11 min-w-[44px] min-h-[44px] rounded-xl text-rose-900 dark:text-rose-200 transition-all press-scale touch-manipulation"
+        className="header-icon-control header-icon-exit flex items-center justify-center w-14 h-14 min-w-[56px] min-h-[56px] rounded-xl text-rose-900 dark:text-rose-200 transition-all press-scale touch-manipulation"
       >
-        <LogOut size={23} strokeWidth={2.5} />
+        <LogOut size={30} strokeWidth={2.6} />
       </button>
       <LogoutConfirmModal
         open={confirmOpen}
@@ -773,9 +773,9 @@ function HeaderAlarmButton({ onClick }: { onClick: () => void }) {
       }}
       aria-label={hasUrgent ? `مرکز آلارم — ${toPersianDigits(bundle.total)} هشدار فعال` : 'مرکز آلارم و هشدارهای بالینی'}
       title={hasUrgent ? `${toPersianDigits(bundle.total)} هشدار فعال بالینی و مالی` : 'مرکز آلارم و هشدارها'}
-      className="header-icon-control header-icon-bell relative flex items-center justify-center w-11 h-11 min-w-[44px] min-h-[44px] rounded-xl text-amber-900 dark:text-amber-200 transition-all press-scale touch-manipulation overflow-visible"
+      className="header-icon-control header-icon-bell relative flex items-center justify-center w-14 h-14 min-w-[56px] min-h-[56px] rounded-xl text-amber-900 dark:text-amber-200 transition-all press-scale touch-manipulation overflow-visible"
     >
-      <Bell size={23} strokeWidth={2.5} className={hasUrgent ? 'text-amber-800 dark:text-amber-300' : ''} />
+      <Bell size={30} strokeWidth={2.6} className={hasUrgent ? 'text-amber-800 dark:text-amber-300' : ''} />
       {hasUrgent && (
         <span
           className="absolute -top-1.5 -right-1.5 min-w-[18px] h-[18px] px-1 rounded-full bg-red-500 text-white text-[10px] font-bold flex items-center justify-center border-2 border-white dark:border-slate-900 shadow-sm"
@@ -903,9 +903,9 @@ function LayoutInner({ children }: { children: React.ReactNode }) {
               }}
               aria-label="دستیار هوشمند بالینی مینادنت"
               title="دستیار هوشمند صوتی و متنی مینادنت"
-              className="header-icon-control header-icon-ai relative flex items-center justify-center w-11 h-11 min-w-[44px] min-h-[44px] rounded-xl text-sky-900 dark:text-sky-200 transition-all press-scale touch-manipulation"
+              className="header-icon-control header-icon-ai relative flex items-center justify-center w-14 h-14 min-w-[56px] min-h-[56px] rounded-xl text-sky-900 dark:text-sky-200 transition-all press-scale touch-manipulation"
             >
-              <Sparkles size={23} strokeWidth={2.5} />
+              <Sparkles size={30} strokeWidth={2.6} />
             </button>
 
             <HeaderAlarmButton onClick={() => setAlarmCenterOpen(true)} />

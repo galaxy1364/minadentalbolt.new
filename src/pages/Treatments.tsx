@@ -25,12 +25,12 @@ import { PatientSelect } from '../components/PatientSelect'
 import { PatientAlerts } from '../components/PatientAlerts'
 import { toJalaliDisplay, toJalaliStringPretty, formatCurrency, formatNumber, toPersianDigits } from '../lib/persianDate'
 import { Encounter, EncounterWithRelations, Treatment, Procedure, Patient, Doctor, Laboratory, ToothRecord, LabOrder, InsuranceClaim, Payment, Cheque, Installment, ImplantCaseWithRelations, InventoryItemWithRelations } from '../types'
-import { Card, Button, Badge, Spinner, EmptyState, Tabs, Input, Select, Textarea, Modal, Wizard, showToast } from '../components/ui'
+import { Card, Button, Badge, Spinner, EmptyState, Input, Select, Textarea, Modal, Wizard, showToast } from '../components/ui'
 import { recordAuditLog } from '../lib/auditLogger'
 import { PersianDateInput } from '../components/PersianDateInput'
 import { ToothArchSelect } from '../components/ToothArchSelect'
 import { deriveToothConditions, conditionMeta, ToothCondition } from '../lib/toothConditions'
-import { ModuleHeader, ModuleStatCard, ReorderableStatGrid } from '../components/ModuleHeader'
+import { ModuleStatCard, ReorderableStatGrid } from '../components/ModuleHeader'
 import { useConfirmAction } from '../components/ConfirmAction'
 import { h } from '../lib/haptics'
 import { chimes } from '../lib/chimes'
@@ -416,25 +416,33 @@ export default function Treatments() {
     }
   }, [location.state, encounters])
 
-  // Load tooth records when detailEnc or treatPatientId changes
+  // The open treatment wizard takes precedence over a previously inspected
+  // encounter. Never show another patient's teeth in the treatment picker.
+  const clinicalPatientId = treatModalOpen ? treatPatientId : detailEnc?.patient_id || treatPatientId
   useEffect(() => {
-    const targetPatId = detailEnc?.patient_id || treatPatientId
-    if (targetPatId) {
-      fetchToothRecords(targetPatId).then(setToothRecords).catch(() => {})
-    }
-  }, [detailEnc, treatPatientId])
+    if (!clinicalPatientId) { setToothRecords([]); return }
+    let cancelled = false
+    setToothRecords([])
+    fetchToothRecords(clinicalPatientId).then((records) => {
+      if (!cancelled) setToothRecords(records)
+    }).catch(() => {})
+    return () => { cancelled = true }
+  }, [clinicalPatientId])
 
   // ── Derived Data ──────────────────────────────────────────────
 
   const archConditions = useMemo(() => {
-    return deriveToothConditions(toothRecords, treatments)
-  }, [toothRecords, treatments])
+    return deriveToothConditions(
+      toothRecords.filter((r) => r.patient_id === clinicalPatientId),
+      treatments.filter((t) => t.patient_id === clinicalPatientId),
+    )
+  }, [toothRecords, treatments, clinicalPatientId])
 
   const suggestedTeeth = useMemo(() => {
-    const result: { tooth_number: string; conditionLabel: string; surface?: string }[] = []
+    const result: { tooth_number: string; conditionLabel: string; surface?: string; planned: boolean }[] = []
     const seen = new Set<string>()
 
-    for (const r of toothRecords) {
+    for (const r of toothRecords.filter((record) => record.patient_id === clinicalPatientId)) {
       const tNum = r.tooth_number ? String(r.tooth_number) : ''
       if (!tNum || seen.has(tNum)) continue
       if (r.condition && r.condition !== 'healthy') {
@@ -444,7 +452,8 @@ export default function Treatments() {
         result.push({
           tooth_number: tNum,
           conditionLabel: label,
-          surface: typeof r.surfaces === 'string' ? r.surfaces : undefined,
+          surface: (() => { try { const parsed = JSON.parse(r.surfaces || '[]'); return Array.isArray(parsed) ? parsed.find((s) => s.condition !== 'healthy')?.surface : undefined } catch { return undefined } })(),
+          planned: (r.notes || '').includes('[طرح درمان]'),
         })
       }
     }
@@ -456,12 +465,13 @@ export default function Treatments() {
         result.push({
           tooth_number: toothNumStr,
           conditionLabel: label,
+          planned: false,
         })
       }
     }
 
-    return result.sort((a, b) => a.tooth_number.localeCompare(b.tooth_number, undefined, { numeric: true }))
-  }, [toothRecords, archConditions])
+    return result.sort((a, b) => Number(b.planned) - Number(a.planned) || a.tooth_number.localeCompare(b.tooth_number, undefined, { numeric: true }))
+  }, [toothRecords, archConditions, clinicalPatientId])
 
   const patientMap = useMemo(() => new Map(patients.map((p) => [p.id, p])), [patients])
   const doctorMap = useMemo(() => new Map(doctors.map((d) => [d.id, d])), [doctors])
@@ -669,8 +679,13 @@ export default function Treatments() {
       setTreatPatientId(quickTreatPatientId)
       setEditingTreat(null)
       setTreatWizardStep(0)
+      const records = await fetchToothRecords(quickTreatPatientId)
+      setToothRecords(records)
+      const candidate = records
+        .filter((r) => r.condition && r.condition !== 'healthy')
+        .sort((a, b) => Number((b.notes || '').includes('[طرح درمان]')) - Number((a.notes || '').includes('[طرح درمان]')))[0]
       setTreatForm({
-        procedure_code: '', procedure_name: '', procedure_category: '', tooth_number: '', tooth_surface: '',
+        procedure_code: '', procedure_name: '', procedure_category: '', tooth_number: candidate?.tooth_number || '', tooth_surface: '',
         quantity: '1', unit_price: '', discount: '', total_price: '', status: 'planned', notes: '',
         has_lab: false, lab_id: '', lab_cost: '', lab_work_type: '', lab_material: '', lab_shade: '', go_to_billing: false,
         materials_used: [],
@@ -803,7 +818,7 @@ export default function Treatments() {
     setTreatEncounterId(encId); setTreatPatientId(patId)
     setTreatForm({
       procedure_code: '', procedure_name: '', procedure_category: '',
-      tooth_number: lastSelectedTooth, tooth_surface: '', quantity: '1', unit_price: '',
+      tooth_number: lastSelectedTooth || toothRecords.filter((r) => r.patient_id === patId && (r.notes || '').includes('[طرح درمان]'))[0]?.tooth_number || '', tooth_surface: '', quantity: '1', unit_price: '',
       discount: '', total_price: '', status: 'planned', notes: '',
       has_lab: false, lab_id: '', lab_cost: '', lab_work_type: '', lab_material: '', lab_shade: '', go_to_billing: false,
       materials_used: [],
@@ -1265,18 +1280,13 @@ export default function Treatments() {
   }
 
   return (
-    <div className="space-y-6">
-      <ModuleHeader
-        moduleKey="treatments"
-        title="درمان‌ها"
-        subtitle="مدیریت ویزیت‌ها و رویه‌های درمانی"
-        action={
-          <div className="flex flex-wrap items-center justify-end gap-2">
-            <Button onClick={openQuickVisitModal} variant="secondary" size="sm" className="flex items-center gap-1.5 whitespace-nowrap"><ClipboardList size={14} /> ویزیت</Button>
-            <Button onClick={openQuickTreatModal} variant="primary" size="sm" className="flex items-center gap-1.5 whitespace-nowrap"><Stethoscope size={14} /> شروع درمان</Button>
-          </div>
-        }
-      />
+    <div className="space-y-3">
+      <div className="treatment-command-row" role="toolbar" aria-label="اقدام‌ها و نماهای درمان">
+        <button type="button" onClick={openQuickVisitModal} className="module-tool tool-teal rounded-xl px-3 flex items-center gap-1.5"><Plus size={16}/><span>ویزیت جدید</span></button>
+        <button type="button" onClick={() => { h.select(); setActiveTab('encounters') }} aria-pressed={activeTab === 'encounters'} className={`module-tool tool-blue rounded-xl px-3 flex items-center gap-1.5 ${activeTab === 'encounters' ? 'tool-active' : ''}`}><ClipboardList size={16}/><span>فهرست ویزیت‌ها</span></button>
+        <button type="button" onClick={openQuickTreatModal} className="module-tool tool-violet rounded-xl px-3 flex items-center gap-1.5"><Stethoscope size={16}/><span>شروع درمان</span></button>
+        <button type="button" onClick={() => { h.select(); setActiveTab('procedures') }} aria-pressed={activeTab === 'procedures'} className={`module-tool tool-orange rounded-xl px-3 flex items-center gap-1.5 ${activeTab === 'procedures' ? 'tool-active' : ''}`}><Layers size={16}/><span>فهرست رویه‌ها</span></button>
+      </div>
 
       {/* Stats */}
       <ReorderableStatGrid
@@ -1287,15 +1297,6 @@ export default function Treatments() {
           { key: 'completed', node: <ModuleStatCard moduleKey="treatments" icon={<Stethoscope size={20} />} label="تکمیل شده" value={formatNumber(stats.completed)} /> },
           { key: 'revenue', node: <ModuleStatCard moduleKey="treatments" icon={<Smile size={20} />} label="ارزش کل درمان‌ها" value={`${formatCurrency(stats.totalRevenue)} ت`} /> },
         ]}
-      />
-
-      <Tabs
-        tabs={[
-          { key: 'encounters', label: 'ویزیت‌ها', icon: <ClipboardList size={16} /> },
-          { key: 'procedures', label: 'رویه‌های درمانی', icon: <Stethoscope size={16} /> },
-        ]}
-        active={activeTab}
-        onChange={(t) => { h.select(); setActiveTab(t) }}
       />
 
       {/* Filters */}
@@ -1787,6 +1788,43 @@ export default function Treatments() {
               </div>
             </div>
 
+            {/* Findings live on ToothRecord, not a second visit-only list.
+                The marker is a clinical note on that record; no charge is
+                created until a real procedure is registered. */}
+            {suggestedTeeth.length > 0 && (
+              <div className="rounded-2xl border border-amber-300 bg-amber-50/90 dark:bg-amber-950/30 p-3 space-y-2">
+                <p className="text-xs font-black text-amber-900 dark:text-amber-200">یافته‌های دندانی این بیمار · برای طرح درمان علامت بزنید</p>
+                <div className="flex flex-wrap gap-2">
+                  {suggestedTeeth.map((finding) => {
+                    const record = toothRecords.find((r) => r.patient_id === detailEnc.patient_id && r.tooth_number === finding.tooth_number)
+                    return (
+                      <button type="button" key={finding.tooth_number}
+                        onClick={() => {
+                          if (!record) return
+                          const marker = '[طرح درمان]'
+                          const notes = (record.notes || '').replace(marker, '').trim()
+                          void handleUpdateTooth(finding.tooth_number, {
+                            is_missing: !!record.is_missing, is_implant: !!record.is_implant,
+                            condition: record.condition || undefined, surfaces: record.surfaces || undefined,
+                            notes: finding.planned ? notes : `${notes} ${marker}`.trim(),
+                          })
+                        }}
+                        aria-pressed={finding.planned}
+                        className={`module-tool rounded-xl px-2.5 py-1.5 text-xs font-bold ${finding.planned ? 'tool-violet tool-active' : 'tool-orange'}`}
+                      >
+                        دندان {toothLabel(finding.tooth_number)} · {finding.conditionLabel}
+                        <span className="mr-1">{finding.planned ? 'در طرح درمان' : 'افزودن به طرح'}</span>
+                      </button>
+                    )
+                  })}
+                </div>
+              </div>
+            )}
+            {(detailEnc.chief_complaint || detailEnc.diagnosis || detailEnc.treatment_plan || detailEnc.notes) && (
+              <div className="rounded-2xl border border-sky-200 bg-sky-50/80 dark:bg-sky-950/25 p-3 text-xs leading-6 text-sky-900 dark:text-sky-200">
+                <strong>یادداشت ویزیت:</strong> {[detailEnc.chief_complaint, detailEnc.diagnosis, detailEnc.treatment_plan, detailEnc.notes].filter(Boolean).join(' · ')}
+              </div>
+            )}
             {/* Dental Chart */}
             <div>
               <h4 className="text-xs font-bold text-slate-500 mb-3 uppercase tracking-wider flex items-center gap-1.5"><Smile size={14} /> چارت دندانی (پالمر)</h4>
@@ -2011,6 +2049,37 @@ export default function Treatments() {
             validate: () => (!treatForm.tooth_number ? 'انتخاب دندان الزامی است' : null),
             content: (
               <>
+                <div className="mb-3 rounded-2xl border border-sky-200 bg-sky-50/90 dark:bg-sky-950/30 p-3 text-xs text-sky-900 dark:text-sky-200 space-y-2">
+                  <p className="font-black">زمینه بالینی · {patientMap.get(treatPatientId || '') ? `${patientMap.get(treatPatientId || '')?.first_name} ${patientMap.get(treatPatientId || '')?.last_name}` : 'بیمار'}</p>
+                  {(() => {
+                    const prior = encounters.filter((e) => e.patient_id === treatPatientId && e.id !== treatEncounterId && e.status !== 'cancelled')
+                      .sort((a, b) => b.encounter_date.localeCompare(a.encounter_date))[0]
+                    const related = treatments.filter((t) => t.patient_id === treatPatientId && t.status !== 'cancelled')
+                    const charged = related.reduce((sum, t) => sum + (t.patient_share ?? t.total_price ?? 0), 0)
+                    const received = payments.filter((p) => p.patient_id === treatPatientId && p.status === 'completed' && !p.implant_case_id).reduce((sum, p) => sum + p.amount, 0)
+                    const lab = labOrders.filter((o) => o.patient_id === treatPatientId && o.status !== 'cancelled' && o.status !== 'delivered')
+                    return <div className="space-y-1">
+                      {prior && <p>ویزیت پیشین {toJalaliStringPretty(prior.encounter_date)}: {[prior.chief_complaint, prior.diagnosis, prior.treatment_plan, prior.notes].filter(Boolean).join(' · ') || 'بدون یادداشت'}</p>}
+                      <p>ثبت مالی درمان‌ها: {formatCurrency(charged)} ت · دریافت‌شده: {formatCurrency(received)} ت · مانده درمان‌ها: {formatCurrency(charged - received)} ت</p>
+                      {lab.length > 0 && <p>لابراتوار: {toPersianDigits(lab.length)} سفارش فعال · {lab.map((o) => `${o.work_type || 'سفارش'}${o.tooth_number ? `، دندان ${toothLabel(o.tooth_number)}` : ''}`).join('؛ ')}</p>}
+                    </div>
+                  })()}
+                </div>
+                {suggestedTeeth.length > 0 && (
+                  <div className="mb-3 rounded-2xl border border-amber-300 bg-amber-50/90 dark:bg-amber-950/30 p-3">
+                    <p className="text-xs font-black text-amber-900 dark:text-amber-200 mb-2">یافته‌های ثبت‌شده در ویزیت · دندان درمان را انتخاب کنید</p>
+                    <div className="flex flex-wrap gap-1.5">
+                      {suggestedTeeth.map((finding) => (
+                        <button key={finding.tooth_number} type="button"
+                          onClick={() => setTreatForm((prev) => ({ ...prev, tooth_number: finding.tooth_number, tooth_surface: finding.surface || '' }))}
+                          aria-pressed={treatForm.tooth_number === finding.tooth_number}
+                          className={`module-tool rounded-xl px-2.5 py-1.5 text-xs font-bold ${treatForm.tooth_number === finding.tooth_number ? 'tool-violet tool-active' : 'tool-orange'}`}>
+                          {finding.planned ? 'طرح درمان · ' : ''}دندان {toothLabel(finding.tooth_number)} · {finding.conditionLabel}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
                 {/* MOD-FEAT-021: a tooth tapped on the chart is shown as
                     settled, not asked again. It stays visible and
                     changeable — a wizard silently carrying an invisible
@@ -2033,41 +2102,6 @@ export default function Treatments() {
                   </div>
                 ) : (
                   <>
-                    {suggestedTeeth.length > 0 && (
-                      <div className="mb-3 p-3 rounded-2xl bg-amber-50/90 dark:bg-amber-950/20 border border-amber-200/80 dark:border-amber-800/40 space-y-1.5">
-                        <p className="text-xs font-bold text-amber-900 dark:text-amber-200 flex items-center gap-1.5">
-                          <AlertCircle size={14} className="text-amber-600 dark:text-amber-400 shrink-0" />
-                          <span>دندان‌های دارای یافته در پرونده بیمار (پیشنهاد هوشمند):</span>
-                        </p>
-                        <div className="flex flex-wrap gap-1.5">
-                          {suggestedTeeth.map((s) => {
-                            const isSelected = treatForm.tooth_number === s.tooth_number
-                            return (
-                              <button
-                                key={s.tooth_number}
-                                type="button"
-                                onClick={() => {
-                                  h.select()
-                                  setTreatForm((p) => ({
-                                    ...p,
-                                    tooth_number: s.tooth_number,
-                                    ...(s.surface ? { tooth_surface: s.surface } : {}),
-                                  }))
-                                }}
-                                className={`px-2.5 py-1 rounded-xl text-xs font-medium flex items-center gap-1.5 transition-all-smooth ${
-                                  isSelected
-                                    ? 'bg-primary-600 text-white shadow-sm ring-2 ring-primary-300'
-                                    : 'bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-100 border border-slate-200 dark:border-slate-700 hover:border-primary-400 shadow-2xs'
-                                }`}
-                              >
-                                <span className="font-bold">دندان {toothLabel(s.tooth_number)}</span>
-                                <span className="text-[10px] text-amber-700 dark:text-amber-300 font-normal">({s.conditionLabel})</span>
-                              </button>
-                            )
-                          })}
-                        </div>
-                      </div>
-                    )}
                     <ToothArchSelect label="دندان *" value={treatForm.tooth_number} onChange={(v) => setTreatForm((p) => ({ ...p, tooth_number: v }))} conditions={archConditions} />
                   </>
                 )}

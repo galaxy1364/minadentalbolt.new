@@ -10,7 +10,11 @@ import { toPersianDigits, formatCurrency } from '../lib/persianDate'
 import { h } from '../lib/haptics'
 import { chimes } from '../lib/chimes'
 import { usePrivacyMode } from '../lib/privacyMask'
-import { Patient, Treatment, Payment, ImplantCase, Cheque } from '../types'
+import { Patient, Treatment, Payment, Cheque, Installment, PaymentPlan, LabOrder } from '../types'
+import { summariseCheques } from '../lib/chequeSummary'
+import { planProgress } from '../lib/installments'
+import { summariseLab } from '../lib/labShelf'
+import { toothLabel } from '../lib/toothLabel'
 import { patientConcepts, conceptStyle, patientRecordStyle, type PatientConcept } from './patientConcepts'
 
 interface MobilePatientsDemoProps {
@@ -20,6 +24,12 @@ interface MobilePatientsDemoProps {
   patientPlansMap: Map<string, number>
   patientImplantsMap: Map<string, number>
   patientLabOrdersMap: Map<string, number>
+  cheques: Cheque[]
+  installments: Installment[]
+  paymentPlans: PaymentPlan[]
+  labOrders: LabOrder[]
+  treatments: Treatment[]
+  payments: Payment[]
   onOpenCreate: () => void
   onOpenEdit: (p: Patient) => void
 }
@@ -33,6 +43,12 @@ export function MobilePatientsDemo({
   patientPlansMap,
   patientImplantsMap,
   patientLabOrdersMap,
+  cheques,
+  installments,
+  paymentPlans,
+  labOrders,
+  treatments,
+  payments,
   onOpenCreate,
   onOpenEdit,
 }: MobilePatientsDemoProps) {
@@ -42,6 +58,39 @@ export function MobilePatientsDemo({
   // Full-screen drilldown state
   const [activeFullScreen, setActiveFullScreen] = useState<FullScreenView>('none')
   const [searchQuery, setSearchQuery] = useState('')
+  const [expandedPatientId, setExpandedPatientId] = useState<string | null>(null)
+  const todayISO = new Date().toISOString().slice(0, 10)
+
+  const clinicalSummary = useMemo(() => {
+    const map = new Map<string, {
+      cheques: ReturnType<typeof summariseCheques>
+      plan: ReturnType<typeof planProgress>
+      lab: ReturnType<typeof summariseLab>
+      items: Treatment[]
+      receipts: Payment[]
+    }>()
+    const byPatient = <T extends { patient_id: string }>(items: T[]) => {
+      const groups = new Map<string, T[]>()
+      for (const item of items) groups.set(item.patient_id, [...(groups.get(item.patient_id) || []), item])
+      return groups
+    }
+    const groupedCheques = byPatient(cheques)
+    const groupedInstallments = byPatient(installments)
+    const groupedLab = byPatient(labOrders)
+    const groupedTreatments = byPatient(treatments)
+    const groupedPayments = byPatient(payments)
+    for (const p of patients) {
+      const activePlanIds = new Set(paymentPlans.filter((plan) => plan.patient_id === p.id && plan.status === 'active').map((plan) => plan.id))
+      map.set(p.id, {
+        cheques: summariseCheques(groupedCheques.get(p.id) || [], p.id),
+        plan: planProgress((groupedInstallments.get(p.id) || []).filter((inst) => activePlanIds.has(inst.payment_plan_id)), todayISO),
+        lab: summariseLab((groupedLab.get(p.id) || []).filter((o) => o.status !== 'delivered'), todayISO),
+        items: (groupedTreatments.get(p.id) || []).filter((t) => t.status !== 'cancelled'),
+        receipts: (groupedPayments.get(p.id) || []).filter((py) => py.status === 'completed'),
+      })
+    }
+    return map
+  }, [patients, cheques, installments, paymentPlans, labOrders, treatments, payments, todayISO])
 
   // Aggregated clinic metrics
   const metrics = useMemo(() => {
@@ -393,17 +442,20 @@ export function MobilePatientsDemo({
               {activeList.map((p) => {
                 const fin = patientFinances.get(p.id) || { balance: 0, paid: 0, totalCost: 0 }
                 const isDebtor = fin.balance > 0
+                const clinical = clinicalSummary.get(p.id)
+                const expanded = expandedPatientId === p.id
 
                 return (
                   <div
                     key={p.id}
                     style={patientRecordStyle(p.id)}
-                    onClick={() => { h.tap(); navigate(`/patients/${p.id}`) }}
-                    className="patient-tile p-4 rounded-[22px] flex flex-col space-y-3 cursor-pointer"
+                    className="patient-tile p-3 rounded-[20px] flex flex-col gap-2"
                   >
-                    <div className="flex items-center justify-between">
+                    <button type="button" onClick={() => { h.tap(); setExpandedPatientId(expanded ? null : p.id) }}
+                      aria-expanded={expanded} aria-label={`جزئیات مالی و درمانی ${p.first_name} ${p.last_name}`}
+                      className="flex items-start justify-between gap-2 w-full text-right">
                       <div className="flex items-center gap-2.5">
-                        <div className="w-10 h-10 min-w-[40px] min-h-[40px] rounded-xl bg-teal-600 text-white font-black text-xs flex items-center justify-center">
+                        <div className="w-9 h-9 min-w-[36px] rounded-xl bg-teal-600 text-white font-black text-xs flex items-center justify-center">
                           {p.first_name?.[0] || 'ب'}
                         </div>
                         <div>
@@ -416,30 +468,55 @@ export function MobilePatientsDemo({
                         </div>
                       </div>
 
-                      <div className="flex items-center gap-1.5 shrink-0" onClick={(e) => e.stopPropagation()}>
-                      {(patientLabOrdersMap.get(p.id) || 0) > 0 && <button aria-label="نمایش سفارش‌های لابراتوار" title="سفارش‌های لابراتوار" onClick={() => navigate(`/patients/${p.id}`, { state: { initialTab: 'labOrders' } })} style={conceptStyle('lab')} className="patient-tile icon-blink w-8 h-8 rounded-xl text-cyan-700 flex items-center justify-center"><patientConcepts.lab.icon size={17}/></button>}
-                      {(patientImplantsMap.get(p.id) || 0) > 0 && <button aria-label="نمایش پرونده ایمپلنت" title="پرونده ایمپلنت" onClick={() => navigate(`/patients/${p.id}`, { state: { initialTab: 'implants' } })} style={conceptStyle('implants')} className="patient-tile icon-blink w-8 h-8 rounded-xl text-indigo-700 flex items-center justify-center"><patientConcepts.implants.icon size={17}/></button>}
                       {isDebtor ? (
-                        <span className="text-[11px] font-black px-2.5 py-1 rounded-xl bg-rose-50 text-rose-700 border border-rose-200">
-                          بدهی: {formatCurrency(fin.balance)}
+                        <span className="text-[10px] font-black px-2 py-1 rounded-xl bg-rose-50 text-rose-700 border border-rose-200 whitespace-nowrap">
+                          مانده {formatCurrency(fin.balance)}
                         </span>
                       ) : (
                         <span className="text-[11px] font-bold px-2 py-0.5 rounded-lg bg-emerald-50 text-emerald-700">
                           تسویه
                         </span>
                       )}
-                      </div>
-                    </div>
+                      <ChevronLeft size={15} className={`text-teal-700 transition-transform ${expanded ? '-rotate-90' : ''}`} />
+                    </button>
 
+                    {clinical && (
+                      <div className="flex flex-wrap items-center gap-1 text-[10px] font-bold leading-5">
+                        {clinical.cheques.inFlight.count > 0 && <span className="px-2 rounded-lg bg-amber-100 text-amber-900 border border-amber-300">چک در جریان {toPersianDigits(clinical.cheques.inFlight.count)} · {formatCurrency(clinical.cheques.inFlight.total)} ت</span>}
+                        {clinical.cheques.guarantee.count > 0 && <span className="px-2 rounded-lg bg-violet-100 text-violet-900 border border-violet-300">ضمانت {toPersianDigits(clinical.cheques.guarantee.count)} · {formatCurrency(clinical.cheques.guarantee.total)} ت</span>}
+                        {clinical.cheques.bounced.count > 0 && <span className="px-2 rounded-lg bg-rose-100 text-rose-900 border border-rose-300">برگشتی {toPersianDigits(clinical.cheques.bounced.count)}</span>}
+                        {clinical.plan.total > 0 && <span className="px-2 rounded-lg bg-sky-100 text-sky-900 border border-sky-300">اقساط {toPersianDigits(clinical.plan.paidCount)} پرداخت / {toPersianDigits(clinical.plan.dueCount)} مانده · {formatCurrency(clinical.plan.remaining)} ت</span>}
+                        {clinical.lab.total > 0 && <span className="px-2 rounded-lg bg-cyan-100 text-cyan-900 border border-cyan-300">لابراتوار {toPersianDigits(clinical.lab.total)} · {clinical.lab.readyForDelivery > 0 ? `${toPersianDigits(clinical.lab.readyForDelivery)} آماده` : 'در جریان'}{clinical.lab.overdueAlarms > 0 ? ` · ${toPersianDigits(clinical.lab.overdueAlarms)} معوق` : ''}</span>}
+                        {(patientImplantsMap.get(p.id) || 0) > 0 && <span className="px-2 rounded-lg bg-indigo-100 text-indigo-900 border border-indigo-300">ایمپلنت {toPersianDigits(patientImplantsMap.get(p.id) || 0)}</span>}
+                      </div>
+                    )}
+
+                    {expanded && clinical && (
+                      <div className="rounded-xl bg-sky-50/80 dark:bg-slate-800/80 border border-sky-200 dark:border-slate-600 p-2.5 space-y-2 text-xs" onClick={(e) => e.stopPropagation()}>
+                        <p className="font-black text-sky-900 dark:text-sky-200">ریز درمان و پرداخت</p>
+                        {clinical.items.length ? clinical.items.map((item) => {
+                          const cost = item.patient_share ?? item.total_price ?? 0
+                          const paid = clinical.receipts.filter((payment) => payment.treatment_id === item.id).reduce((sum, payment) => sum + payment.amount, 0)
+                          return <div key={item.id} className="flex justify-between items-start gap-2 border-b border-sky-200/80 pb-1.5 text-slate-800 dark:text-slate-100">
+                            <span className="font-semibold">{item.tooth_number ? `دندان ${toothLabel(item.tooth_number)} · ` : ''}{item.procedure_name || item.procedure_code || 'درمان'}</span>
+                            <span className="shrink-0 text-left leading-5">هزینه {formatCurrency(cost)} ت<br/>پرداخت مرتبط {formatCurrency(paid)} ت<br/><strong className="text-rose-700 dark:text-rose-300">مانده مرتبط {formatCurrency(cost - paid)} ت</strong></span>
+                          </div>
+                        }) : <p className="text-slate-700 dark:text-slate-200">درمانی ثبت نشده است.</p>}
+                        {clinical.receipts.some((payment) => !payment.treatment_id && !payment.implant_case_id) && <p className="text-sky-900 dark:text-sky-200">پرداخت‌های عمومی جداگانه در مانده کل لحاظ می‌شوند و به یک درمان خاص نسبت داده نشده‌اند.</p>}
+                        <p className="font-bold text-slate-800 dark:text-slate-100">مانده کل پرونده با احتساب ایمپلنت و پرداخت عمومی: {formatCurrency(fin.balance)} ت</p>
+                        {clinical.cheques.guaranteeWithoutPlan > 0 && <p className="text-rose-700 dark:text-rose-300">چک ضمانت بدون طرح قسطی: {toPersianDigits(clinical.cheques.guaranteeWithoutPlan)}</p>}
+                        {clinical.plan.overdueCount > 0 && <p className="text-rose-700 dark:text-rose-300">اقساط سررسید گذشته: {toPersianDigits(clinical.plan.overdueCount)}</p>}
+                      </div>
+                    )}
                     {/* Quick Sterile Touch Actions */}
-                    <div className="pt-2 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between" onClick={(e) => e.stopPropagation()}>
-                      <div className="flex items-center gap-2">
+                    <div className="pt-1.5 border-t border-slate-200 dark:border-slate-700 flex flex-wrap items-center justify-between gap-1" >
+                      <div className="flex flex-wrap items-center gap-1">
                         {p.phone && (
                           <>
                             <a
                               href={`tel:${p.phone}`}
                               onClick={() => { h.tap(); chimes.playPop() }}
-                              className="raised-surface icon-blink px-3 min-h-[44px] rounded-xl bg-emerald-100 text-emerald-700 border border-emerald-200 flex items-center gap-1 text-xs font-bold"
+                              className="raised-surface icon-blink px-2 min-h-[38px] rounded-xl bg-emerald-100 text-emerald-700 border border-emerald-200 flex items-center gap-1 text-[11px] font-bold"
                             >
                               <PhoneCall size={14} />
                               <span>تماس</span>
@@ -447,7 +524,7 @@ export function MobilePatientsDemo({
                             <a
                               href={`sms:${p.phone}`}
                               onClick={() => { h.tap(); chimes.playPop() }}
-                              className="raised-surface icon-blink px-3 min-h-[44px] rounded-xl bg-sky-100 text-sky-700 border border-sky-200 flex items-center gap-1 text-xs font-bold"
+                              className="raised-surface icon-blink px-2 min-h-[38px] rounded-xl bg-sky-100 text-sky-700 border border-sky-200 flex items-center gap-1 text-[11px] font-bold"
                             >
                               <MessageSquare size={14} />
                               <span>پیامک</span>
@@ -461,7 +538,7 @@ export function MobilePatientsDemo({
                               state: { quickStartPatientId: p.id, quickStartDoctorId: p.primary_doctor_id, openWizard: true }
                             })
                           }}
-                          className="appointment-primary raised-surface icon-blink px-4 min-h-[44px] rounded-xl flex items-center gap-1 text-xs font-bold"
+                          className="appointment-primary raised-surface icon-blink px-2 min-h-[38px] rounded-xl flex items-center gap-1 text-[11px] font-bold"
                         >
                           <Calendar size={14} />
                           <span>+ نوبت</span>
@@ -470,11 +547,10 @@ export function MobilePatientsDemo({
 
                       <button
                         onClick={() => { h.tap(); navigate(`/patients/${p.id}`) }}
-                         className="file-action breathing-surface px-3 min-h-[44px] rounded-xl flex items-center gap-1 text-xs font-bold press-scale"
+                         className="file-action breathing-surface px-2 min-h-[38px] rounded-xl flex items-center gap-1 text-[11px] font-bold press-scale"
                       >
                          <FileSearch size={14} />
                         <span>پرونده</span>
-                          <span className="patient-chevron-trail inline-flex items-center -space-x-2 text-violet-300" aria-hidden="true"><ChevronLeft size={14}/><ChevronLeft size={14}/><ChevronLeft size={14}/></span>
                       </button>
                     </div>
                   </div>

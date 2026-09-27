@@ -220,8 +220,8 @@ function StatTile({
     >
       <div className={`absolute -top-6 -left-6 w-24 h-24 rounded-full bg-gradient-to-br ${theme.blob} to-transparent blur-xl pointer-events-none breathe-slow`} />
       <div className="relative flex items-center gap-2 mb-1.5">
-        <ModuleIconBadge color={theme.solidColor} size={22}>
-          {isValidElement(icon) ? cloneElement(icon as React.ReactElement<any>, { size: 20 }) : icon}
+        <ModuleIconBadge color={theme.solidColor} size={42}>
+          {isValidElement(icon) ? cloneElement(icon as React.ReactElement<any>, { size: 34 }) : icon}
         </ModuleIconBadge>
         <p className="text-[11px] font-bold text-slate-700 dark:text-slate-300 truncate">{label}</p>
       </div>
@@ -276,9 +276,9 @@ function QuickAction({ icon, label, color, onClick, delay }: { icon: React.React
       className={`tile-in card-lift card-tactile-3d relative overflow-hidden flex flex-col items-center justify-center gap-1.5 p-2 rounded-2xl bg-gradient-to-br ${theme.bg} border-t border-t-white/80 dark:border-t-white/10 border border-slate-200/60 dark:border-slate-700 shadow-md shadow-slate-900/5 min-h-[66px] flex-1 focus:outline-none focus:ring-4 ${theme.ring} press-scale hover:-translate-y-0.5 active:translate-y-0.5 transition-all`}
     >
       <div className={`absolute -bottom-6 -left-6 w-16 h-16 rounded-full bg-gradient-to-br ${theme.blob} to-transparent blur-lg pointer-events-none opacity-40`} />
-      <ModuleIconBadge color={theme.solidColor} size={28}>
+      <ModuleIconBadge color={theme.solidColor} size={50}>
         <div className="float-bounce">
-          {isValidElement(icon) ? cloneElement(icon as React.ReactElement<any>, { size: 22 }) : icon}
+          {isValidElement(icon) ? cloneElement(icon as React.ReactElement<any>, { size: 40 }) : icon}
         </div>
       </ModuleIconBadge>
       <span className={`relative text-[11px] font-extrabold ${theme.text} truncate max-w-full drop-shadow-xs`}>{label}</span>
@@ -1204,7 +1204,7 @@ export default function Dashboard() {
           className="inline-flex items-center gap-1.5 text-xs font-bold text-violet-700 dark:text-violet-300 bg-violet-50/80 dark:bg-violet-950/40 hover:bg-violet-100 dark:hover:bg-violet-900/60 border border-violet-200/60 dark:border-violet-800/50 rounded-xl px-2.5 py-1.5 shadow-2xs transition-all press-scale cursor-pointer"
           title="مشاهده تقویم و نوبت‌ها"
         >
-          <Calendar size={14} className="text-violet-500 shrink-0" />
+          <Calendar size={20} strokeWidth={2.4} className="text-violet-600 shrink-0" />
           <span>{toJalaliStringPretty(todayStr)}</span>
         </button>
 
@@ -1230,18 +1230,18 @@ export default function Dashboard() {
             aria-label="به‌روزرسانی"
             title="به‌روزرسانی داده‌ها"
             disabled={refreshing}
-            className="flex items-center justify-center min-w-[38px] min-h-[38px] rounded-xl bg-gradient-to-br from-teal-500 to-emerald-600 text-white shadow-md shadow-emerald-500/25 border-t border-t-white/40 border border-emerald-400/30 hover:brightness-110 active:scale-95 transition-all press-scale disabled:opacity-50"
+            className="flex items-center justify-center min-w-[52px] min-h-[52px] rounded-xl bg-gradient-to-br from-teal-500 to-emerald-600 text-white shadow-md shadow-emerald-500/25 border-t border-t-white/40 border border-emerald-400/30 hover:brightness-110 active:scale-95 transition-all press-scale disabled:opacity-50"
           >
-            <RefreshCw size={15} className={`drop-shadow-xs ${refreshing ? 'animate-spin' : ''}`} />
+            <RefreshCw size={22} strokeWidth={2.4} className={`drop-shadow-xs ${refreshing ? 'animate-spin' : ''}`} />
           </button>
 
           {/* Notifications Bell - Vibrant Amber / Orange 3D Gradient */}
           <button
             onClick={() => { h.tap(); setNotifCenterOpen(true) }}
             aria-label={`مرکز اعلان‌ها${totalNotifCount > 0 ? `، ${totalNotifCount} مورد` : ''}`}
-            className="relative flex items-center justify-center min-w-[44px] min-h-[44px] rounded-xl bg-gradient-to-br from-amber-500 to-orange-500 text-white shadow-md shadow-orange-500/25 border-t border-t-white/40 border border-amber-400/30 hover:brightness-110 active:scale-95 transition-all press-scale"
+            className="relative flex items-center justify-center min-w-[52px] min-h-[52px] rounded-xl bg-gradient-to-br from-amber-500 to-orange-500 text-white shadow-md shadow-orange-500/25 border-t border-t-white/40 border border-amber-400/30 hover:brightness-110 active:scale-95 transition-all press-scale"
           >
-            <Bell size={18} className="drop-shadow-xs" />
+            <Bell size={24} strokeWidth={2.4} className="drop-shadow-xs" />
             {totalNotifCount > 0 && (
               <span className="absolute -top-1.5 -left-1.5 min-w-[20px] h-[20px] px-1 rounded-full bg-rose-600 text-white text-[10px] font-extrabold flex items-center justify-center border-2 border-white dark:border-slate-800 shadow-sm animate-pulse">
                 {toPersianDigits(Math.min(totalNotifCount, 99))}

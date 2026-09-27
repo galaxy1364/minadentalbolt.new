@@ -1901,8 +1901,34 @@ input, textarea, select { font-size: 16px !important; }
 .appt-view-list { background:#e3ecff; color:#264ca3; }
 .appt-view-calendar { background:#f1e5fb; color:#75319c; }
 .appt-view-chairs { background:#e0f3e6; color:#166341; }
+.appt-tool-monitor { background:#d9faf3; color:#075f58; }
+.appt-tool-monitor svg { color:#087e82; stroke-width:2.7; filter:drop-shadow(0 1px 0 rgba(255,255,255,.9)); }
 .appt-tool-selected,.appt-view-selected { border-bottom-width:3px; box-shadow: 0 7px 12px -4px rgba(27,49,72,.39), inset 0 1px 0 rgba(255,255,255,.9); }
 .dark .appt-tool,.dark .appt-view { background:#25394a; color:#e7efff; }
+
+/* Toolbar enamel: the lift belongs to the control, never a square behind
+   the artwork. Each action keeps its own legible pigment. */
+.module-tool {
+  border:1px solid currentColor;
+  border-bottom-width:3px;
+  box-shadow:0 7px 12px -6px rgba(27,49,72,.38),inset 0 1px 0 rgba(255,255,255,.84);
+}
+.module-tool svg { flex-shrink:0; stroke-width:2.45; background:none!important; padding:0!important; box-shadow:none!important; }
+.tool-violet {background:#eee1fc!important;color:#693398!important;}
+.tool-teal {background:#d6f5ec!important;color:#075d53!important;}
+.tool-orange {background:#ffead7!important;color:#915017!important;}
+.tool-blue {background:#deedff!important;color:#235a9c!important;}
+.tool-rose {background:#ffe0e9!important;color:#9d3155!important;}
+.tool-lime {background:#e5f3d8!important;color:#416b24!important;}
+.tool-cyan {background:#dcf4fa!important;color:#126780!important;}
+.tool-active {filter:saturate(1.25);border-bottom-width:4px;box-shadow:0 8px 12px -5px rgba(27,49,72,.38),inset 0 1px 0 rgba(255,255,255,.92);}
+.dark .module-tool {background:#28394b!important;color:#d6ecfa!important;}
+.treatment-command-row {display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin-bottom:-14px}
+.treatment-command-row button {min-height:42px;white-space:nowrap;font-weight:800}
+@media(max-width:767px) {
+  .treatment-command-row {display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:7px;margin-bottom:-16px}
+  .treatment-command-row button {justify-content:center;font-size:11px;padding-inline:6px}
+}
 
 /* Make small clinical metadata and tint-card captions readable at a glance. */
 :root:not(.dark) #root .text-slate-600 { color:#344459; }

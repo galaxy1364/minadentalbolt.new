@@ -956,11 +956,11 @@ export default function Appointments() {
               h.tap()
               window.open('#/waiting-room', '_blank')
             }}
-            className="flex items-center gap-1.5 min-h-[44px] px-3.5 rounded-xl bg-gradient-to-r from-teal-500 to-emerald-600 text-white font-extrabold text-xs shadow-md shadow-emerald-500/20 border-t border-white/30 hover:brightness-110 active:scale-95 transition-all press-scale"
+            className="appt-tool appt-tool-monitor flex items-center gap-1.5 min-h-[44px] px-3.5 rounded-xl font-extrabold text-xs hover:brightness-105 active:scale-95 transition-all press-scale"
             title="باز کردن مانیتور سالن انتظار (مخصوص تلویزیون و نمایشگر عمومی)"
           >
-            <Tv size={16} />
-            <span className="hidden sm:inline">مانیتور سالن</span>
+            <Tv size={19} strokeWidth={2.6} />
+            <span>مانیتور سالن</span>
           </button>
         </div>
       </div>
