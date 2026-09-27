@@ -283,25 +283,24 @@ export function MobilePatientsDemo({
               }
             }}
             style={conceptStyle(card.concept)}
-            className={`patient-tile p-3.5 sm:p-5 rounded-[22px] cursor-pointer flex flex-col justify-between min-h-[116px] sm:min-h-[150px] text-right group ${card.concept === 'intake' ? 'breathing-surface' : ''}`}
+            className={`patient-tile p-3.5 sm:p-5 rounded-[22px] cursor-pointer flex flex-col gap-2.5 text-right group ${card.concept === 'intake' ? 'breathing-surface' : ''}`}
           >
-            <div className="flex items-center justify-between">
-              <div className={`concept-icon p-2.5 sm:p-3 rounded-2xl ${patientConcepts[card.concept].color}`}>
-                <Icon size={25} />
+            <div className="flex items-center gap-2.5">
+              <div className={`concept-icon p-2.5 sm:p-3 rounded-2xl shrink-0 ${patientConcepts[card.concept].color}`}>
+                <Icon size={26} />
               </div>
-              <span className={`concept-icon text-[10px] sm:text-xs font-black px-2 py-1 rounded-xl ${patientConcepts[card.concept].color}`}>
-                {card.badge}
-              </span>
+              <div className="min-w-0 flex-1 text-right">
+                <h3 className="text-sm sm:text-base font-black leading-tight text-slate-900 dark:text-slate-100 truncate">
+                  {card.title}
+                </h3>
+                <p className="text-[11px] sm:text-xs font-medium text-slate-600 dark:text-slate-300 truncate mt-0.5" dir="rtl">
+                  {card.sub}
+                </p>
+              </div>
             </div>
-
-            <div className="mt-3 text-right">
-              <h3 className="text-sm sm:text-base font-black leading-tight text-slate-900 dark:text-slate-100">
-                {card.title}
-              </h3>
-              <p className="text-[11px] sm:text-xs font-medium text-slate-600 dark:text-slate-300 truncate mt-1" dir="rtl">
-                {card.sub}
-              </p>
-            </div>
+            <span className={`concept-icon self-start text-[10px] sm:text-xs font-black px-2.5 py-1 rounded-xl ${patientConcepts[card.concept].color}`}>
+              {card.badge}
+            </span>
           </button>
         })}
       </div>

@@ -1230,7 +1230,7 @@ export default function Dashboard() {
             aria-label="به‌روزرسانی"
             title="به‌روزرسانی داده‌ها"
             disabled={refreshing}
-            className="flex items-center justify-center min-w-[52px] min-h-[52px] rounded-xl bg-gradient-to-br from-teal-500 to-emerald-600 text-white shadow-md shadow-emerald-500/25 border-t border-t-white/40 border border-emerald-400/30 hover:brightness-110 active:scale-95 transition-all press-scale disabled:opacity-50"
+            className="flex items-center justify-center min-w-[52px] min-h-[52px] rounded-xl bg-gradient-to-br from-teal-500 to-emerald-600 text-white shadow-lg shadow-emerald-600/40 ring-2 ring-emerald-300/60 border-t border-t-white/60 border border-emerald-700/40 hover:brightness-110 active:scale-95 transition-all press-scale disabled:opacity-50"
           >
             <RefreshCw size={22} strokeWidth={2.4} className={`drop-shadow-xs ${refreshing ? 'animate-spin' : ''}`} />
           </button>
@@ -1239,7 +1239,7 @@ export default function Dashboard() {
           <button
             onClick={() => { h.tap(); setNotifCenterOpen(true) }}
             aria-label={`مرکز اعلان‌ها${totalNotifCount > 0 ? `، ${totalNotifCount} مورد` : ''}`}
-            className="relative flex items-center justify-center min-w-[52px] min-h-[52px] rounded-xl bg-gradient-to-br from-amber-500 to-orange-500 text-white shadow-md shadow-orange-500/25 border-t border-t-white/40 border border-amber-400/30 hover:brightness-110 active:scale-95 transition-all press-scale"
+            className="relative flex items-center justify-center min-w-[52px] min-h-[52px] rounded-xl bg-gradient-to-br from-amber-500 to-orange-500 text-white shadow-lg shadow-orange-600/40 ring-2 ring-amber-300/60 border-t border-t-white/60 border border-orange-700/40 hover:brightness-110 active:scale-95 transition-all press-scale"
           >
             <Bell size={24} strokeWidth={2.4} className="drop-shadow-xs" />
             {totalNotifCount > 0 && (
@@ -1253,9 +1253,9 @@ export default function Dashboard() {
           <button
             onClick={() => { h.confirm(); navigate('/appointments') }}
             aria-label="نوبت جدید"
-            className="flex items-center justify-center gap-1.5 min-h-[48px] min-w-[48px] px-3.5 sm:px-4 py-2.5 rounded-xl bg-gradient-to-l from-primary-600 to-violet-600 text-white text-xs font-bold btn-tactile-3d shadow-md shadow-primary-600/25 border-t border-white/40 hover:opacity-95 active:scale-95 transition-all shrink-0"
+            className="flex items-center justify-center gap-1.5 min-h-[52px] min-w-[52px] px-3.5 sm:px-4 py-2.5 rounded-xl bg-gradient-to-l from-primary-600 to-violet-600 text-white text-xs font-bold btn-tactile-3d shadow-lg shadow-violet-700/40 ring-2 ring-violet-300/60 border-t border-white/60 border border-violet-800/40 hover:opacity-95 active:scale-95 transition-all shrink-0"
           >
-            <Plus size={16} />
+            <Plus size={22} strokeWidth={2.6} />
             <span className="hidden sm:inline">نوبت جدید</span>
           </button>
         </div>
