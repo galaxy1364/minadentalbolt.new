@@ -3,6 +3,28 @@ import { APP_VERSION } from './appVersion'
 export const AUTO_CHECK_KEY = 'minadent-auto-update-check'
 export const AUTO_APPLY_KEY = 'minadent-auto-apply-update'
 
+// Some installs (home-screen PWA on iOS/Android, or a WebView shell built
+// from an older snapshot) can never actually pick up a newer bundle after
+// a reload — the OS/WebView keeps serving its own cached copy, so
+// APP_VERSION stays stale forever and checkForUpdate() keeps reporting
+// "update available" on every check. Without a cap, the auto-apply
+// countdown in the update banner re-arms on every fresh page load and the
+// app reloads itself every few seconds forever (constant refresh / white
+// screen, reported on iPhone, Android and Desktop installs). Cap
+// automatic reloads to once per browser session; after that, still show
+// the banner but require the user to tap "به‌روزرسانی فوری" manually.
+const AUTO_APPLY_ATTEMPTED_KEY = 'minadent-auto-apply-attempted'
+
+export function hasAutoApplyBeenAttempted(): boolean {
+  if (typeof sessionStorage === 'undefined') return false
+  return sessionStorage.getItem(AUTO_APPLY_ATTEMPTED_KEY) === '1'
+}
+
+export function markAutoApplyAttempted(): void {
+  if (typeof sessionStorage === 'undefined') return
+  sessionStorage.setItem(AUTO_APPLY_ATTEMPTED_KEY, '1')
+}
+
 
 export interface UpdateCheckResult {
   updateAvailable: boolean

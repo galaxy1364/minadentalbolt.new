@@ -21,7 +21,7 @@ import { ModuleIconBadge } from './ModuleIconBadge'
 import { labOpenWork, appointmentsOpenWork, billingOpenWork, LEVEL_COLORS, type OpenWork } from '../lib/openWork'
 import { APP_VERSION } from '../lib/appVersion'
 import { toPersianDigits } from '../lib/persianDate'
-import { checkForUpdate, applyUpdate, isAutoCheckEnabled, isAutoApplyEnabled } from '../lib/updateCheck'
+import { checkForUpdate, applyUpdate, isAutoCheckEnabled, isAutoApplyEnabled, hasAutoApplyBeenAttempted, markAutoApplyAttempted } from '../lib/updateCheck'
 import {
   primaryModules, secondaryModules, allModules,
   getModuleByPath, setModuleTheme, type ModuleIdentity,
@@ -117,7 +117,7 @@ function UpdateBanner() {
     if (result.updateAvailable) {
       setAvailable(true)
       setRemoteVersion(result.remoteVersion)
-      if (isAutoApplyEnabled() && countdown === null && !paused) {
+      if (isAutoApplyEnabled() && countdown === null && !paused && !hasAutoApplyBeenAttempted()) {
         setCountdown(6)
       }
     }
@@ -139,6 +139,7 @@ function UpdateBanner() {
     if (countdown === null || paused || dismissed || updating) return
     if (countdown <= 0) {
       setUpdating(true)
+      markAutoApplyAttempted()
       applyUpdate()
       return
     }
