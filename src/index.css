@@ -1940,21 +1940,21 @@ input, textarea, select { font-size: 16px !important; }
 }
 .dark .billing-tab { background: color-mix(in srgb, var(--tab-color) 24%, #1e293b); color: #fff; }
 .settings-tab {
-  background: #f1f5f9;
-  color: #475569;
-  border: 1px solid #e2e8f0;
+  background: color-mix(in srgb, var(--tab-color) 12%, white);
+  color: var(--tab-color);
+  border: 1px solid color-mix(in srgb, var(--tab-color) 35%, white);
   border-bottom-width: 2px;
-  box-shadow: 0 6px 10px -6px rgba(27,49,72,.2), inset 0 1px 0 rgba(255,255,255,.8);
+  box-shadow: 0 6px 10px -6px rgba(27,49,72,.3), inset 0 1px 0 rgba(255,255,255,.8);
 }
 .settings-tab svg { flex-shrink: 0; }
 .settings-tab-active {
-  background: #0d9488 !important;
+  background: var(--tab-color) !important;
   color: #fff !important;
-  border-color: #0d9488 !important;
+  border-color: var(--tab-color) !important;
   border-bottom-width: 3px;
   box-shadow: 0 8px 14px -6px rgba(27,49,72,.4), inset 0 1px 0 rgba(255,255,255,.35);
 }
-.dark .settings-tab { background: #253544; color: #cbd5e1; border-color: #334155; }
+.dark .settings-tab { background: color-mix(in srgb, var(--tab-color) 24%, #1e293b); color: #fff; }
 .treatment-command-row {display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin-bottom:-14px}
 .treatment-command-row button {min-height:42px;white-space:nowrap;font-weight:800}
 @media(max-width:767px) {

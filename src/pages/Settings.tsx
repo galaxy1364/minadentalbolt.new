@@ -656,22 +656,22 @@ export default function Settings() {
 
       <div className="grid grid-cols-4 gap-2">
         {[
-          { key: 'general', label: 'عمومی', icon: <Building2 size={17} /> },
-          { key: 'doctors', label: 'پزشکان و یونیت‌ها', icon: <Stethoscope size={17} /> },
-          { key: 'procedures', label: 'رویه‌ها', icon: <ListOrdered size={17} /> },
-          { key: 'backup', label: 'پشتیبان', icon: <Cloud size={17} /> },
-          { key: 'appearance', label: 'ظاهر و شفافیت', icon: <Sparkles size={17} /> },
-          { key: 'haptics', label: 'لرزش و صدا', icon: <Vibrate size={17} /> },
-          { key: 'app_lock', label: 'قفل امنیتی', icon: <Fingerprint size={17} /> },
-          { key: 'file_number', label: 'شماره پرونده', icon: <Hash size={17} /> },
-          { key: 'pos', label: 'کارتخوان (PC-POS)', icon: <CreditCard size={17} /> },
-          { key: 'packages', label: 'پکیج درمان', icon: <Package size={17} /> },
-          { key: 'categories', label: 'دسته‌بندی انبار', icon: <Tag size={17} /> },
-          { key: 'errors', label: 'گزارش خطاها', icon: <AlertTriangle size={17} /> },
-          { key: 'audit', label: 'گزارش فعالیت‌ها', icon: <History size={17} /> },
-          { key: 'rbac', label: 'دسترسی نقش‌ها', icon: <Shield size={17} /> },
-          { key: 'failed_sync', label: 'همگام‌سازی ناموفق', icon: <CloudOff size={17} /> },
-          { key: 'updates', label: 'به‌روزرسانی', icon: <Sparkles size={17} /> },
+          { key: 'general', label: 'عمومی', icon: <Building2 size={17} />, color: '#0d9488' },
+          { key: 'doctors', label: 'پزشکان و یونیت‌ها', icon: <Stethoscope size={17} />, color: '#2563eb' },
+          { key: 'procedures', label: 'رویه‌ها', icon: <ListOrdered size={17} />, color: '#d97706' },
+          { key: 'backup', label: 'پشتیبان', icon: <Cloud size={17} />, color: '#0891b2' },
+          { key: 'appearance', label: 'ظاهر و شفافیت', icon: <Sparkles size={17} />, color: '#7c3aed' },
+          { key: 'haptics', label: 'لرزش و صدا', icon: <Vibrate size={17} />, color: '#c026d3' },
+          { key: 'app_lock', label: 'قفل امنیتی', icon: <Fingerprint size={17} />, color: '#e11d48' },
+          { key: 'file_number', label: 'شماره پرونده', icon: <Hash size={17} />, color: '#475569' },
+          { key: 'pos', label: 'کارتخوان (PC-POS)', icon: <CreditCard size={17} />, color: '#16a34a' },
+          { key: 'packages', label: 'پکیج درمان', icon: <Package size={17} />, color: '#ea580c' },
+          { key: 'categories', label: 'دسته‌بندی انبار', icon: <Tag size={17} />, color: '#0284c7' },
+          { key: 'errors', label: 'گزارش خطاها', icon: <AlertTriangle size={17} />, color: '#dc2626' },
+          { key: 'audit', label: 'گزارش فعالیت‌ها', icon: <History size={17} />, color: '#4338ca' },
+          { key: 'rbac', label: 'دسترسی نقش‌ها', icon: <Shield size={17} />, color: '#9d174d' },
+          { key: 'failed_sync', label: 'همگام‌سازی ناموفق', icon: <CloudOff size={17} />, color: '#b45309' },
+          { key: 'updates', label: 'به‌روزرسانی', icon: <Sparkles size={17} />, color: '#059669' },
         ].filter((t) =>
           // MOD-FIX-019: «به‌روزرسانی» is about the installed app itself,
           // not clinic data, so it stays open like the personal
@@ -684,6 +684,7 @@ export default function Settings() {
             onClick={() => { h.select(); setSubView(t.key as SettingsSection) }}
             aria-pressed={subView === t.key}
             className={`settings-tab flex flex-col items-center justify-center gap-1 min-h-[56px] rounded-xl px-1 py-1.5 text-[10px] font-extrabold leading-tight text-center press-scale transition-all ${subView === t.key ? 'settings-tab-active' : ''}`}
+            style={{ '--tab-color': t.color } as React.CSSProperties}
           >
             {t.icon}
             <span className="truncate max-w-full">{t.label}</span>
