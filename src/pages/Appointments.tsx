@@ -4,7 +4,7 @@ import { Calendar, Clock, CheckCircle2, User, ChevronRight, ChevronLeft, Plus, S
 import { fetchTreatments, fetchPayments, fetchImplantCases, fetchAppointments, createAppointment, updateAppointment, checkConflict, fetchPatients, updatePatient, fetchDoctors, fetchUnits, peekNextFileNumber, createPatient, createEncounter, createPayment, fetchDoctorSchedules, fetchOnlineBookingRequests, rejectBookingRequest, updateLabOrder, fetchLabOrders, updateImplantCase, fetchWaitingList, updateWaitingEntry } from '../lib/api'
 import { useDataRefresh } from '../lib/realtimeSync'
 import { supabase } from '../lib/supabase'
-import { toJalaliString, toJalaliStringPretty, getJalaliDateInfo, formatTime, timeParts, formatCurrency, toPersianDigits, persianWeekdaysShort, getHoliday, jsDateToPersianWeekday } from '../lib/persianDate'
+import { toJalaliString, toJalaliStringPretty, getJalaliDateInfo, formatTime, timeParts, formatCurrency, toPersianDigits, persianWeekdays, persianWeekdaysShort, getHoliday, jsDateToPersianWeekday } from '../lib/persianDate'
 import { doctorColor } from '../lib/doctorColors'
 import { generateSlots, slotAvailability, defaultEndTime, addMinutes, firstBookableSlot } from '../lib/timeSlots'
 import { doctorsForDay, unitAvailability, patientPickerHint } from '../lib/selectionHints'
@@ -808,7 +808,7 @@ export default function Appointments() {
       <ModuleHeader
         moduleKey="appointments"
         title="نوبت‌دهی"
-        subtitle={`${toJalaliStringPretty(todayStr)} — ${persianWeekdaysShort[getJalaliDateInfo(todayStr).weekday]}`}
+        subtitle={`${toJalaliStringPretty(todayStr)} — ${persianWeekdays[getJalaliDateInfo(todayStr).weekday]}`}
         action={
           <button onClick={() => openWizard()} aria-label="نوبت جدید" className="appointment-new-action btn-tactile-3d flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-white text-sm font-extrabold transition-all-smooth press-scale">
             <Plus size={16} /> نوبت جدید

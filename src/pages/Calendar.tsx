@@ -307,7 +307,7 @@ export default function CalendarPage() {
         {eventsOnSelectedDate.length === 0 ? (
           <Card className="p-4"><EmptyState icon={<CalIcon size={24} />} title="رویدادی در این روز نیست" /></Card>
         ) : (
-          <div className="space-y-2">
+          <div className="space-y-2" style={{ paddingBottom: 'calc(6rem + env(safe-area-inset-bottom, 0px))' }}>
             {eventsOnSelectedDate.map((e) => {
               const meta = eventTypeMeta[e.type]
               return (
