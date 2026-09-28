@@ -1923,6 +1923,22 @@ input, textarea, select { font-size: 16px !important; }
 .tool-cyan {background:#dcf4fa!important;color:#126780!important;}
 .tool-active {filter:saturate(1.25);border-bottom-width:4px;box-shadow:0 8px 12px -5px rgba(27,49,72,.38),inset 0 1px 0 rgba(255,255,255,.92);}
 .dark .module-tool {background:#28394b!important;color:#d6ecfa!important;}
+.billing-tab {
+  background: color-mix(in srgb, var(--tab-color) 12%, white);
+  color: var(--tab-color);
+  border: 1px solid color-mix(in srgb, var(--tab-color) 35%, white);
+  border-bottom-width: 2px;
+  box-shadow: 0 6px 10px -6px rgba(27,49,72,.3), inset 0 1px 0 rgba(255,255,255,.8);
+}
+.billing-tab svg { flex-shrink: 0; }
+.billing-tab-active {
+  background: var(--tab-color) !important;
+  color: #fff !important;
+  border-color: var(--tab-color) !important;
+  border-bottom-width: 3px;
+  box-shadow: 0 8px 14px -6px rgba(27,49,72,.4), inset 0 1px 0 rgba(255,255,255,.35);
+}
+.dark .billing-tab { background: color-mix(in srgb, var(--tab-color) 24%, #1e293b); color: #fff; }
 .treatment-command-row {display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin-bottom:-14px}
 .treatment-command-row button {min-height:42px;white-space:nowrap;font-weight:800}
 @media(max-width:767px) {

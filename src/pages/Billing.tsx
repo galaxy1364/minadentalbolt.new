@@ -823,9 +823,9 @@ export default function Billing() {
         aria-expanded={chartsOpen}
         className="w-full flex items-center justify-between gap-2 px-4 py-3 text-right"
       >
-        <span className="flex items-center gap-2 text-sm font-bold text-slate-700 dark:text-slate-200">
-          <TrendingUp size={16} className="text-primary-600" />
-          نمودار درآمد و روش‌های پرداخت
+        <span className="inline-flex items-center gap-2 text-xs font-bold text-primary-700 dark:text-primary-300 bg-primary-50 dark:bg-primary-950/40 border border-primary-200/70 dark:border-primary-800/60 rounded-full px-3 py-1.5 w-fit">
+          <TrendingUp size={15} className="text-primary-600" />
+          نمودار درآمد
         </span>
         <ChevronDown
           size={18}
@@ -2507,23 +2507,27 @@ export default function Billing() {
   }
 
   const tabs = [
-    { key: 'payments', label: 'پرداخت‌ها', icon: <CreditCard size={16} /> },
-    { key: 'register', label: 'صندوق', icon: <Wallet size={16} /> },
-    { key: 'cheques', label: 'چک‌ها', icon: <Banknote size={16} /> },
-    { key: 'plans', label: 'طرح‌های قسطی', icon: <Calendar size={16} /> },
-    { key: 'expenses', label: 'هزینه‌ها', icon: <Receipt size={16} /> },
-    { key: 'balances', label: 'مانده حساب', icon: <Wallet size={16} /> },
-    { key: 'shares', label: 'سهم پزشکان', icon: <DollarSign size={16} /> },
+    { key: 'payments', label: 'پرداخت‌ها', icon: <CreditCard size={18} /> },
+    { key: 'register', label: 'صندوق', icon: <Wallet size={18} /> },
+    { key: 'cheques', label: 'چک‌ها', icon: <Banknote size={18} /> },
+    { key: 'plans', label: 'طرح‌های قسطی', icon: <Calendar size={18} /> },
+    { key: 'expenses', label: 'هزینه‌ها', icon: <Receipt size={18} /> },
+    { key: 'balances', label: 'مانده حساب', icon: <Wallet size={18} /> },
+    { key: 'shares', label: 'سهم پزشکان', icon: <DollarSign size={18} /> },
   ]
+
+  const billingTabColors: Record<string, string> = {
+    payments: '#0d9488',
+    register: '#2563eb',
+    cheques: '#c026d3',
+    plans: '#d97706',
+    expenses: '#e11d48',
+    balances: '#0891b2',
+    shares: '#7c3aed',
+  }
 
   return (
     <div className="space-y-4">
-      <ModuleHeader
-        moduleKey="billing"
-        title="مالی و پرداخت"
-        subtitle="مدیریت پرداخت‌ها، چک‌ها و طرح‌های قسطی"
-      />
-
       {renderStats()}
       {renderCharts()}
 
@@ -2554,7 +2558,21 @@ export default function Billing() {
         )}
       </Modal>
 
-      <Tabs tabs={tabs} active={activeTab} onChange={setActiveTab} />
+      <div className="grid grid-cols-4 gap-2">
+        {tabs.map((t) => (
+          <button
+            key={t.key}
+            type="button"
+            onClick={() => { h.select(); setActiveTab(t.key) }}
+            aria-pressed={activeTab === t.key}
+            className={`billing-tab flex flex-col items-center justify-center gap-1 min-h-[56px] rounded-xl px-1 py-1.5 text-[10px] font-extrabold leading-tight text-center press-scale transition-all ${activeTab === t.key ? 'billing-tab-active' : ''}`}
+            style={{ '--tab-color': billingTabColors[t.key] || '#0d9488' } as React.CSSProperties}
+          >
+            {t.icon}
+            <span className="truncate max-w-full">{t.label}</span>
+          </button>
+        ))}
+      </div>
 
       {activeTab === 'payments' && renderPaymentsTab()}
       {activeTab === 'register' && renderCashRegisterTab()}
