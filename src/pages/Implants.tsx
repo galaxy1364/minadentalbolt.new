@@ -801,7 +801,6 @@ export default function Implants() {
       {/* Stats Cards */}
       <ReorderableStatGrid
         storageKey="implants"
-        className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-3"
         items={[
           { key: 'total', node: <ModuleStatCard moduleKey="implants" icon={<Smile size={20} />} label="کل موارد" value={formatNumber(stats.total)} /> },
           { key: 'surgery', node: <ModuleStatCard moduleKey="implants" icon={<Activity size={20} />} label="در جراحی" value={formatNumber(stats.inSurgery)} /> },

@@ -654,46 +654,55 @@ export default function Settings() {
         </div>
       </div>
 
-      <Tabs
-        tabs={[
-          { key: 'general', label: 'عمومی', icon: <Building2 size={16} /> },
-          { key: 'doctors', label: 'پزشکان و یونیت‌ها', icon: <Stethoscope size={16} /> },
-          { key: 'procedures', label: 'رویه‌ها', icon: <ListOrdered size={16} /> },
-          { key: 'backup', label: 'پشتیبان', icon: <Cloud size={16} /> },
-          { key: 'appearance', label: 'ظاهر و شفافیت', icon: <Sparkles size={16} /> },
-          { key: 'haptics', label: 'لرزش و صدا', icon: <Vibrate size={16} /> },
-          { key: 'app_lock', label: 'قفل امنیتی', icon: <Fingerprint size={16} /> },
-          { key: 'file_number', label: 'شماره پرونده', icon: <Hash size={16} /> },
-          { key: 'pos', label: 'کارتخوان (PC-POS)', icon: <CreditCard size={16} /> },
-          { key: 'packages', label: 'پکیج درمان', icon: <Package size={16} /> },
-          { key: 'categories', label: 'دسته‌بندی انبار', icon: <Tag size={16} /> },
-          { key: 'errors', label: 'گزارش خطاها', icon: <AlertTriangle size={16} /> },
-          { key: 'audit', label: 'گزارش فعالیت‌ها', icon: <History size={16} /> },
-          { key: 'rbac', label: 'دسترسی نقش‌ها', icon: <Shield size={16} /> },
-          { key: 'failed_sync', label: 'همگام‌سازی ناموفق', icon: <CloudOff size={16} /> },
-          { key: 'updates', label: 'به‌روزرسانی', icon: <Sparkles size={16} /> },
+      <div className="grid grid-cols-4 gap-2">
+        {[
+          { key: 'general', label: 'عمومی', icon: <Building2 size={17} /> },
+          { key: 'doctors', label: 'پزشکان و یونیت‌ها', icon: <Stethoscope size={17} /> },
+          { key: 'procedures', label: 'رویه‌ها', icon: <ListOrdered size={17} /> },
+          { key: 'backup', label: 'پشتیبان', icon: <Cloud size={17} /> },
+          { key: 'appearance', label: 'ظاهر و شفافیت', icon: <Sparkles size={17} /> },
+          { key: 'haptics', label: 'لرزش و صدا', icon: <Vibrate size={17} /> },
+          { key: 'app_lock', label: 'قفل امنیتی', icon: <Fingerprint size={17} /> },
+          { key: 'file_number', label: 'شماره پرونده', icon: <Hash size={17} /> },
+          { key: 'pos', label: 'کارتخوان (PC-POS)', icon: <CreditCard size={17} /> },
+          { key: 'packages', label: 'پکیج درمان', icon: <Package size={17} /> },
+          { key: 'categories', label: 'دسته‌بندی انبار', icon: <Tag size={17} /> },
+          { key: 'errors', label: 'گزارش خطاها', icon: <AlertTriangle size={17} /> },
+          { key: 'audit', label: 'گزارش فعالیت‌ها', icon: <History size={17} /> },
+          { key: 'rbac', label: 'دسترسی نقش‌ها', icon: <Shield size={17} /> },
+          { key: 'failed_sync', label: 'همگام‌سازی ناموفق', icon: <CloudOff size={17} /> },
+          { key: 'updates', label: 'به‌روزرسانی', icon: <Sparkles size={17} /> },
         ].filter((t) =>
           // MOD-FIX-019: «به‌روزرسانی» is about the installed app itself,
           // not clinic data, so it stays open like the personal
           // preferences. Everything else answers to the role.
           t.key === 'updates' || canOpenSettingsSection(profile?.role, t.key as SettingsSection),
-        )}
-        active={subView}
-        onChange={setSubView}
-      />
+        ).map((t) => (
+          <button
+            key={t.key}
+            type="button"
+            onClick={() => { h.select(); setSubView(t.key as SettingsSection) }}
+            aria-pressed={subView === t.key}
+            className={`settings-tab flex flex-col items-center justify-center gap-1 min-h-[56px] rounded-xl px-1 py-1.5 text-[10px] font-extrabold leading-tight text-center press-scale transition-all ${subView === t.key ? 'settings-tab-active' : ''}`}
+          >
+            {t.icon}
+            <span className="truncate max-w-full">{t.label}</span>
+          </button>
+        ))}
+      </div>
 
       {/* General Tab */}
       {subView === 'general' && canOpenSettingsSection(profile?.role, 'general') && (
-        <Card className="p-5">
-          <h2 className="text-base font-bold text-slate-800 mb-4 flex items-center gap-2"><Building2 size={18} className="text-primary-600" /> اطلاعات کلینیک</h2>
-          <div className="space-y-3">
+        <Card className="p-4">
+          <h2 className="text-sm font-bold text-slate-800 mb-3 flex items-center gap-2"><Building2 size={16} className="text-primary-600" /> اطلاعات کلینیک</h2>
+          <div className="space-y-2.5">
             <Input label="نام کلینیک" value={generalForm.clinic_name} onChange={(v) => setGeneralForm({ ...generalForm, clinic_name: v })} placeholder="نام کلینیک" />
             <Textarea label="آدرس" value={generalForm.address} onChange={(v) => setGeneralForm({ ...generalForm, address: v })} placeholder="آدرس کامل کلینیک" rows={2} />
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-2.5">
               <Input label="تلفن" value={generalForm.phone} onChange={(v) => setGeneralForm({ ...generalForm, phone: v })} placeholder="شماره تلفن" dir="ltr" />
               <Input label="ایمیل" value={generalForm.email} onChange={(v) => setGeneralForm({ ...generalForm, email: v })} placeholder="email@example.com" dir="ltr" />
             </div>
-            <Button onClick={handleSaveGeneral} variant="primary"><Save size={16} className="inline ml-1" /> ذخیره تنظیمات</Button>
+            <Button onClick={handleSaveGeneral} variant="primary" size="sm"><Save size={15} className="inline ml-1" /> ذخیره تنظیمات</Button>
           </div>
         </Card>
       )}

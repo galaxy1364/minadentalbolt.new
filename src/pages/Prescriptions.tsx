@@ -501,34 +501,6 @@ export default function Prescriptions() {
         ]}
       />
 
-      {/* Trend Chart */}
-      <Card className="p-5">
-        <div className="flex items-center justify-between mb-4">
-          <h2 className="text-base font-bold text-slate-800 flex items-center gap-2">
-            <TrendingUp size={18} className="text-primary-600" />
-            روند نسخه‌های ۶ ماه اخیر
-          </h2>
-        </div>
-        {trendChartData.every((d) => d.count === 0) ? (
-          <EmptyState icon={<TrendingUp size={28} />} title="داده‌ای موجود نیست" description="پس از ثبت نسخه، نمودار نمایش داده می‌شود" />
-        ) : (
-          <ResponsiveContainer width="100%" height={250}>
-            <AreaChart data={trendChartData} margin={{ top: 10, right: 10, left: 10, bottom: 0 }}>
-              <defs>
-                <linearGradient id="prescGradient" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="5%" stopColor="#0ea5e9" stopOpacity={0.3} />
-                  <stop offset="95%" stopColor="#0ea5e9" stopOpacity={0} />
-                </linearGradient>
-              </defs>
-              <XAxis dataKey="label" tick={{ fontSize: 11, fill: '#64748b' }} />
-              <YAxis tick={{ fontSize: 11, fill: '#64748b' }} allowDecimals={false} />
-              <RTooltip formatter={(v: number) => [formatNumber(v), 'نسخه']} contentStyle={{ direction: 'rtl', fontSize: 12, borderRadius: 12, border: 'none', boxShadow: '0 4px 12px rgba(0,0,0,0.1)' }} />
-              <Area type="monotone" dataKey="count" stroke="#0ea5e9" strokeWidth={2} fill="url(#prescGradient)" />
-            </AreaChart>
-          </ResponsiveContainer>
-        )}
-      </Card>
-
       {/* Filters */}
       <Card className="p-4">
         <div className="relative">
