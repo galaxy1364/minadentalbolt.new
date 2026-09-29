@@ -2,6 +2,7 @@ import React, { useState, useRef, useEffect, useCallback } from 'react'
 import { createPortal } from 'react-dom'
 import { h } from '../lib/haptics'
 import { chimes } from '../lib/chimes'
+import { useBackDismiss } from '../lib/useBackDismiss'
 
 /**
  * iOS 27 Context Menu
@@ -83,6 +84,8 @@ function ContextMenuOverlay({
     window.addEventListener('keydown', handleEsc)
     return () => window.removeEventListener('keydown', handleEsc)
   }, [onClose])
+
+  useBackDismiss(true, onClose)
 
   return createPortal(
     <>

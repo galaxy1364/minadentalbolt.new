@@ -5,13 +5,58 @@ import { h } from '../lib/haptics'
 import { chimes } from '../lib/chimes'
 import { toPersianDigits } from '../lib/persianDate'
 import { matchRanges } from '../lib/fuzzySearch'
+import { useBackDismiss } from '../lib/useBackDismiss'
+
+// --- Standard mobile visual scale ---------------------------------------
+// Icons (lucide-react `size=` prop): pick the nearest tier below instead of
+// an arbitrary number, so the same "kind" of icon reads at the same size
+// everywhere in the app.
+//   xs=12   inline meta glyphs, badges
+//   sm=14   list rows, table cells, secondary buttons
+//   md=16   default — nav items, primary buttons, form fields
+//   base=18 section headers, card titles
+//   lg=20   page headers, prominent actions
+//   xl=24   empty-state icons, tab bar
+//   2xl=28  stat card icons, modal headers
+//   3xl=32  dashboard tile icons, avatars
+//   4xl=40  onboarding / large empty states
+//   5xl=48  splash / logo-scale marks
+export const ICON_SIZE = { xs: 12, sm: 14, md: 16, base: 18, lg: 20, xl: 24, '2xl': 28, '3xl': 32, '4xl': 40, '5xl': 48 } as const
+
+// Icon-wrapper sizing: the square/circular container around an icon must
+// match the icon's ICON_SIZE tier so the same "kind" of icon reads at the
+// same wrapper size everywhere. Do not invent ad-hoc wrapper sizes
+// (w-11 h-11, etc.) — pick the tier below instead.
+//   xs/sm  (12-14) -> w-8 h-8    inline/list-row icon chips
+//   md     (16)    -> w-9 h-9   compact icon chips (step indicators, avatars)
+//   base/lg(18-20) -> w-10 h-10 card/section icon chips
+//   xl     (24)    -> w-12 h-12 stat-card / prominent icon chips
+//   2xl/3xl(28-32) -> w-14 h-14 large feature icon chips
+//   4xl/5xl(40-48) -> w-16 h-16 empty-state / onboarding icon chips
+export const ICON_WRAPPER_SIZE: Record<keyof typeof ICON_SIZE, string> = {
+  xs: 'w-8 h-8',
+  sm: 'w-8 h-8',
+  md: 'w-9 h-9',
+  base: 'w-10 h-10',
+  lg: 'w-10 h-10',
+  xl: 'w-12 h-12',
+  '2xl': 'w-14 h-14',
+  '3xl': 'w-14 h-14',
+  '4xl': 'w-16 h-16',
+  '5xl': 'w-16 h-16',
+}
+
+// Border radius: use the named Tailwind tokens from tailwind.config
+// (rounded-input/rounded-button = 8px, rounded-card = 12px, rounded-sheet
+// = 16px, rounded-dialog = 20px, rounded-full = circle) instead of raw
+// rounded-lg/xl/2xl so every surface of the same kind matches.
 
 export function Spinner({ size = 24 }: { size?: number }) {
   return <Loader2 size={size} className="animate-spin text-primary-500 mx-auto" />
 }
 
-export function Card({ children, className = '', style, onClick }: { children: React.ReactNode; className?: string; style?: React.CSSProperties; onClick?: () => void }) {
-  return <div style={style} onClick={onClick} className={`module-surface gemini-ambient-card card-tactile-3d rounded-card border border-slate-200/70 dark:border-slate-700/70 transition-all duration-200 ${className}`}>{children}</div>
+export function Card({ children, className = '', style, onClick, role, tabIndex, onKeyDown, 'aria-label': ariaLabel }: { children: React.ReactNode; className?: string; style?: React.CSSProperties; onClick?: () => void; role?: string; tabIndex?: number; onKeyDown?: React.KeyboardEventHandler<HTMLDivElement>; 'aria-label'?: string }) {
+  return <div style={style} onClick={onClick} role={role} tabIndex={tabIndex} onKeyDown={onKeyDown} aria-label={ariaLabel} className={`module-surface gemini-ambient-card card-tactile-3d rounded-card border border-slate-200/70 dark:border-slate-700/70 transition-all duration-200 ${className}`}>{children}</div>
 }
 
 export function StatCard({ icon, title, value, color = 'primary', subtitle }: { icon: React.ReactNode; title: string; value: string | number; color?: string; subtitle?: string }) {
@@ -92,7 +137,7 @@ export function Input({ label, value, onChange, placeholder, type = 'text', clas
         className={`w-full px-3 py-2 rounded-input border bg-slate-50 dark:bg-slate-700 text-base text-slate-800 dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-primary-400 focus:border-transparent transition-all-smooth ${error ? 'border-error-300 dark:border-error-600' : 'border-slate-200 dark:border-slate-600'}`}
       />
       {error && <p className="text-xs text-error-500 mt-1">{error}</p>}
-      {!error && hint && <p className="text-[11px] text-slate-400 dark:text-slate-500 mt-1">{hint}</p>}
+      {!error && hint && <p className="text-2xs text-slate-400 dark:text-slate-500 mt-1">{hint}</p>}
     </div>
   )
 }
@@ -151,7 +196,7 @@ export function EmptyState({ icon, title, description, action }: { icon: React.R
       
       <div className="relative z-10">
         <div
-          className="w-16 h-16 rounded-3xl flex items-center justify-center mx-auto mb-5 shadow-sm ring-1 ring-slate-900/5 dark:ring-white/10 transition-transform duration-500 group-hover:scale-110"
+          className="w-16 h-16 rounded-2xl flex items-center justify-center mx-auto mb-5 shadow-sm ring-1 ring-slate-900/5 dark:ring-white/10 transition-transform duration-500 group-hover:scale-110"
           style={{ background: 'color-mix(in srgb, var(--module-color, #64748b) 14%, white)', color: 'var(--module-color, #64748b)' }}
         >
           {icon}
@@ -176,6 +221,11 @@ export function Modal({ open, onClose, title, children, size = 'full', footer }:
     return () => window.removeEventListener('keydown', onKeyDown)
   }, [open, onClose])
 
+  // iOS edge-swipe-back / Android back gesture closes the modal instead of
+  // navigating the page underneath it away (or exiting the app if this was
+  // the first screen).
+  useBackDismiss(open, onClose)
+
   if (!open) return null
   const sizes: Record<string, string> = { sm: 'max-w-md', md: 'max-w-lg', lg: 'max-w-2xl', xl: 'max-w-4xl', full: 'max-w-none' }
   const isFull = size === 'full'
@@ -187,7 +237,7 @@ export function Modal({ open, onClose, title, children, size = 'full', footer }:
   return createPortal(
     <div className={`fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/30 backdrop-blur-sm ${isFull ? '' : 'p-4'}`} onClick={() => { h.cancel(); onClose() }}>
       <div
-        className={`w-full ${sizes[size]} bg-white dark:bg-slate-800 card-shadow-lg dark:card-shadow-lg overflow-y-auto ${isFull ? 'h-[100dvh] rounded-none fullmodal-in' : 'rounded-3xl max-h-[90vh] modal-in'}`}
+        className={`w-full ${sizes[size]} bg-white dark:bg-slate-800 card-shadow-lg dark:card-shadow-lg overflow-y-auto ${isFull ? 'h-[100dvh] rounded-none fullmodal-in' : 'rounded-2xl max-h-[90vh] modal-in'}`}
         onClick={(e) => e.stopPropagation()}
       >
         <div className={`flex items-center justify-between px-5 py-4 border-b border-slate-100 dark:border-slate-700 sticky top-0 bg-white dark:bg-slate-800 z-10 ${isFull ? '' : 'rounded-t-3xl'}`}>
@@ -265,7 +315,7 @@ export function Wizard({
               }`}>
                 {i < step ? <CheckCircle2 size={18} /> : toPersianDigits(i + 1)}
               </div>
-              <span className={`text-[10px] sm:text-[11px] font-semibold text-center leading-tight truncate w-full ${i <= step ? 'text-slate-700 dark:text-slate-200' : 'text-slate-400 dark:text-slate-500'}`}>{s.label}</span>
+              <span className={`text-3xs sm:text-2xs font-semibold text-center leading-tight truncate w-full ${i <= step ? 'text-slate-700 dark:text-slate-200' : 'text-slate-400 dark:text-slate-500'}`}>{s.label}</span>
             </button>
           ))}
         </div>
@@ -678,7 +728,7 @@ export function Tabs({
                 <span>{tab.label}</span>
                 {tab.badge !== undefined && (
                   <span
-                    className={`text-[10px] px-1.5 py-0.5 rounded-full font-black ${
+                    className={`text-3xs px-1.5 py-0.5 rounded-full font-black ${
                       isCurrent
                         ? 'bg-white/20 text-white'
                         : theme.badgeInactive
@@ -720,7 +770,7 @@ export function Tabs({
                   : 'bg-white/80 dark:bg-slate-700/80 text-slate-700 dark:text-slate-200 hover:bg-white dark:hover:bg-slate-700 border-slate-200/80 dark:border-slate-600/80 shadow-2xs'
               }`}
             >
-              <ChevronDown size={17} className={`transition-transform duration-200 ${quickMenuOpen ? 'rotate-180' : ''}`} />
+              <ChevronDown size={18} className={`transition-transform duration-200 ${quickMenuOpen ? 'rotate-180' : ''}`} />
             </button>
           </div>
         )}
@@ -738,7 +788,7 @@ export function Tabs({
           }}
         >
           <div
-            className="relative w-full max-w-2xl max-h-[85vh] flex flex-col bg-white/98 dark:bg-slate-900/98 backdrop-blur-2xl rounded-3xl shadow-2xl border-2 border-primary-500/30 dark:border-primary-500/40 overflow-hidden animate-in zoom-in-95 duration-200"
+            className="relative w-full max-w-2xl max-h-[85vh] flex flex-col bg-white/98 dark:bg-slate-900/98 backdrop-blur-2xl rounded-2xl shadow-2xl border-2 border-primary-500/30 dark:border-primary-500/40 overflow-hidden animate-in zoom-in-95 duration-200"
             role="dialog"
             aria-modal="true"
             aria-label="دسترسی سریع به بخش‌های پرونده"
@@ -746,14 +796,14 @@ export function Tabs({
             {/* Modal Header */}
             <div className="px-5 py-3.5 border-b border-slate-100 dark:border-slate-800/80 flex items-center justify-between bg-slate-50/80 dark:bg-slate-850/80">
               <div className="flex items-center gap-2">
-                <div className="w-8 h-8 rounded-xl bg-primary-100 dark:bg-primary-950/60 flex items-center justify-center text-primary-600 dark:text-primary-400">
+                <div className="w-9 h-9 rounded-xl bg-primary-100 dark:bg-primary-950/60 flex items-center justify-center text-primary-600 dark:text-primary-400">
                   <Layers size={18} />
                 </div>
                 <div>
                   <h3 className="text-sm font-black text-slate-900 dark:text-white">
                     دسترسی سریع به بخش‌های پرونده
                   </h3>
-                  <p className="text-[11px] text-slate-500 dark:text-slate-400 font-medium">
+                  <p className="text-2xs text-slate-500 dark:text-slate-400 font-medium">
                     انتخاب مستقیم از میان {toPersianDigits(tabs.length)} بخش تخصصی بالینی
                   </p>
                 </div>
@@ -802,7 +852,7 @@ export function Tabs({
                     <div className="flex items-center gap-1.5 shrink-0">
                       {tab.badge !== undefined && (
                         <span
-                          className={`text-[10px] px-2 py-0.5 rounded-full font-black font-mono ${
+                          className={`text-3xs px-2 py-0.5 rounded-full font-black font-mono ${
                             isCurrent
                               ? 'bg-white/20 text-white'
                               : theme.badgeInactive

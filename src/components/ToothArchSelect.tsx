@@ -92,7 +92,7 @@ export function ToothArchSelect({
             }`}
           >
             {jaw === 'lower' && (
-              <span className="text-[10px] font-bold text-slate-500 dark:text-slate-400 mb-0.5 select-none">
+              <span className="text-3xs font-bold text-slate-500 dark:text-slate-400 mb-0.5 select-none">
                 {toPersianDigits(t.palmer)}
               </span>
             )}
@@ -104,7 +104,7 @@ export function ToothArchSelect({
               selected={selected === t.fdi}
             />
             {jaw === 'upper' && (
-              <span className="text-[10px] font-bold text-slate-500 dark:text-slate-400 mt-0.5 select-none">
+              <span className="text-3xs font-bold text-slate-500 dark:text-slate-400 mt-0.5 select-none">
                 {toPersianDigits(t.palmer)}
               </span>
             )}
@@ -119,7 +119,7 @@ export function ToothArchSelect({
       <div className="flex items-center justify-between mb-1.5 flex-wrap gap-1.5">
         <label className="block text-xs font-medium text-slate-600 dark:text-slate-300">{label}</label>
         <div className="flex items-center gap-1.5">
-          <div className="inline-flex p-0.5 rounded-lg bg-slate-100 dark:bg-slate-700/60 text-[11px] font-medium text-slate-600 dark:text-slate-300 border border-slate-200/50 dark:border-slate-600/50">
+          <div className="inline-flex p-0.5 rounded-lg bg-slate-100 dark:bg-slate-700/60 text-2xs font-medium text-slate-600 dark:text-slate-300 border border-slate-200/50 dark:border-slate-600/50">
             <button
               type="button"
               aria-label="نمایش هر دو فک"
@@ -128,7 +128,7 @@ export function ToothArchSelect({
                 h.select()
                 setJawView('all')
               }}
-              className={`px-2 py-0.5 rounded-md transition-all-smooth ${
+              className={`px-2 py-0.5 rounded-lg transition-all-smooth ${
                 jawView === 'all'
                   ? 'bg-white dark:bg-slate-800 text-primary-600 dark:text-primary-400 font-semibold shadow-xs'
                   : 'hover:text-slate-900 dark:hover:text-slate-100'
@@ -144,7 +144,7 @@ export function ToothArchSelect({
                 h.select()
                 setJawView('upper')
               }}
-              className={`px-2 py-0.5 rounded-md transition-all-smooth ${
+              className={`px-2 py-0.5 rounded-lg transition-all-smooth ${
                 jawView === 'upper'
                   ? 'bg-white dark:bg-slate-800 text-primary-600 dark:text-primary-400 font-semibold shadow-xs'
                   : 'hover:text-slate-900 dark:hover:text-slate-100'
@@ -160,7 +160,7 @@ export function ToothArchSelect({
                 h.select()
                 setJawView('lower')
               }}
-              className={`px-2 py-0.5 rounded-md transition-all-smooth ${
+              className={`px-2 py-0.5 rounded-lg transition-all-smooth ${
                 jawView === 'lower'
                   ? 'bg-white dark:bg-slate-800 text-primary-600 dark:text-primary-400 font-semibold shadow-xs'
                   : 'hover:text-slate-900 dark:hover:text-slate-100'
@@ -191,7 +191,7 @@ export function ToothArchSelect({
       <div className={`rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 p-2 space-y-1 ${primary ? 'bg-amber-50/30 border-amber-100 dark:bg-amber-900/10' : ''}`}>
         {(jawView === 'all' || jawView === 'upper') && (
           <>
-            <div dir="ltr" className="flex items-center justify-between px-1 text-[10px] text-slate-400">
+            <div dir="ltr" className="flex items-center justify-between px-1 text-3xs text-slate-400">
               <span>راست بیمار</span>
               <span className="font-medium text-xs">فک بالا</span>
               <span>چپ بیمار</span>
@@ -203,7 +203,7 @@ export function ToothArchSelect({
         {(jawView === 'all' || jawView === 'lower') && (
           <>
             {jawView === 'lower' && (
-              <div dir="ltr" className="flex items-center justify-between px-1 text-[10px] text-slate-400">
+              <div dir="ltr" className="flex items-center justify-between px-1 text-3xs text-slate-400">
                 <span>راست بیمار</span>
                 <span className="font-medium text-xs">فک پایین</span>
                 <span>چپ بیمار</span>
@@ -211,7 +211,7 @@ export function ToothArchSelect({
             )}
             {renderRow(lower, 'lower')}
             {jawView === 'all' && (
-              <div dir="ltr" className="flex items-center justify-between px-1 text-[10px] text-slate-400">
+              <div dir="ltr" className="flex items-center justify-between px-1 text-3xs text-slate-400">
                 <span>راست بیمار</span>
                 <span className="font-medium text-xs">فک پایین</span>
                 <span>چپ بیمار</span>
@@ -231,7 +231,7 @@ export function ToothArchSelect({
         {value ? (
           <>
             <span>انتخاب‌شده:</span>
-            <PalmerMark fdi={value} size={22} />
+            <PalmerMark fdi={value} size={20} />
             <span>{toothSideLabel(value)}</span>
           </>
         ) : (

@@ -212,7 +212,7 @@ export default function WaitingRoomDisplay() {
               {toPersianDigits(formattedTime)}
             </div>
             <div className="text-xs text-slate-400 font-medium flex items-center gap-1.5 justify-end mt-0.5">
-              <Calendar size={13} className="text-teal-400" />
+              <Calendar size={14} className="text-teal-400" />
               <span>{toJalaliStringPretty(todayStr)}</span>
             </div>
           </div>
@@ -238,6 +238,8 @@ export default function WaitingRoomDisplay() {
 
             <button
               onClick={togglePrivacyMode}
+              aria-label={privacyMode ? 'غیرفعال‌سازی حالت حریم خصوصی' : 'فعال‌سازی حالت حریم خصوصی'}
+              aria-pressed={privacyMode}
               className={`p-2.5 rounded-xl border transition-all ${
                 privacyMode
                   ? 'bg-teal-500/20 border-teal-500/40 text-teal-300'
@@ -266,6 +268,7 @@ export default function WaitingRoomDisplay() {
 
             <button
               onClick={toggleFullscreen}
+              aria-label={isFullscreen ? 'خروج از حالت تمام‌صفحه' : 'ورود به حالت تمام‌صفحه'}
               className="p-2.5 rounded-xl bg-slate-800 border border-slate-700 text-slate-400 hover:text-white transition-all"
               title="حالت تمام‌صفحه"
             >
@@ -277,12 +280,12 @@ export default function WaitingRoomDisplay() {
 
       {/* ── Active Patient Call Hero Banner (When Announcement Triggers) ── */}
       {activeCall && (
-        <div className="mx-8 mt-6 p-6 rounded-3xl bg-gradient-to-r from-teal-600 via-cyan-600 to-teal-700 text-white shadow-2xl shadow-teal-500/30 border-2 border-teal-300/40 animate-in fade-in zoom-in duration-300 relative overflow-hidden z-30">
+        <div className="mx-8 mt-6 p-6 rounded-2xl bg-gradient-to-r from-teal-600 via-cyan-600 to-teal-700 text-white shadow-2xl shadow-teal-500/30 border-2 border-teal-300/40 animate-in fade-in zoom-in duration-300 relative overflow-hidden z-30">
           <div className="absolute top-0 right-0 w-96 h-96 bg-white/10 rounded-full blur-3xl -translate-y-1/2 translate-x-1/2 pointer-events-none" />
           <div className="flex items-center justify-between gap-6 relative z-10">
             <div className="flex items-center gap-5">
               <div className="w-20 h-20 rounded-2xl bg-white/20 backdrop-blur-md flex items-center justify-center shrink-0 animate-bounce shadow-inner">
-                <BellRing size={42} className="text-white" />
+                <BellRing size={40} className="text-white" />
               </div>
               <div>
                 <div className="flex items-center gap-2 flex-wrap mb-2">
@@ -336,7 +339,7 @@ export default function WaitingRoomDisplay() {
           <div className="flex items-center justify-between pb-3 border-b border-slate-800">
             <div className="flex items-center gap-3">
               <div className="p-2.5 rounded-xl bg-teal-500/20 text-teal-400 border border-teal-500/30">
-                <Clock size={22} />
+                <Clock size={20} />
               </div>
               <div>
                 <h2 className="text-xl font-black text-white">صف حاضرین در سالن انتظار</h2>
@@ -349,7 +352,7 @@ export default function WaitingRoomDisplay() {
           </div>
 
           {waitingPatients.length === 0 ? (
-            <div className="p-12 rounded-3xl bg-slate-900/60 border border-slate-800/80 text-center flex flex-col items-center justify-center">
+            <div className="p-12 rounded-2xl bg-slate-900/60 border border-slate-800/80 text-center flex flex-col items-center justify-center">
               <div className="w-16 h-16 rounded-full bg-slate-800 flex items-center justify-center text-slate-500 mb-3">
                 <CheckCircle2 size={32} />
               </div>
@@ -375,14 +378,14 @@ export default function WaitingRoomDisplay() {
                     <div className="flex items-center gap-4">
                       {/* Queue Number */}
                       <div className="w-12 h-12 rounded-xl bg-slate-800 border border-slate-700 flex flex-col items-center justify-center text-teal-400 font-black">
-                        <span className="text-[10px] text-slate-400">نوبت</span>
+                        <span className="text-3xs text-slate-400">نوبت</span>
                         <span className="text-base leading-none">{toPersianDigits(idx + 1)}</span>
                       </div>
 
                       <div>
                         <h4 className="text-lg font-bold text-white flex items-center gap-2">
                           <span>{patientName}</span>
-                          <span className="text-xs px-2 py-0.5 rounded-md bg-teal-500/10 text-teal-300 border border-teal-500/20 font-medium">
+                          <span className="text-xs px-2 py-0.5 rounded-lg bg-teal-500/10 text-teal-300 border border-teal-500/20 font-medium">
                             پذیرش‌شده
                           </span>
                         </h4>
@@ -415,7 +418,7 @@ export default function WaitingRoomDisplay() {
                         className="px-3 py-2 rounded-xl bg-teal-500/15 hover:bg-teal-500/25 text-teal-300 border border-teal-500/30 transition-all flex items-center gap-1.5 text-xs font-bold"
                         title="فراخوان مجدد این بیمار با صدای بلندگو"
                       >
-                        <Volume2 size={15} />
+                        <Volume2 size={14} />
                         <span>فراخوان</span>
                       </button>
 
@@ -423,7 +426,7 @@ export default function WaitingRoomDisplay() {
                         <span className={`text-xs px-2.5 py-1 rounded-lg border font-bold ${triage.badgeClass}`}>
                           ⏳ {formatWaitingTime(waitMinutes)}
                         </span>
-                        <p className="text-[11px] text-slate-500 mt-1">
+                        <p className="text-2xs text-slate-500 mt-1">
                           زمان ورود: {appt.check_in_time ? toPersianDigits(formatTime(appt.check_in_time)) : toPersianDigits(appt.start_time)}
                         </p>
                       </div>
@@ -440,7 +443,7 @@ export default function WaitingRoomDisplay() {
           <div className="flex items-center justify-between pb-3 border-b border-slate-800">
             <div className="flex items-center gap-3">
               <div className="p-2.5 rounded-xl bg-cyan-500/20 text-cyan-400 border border-cyan-500/30">
-                <Armchair size={22} />
+                <Armchair size={20} />
               </div>
               <div>
                 <h2 className="text-xl font-black text-white">وضعیت یونیت‌های کلینیک</h2>
@@ -484,7 +487,7 @@ export default function WaitingRoomDisplay() {
                         <span className="text-xs px-2.5 py-1 rounded-lg bg-amber-500/20 text-amber-300 border border-amber-500/40 font-bold">
                           در حال درمان
                         </span>
-                        <p className="text-[10px] text-slate-400 mt-1">
+                        <p className="text-3xs text-slate-400 mt-1">
                           شروع: {currentAppt.chair_entry_time ? toPersianDigits(formatTime(currentAppt.chair_entry_time)) : toPersianDigits(currentAppt.start_time)}
                         </p>
                       </div>

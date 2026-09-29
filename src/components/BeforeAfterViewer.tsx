@@ -1,4 +1,5 @@
 import React, { useState, useRef } from 'react'
+import { createPortal } from 'react-dom'
 import { Split, Columns, Eye, RotateCcw, X, ZoomIn, Sparkles } from 'lucide-react'
 import { toJalaliStringPretty } from '../lib/persianDate'
 import { h } from '../lib/haptics'
@@ -46,7 +47,7 @@ export function BeforeAfterViewer({
     handlePointerMove(e.clientX)
   }
 
-  return (
+  return createPortal(
     <div className="fixed inset-0 z-50 bg-black/85 backdrop-blur-md flex flex-col justify-between p-3 md:p-6 select-none animate-fade-in">
       {/* Top Header Bar */}
       <div className="flex items-center justify-between text-white pb-3 border-b border-white/10">
@@ -208,6 +209,7 @@ export function BeforeAfterViewer({
           <span>بازنشانی به وسط (۵۰٪)</span>
         </button>
       </div>
-    </div>
+    </div>,
+    document.body
   )
 }

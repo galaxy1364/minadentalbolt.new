@@ -1,8 +1,10 @@
 // Inventory.tsx - Persian RTL Dental Clinic Inventory Management
 import { useState, useEffect, useCallback, useMemo } from 'react'
+import { usePullToRefresh } from '../lib/usePullToRefresh'
 import { useNavigate } from 'react-router-dom'
 import { Package, Boxes, Search, Plus, Minus, Edit2, AlertTriangle, TrendingDown, PackageCheck, Smile, ScanLine, Archive } from 'lucide-react'
 import { BarcodeScanner } from '../components/BarcodeScanner'
+import { CHART_AXIS_COLOR_STRONG } from '../lib/colorTokens'
 import { BarChart, Bar, XAxis, YAxis, Tooltip as RTooltip, ResponsiveContainer, Cell } from 'recharts'
 import { fetchInventoryItems, fetchInventoryCategories, createInventoryItem, updateInventoryItem, deactivateInventoryItem } from '../lib/api'
 import { toJalaliString, toJalaliStringPretty, formatCurrency, formatNumber, toPersianDigits } from '../lib/persianDate'
@@ -110,6 +112,7 @@ export default function Inventory() {
   useEffect(() => {
     loadData()
   }, [loadData])
+  const ptr = usePullToRefresh(async () => { await loadData() })
 
   // ===========================================================================
   // Derived Data
@@ -376,14 +379,25 @@ export default function Inventory() {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center py-20">
-        <Spinner size={32} />
+      <div className="space-y-4" aria-busy="true" aria-live="polite">
+        <div className="skeleton h-12 rounded-xl" />
+        <div className="space-y-2">
+          {[0, 1, 2, 3].map((i) => <div key={i} className="skeleton h-20 rounded-2xl" />)}
+        </div>
       </div>
     )
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6" {...ptr.handlers}>
+      {ptr.pullDistance > 0 && (
+        <div className="pull-indicator" style={{ opacity: ptr.isRefreshing ? 1 : ptr.pullProgress, top: -4 }}>
+          <div className="flex flex-col items-center gap-1">
+            <div className={`w-7 h-7 rounded-full border-2 border-teal-300 dark:border-teal-600 border-t-teal-600 dark:border-t-teal-400 ${ptr.isRefreshing ? 'animate-spin' : ''}`} style={{ transform: `scale(${0.6 + ptr.pullProgress * 0.4})` }} />
+            <span className="text-3xs text-teal-600 font-medium">{ptr.isRefreshing ? 'در حال به‌روزرسانی...' : 'برای به‌روزرسانی بکشید'}</span>
+          </div>
+        </div>
+      )}
       <ModuleHeader
         moduleKey="inventory"
         title="انبار"
@@ -432,6 +446,7 @@ export default function Inventory() {
           <select
             value={filterCategory}
             onChange={(e) => setFilterCategory(e.target.value)}
+            aria-label="فیلتر دسته‌بندی کالا"
             className="px-3 py-2 rounded-xl border border-slate-200 bg-slate-50 text-sm focus:outline-none focus:ring-2 focus:ring-primary-400"
           >
             <option value="">همه دسته‌ها</option>
@@ -462,7 +477,7 @@ export default function Inventory() {
           <Card className="p-0 overflow-hidden lg:col-span-2">
             {filteredItems.length === 0 ? (
               <EmptyState
-                icon={<Package size={28} />}
+                icon={<Package size={56} />}
                 title="اقلامی یافت نشد"
                 description="با افزودن اقلام جدید شروع کنید"
                 action={<Button onClick={openCreateModal} variant="primary" size="sm"><Plus size={14} className="inline ml-1" />افزودن اقلام</Button>}
@@ -497,7 +512,7 @@ export default function Inventory() {
                               <Edit2 size={12} className="opacity-0 group-hover:opacity-100 text-primary-500 transition-opacity" />
                             </button>
                             {i.supplier && (
-                              <span className="block text-[11px] text-slate-400 dark:text-slate-500 truncate mt-0.5">
+                              <span className="block text-2xs text-slate-400 dark:text-slate-500 truncate mt-0.5">
                                 تأمین‌کننده: {i.supplier}
                               </span>
                             )}
@@ -532,7 +547,7 @@ export default function Inventory() {
                                 title="افزایش سریع موجودی (+۱)"
                                 className="w-8 h-8 rounded-xl bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-100 dark:hover:bg-emerald-900/50 flex items-center justify-center transition-all-smooth press-scale border border-emerald-200/60 dark:border-emerald-800/40"
                               >
-                                <Plus size={15} />
+                                <Plus size={14} />
                               </button>
                               <button
                                 onClick={() => handleQuickDecrement(i)}
@@ -540,7 +555,7 @@ export default function Inventory() {
                                 title="ثبت مصرف و کاهش موجودی (-۱)"
                                 className="w-8 h-8 rounded-xl bg-amber-50 dark:bg-amber-950/40 text-amber-600 dark:text-amber-400 hover:bg-amber-100 dark:hover:bg-amber-900/50 flex items-center justify-center transition-all-smooth press-scale border border-amber-200/60 dark:border-amber-800/40"
                               >
-                                <Minus size={15} />
+                                <Minus size={14} />
                               </button>
                               <button
                                 onClick={() => openEditModal(i)}
@@ -573,12 +588,12 @@ export default function Inventory() {
           <Card className="p-5">
             <h3 className="text-sm font-bold text-slate-800 mb-4">توزیع اقلام بر اساس دسته</h3>
             {categoryChartData.length === 0 ? (
-              <EmptyState icon={<Boxes size={28} />} title="داده‌ای موجود نیست" />
+              <EmptyState icon={<Boxes size={56} />} title="داده‌ای موجود نیست" />
             ) : (
               <ResponsiveContainer width="100%" height={300}>
                 <BarChart data={categoryChartData} layout="vertical" margin={{ top: 0, right: 10, left: 10, bottom: 0 }}>
-                  <XAxis type="number" tick={{ fontSize: 11, fill: '#64748b' }} />
-                  <YAxis dataKey="name" type="category" tick={{ fontSize: 11, fill: '#64748b' }} width={90} />
+                  <XAxis type="number" tick={{ fontSize: 11, fill: CHART_AXIS_COLOR_STRONG }} />
+                  <YAxis dataKey="name" type="category" tick={{ fontSize: 11, fill: CHART_AXIS_COLOR_STRONG }} width={90} />
                   <RTooltip formatter={(v: number) => [formatNumber(v), 'تعداد']} contentStyle={{ direction: 'rtl', fontSize: 12, borderRadius: 12, border: 'none', boxShadow: '0 4px 12px rgba(0,0,0,0.1)' }} />
                   <Bar dataKey="count" radius={[0, 6, 6, 0]}>
                     {categoryChartData.map((_, i) => <Cell key={i} fill={CHART_COLORS[i % CHART_COLORS.length]} />)}
@@ -595,7 +610,7 @@ export default function Inventory() {
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {categories.length === 0 ? (
             <Card className="p-5 md:col-span-2 lg:col-span-3">
-              <EmptyState icon={<Boxes size={28} />} title="دسته‌بندی ثبت نشده است" description="دسته‌بندی‌های انبار در اینجا نمایش داده می‌شوند" />
+              <EmptyState icon={<Boxes size={56} />} title="دسته‌بندی ثبت نشده است" description="دسته‌بندی‌های انبار در اینجا نمایش داده می‌شوند" />
             </Card>
           ) : (
             categories.map((c) => {
@@ -604,7 +619,7 @@ export default function Inventory() {
                 <Card key={c.id} className="p-5">
                   <div className="flex items-center gap-3 mb-3">
                     <div className="w-12 h-12 rounded-xl bg-accent-100 flex items-center justify-center text-accent-700">
-                      <Boxes size={22} />
+                      <Boxes size={20} />
                     </div>
                     <div>
                       <h3 className="font-bold text-slate-800">{c.name}</h3>

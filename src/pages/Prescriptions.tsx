@@ -1,5 +1,6 @@
 // Prescriptions.tsx - Persian RTL Dental Clinic Prescriptions Management
 import { useState, useEffect, useCallback, useMemo } from 'react'
+import { usePullToRefresh } from '../lib/usePullToRefresh'
 import { PatientSelect } from '../components/PatientSelect'
 import { PatientAlerts } from '../components/PatientAlerts'
 import { buildPrintDocument } from '../lib/printDocument'
@@ -143,6 +144,7 @@ export default function Prescriptions() {
   useEffect(() => {
     loadData()
   }, [loadData])
+  const ptr = usePullToRefresh(async () => { await loadData() })
 
   // Handle handoff from Treatments encounter or DentalChart
   useEffect(() => {
@@ -475,14 +477,25 @@ export default function Prescriptions() {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center py-20">
-        <Spinner size={32} />
+      <div className="space-y-4" aria-busy="true" aria-live="polite">
+        <div className="skeleton h-12 rounded-xl" />
+        <div className="space-y-2">
+          {[0, 1, 2, 3].map((i) => <div key={i} className="skeleton h-20 rounded-2xl" />)}
+        </div>
       </div>
     )
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6" {...ptr.handlers}>
+      {ptr.pullDistance > 0 && (
+        <div className="pull-indicator" style={{ opacity: ptr.isRefreshing ? 1 : ptr.pullProgress, top: -4 }}>
+          <div className="flex flex-col items-center gap-1">
+            <div className={`w-7 h-7 rounded-full border-2 border-teal-300 dark:border-teal-600 border-t-teal-600 dark:border-t-teal-400 ${ptr.isRefreshing ? 'animate-spin' : ''}`} style={{ transform: `scale(${0.6 + ptr.pullProgress * 0.4})` }} />
+            <span className="text-3xs text-teal-600 font-medium">{ptr.isRefreshing ? 'در حال به‌روزرسانی...' : 'برای به‌روزرسانی بکشید'}</span>
+          </div>
+        </div>
+      )}
       <ModuleHeader
         moduleKey="prescriptions"
         title="نسخه‌ها"
@@ -518,7 +531,7 @@ export default function Prescriptions() {
       {filteredPrescriptions.length === 0 ? (
         <Card className="p-5">
           <EmptyState
-            icon={<Pill size={28} />}
+            icon={<Pill size={56} />}
             title="نسخه‌ای ثبت نشده است"
             description="با ایجاد نسخه جدید شروع کنید"
             action={<Button onClick={openCreateModal} variant="primary" size="sm"><Plus size={14} className="inline ml-1" />افزودن نسخه</Button>}
@@ -532,7 +545,7 @@ export default function Prescriptions() {
               <Card key={p.id} className="p-5 hover:card-shadow-lg transition-all-smooth">
                 <div className="flex items-start justify-between mb-3">
                   <div className="flex items-center gap-3">
-                    <div className="w-11 h-11 rounded-xl bg-primary-100 flex items-center justify-center text-primary-700">
+                    <div className="w-10 h-10 rounded-xl bg-primary-100 flex items-center justify-center text-primary-700">
                       <Pill size={20} />
                     </div>
                     <div>
@@ -560,7 +573,7 @@ export default function Prescriptions() {
                                 if (p.patient_id) navigate(`/patients/${p.patient_id}`)
                               }}
                               title="شماره پرونده بیمار"
-                              className="inline-flex items-center gap-1 px-1.5 py-0.2 rounded bg-slate-900 dark:bg-primary-950 text-white dark:text-primary-300 text-[10px] font-mono font-bold hover:scale-105 active:scale-95 transition-all cursor-pointer"
+                              className="inline-flex items-center gap-1 px-1.5 py-0.2 rounded bg-slate-900 dark:bg-primary-950 text-white dark:text-primary-300 text-3xs font-mono font-bold hover:scale-105 active:scale-95 transition-all cursor-pointer"
                               dir="ltr"
                             >
                               <span>{toPersianDigits(pat.file_number)}</span>
@@ -609,7 +622,7 @@ export default function Prescriptions() {
                           title="ارسال اقلام نسخه در واتساپ"
                           onClick={() => chimes.playPop()}
                         >
-                          <MessageSquare size={13} /> واتساپ
+                          <MessageSquare size={14} /> واتساپ
                         </a>
                       )
                     })()}
@@ -668,12 +681,12 @@ export default function Prescriptions() {
                   <div className="p-2.5 rounded-xl bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 text-xs flex items-center gap-2 flex-wrap">
                     <span className="font-bold text-slate-700 dark:text-slate-300">وضعیت پرونده بیمار:</span>
                     {selectedPatient.allergies && (
-                      <span className="px-2 py-0.5 rounded-md bg-error-50 dark:bg-error-900/30 text-error-700 dark:text-error-400 font-medium">
+                      <span className="px-2 py-0.5 rounded-lg bg-error-50 dark:bg-error-900/30 text-error-700 dark:text-error-400 font-medium">
                         حساسیت: {selectedPatient.allergies}
                       </span>
                     )}
                     {selectedPatient.medical_conditions && (
-                      <span className="px-2 py-0.5 rounded-md bg-warning-50 dark:bg-warning-900/30 text-warning-700 dark:text-warning-400 font-medium">
+                      <span className="px-2 py-0.5 rounded-lg bg-warning-50 dark:bg-warning-900/30 text-warning-700 dark:text-warning-400 font-medium">
                         بیماری: {selectedPatient.medical_conditions}
                       </span>
                     )}
@@ -700,10 +713,10 @@ export default function Prescriptions() {
                           )}
                           <div className="flex-1 min-w-0">
                             <p className="text-xs font-bold leading-snug">{alert.title}</p>
-                            <p className="text-[11px] opacity-90 mt-0.5">{alert.description}</p>
+                            <p className="text-2xs opacity-90 mt-0.5">{alert.description}</p>
                             {alert.alternativeSuggestion && (
                               <div className="mt-2 pt-2 border-t border-error-200/50 dark:border-error-800/50 flex items-center justify-between gap-2 flex-wrap">
-                                <span className="text-[11px] font-medium">پیشنهاد جایگزین امن: {alert.alternativeSuggestion}</span>
+                                <span className="text-2xs font-medium">پیشنهاد جایگزین امن: {alert.alternativeSuggestion}</span>
                                 <button
                                   type="button"
                                   onClick={() => {
@@ -713,7 +726,7 @@ export default function Prescriptions() {
                                     }))
                                     showToast('info', 'داروی جایگزین اضافه شد')
                                   }}
-                                  className="px-2 py-0.5 rounded-md text-[10px] font-bold bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-100 shadow-sm border border-slate-200 dark:border-slate-700"
+                                  className="px-2 py-0.5 rounded-lg text-3xs font-bold bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-100 shadow-sm border border-slate-200 dark:border-slate-700"
                                 >
                                   + افزودن جایگزین
                                 </button>
@@ -740,7 +753,7 @@ export default function Prescriptions() {
                         className={`p-2.5 rounded-xl border text-right transition-all hover:scale-[1.01] active:scale-[0.99] ${p.badgeColor}`}
                       >
                         <p className="text-xs font-bold mb-0.5">{p.title}</p>
-                        <p className="text-[10px] opacity-80 line-clamp-1">{p.description}</p>
+                        <p className="text-3xs opacity-80 line-clamp-1">{p.description}</p>
                       </button>
                     ))}
                   </div>
@@ -755,7 +768,7 @@ export default function Prescriptions() {
                       onClick={() => setShowPediaCalc(!showPediaCalc)}
                       className="flex items-center gap-1 text-xs font-bold text-primary-600 dark:text-primary-400 hover:underline"
                     >
-                      <Calculator size={13} />
+                      <Calculator size={14} />
                       {showPediaCalc ? 'بستن محاسبه‌گر اطفال' : 'محاسبه‌گر دوز اطفال (mg/kg)'}
                     </button>
                   </div>
@@ -768,10 +781,11 @@ export default function Prescriptions() {
                       </p>
                       <div className="grid grid-cols-2 gap-2">
                         <div>
-                          <label className="block text-[11px] text-slate-600 dark:text-slate-400 mb-1">دارو</label>
+                          <label className="block text-2xs text-slate-600 dark:text-slate-400 mb-1">دارو</label>
                           <select
                             value={pediaDrug}
                             onChange={(e) => setPediaDrug(e.target.value as any)}
+                            aria-label="داروی کودکان"
                             className="w-full px-2 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-xs"
                           >
                             <option value="amoxicillin">آموکسی‌سیلین (شربت)</option>
@@ -780,7 +794,7 @@ export default function Prescriptions() {
                           </select>
                         </div>
                         <div>
-                          <label className="block text-[11px] text-slate-600 dark:text-slate-400 mb-1">وزن کودک (کیلوگرم)</label>
+                          <label className="block text-2xs text-slate-600 dark:text-slate-400 mb-1">وزن کودک (کیلوگرم)</label>
                           <input
                             type="number"
                             min="3"
@@ -798,9 +812,9 @@ export default function Prescriptions() {
                         const lineToInsert = `${drugLabel} | ${calc.recommendedSingleDoseMg}mg | ${calc.dailyFrequency} ${calc.suspensionNote ? `(${calc.suspensionNote})` : ''}`
                         return (
                           <div className="pt-2 border-t border-primary-200/60 dark:border-primary-800/60 flex items-center justify-between flex-wrap gap-2">
-                            <div className="text-[11px] text-slate-700 dark:text-slate-300">
+                            <div className="text-2xs text-slate-700 dark:text-slate-300">
                               <span className="font-bold text-primary-700 dark:text-primary-400">{calc.recommendedSingleDoseMg} میلی‌گرم هر نوبت</span>
-                              <p className="text-[10px] text-slate-500">{calc.suspensionNote || calc.dailyFrequency}</p>
+                              <p className="text-3xs text-slate-500">{calc.suspensionNote || calc.dailyFrequency}</p>
                             </div>
                             <button
                               type="button"
@@ -867,7 +881,7 @@ export default function Prescriptions() {
                     <span className="text-xs font-bold text-slate-700 dark:text-slate-200">
                       مشخصات نسخه الکترونیک (سامانه سپاس / تأمین / سلامت)
                     </span>
-                    <span className="text-[11px] text-slate-400">اختیاری</span>
+                    <span className="text-2xs text-slate-400">اختیاری</span>
                   </div>
 
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">

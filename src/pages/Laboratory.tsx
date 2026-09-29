@@ -1,5 +1,6 @@
 // Laboratory.tsx - Persian RTL Dental Clinic Laboratory Management
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
+import { usePullToRefresh } from '../lib/usePullToRefresh'
 import { SurfaceSelect } from '../components/SurfaceSelect'
 import { VitaShadePicker } from '../components/VitaShadePicker'
 import { formatSurfaces } from '../lib/toothSurfaces'
@@ -223,6 +224,7 @@ export default function Laboratory() {
   useEffect(() => {
     loadData()
   }, [loadData])
+  const ptr = usePullToRefresh(async () => { await loadData() })
 
   // Auto-fill & auto-launch order wizard from clinical treatments or dental chart handoff
   useEffect(() => {
@@ -527,6 +529,14 @@ export default function Laboratory() {
       return
     }
 
+    // The status dropdown and the work_done/delivered flags are two views
+    // of the same fact and must agree — otherwise a case can end up
+    // "delivered" by one field and "ready for pickup" by the other, which
+    // is exactly the kind of contradictory state this form must not allow.
+    const deliveredNow = orderForm.delivered || orderForm.status === 'delivered'
+    const workDoneNow = orderForm.work_done || deliveredNow
+    const statusNow = deliveredNow ? 'delivered' : orderForm.status
+
     const payload = {
       lab_id: orderForm.lab_id,
       patient_id: orderForm.patient_id,
@@ -539,16 +549,16 @@ export default function Laboratory() {
       deadline: orderForm.deadline || null,
       cost: orderForm.cost ? Number(orderForm.cost) : null,
       notes: orderForm.notes || null,
-      status: orderForm.status,
+      status: statusNow,
       encounter_id: null,
-      sent_at: null,
-      received_at: null,
+      sent_at: editingOrder ? editingOrder.sent_at : null,
+      received_at: editingOrder ? editingOrder.received_at : null,
       shelf: orderForm.shelf.trim() || null,
       shelf_number: orderForm.shelf_number.trim() || null,
       shelf_space: orderForm.shelf_space.trim() || null,
       alarm_date: orderForm.alarm_date || null,
-      work_done: orderForm.work_done,
-      delivered: orderForm.delivered,
+      work_done: workDoneNow,
+      delivered: deliveredNow,
       material_returned: orderForm.material_returned,
       dispatch_type: orderForm.dispatch_type || null,
       courier_name: orderForm.courier_name.trim() || null,
@@ -693,8 +703,13 @@ export default function Laboratory() {
       ],
       confirmLabel: 'تایید',
       onConfirm: async () => {
-        const updates: any = { status: newStatus }
-        if (newStatus === 'delivered') updates.received_at = new Date().toISOString()
+        // Marking an order 'delivered' must also flip work_done/delivered
+        // together (deliveryPatch), or the record ends up with
+        // status === 'delivered' while delivered/work_done stay false —
+        // readyForDelivery() then still counts it as "ready for pickup"
+        // even though it shows as delivered, i.e. two contradictory states
+        // at once.
+        const updates: any = newStatus === 'delivered' ? { ...deliveryPatch(), received_at: new Date().toISOString() } : { status: newStatus }
         try {
           await updateLabOrder(order.id, updates)
           if (linkedTreatment) await updateTreatment(linkedTreatment.id, { status: 'completed' })
@@ -729,6 +744,13 @@ export default function Laboratory() {
         chimes.playSuccess()
         showToast('success', 'ارسال به لابراتوار ثبت شد')
       } else if (step === 'arrived') {
+        // The receipt date can never be earlier than the send date — a case
+        // cannot come back from the lab before it was sent out.
+        if (order.sent_at && today < order.sent_at.slice(0, 10)) {
+          chimes.playWarning()
+          showToast('error', 'تاریخ دریافت نمی‌تواند قبل از تاریخ ارسال باشد')
+          return
+        }
         await updateLabOrder(order.id, { received_at: today, work_done: true } as never)
         chimes.playSuccess()
         showToast('success', 'رسیدن کار به مطب ثبت شد')
@@ -740,7 +762,7 @@ export default function Laboratory() {
         })
         return
       } else if (step === 'delivered') {
-        await updateLabOrder(order.id, { delivered: true, status: 'delivered' } as never)
+        await updateLabOrder(order.id, deliveryPatch() as never)
         chimes.playSuccess()
         showToast('success', 'تحویل به بیمار ثبت شد')
       }
@@ -883,7 +905,7 @@ export default function Laboratory() {
                         title="اطلاع‌رسانی به بیمار در واتساپ"
                         onClick={() => chimes.playPop()}
                       >
-                        <MessageSquare size={13} />
+                        <MessageSquare size={14} />
                         اطلاع به بیمار
                       </a>
                     )
@@ -964,7 +986,7 @@ export default function Laboratory() {
                       if (order.patient_id) appointmentNav(`/patients/${order.patient_id}`)
                     }}
                     title="شماره پرونده بیمار"
-                    className="inline-flex items-center gap-1 px-1.5 py-0.2 rounded bg-slate-900 dark:bg-primary-950 text-white dark:text-primary-300 text-[10px] font-mono font-bold hover:scale-105 active:scale-95 transition-all cursor-pointer"
+                    className="inline-flex items-center gap-1 px-1.5 py-0.2 rounded bg-slate-900 dark:bg-primary-950 text-white dark:text-primary-300 text-3xs font-mono font-bold hover:scale-105 active:scale-95 transition-all cursor-pointer"
                     dir="ltr"
                   >
                     <span>{toPersianDigits(patientMap.get(order.patient_id)!.file_number!)}</span>
@@ -1038,11 +1060,11 @@ export default function Laboratory() {
                     : 'bg-slate-50 dark:bg-slate-700/50 border-slate-200 dark:border-slate-600 text-slate-600 dark:text-slate-300'
             }`}>
               <span className="flex items-center gap-1.5 font-medium">
-                <Truck size={13} className={courierMeta.color === 'error' ? 'text-rose-500' : 'text-teal-600'} />
+                <Truck size={14} className={courierMeta.color === 'error' ? 'text-rose-500' : 'text-teal-600'} />
                 <span>{courierMeta.label}</span>
               </span>
               {order.tracking_code && (
-                <span className="text-[11px] font-mono text-slate-400" dir="ltr">
+                <span className="text-2xs font-mono text-slate-400" dir="ltr">
                   #{toPersianDigits(order.tracking_code)}
                 </span>
               )}
@@ -1079,7 +1101,7 @@ export default function Laboratory() {
               })}
             </div>
             <div className="flex items-center justify-between">
-              <span className="text-[11px] text-slate-500">
+              <span className="text-2xs text-slate-500">
                 {(() => {
                   const done = clinicMilestones(order).filter((m) => m.done)
                   return done.length ? done[done.length - 1].label : 'هنوز ارسال نشده'
@@ -1154,7 +1176,7 @@ export default function Laboratory() {
               title="افزودن یادآوری به تقویم گوشی"
               className="p-1 rounded-lg hover:bg-black/5"
             >
-              <CalendarClock size={13} />
+              <CalendarClock size={14} />
             </button>
           </div>
         )}
@@ -1162,7 +1184,7 @@ export default function Laboratory() {
         {/* Real sent/received dates — the actual pipeline history, not
             just the deadline target. */}
         {(order.sent_at || order.received_at) && (
-          <div className="flex items-center gap-3 text-[11px] text-slate-400 mb-2">
+          <div className="flex items-center gap-3 text-2xs text-slate-400 mb-2">
             {order.sent_at && <span>ارسال: {toJalaliStringPretty(order.sent_at.slice(0, 10))}</span>}
             {order.received_at && <span className="text-success-600 font-medium">دریافت: {toJalaliStringPretty(order.received_at.slice(0, 10))}</span>}
           </div>
@@ -1317,7 +1339,7 @@ export default function Laboratory() {
       {/* Orders Grid */}
       {filteredOrders.length === 0 ? (
         <Card className="p-6">
-          <EmptyState icon={<FlaskConical size={32} />} title="سفارشی یافت نشد" description={searchQuery || filterStatus || filterLab || filterOverdue ? "فیلترها را تغییر دهید" : "برای ثبت سفارش جدید کلیک کنید"} action={!searchQuery && !filterStatus && !filterLab && !filterOverdue ? <Button size="sm" onClick={openCreateOrderModal}><Plus size={16} /> سفارش جدید</Button> : undefined} />
+          <EmptyState icon={<FlaskConical size={56} />} title="سفارشی یافت نشد" description={searchQuery || filterStatus || filterLab || filterOverdue ? "فیلترها را تغییر دهید" : "برای ثبت سفارش جدید کلیک کنید"} action={!searchQuery && !filterStatus && !filterLab && !filterOverdue ? <Button size="sm" onClick={openCreateOrderModal}><Plus size={16} /> سفارش جدید</Button> : undefined} />
         </Card>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
@@ -1342,7 +1364,7 @@ export default function Laboratory() {
 
       {labs.length === 0 ? (
         <Card className="p-6">
-          <EmptyState icon={<FlaskConical size={32} />} title="لابراتواری ثبت نشده" description="برای افزودن لابراتوار جدید کلیک کنید" action={<Button size="sm" onClick={openCreateLab}><Plus size={16} /> لابراتوار جدید</Button>} />
+          <EmptyState icon={<FlaskConical size={56} />} title="لابراتواری ثبت نشده" description="برای افزودن لابراتوار جدید کلیک کنید" action={<Button size="sm" onClick={openCreateLab}><Plus size={16} /> لابراتوار جدید</Button>} />
         </Card>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
@@ -1398,11 +1420,11 @@ export default function Laboratory() {
                 <div className="flex items-center gap-2 pt-2 border-t border-slate-100">
                   <div className="flex-1 p-2 rounded-lg bg-slate-50 text-center">
                     <p className="text-lg font-bold text-slate-700">{toPersianDigits(labOrdersCount)}</p>
-                    <p className="text-[10px] text-slate-400">کل سفارش‌ها</p>
+                    <p className="text-3xs text-slate-400">کل سفارش‌ها</p>
                   </div>
                   <div className="flex-1 p-2 rounded-lg bg-warning-50 text-center">
                     <p className="text-lg font-bold text-warning-700">{toPersianDigits(activeOrders)}</p>
-                    <p className="text-[10px] text-slate-400">در حال انجام</p>
+                    <p className="text-3xs text-slate-400">در حال انجام</p>
                   </div>
                 </div>
 
@@ -1616,7 +1638,7 @@ export default function Laboratory() {
                   </label>
                 </div>
                 {!editingOrder && typicalTurnaroundDays[orderForm.work_type] && (
-                  <p className="text-[11px] text-slate-400 -mt-2">
+                  <p className="text-2xs text-slate-400 -mt-2">
                     پیشنهاد خودکار بر اساس زمان معمول «{workTypes.find((w) => w.value === orderForm.work_type)?.label}» — قابل تغییر است
                   </p>
                 )}
@@ -1686,11 +1708,11 @@ export default function Laboratory() {
               <>
                 <div className="grid grid-cols-2 gap-2 mb-1">
                   <div className="bg-slate-50 dark:bg-slate-700/50 rounded-xl p-3">
-                    <p className="text-[11px] text-slate-400 mb-0.5">بیمار</p>
+                    <p className="text-2xs text-slate-400 mb-0.5">بیمار</p>
                     <p className="text-sm font-bold text-slate-700 dark:text-slate-200 truncate">{selectedPatient ? `${selectedPatient.first_name} ${selectedPatient.last_name}` : '-'}</p>
                   </div>
                   <div className="bg-slate-50 dark:bg-slate-700/50 rounded-xl p-3">
-                    <p className="text-[11px] text-slate-400 mb-0.5">لابراتوار</p>
+                    <p className="text-2xs text-slate-400 mb-0.5">لابراتوار</p>
                     <p className="text-sm font-bold text-slate-700 dark:text-slate-200 truncate">{selectedLab?.name || '-'}</p>
                   </div>
                 </div>
@@ -1768,11 +1790,26 @@ export default function Laboratory() {
   // ===========================================================================
 
   if (loading) {
-    return <div className="flex items-center justify-center py-20"><Spinner size={32} /></div>
+    return (
+      <div className="space-y-4" aria-busy="true" aria-live="polite">
+        <div className="skeleton h-12 rounded-xl" />
+        <div className="space-y-2">
+          {[0, 1, 2, 3].map((i) => <div key={i} className="skeleton h-20 rounded-2xl" />)}
+        </div>
+      </div>
+    )
   }
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-4" {...ptr.handlers}>
+      {ptr.pullDistance > 0 && (
+        <div className="pull-indicator" style={{ opacity: ptr.isRefreshing ? 1 : ptr.pullProgress, top: -4 }}>
+          <div className="flex flex-col items-center gap-1">
+            <div className={`w-7 h-7 rounded-full border-2 border-teal-300 dark:border-teal-600 border-t-teal-600 dark:border-t-teal-400 ${ptr.isRefreshing ? 'animate-spin' : ''}`} style={{ transform: `scale(${0.6 + ptr.pullProgress * 0.4})` }} />
+            <span className="text-3xs text-teal-600 font-medium">{ptr.isRefreshing ? 'در حال به‌روزرسانی...' : 'برای به‌روزرسانی بکشید'}</span>
+          </div>
+        </div>
+      )}
       <ModuleHeader
         moduleKey="laboratory"
         title="لابراتوار"

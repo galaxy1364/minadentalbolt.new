@@ -275,6 +275,7 @@ export function DocumentScannerModal({
                 <button
                   type="button"
                   onClick={handleClearImage}
+                  aria-label="حذف تصویر و عکس مجدد"
                   className="absolute top-2 left-2 p-1.5 rounded-full bg-rose-600 text-white shadow-lg hover:bg-rose-700 transition-colors"
                   title="حذف و عکس مجدد"
                 >
@@ -307,7 +308,7 @@ export function DocumentScannerModal({
             </div>
           ) : (
             <div className="py-4 space-y-4">
-              <div className="w-16 h-16 mx-auto rounded-3xl bg-primary-100 dark:bg-primary-950/60 text-primary-600 dark:text-primary-400 flex items-center justify-center shadow-inner">
+              <div className="w-16 h-16 mx-auto rounded-2xl bg-primary-100 dark:bg-primary-950/60 text-primary-600 dark:text-primary-400 flex items-center justify-center shadow-inner">
                 <Camera size={32} />
               </div>
               <div>

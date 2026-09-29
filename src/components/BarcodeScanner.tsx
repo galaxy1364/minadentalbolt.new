@@ -7,6 +7,7 @@
 // their own device. zxing works identically on any browser with camera
 // access.
 import { useEffect, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
 import { BrowserMultiFormatReader } from '@zxing/library'
 import { X, Camera as CameraIcon, AlertCircle } from 'lucide-react'
 import { h } from '../lib/haptics'
@@ -50,7 +51,7 @@ export function BarcodeScanner({ onScan, onClose }: BarcodeScannerProps) {
     }
   }, [])
 
-  return (
+  return createPortal(
     <div className="fixed inset-0 z-[200] bg-black flex flex-col">
       <div className="flex items-center justify-between p-4">
         <button
@@ -85,6 +86,7 @@ export function BarcodeScanner({ onScan, onClose }: BarcodeScannerProps) {
           </>
         )}
       </div>
-    </div>
+    </div>,
+    document.body
   )
 }

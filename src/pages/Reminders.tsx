@@ -340,7 +340,7 @@ export default function Reminders() {
 
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-4" style={{ paddingBottom: 'calc(6rem + env(safe-area-inset-bottom, 0px))' }}>
       <ModuleHeader
         moduleKey="reminders"
         title="یادآوری‌ها"
@@ -356,7 +356,7 @@ export default function Reminders() {
             </div>
             <div className="flex-1">
               <p className="text-sm font-bold text-warning-700 dark:text-warning-400">نوتیفیکیشن واقعی گوشی</p>
-              <p className="text-[11px] text-warning-600 dark:text-warning-500">برای دریافت هشدار فوری روی گوشی، اجازه‌ی نوتیفیکیشن را فعال کنید</p>
+              <p className="text-2xs text-warning-600 dark:text-warning-500">برای دریافت هشدار فوری روی گوشی، اجازه‌ی نوتیفیکیشن را فعال کنید</p>
             </div>
             <Button size="sm" variant="primary" onClick={handleEnableNotifications}>فعال‌سازی</Button>
           </div>
@@ -364,13 +364,13 @@ export default function Reminders() {
       )}
       {notifPermission === 'denied' && (
         <Card className="p-3 bg-slate-50 dark:bg-slate-800/60">
-          <p className="text-[11px] text-slate-500 flex items-center gap-1.5"><BellOff size={13} /> نوتیفیکیشن مسدود شده — از تنظیمات مرورگر/گوشی فعالش کنید</p>
+          <p className="text-2xs text-slate-500 flex items-center gap-1.5"><BellOff size={14} /> نوتیفیکیشن مسدود شده — از تنظیمات مرورگر/گوشی فعالش کنید</p>
         </Card>
       )}
 
       <Card className="p-4">
         <div className="flex items-center gap-2 mb-1">
-          <Settings2 size={15} className="text-slate-400" />
+          <Settings2 size={14} className="text-slate-400" />
           <p className="text-xs font-bold text-slate-600 dark:text-slate-300">آستانه‌ی هشدار فوری</p>
         </div>
         <Select
@@ -378,16 +378,16 @@ export default function Reminders() {
           onChange={updateLeadDays}
           options={[{ value: '1', label: '۱ روز قبل' }, { value: '3', label: '۳ روز قبل' }, { value: '7', label: '۷ روز قبل' }, { value: '14', label: '۱۴ روز قبل' }]}
         />
-        <p className="text-[11px] text-slate-400 mt-1.5">مواردی که کمتر از این فاصله تا سررسید دارند، «فوری» علامت‌گذاری می‌شوند.</p>
+        <p className="text-2xs text-slate-400 mt-1.5">مواردی که کمتر از این فاصله تا سررسید دارند، «فوری» علامت‌گذاری می‌شوند.</p>
       </Card>
 
       <div className="grid grid-cols-2 gap-2.5">
         <Card className="p-3.5">
-          <p className="text-[11px] text-slate-400">کل یادآوری‌های فعال</p>
+          <p className="text-2xs text-slate-400">کل یادآوری‌های فعال</p>
           <p className="text-xl font-extrabold text-slate-800 dark:text-slate-100">{toPersianDigits(items.length)}</p>
         </Card>
         <Card className="p-3.5 border-2 border-error-200">
-          <p className="text-[11px] text-error-500">فوری (زیر آستانه)</p>
+          <p className="text-2xs text-error-500">فوری (زیر آستانه)</p>
           <p className="text-xl font-extrabold text-error-600">{toPersianDigits(urgentCount)}</p>
         </Card>
       </div>
@@ -401,7 +401,7 @@ export default function Reminders() {
               </div>
               <div>
                 <h3 className="text-sm font-bold text-slate-800 dark:text-slate-100">شاخص وفاداری و ماندگاری بیماران (CRM Retention)</h3>
-                <p className="text-[11px] text-slate-500">پایش هوشمند مراجعات، نرخ ریزش و یادآوری‌های کلینیکی</p>
+                <p className="text-2xs text-slate-500">پایش هوشمند مراجعات، نرخ ریزش و یادآوری‌های کلینیکی</p>
               </div>
             </div>
             <Badge color={retentionSummary.retentionRatePercent >= 80 ? 'success' : retentionSummary.retentionRatePercent >= 60 ? 'warning' : 'error'}>
@@ -411,19 +411,19 @@ export default function Reminders() {
 
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
             <div className="p-2.5 rounded-xl bg-white/80 dark:bg-slate-800/80 border border-slate-200/60 dark:border-slate-700/60">
-              <span className="text-[11px] text-slate-500">بیماران وفادار</span>
+              <span className="text-2xs text-slate-500">بیماران وفادار</span>
               <p className="text-base font-extrabold text-emerald-600 mt-0.5">{toPersianDigits(retentionSummary.loyalCount)}</p>
             </div>
             <div className="p-2.5 rounded-xl bg-white/80 dark:bg-slate-800/80 border border-slate-200/60 dark:border-slate-700/60">
-              <span className="text-[11px] text-slate-500">پایدار و عادی</span>
+              <span className="text-2xs text-slate-500">پایدار و عادی</span>
               <p className="text-base font-extrabold text-primary-600 mt-0.5">{toPersianDigits(retentionSummary.stableCount)}</p>
             </div>
             <div className="p-2.5 rounded-xl bg-white/80 dark:bg-slate-800/80 border border-amber-200/60 dark:border-amber-900/40">
-              <span className="text-[11px] text-amber-600">در معرض ریزش</span>
+              <span className="text-2xs text-amber-600">در معرض ریزش</span>
               <p className="text-base font-extrabold text-amber-600 mt-0.5">{toPersianDigits(retentionSummary.atRiskCount)}</p>
             </div>
             <div className="p-2.5 rounded-xl bg-white/80 dark:bg-slate-800/80 border border-rose-200/60 dark:border-rose-900/40">
-              <span className="text-[11px] text-rose-600">ریزش‌کرده (بازگشت)</span>
+              <span className="text-2xs text-rose-600">ریزش‌کرده (بازگشت)</span>
               <p className="text-base font-extrabold text-rose-600 mt-0.5">{toPersianDigits(retentionSummary.churnedCount)}</p>
             </div>
           </div>
@@ -431,7 +431,7 @@ export default function Reminders() {
           {retentionSummary.atRiskPatients.length > 0 && (
             <div className="mt-3 pt-3 border-t border-indigo-100/60 dark:border-slate-700/60 flex items-center justify-between text-xs">
               <span className="text-amber-700 dark:text-amber-400 font-medium flex items-center gap-1">
-                <AlertTriangle size={13} className="shrink-0" />
+                <AlertTriangle size={14} className="shrink-0" />
                 {toPersianDigits(retentionSummary.atRiskPatients.length)} بیمار نیازمند ارتباط و پیگیری ویژه جهت پیشگیری از ریزش
               </span>
               <Button
@@ -459,9 +459,11 @@ export default function Reminders() {
       </div>
 
       {loading ? (
-        <div className="flex justify-center py-10"><Spinner size={24} /></div>
+        <div className="space-y-2" aria-busy="true" aria-live="polite">
+          {[0, 1, 2].map((i) => <div key={i} className="skeleton h-16 rounded-2xl" />)}
+        </div>
       ) : filteredItems.length === 0 ? (
-        <EmptyState icon={<CalendarClock size={28} />} title="یادآوری فعالی نیست" description="همه‌چیز تسویه و به‌روز است" />
+        <EmptyState icon={<CalendarClock size={56} />} title="یادآوری فعالی نیست" description="همه‌چیز تسویه و به‌روز است" />
       ) : (
         <div className="space-y-2">
           {filteredItems.map((it) => {
@@ -476,14 +478,21 @@ export default function Reminders() {
                   >
                     {meta.icon}
                   </div>
-                  <div className={`flex-1 min-w-0 ${it.manualSource ? 'cursor-pointer' : ''}`} onClick={it.manualSource ? () => openEditModal(it.manualSource!) : undefined}>
+                  <div
+                    className={`flex-1 min-w-0 ${it.manualSource ? 'cursor-pointer focus:outline-none focus:ring-2 focus:ring-primary-400 rounded-lg' : ''}`}
+                    role={it.manualSource ? 'button' : undefined}
+                    tabIndex={it.manualSource ? 0 : undefined}
+                    aria-label={it.manualSource ? `ویرایش یادآوری ${it.title} — ${it.patientName}` : undefined}
+                    onClick={it.manualSource ? () => openEditModal(it.manualSource!) : undefined}
+                    onKeyDown={it.manualSource ? (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); openEditModal(it.manualSource!) } } : undefined}
+                  >
                     <p className="text-sm font-bold text-slate-800 dark:text-slate-100 truncate">{it.title} — {it.patientName}</p>
-                    <p className="text-[11px] text-slate-400">
+                    <p className="text-2xs text-slate-400">
                       {toJalaliStringPretty(it.dueDate)}
                       {it.amount ? ` — ${formatCurrency(it.amount)} ت` : ''}
                       {isUrgent && <span className="text-error-600 font-bold"> — {it.daysLeft < 0 ? `${toPersianDigits(Math.abs(it.daysLeft))} روز تاخیر` : it.daysLeft === 0 ? 'امروز' : `${toPersianDigits(it.daysLeft)} روز مانده`}</span>}
                     </p>
-                    {it.manualSource?.notes && <p className="text-[11px] text-slate-400 mt-0.5">{it.manualSource.notes}</p>}
+                    {it.manualSource?.notes && <p className="text-2xs text-slate-400 mt-0.5">{it.manualSource.notes}</p>}
                   </div>
                   {it.manualSource ? (
                     <div className="flex items-center gap-1 shrink-0">
@@ -600,7 +609,7 @@ export default function Reminders() {
                             {profile.tierLabel} (امتیاز: {toPersianDigits(profile.score)}٪)
                           </Badge>
                         </div>
-                        <p className="text-[11px] text-slate-500 mt-0.5">
+                        <p className="text-2xs text-slate-500 mt-0.5">
                           آخرین حضور: {toPersianDigits(profile.daysSinceLastVisit)} روز پیش
                           {profile.outstandingBalance > 0 && ` — مانده بدهی: ${formatCurrency(profile.outstandingBalance)} تومان`}
                         </p>
@@ -614,7 +623,7 @@ export default function Reminders() {
                               className="p-2 rounded-xl bg-emerald-100 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 hover:bg-emerald-200 transition-colors"
                               title={`تماس تلفنی با ${fullName}`}
                             >
-                              <Phone size={15} />
+                              <Phone size={14} />
                             </a>
                             {cleanPhone && (
                               <a
@@ -624,7 +633,7 @@ export default function Reminders() {
                                 className="p-2 rounded-xl bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600 hover:bg-emerald-100 transition-colors"
                                 title="پیامک / پیام در واتساپ"
                               >
-                                <MessageSquare size={15} />
+                                <MessageSquare size={14} />
                               </a>
                             )}
                           </>
@@ -638,17 +647,17 @@ export default function Reminders() {
                           className="p-2 rounded-xl bg-primary-100 dark:bg-primary-950/60 text-primary-700 dark:text-primary-300 hover:bg-primary-200 transition-colors"
                           title="مشاهده پرونده کامل بیمار"
                         >
-                          <ExternalLink size={15} />
+                          <ExternalLink size={14} />
                         </button>
                       </div>
                     </div>
 
                     {profile.riskFactors && profile.riskFactors.length > 0 && (
                       <div className="mt-2 pt-2 border-t border-slate-200/60 dark:border-slate-800/60 space-y-1">
-                        <p className="text-[11px] font-bold text-slate-600 dark:text-slate-300">عوامل ریسک شناسایی‌شده:</p>
+                        <p className="text-2xs font-bold text-slate-600 dark:text-slate-300">عوامل ریسک شناسایی‌شده:</p>
                         <div className="flex flex-wrap gap-1">
                           {profile.riskFactors.map((rf, rIdx) => (
-                            <span key={rIdx} className="text-[10px] bg-white dark:bg-slate-850 px-2 py-0.5 rounded-md text-amber-700 dark:text-amber-300 border border-amber-200/70 dark:border-amber-900/40">
+                            <span key={rIdx} className="text-3xs bg-white dark:bg-slate-850 px-2 py-0.5 rounded-lg text-amber-700 dark:text-amber-300 border border-amber-200/70 dark:border-amber-900/40">
                               • {rf}
                             </span>
                           ))}
@@ -656,7 +665,7 @@ export default function Reminders() {
                       </div>
                     )}
 
-                    <div className="mt-2 text-[11px] text-slate-500 dark:text-slate-400 flex items-center gap-1 bg-white/60 dark:bg-slate-850/60 p-2 rounded-xl">
+                    <div className="mt-2 text-2xs text-slate-500 dark:text-slate-400 flex items-center gap-1 bg-white/60 dark:bg-slate-850/60 p-2 rounded-xl">
                       <span className="font-bold text-primary-600 dark:text-primary-400 shrink-0">اقدام پیشنهادی هوش بالینی:</span>
                       <span className="truncate">{profile.recommendedAction}</span>
                     </div>

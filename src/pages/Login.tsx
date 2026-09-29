@@ -19,7 +19,7 @@ function normalizeIranPhone(raw: string): string | null {
 }
 
 export default function Login() {
-  const { signIn, notice, isOffline, signInOffline, profile } = useAuth()
+  const { signIn, notice, isOffline } = useAuth()
   const [mode, setMode] = useState<Mode>('email')
   const [email, setEmail] = useState('')
   const [phone, setPhone] = useState('')
@@ -95,39 +95,14 @@ export default function Login() {
       <div className="w-full max-w-sm relative">
         <div className="flex flex-col items-center mb-4">
           <div className="mb-2.5">
-            <MinadentLogo size={54} />
+            <MinadentLogo size={56} />
           </div>
           <h1 className="text-xl font-black text-white tracking-tight">مینادنت</h1>
           <p className="text-xs text-slate-300 font-medium">سیستم جامع مدیریت کلینیک دندانپزشکی</p>
         </div>
 
-        <div className="rounded-3xl p-[1.5px] bg-gradient-to-br from-violet-400/60 via-fuchsia-400/40 to-sky-400/60 shadow-2xl">
-          <div className="bg-white/95 dark:bg-slate-900/90 backdrop-blur-xl rounded-[22px] p-4 sm:p-5">
-
-            {/* ورود سریع مدیریت کلینیک (تک لمسی بدون گیر کردن پشت سرور) */}
-            <button
-              type="button"
-              onClick={() => {
-                h.confirm()
-                chimes.playSuccess()
-                signInOffline('owner', 'مصطفی حسن‌وند', 'mostafa.hasanvand@gmail.com')
-              }}
-              className="w-full flex items-center justify-between px-3.5 py-2.5 mb-3.5 rounded-2xl bg-gradient-to-r from-amber-500/15 via-violet-500/10 to-sky-500/15 border border-amber-500/35 hover:border-amber-500/60 transition-all press-scale shadow-sm text-right group"
-            >
-              <div className="flex items-center gap-2.5">
-                <div className="w-8 h-8 rounded-xl bg-amber-500/20 text-amber-500 flex items-center justify-center text-sm font-bold shadow-inner group-hover:scale-105 transition-transform">
-                  👑
-                </div>
-                <div>
-                  <div className="text-xs font-extrabold text-slate-800 dark:text-slate-100 flex items-center gap-1.5">
-                    ورود سریع مدیر (مصطفی حسن‌وند)
-                    <span className="text-[10px] font-normal px-1.5 py-0.5 rounded-full bg-emerald-500/15 text-emerald-600 dark:text-emerald-400">آنی</span>
-                  </div>
-                  <div className="text-[11px] text-slate-500 dark:text-slate-400 font-mono" dir="ltr">mostafa.hasanvand@gmail.com</div>
-                </div>
-              </div>
-              <ArrowRight size={16} className="text-amber-500 group-hover:translate-x-0.5 transition-transform" />
-            </button>
+        <div className="rounded-2xl p-[1.5px] bg-gradient-to-br from-violet-400/60 via-fuchsia-400/40 to-sky-400/60 shadow-2xl">
+          <div className="bg-white/95 dark:bg-slate-900/90 backdrop-blur-xl rounded-ios-lg p-4 sm:p-5">
 
             {/* Mode toggle */}
             <div className="flex items-center gap-1 p-1 rounded-2xl bg-slate-100 dark:bg-slate-800 mb-3.5">
@@ -162,7 +137,7 @@ export default function Login() {
                         h.tap()
                         setEmail('mostafa.hasanvand@gmail.com')
                       }}
-                      className="text-[11px] text-violet-600 dark:text-violet-400 hover:underline font-mono"
+                      className="text-2xs text-violet-600 dark:text-violet-400 hover:underline font-mono"
                     >
                       mostafa.hasanvand@gmail.com ⚡
                     </button>
@@ -208,17 +183,6 @@ export default function Login() {
               {error && (
                 <div className="rounded-xl p-3 bg-error-50 dark:bg-error-900/20 border border-error-200 dark:border-error-800/40 text-error-700 dark:text-error-300 space-y-2">
                   <p className="text-xs font-medium leading-relaxed">{error}</p>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      h.confirm()
-                      chimes.playSuccess()
-                      signInOffline('owner', 'مصطفی حسن‌وند', email.trim().toLowerCase() || 'mostafa.hasanvand@gmail.com')
-                    }}
-                    className="w-full min-h-[40px] py-1.5 px-3 rounded-lg text-xs font-bold bg-amber-500/20 hover:bg-amber-500/30 text-amber-900 dark:text-amber-200 border border-amber-500/40 transition-all flex items-center justify-center gap-1.5"
-                  >
-                    ⚡ ورود اضطراری به حساب مدیریت (بدون معطلی)
-                  </button>
                 </div>
               )}
 
@@ -236,7 +200,7 @@ export default function Login() {
                   type="button"
                   onClick={handleForgotPassword}
                   disabled={resetLoading}
-                  className="text-[11px] text-violet-600 dark:text-violet-400 hover:underline"
+                  className="text-2xs text-violet-600 dark:text-violet-400 hover:underline"
                 >
                   {resetLoading ? 'در حال ارسال...' : 'فراموشی رمز عبور؟'}
                 </button>
@@ -246,42 +210,17 @@ export default function Login() {
                 {loading ? <Loader2 size={16} className="animate-spin" /> : <>ورود به کلینیک <ArrowRight size={16} /></>}
               </Button>
 
-              {/* بخش ورود محلی و آفلاین بر اساس نقش پرسنل */}
-              <div className="pt-3 border-t border-slate-100 dark:border-slate-800 text-center space-y-2">
-                <p className="text-[11px] text-slate-500 dark:text-slate-400 font-medium">
-                  {isOffline ? '🌐 اتصال آنلاین نیست — ورود محلی با نقش سازمانی:' : '⚡ ورود سریع پرسنل (دسترسی مستقیم):'}
+              {/* MOD-SEC-011/012: no one-tap role buttons here anymore — a
+                  password-free login can never be both real (DB-verifiable)
+                  and safe. If the device is genuinely offline and this
+                  identity has logged in here before, signIn() above already
+                  re-enters that cached role locally; there is nothing more
+                  to offer without a network to authenticate over. */}
+              {isOffline && (
+                <p className="text-2xs text-slate-500 dark:text-slate-400 font-medium text-center pt-3 border-t border-slate-100 dark:border-slate-800">
+                  🌐 اتصال آنلاین نیست — اگر قبلاً با همین حساب وارد شده‌اید، دوباره با ایمیل و رمز عبور خود وارد شوید
                 </p>
-                <div className="grid grid-cols-2 gap-1.5">
-                  <button
-                    type="button"
-                    onClick={() => { h.confirm(); signInOffline('owner', 'مصطفی حسن‌وند', 'mostafa.hasanvand@gmail.com') }}
-                    className="min-h-[44px] p-2 rounded-xl text-xs font-bold bg-amber-500/10 hover:bg-amber-500/20 text-amber-800 dark:text-amber-300 border border-amber-500/30 transition-all press-scale flex items-center justify-center gap-1.5"
-                  >
-                    👑 مدیر کلینیک
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => { h.confirm(); signInOffline('doctor', 'پزشک کلینیک') }}
-                    className="min-h-[44px] p-2 rounded-xl text-xs font-bold bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-800 dark:text-emerald-300 border border-emerald-500/30 transition-all press-scale flex items-center justify-center gap-1.5"
-                  >
-                    🩺 پزشک کلینیک
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => { h.confirm(); signInOffline('receptionist', 'پذیرش و منشی') }}
-                    className="min-h-[44px] p-2 rounded-xl text-xs font-bold bg-sky-500/10 hover:bg-sky-500/20 text-sky-800 dark:text-sky-300 border border-sky-500/30 transition-all press-scale flex items-center justify-center gap-1.5"
-                  >
-                    📋 پذیرش و منشی
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => { h.confirm(); signInOffline('assistant', 'دستیار دندانپزشک') }}
-                    className="min-h-[44px] p-2 rounded-xl text-xs font-bold bg-purple-500/10 hover:bg-purple-500/20 text-purple-800 dark:text-purple-300 border border-purple-500/30 transition-all press-scale flex items-center justify-center gap-1.5"
-                  >
-                    🥼 دستیار دندانپزشک
-                  </button>
-                </div>
-              </div>
+              )}
             </form>
           </div>
         </div>

@@ -68,7 +68,7 @@ export function PatientDebtBar({ patientId, balance, familyBalance, variant = 'f
     if (variant === 'compact') return null
     return (
       <div className="flex items-center gap-2 px-3 py-2 rounded-xl bg-success-50 dark:bg-success-900/20">
-        <Wallet size={15} className="text-success-600 shrink-0" />
+        <Wallet size={14} className="text-success-600 shrink-0" />
         <span className="text-xs font-medium text-success-700 dark:text-success-400">
           تسویه — مانده‌حساب صفر
         </span>
@@ -82,14 +82,14 @@ export function PatientDebtBar({ patientId, balance, familyBalance, variant = 'f
         type="button"
         onClick={goToPayment}
         aria-label={`ثبت پرداخت — مانده ${formatCurrency(owed)} تومان`}
-        className="flex flex-col items-end gap-0.5 px-2 py-1 rounded-lg bg-error-50 dark:bg-error-900/20 text-error-700 dark:text-error-400 text-[11px] font-bold shrink-0 press-scale"
+        className="flex flex-col items-end gap-0.5 px-2 py-1 rounded-lg bg-error-50 dark:bg-error-900/20 text-error-700 dark:text-error-400 text-2xs font-bold shrink-0 press-scale"
       >
         <div className="flex items-center gap-1">
           <CreditCard size={12} />
           {formatCurrency(owed)} ت
         </div>
         {familyOwed > 0 && familyOwed !== owed && (
-          <span className="text-[9px] text-error-500 opacity-80 font-normal">خانواده: {formatCurrency(familyOwed)} ت</span>
+          <span className="text-4xs text-error-500 opacity-80 font-normal">خانواده: {formatCurrency(familyOwed)} ت</span>
         )}
       </button>
     )
@@ -100,14 +100,14 @@ export function PatientDebtBar({ patientId, balance, familyBalance, variant = 'f
       {owed > 0 && (
         <div className="flex items-center justify-between gap-3 px-3 py-2.5 rounded-xl bg-error-50 dark:bg-error-900/20 border border-error-100 dark:border-error-800">
           <div className="min-w-0">
-            <p className="text-[11px] text-error-600 dark:text-error-400">مانده‌حساب شخصی</p>
+            <p className="text-2xs text-error-600 dark:text-error-400">مانده‌حساب شخصی</p>
             <p className="text-sm font-bold text-error-700 dark:text-error-300">
               {formatCurrency(owed)} تومان
             </p>
             {/* The two halves of the balance, so the number above can be
                 checked rather than trusted. */}
             {balance && (
-              <p className="text-[10px] text-slate-500 mt-0.5">
+              <p className="text-3xs text-slate-500 mt-0.5">
                 هزینه {formatCurrency(balance.totalCost)} — پرداختی {formatCurrency(balance.paid)}
               </p>
             )}
@@ -126,12 +126,12 @@ export function PatientDebtBar({ patientId, balance, familyBalance, variant = 'f
       {familyOwed > 0 && familyOwed !== owed && (
         <div className="flex items-center justify-between gap-3 px-3 py-2.5 rounded-xl bg-warning-50 dark:bg-warning-900/20 border border-warning-100 dark:border-warning-800">
           <div className="min-w-0">
-            <p className="text-[11px] text-warning-700 dark:text-warning-400">مانده‌حساب خانواده</p>
+            <p className="text-2xs text-warning-700 dark:text-warning-400">مانده‌حساب خانواده</p>
             <p className="text-sm font-bold text-warning-800 dark:text-warning-300">
               {formatCurrency(familyOwed)} تومان
             </p>
             {familyBalance && (
-              <p className="text-[10px] text-warning-600/80 mt-0.5">
+              <p className="text-3xs text-warning-600/80 mt-0.5">
                 مجموع هزینه {formatCurrency(familyBalance.totalCost)} — مجموع پرداختی {formatCurrency(familyBalance.paid)}
               </p>
             )}
@@ -166,7 +166,7 @@ export function PatientChequeRows({ patientId, cheques }: { patientId: string; c
       {s.inFlight.count > 0 && (
         <button type="button" onClick={open} className="w-full flex items-center gap-2 px-3 py-2 rounded-xl bg-warning-50 dark:bg-warning-900/20 text-right press-scale">
           <Banknote size={14} className="text-warning-600 shrink-0" />
-          <span className="text-[11px] text-warning-800 dark:text-warning-300">
+          <span className="text-2xs text-warning-800 dark:text-warning-300">
             {toPersianDigits(s.inFlight.count)} چک در جریان — {formatCurrency(s.inFlight.total)} ت
             {s.inFlight.nextDue && ` · نزدیک‌ترین سررسید ${toJalaliStringPretty(s.inFlight.nextDue)}`}
           </span>
@@ -176,7 +176,7 @@ export function PatientChequeRows({ patientId, cheques }: { patientId: string; c
       {s.guarantee.count > 0 && (
         <button type="button" onClick={open} className="w-full flex items-center gap-2 px-3 py-2 rounded-xl bg-slate-100 dark:bg-slate-800 text-right press-scale">
           <ShieldAlert size={14} className="text-slate-500 shrink-0" />
-          <span className="text-[11px] text-slate-700 dark:text-slate-300">
+          <span className="text-2xs text-slate-700 dark:text-slate-300">
             {toPersianDigits(s.guarantee.count)} چک ضمانت — {formatCurrency(s.guarantee.total)} ت
             {/* Collateral with no schedule behind it is collateral nobody
                 is collecting on. Taking the cheque is only half the act. */}
@@ -188,7 +188,7 @@ export function PatientChequeRows({ patientId, cheques }: { patientId: string; c
       {s.bounced.count > 0 && (
         <button type="button" onClick={open} className="w-full flex items-center gap-2 px-3 py-2 rounded-xl bg-error-100 dark:bg-error-900/30 text-right press-scale">
           <ShieldAlert size={14} className="text-error-600 shrink-0" />
-          <span className="text-[11px] font-bold text-error-700 dark:text-error-300">
+          <span className="text-2xs font-bold text-error-700 dark:text-error-300">
             {toPersianDigits(s.bounced.count)} چک برگشتی — {formatCurrency(s.bounced.total)} ت
           </span>
         </button>

@@ -25,6 +25,7 @@ import { evaluateClinicalPrerequisites, PrerequisiteEvaluation } from '../lib/cl
 import { groupPhasesByPlan, comparePlanOptions, generateComparativePlanPrintData, PlanOptionSummary } from '../lib/alternativePlans'
 import { useConfirmAction } from '../components/ConfirmAction'
 import { h } from '../lib/haptics'
+import { useBackDismiss } from '../lib/useBackDismiss'
 import { chimes } from '../lib/chimes'
 import { calculateAge } from '../lib/patientUtils'
 import { db } from '../lib/db'
@@ -166,13 +167,13 @@ function OverviewAccordion({ title, icon, accent, children, className = '' }: {
   className?: string
 }) {
   return (
-    <details className={`group rounded-3xl bg-white/95 dark:bg-slate-900/90 backdrop-blur-xl border border-slate-200/80 dark:border-slate-800 shadow-sm overflow-hidden ${className}`}>
+    <details className={`group rounded-2xl bg-white/95 dark:bg-slate-900/90 backdrop-blur-xl border border-slate-200/80 dark:border-slate-800 shadow-sm overflow-hidden ${className}`}>
       <summary className="list-none [&::-webkit-details-marker]:hidden cursor-pointer flex items-center justify-between gap-3 px-5 py-3.5 min-h-[60px] text-sm font-bold text-slate-800 dark:text-slate-100 select-none">
         <span className="flex items-center gap-2 min-w-0">
           <span className={`p-2 rounded-xl shrink-0 ${accent}`}>{icon}</span>
           <span>{title}</span>
         </span>
-        <ChevronLeft size={17} className="text-slate-400 shrink-0 transition-transform group-open:-rotate-90" />
+        <ChevronLeft size={18} className="text-slate-400 shrink-0 transition-transform group-open:-rotate-90" />
       </summary>
       <div className="px-5 pb-5 pt-1 border-t border-slate-100 dark:border-slate-800">
         {children}
@@ -226,6 +227,11 @@ export default function PatientDetail() {
 
   const [mainTab, setMainTab] = useState<'overview' | 'clinical' | 'appointments' | 'finance_docs'>(getInitialMainTab(initial) as any)
   const [subView, setSubView] = useState<string | null>(['overview', 'appointments'].includes(initial) ? null : initial)
+
+  // iOS edge-swipe-back / Android back gesture returns to the sub-view menu
+  // instead of leaving the patient detail page entirely — this sub-view is
+  // in-page state, not a separate route, so it needs its own history entry.
+  useBackDismiss(subView !== null, () => setSubView(null))
   const switchTab = (tab: string) => {
     setMainTab(getInitialMainTab(tab) as any)
     setSubView(['overview', 'appointments'].includes(tab) ? null : tab)
@@ -1600,7 +1606,7 @@ export default function PatientDetail() {
 
     return (
       <div>
-        <div className={`rounded-3xl bg-white/90 dark:bg-slate-900/90 backdrop-blur-xl border-2 ${theme.border} p-4 sm:p-5 shadow-lg transition-all space-y-3`}>
+        <div className={`rounded-2xl bg-white/90 dark:bg-slate-900/90 backdrop-blur-xl border-2 ${theme.border} p-4 sm:p-5 shadow-lg transition-all space-y-3`}>
           {!patient.is_active && (
             <div className="p-2.5 rounded-xl bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 flex items-center justify-between gap-2 flex-wrap text-xs">
               <div className="flex items-center gap-2 text-amber-800 dark:text-amber-200">
@@ -1650,11 +1656,11 @@ export default function PatientDetail() {
                       dir="ltr"
                       title="شماره پرونده بالینی بیمار"
                     >
-                      <FileText size={13} className="opacity-80 shrink-0" />
+                      <FileText size={14} className="opacity-80 shrink-0" />
                       <span>#{toPersianDigits(patient.file_number)}</span>
                     </span>
                   ) : (
-                    <span className="font-mono text-[11px] font-medium px-2.5 py-1 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-500 border border-slate-200 dark:border-slate-700">
+                    <span className="font-mono text-2xs font-medium px-2.5 py-1 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-500 border border-slate-200 dark:border-slate-700">
                       شناسه: {toPersianDigits(patient.id.slice(0, 6))}
                     </span>
                   )}
@@ -1672,13 +1678,13 @@ export default function PatientDetail() {
                   {age !== null && <span className="font-medium">{toPersianDigits(age)} ساله</span>}
                   {patient.gender && <span>{patient.gender === 'male' ? '• آقا' : '• خانم'}</span>}
                   {patient.blood_type && (
-                    <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md text-[10px] font-bold bg-rose-100/80 text-rose-700 dark:bg-rose-950/50 dark:text-rose-300">
+                    <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-lg text-3xs font-bold bg-rose-100/80 text-rose-700 dark:bg-rose-950/50 dark:text-rose-300">
                       <span className="w-1.5 h-1.5 rounded-full bg-rose-500" />
                       {patient.blood_type}
                     </span>
                   )}
                   {patient.national_id && (
-                    <span className="font-mono text-[11px] text-slate-500" dir="ltr">
+                    <span className="font-mono text-2xs text-slate-500" dir="ltr">
                       کد ملی: {maskNationalId(patient.national_id)}
                     </span>
                   )}
@@ -1690,19 +1696,19 @@ export default function PatientDetail() {
                       <a
                         href={`tel:${patient.phone}`}
                         onClick={() => { h.tap(); chimes.playPop() }}
-                        className="raised-surface icon-blink inline-flex items-center gap-1 px-2 py-1 min-h-[40px] rounded-lg bg-teal-100 hover:bg-teal-200 text-teal-700 dark:bg-teal-950/40 dark:text-teal-300 text-[11px] font-bold press-scale"
+                        className="raised-surface icon-blink inline-flex items-center gap-1 px-2 py-1 min-h-[40px] rounded-lg bg-teal-100 hover:bg-teal-200 text-teal-700 dark:bg-teal-950/40 dark:text-teal-300 text-2xs font-bold press-scale"
                         title="تماس تلفنی مستقیم با بیمار"
                       >
-                        <PhoneCall size={11} className="text-teal-600" />
+                        <PhoneCall size={12} className="text-teal-600" />
                         <span>تماس</span>
                       </a>
                       <a
                         href={`sms:${patient.phone}`}
                         onClick={() => { h.tap(); chimes.playPop() }}
-                        className="raised-surface icon-blink inline-flex items-center gap-1 px-2 py-1 min-h-[40px] rounded-lg bg-sky-100 hover:bg-sky-200 text-sky-700 dark:bg-sky-950/40 dark:text-sky-300 text-[11px] font-bold press-scale"
+                        className="raised-surface icon-blink inline-flex items-center gap-1 px-2 py-1 min-h-[40px] rounded-lg bg-sky-100 hover:bg-sky-200 text-sky-700 dark:bg-sky-950/40 dark:text-sky-300 text-2xs font-bold press-scale"
                         title="ارسال پیامک به بیمار"
                       >
-                        <MessageSquare size={11} className="text-sky-600" />
+                        <MessageSquare size={12} className="text-sky-600" />
                         <span>پیامک</span>
                       </a>
                       <a
@@ -1710,10 +1716,10 @@ export default function PatientDetail() {
                         target="_blank"
                         rel="noopener noreferrer"
                         onClick={() => { h.tap(); chimes.playPop() }}
-                        className="raised-surface icon-blink inline-flex items-center gap-1 px-2 py-1 min-h-[40px] rounded-lg bg-emerald-100 hover:bg-emerald-200 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300 text-[11px] font-bold press-scale"
+                        className="raised-surface icon-blink inline-flex items-center gap-1 px-2 py-1 min-h-[40px] rounded-lg bg-emerald-100 hover:bg-emerald-200 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300 text-2xs font-bold press-scale"
                         title="گفتگو در واتساپ"
                       >
-                        <MessageCircle size={11} className="text-emerald-600" />
+                        <MessageCircle size={12} className="text-emerald-600" />
                         <span>واتساپ</span>
                       </a>
                     </div>
@@ -1734,7 +1740,7 @@ export default function PatientDetail() {
                   className="raised-surface icon-blink flex items-center gap-1 px-2.5 py-1.5 min-h-[44px] rounded-xl bg-amber-100 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800 text-amber-800 dark:text-amber-300 text-xs font-bold hover:bg-amber-100 press-scale"
                   title="مشاهده چک‌ها"
                 >
-                  <FileSignature size={13} className="text-amber-600" />
+                  <FileSignature size={14} className="text-amber-600" />
                   <span>{toPersianDigits(cheques.length)} چک</span>
                 </button>
               )}
@@ -1743,7 +1749,7 @@ export default function PatientDetail() {
                 <div className="raised-surface flex items-center gap-2 px-3 py-1.5 rounded-2xl bg-rose-100 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-800 text-rose-900 dark:text-rose-200 text-xs">
                   <CreditCard size={14} className="text-rose-600 dark:text-rose-400 shrink-0" />
                   <div>
-                    <span className="text-[10px] text-rose-500 block leading-none">بدهی بیمار</span>
+                    <span className="text-3xs text-rose-500 block leading-none">بدهی بیمار</span>
                     <span className="font-extrabold">{formatCurrency(patientBalance.balance)} ت</span>
                   </div>
                   <button
@@ -1752,7 +1758,7 @@ export default function PatientDetail() {
                       h.tap()
                       handleOpenPaymentModal()
                     }}
-                    className="raised-surface px-2.5 py-1 min-h-[44px] rounded-xl bg-amber-700 hover:bg-amber-800 text-white font-bold text-[11px] press-scale"
+                    className="raised-surface px-2.5 py-1 min-h-[44px] rounded-xl bg-amber-700 hover:bg-amber-800 text-white font-bold text-2xs press-scale"
                   >
                     تسویه
                   </button>
@@ -1775,45 +1781,45 @@ export default function PatientDetail() {
           )}
 
           {(hasAllergies || hasConditions || hasMedications || patient.anticoagulant_use || patient.bisphosphonate_use || patient.endocarditis_prophylaxis || (patient.bp_systolic != null && patient.bp_systolic >= 140) || (patient.diabetes_hba1c != null && patient.diabetes_hba1c >= 7) || (patient.pregnancy_trimester != null && patient.pregnancy_trimester > 0)) && (
-            <div className="flex items-center gap-1.5 overflow-x-auto py-1 scrollbar-none text-[11px]">
+            <div className="flex items-center gap-1.5 overflow-x-auto py-1 scrollbar-none text-2xs">
               {hasAllergies && (
                 <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-rose-50 dark:bg-rose-950/50 text-rose-700 dark:text-rose-300 border border-rose-200 dark:border-rose-800 shrink-0 font-bold">
-                  <AlertCircle size={11} className="text-rose-600" /> حساسیت: {patient.allergies}
+                  <AlertCircle size={12} className="text-rose-600" /> حساسیت: {patient.allergies}
                 </span>
               )}
               {hasConditions && (
                 <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-amber-50 dark:bg-amber-950/50 text-amber-700 dark:text-amber-300 border border-amber-200 dark:border-amber-800 shrink-0 font-bold">
-                  <AlertCircle size={11} className="text-amber-600" /> بیماری: {patient.medical_conditions}
+                  <AlertCircle size={12} className="text-amber-600" /> بیماری: {patient.medical_conditions}
                 </span>
               )}
               {hasMedications && (
                 <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-sky-50 dark:bg-sky-950/50 text-sky-700 dark:text-sky-300 border border-sky-200 dark:border-sky-800 shrink-0 font-medium">
-                  <Pill size={11} className="text-sky-600" /> دارو: {patient.medications}
+                  <Pill size={12} className="text-sky-600" /> دارو: {patient.medications}
                 </span>
               )}
               {patient.anticoagulant_use && (
                 <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-red-100 dark:bg-red-950/60 text-red-800 dark:text-red-200 border border-red-300 shrink-0 font-bold animate-pulse">
-                  <AlertTriangle size={11} className="text-red-600" /> ضد انعقاد {patient.inr_value ? `(INR: ${toPersianDigits(patient.inr_value)})` : ''}
+                  <AlertTriangle size={12} className="text-red-600" /> ضد انعقاد {patient.inr_value ? `(INR: ${toPersianDigits(patient.inr_value)})` : ''}
                 </span>
               )}
               {patient.bisphosphonate_use && (
                 <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-purple-50 dark:bg-purple-950/60 text-purple-800 dark:text-purple-200 border border-purple-300 shrink-0 font-bold">
-                  <AlertTriangle size={11} className="text-purple-600" /> مصرف بیس‌فسفونات (خطر ONJ)
+                  <AlertTriangle size={12} className="text-purple-600" /> مصرف بیس‌فسفونات (خطر ONJ)
                 </span>
               )}
               {patient.endocarditis_prophylaxis && (
                 <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-amber-100 dark:bg-amber-950/60 text-amber-800 dark:text-amber-200 border border-amber-300 shrink-0 font-bold">
-                  <HeartPulse size={11} className="text-amber-600" /> اندوکاردیت (پروفیلاکسی)
+                  <HeartPulse size={12} className="text-amber-600" /> اندوکاردیت (پروفیلاکسی)
                 </span>
               )}
               {patient.bp_systolic != null && patient.bp_systolic >= 140 && (
                 <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-amber-50 dark:bg-amber-950/50 text-amber-800 dark:text-amber-300 border border-amber-300 shrink-0 font-medium">
-                  <Activity size={11} className="text-amber-600" /> فشار خون: {toPersianDigits(patient.bp_systolic)}/{toPersianDigits(patient.bp_diastolic || 90)}
+                  <Activity size={12} className="text-amber-600" /> فشار خون: {toPersianDigits(patient.bp_systolic)}/{toPersianDigits(patient.bp_diastolic || 90)}
                 </span>
               )}
               {patient.diabetes_hba1c != null && patient.diabetes_hba1c >= 7 && (
                 <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-amber-50 dark:bg-amber-950/50 text-amber-800 dark:text-amber-300 border border-amber-300 shrink-0 font-medium">
-                  <Activity size={11} className="text-amber-600" /> دیابت (HbA1c: {toPersianDigits(patient.diabetes_hba1c)}٪)
+                  <Activity size={12} className="text-amber-600" /> دیابت (HbA1c: {toPersianDigits(patient.diabetes_hba1c)}٪)
                 </span>
               )}
             </div>
@@ -1828,7 +1834,7 @@ export default function PatientDetail() {
                   سفارش فعال لابراتوار: {activeLabOrder.work_type || 'پروتز/روکش'}
                   {activeLabOrder.tooth_number ? ` (دندان ${toothLabel(activeLabOrder.tooth_number)})` : ''}
                 </span>
-                <span className="text-[11px] text-cyan-700 dark:text-cyan-300 hidden sm:inline">
+                <span className="text-2xs text-cyan-700 dark:text-cyan-300 hidden sm:inline">
                   وضعیت: {activeLabOrder.status === 'in_progress' ? 'در حال ساخت' : activeLabOrder.status === 'sent' ? 'ارسال‌شده به لابراتوار' : activeLabOrder.status}
                   {activeLabOrder.deadline ? ` — موعد: ${toJalaliStringPretty(activeLabOrder.deadline)}` : ''}
                 </span>
@@ -1839,7 +1845,7 @@ export default function PatientDetail() {
                   h.tap()
                   switchTab('labOrders')
                 }}
-                className="px-2.5 py-1 rounded-xl bg-cyan-600 hover:bg-cyan-700 text-white font-bold text-[10px] shrink-0 transition-colors press-scale"
+                className="px-2.5 py-1 rounded-xl bg-cyan-600 hover:bg-cyan-700 text-white font-bold text-3xs shrink-0 transition-colors press-scale"
               >
                 پیگیری کارتابل
               </button>
@@ -1864,7 +1870,7 @@ export default function PatientDetail() {
                 }}
                 className="appointment-primary icon-blink flex items-center justify-center gap-1.5 px-3 py-2.5 rounded-2xl text-xs font-bold press-scale min-h-[72px]"
               >
-                <patientConcepts.appointments.icon size={19} className="shrink-0" /> <span className="truncate">نوبت جدید</span>
+                <patientConcepts.appointments.icon size={18} className="shrink-0" /> <span className="truncate">نوبت جدید</span>
               </button>
 
               {/* Document & Paper Chart Camera Scanner */}
@@ -1878,7 +1884,7 @@ export default function PatientDetail() {
                 className="raised-surface icon-blink flex items-center justify-center gap-1.5 px-3 py-2.5 rounded-2xl text-xs font-bold bg-gradient-to-r from-sky-600 to-blue-600 text-white press-scale min-h-[48px]"
                 title="عکس‌برداری با دوربین گوشی و اسکن پرونده کاغذی، اسناد یا رادیولوژی"
               >
-                <Camera size={15} className="shrink-0" /> <span className="truncate">اسکن مدارک / رادیولوژی</span>
+                <Camera size={14} className="shrink-0" /> <span className="truncate">اسکن مدارک / رادیولوژی</span>
               </button>
 
               {/* Visit / Treatment */}
@@ -1890,7 +1896,7 @@ export default function PatientDetail() {
                 }}
                 className="flex items-center justify-center gap-1.5 px-3 py-2.5 rounded-2xl text-xs font-bold bg-gradient-to-r from-violet-600 to-indigo-600 hover:from-violet-700 hover:to-indigo-700 text-white shadow-xs press-scale min-h-[48px]"
               >
-                <Stethoscope size={15} className="shrink-0" /> <span className="truncate">ثبت درمان</span>
+                <Stethoscope size={14} className="shrink-0" /> <span className="truncate">ثبت درمان</span>
               </button>
 
               {/* Dental Chart (FDI) */}
@@ -1902,7 +1908,7 @@ export default function PatientDetail() {
                 }}
                 className="flex items-center justify-center gap-1.5 px-3 py-2.5 rounded-2xl text-xs font-bold bg-white dark:bg-slate-800 text-teal-700 dark:text-teal-300 border border-teal-200 dark:border-teal-800 hover:bg-teal-50 dark:hover:bg-teal-900/60 press-scale shadow-xs min-h-[48px]"
               >
-                <patientConcepts.directory.icon size={19} className="text-teal-700 shrink-0" /> <span className="truncate">چارت دندان</span>
+                <patientConcepts.directory.icon size={18} className="text-teal-700 shrink-0" /> <span className="truncate">چارت دندان</span>
               </button>
 
               {/* Payment */}
@@ -1914,7 +1920,7 @@ export default function PatientDetail() {
                 }}
                 className="raised-surface icon-blink flex items-center justify-center gap-1.5 px-3 py-2.5 rounded-2xl text-xs font-bold bg-amber-100 dark:bg-amber-950/40 text-amber-800 dark:text-amber-300 border border-amber-200 dark:border-amber-800 press-scale min-h-[48px]"
               >
-                <patientConcepts.plans.icon size={19} className="text-amber-700 shrink-0" /> <span className="truncate">دریافت وجه</span>
+                <patientConcepts.plans.icon size={18} className="text-amber-700 shrink-0" /> <span className="truncate">دریافت وجه</span>
               </button>
 
               {/* Sayad Cheque */}
@@ -1926,7 +1932,7 @@ export default function PatientDetail() {
                 }}
                 className="flex items-center justify-center gap-1.5 px-3 py-2.5 rounded-2xl text-xs font-bold bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-300 border border-amber-200 dark:border-amber-800 hover:bg-amber-100 dark:hover:bg-amber-900/60 press-scale shadow-xs min-h-[48px]"
               >
-                <patientConcepts.plans.icon size={19} className="text-amber-700 shrink-0" /> <span className="truncate">ثبت چک صیادی</span>
+                <patientConcepts.plans.icon size={18} className="text-amber-700 shrink-0" /> <span className="truncate">ثبت چک صیادی</span>
               </button>
 
               {/* Prescription */}
@@ -1944,7 +1950,7 @@ export default function PatientDetail() {
                 }}
                 className="flex items-center justify-center gap-1.5 px-3 py-2.5 rounded-2xl text-xs font-bold bg-purple-50 dark:bg-purple-950/40 text-purple-700 dark:text-purple-300 border border-purple-200 dark:border-purple-800 hover:bg-purple-100 dark:hover:bg-purple-900/60 press-scale shadow-xs min-h-[48px]"
               >
-                <Pill size={15} className="text-purple-600 shrink-0" /> <span className="truncate">صدور نسخه</span>
+                <Pill size={14} className="text-purple-600 shrink-0" /> <span className="truncate">صدور نسخه</span>
               </button>
 
               {/* Lab Order */}
@@ -1956,7 +1962,7 @@ export default function PatientDetail() {
                 }}
                 className="flex items-center justify-center gap-1.5 px-3 py-2.5 rounded-2xl text-xs font-bold bg-cyan-50 dark:bg-cyan-950/40 text-cyan-700 dark:text-cyan-300 border border-cyan-200 dark:border-cyan-800 hover:bg-cyan-100 dark:hover:bg-cyan-900/60 press-scale shadow-xs min-h-[48px]"
               >
-                <patientConcepts.lab.icon size={19} className="text-cyan-700 shrink-0" /> <span className="truncate">سفارش لابراتوار</span>
+                <patientConcepts.lab.icon size={18} className="text-cyan-700 shrink-0" /> <span className="truncate">سفارش لابراتوار</span>
               </button>
 
               {/* Implant Case */}
@@ -1968,7 +1974,7 @@ export default function PatientDetail() {
                 }}
                 className="flex items-center justify-center gap-1.5 px-3 py-2.5 rounded-2xl text-xs font-bold bg-blue-50 dark:bg-blue-950/40 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-800 hover:bg-blue-100 dark:hover:bg-blue-900/60 press-scale shadow-xs min-h-[48px]"
               >
-                <patientConcepts.implants.icon size={19} className="text-indigo-700 shrink-0" /> <span className="truncate">پرونده ایمپلنت</span>
+                <patientConcepts.implants.icon size={18} className="text-indigo-700 shrink-0" /> <span className="truncate">پرونده ایمپلنت</span>
               </button>
 
               {/* Print Record */}
@@ -1977,7 +1983,7 @@ export default function PatientDetail() {
                 onClick={handlePrintFullChart}
                 className="flex items-center justify-center gap-1.5 px-3 py-2.5 rounded-2xl text-xs font-bold bg-indigo-50 dark:bg-indigo-950/40 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800 hover:bg-indigo-100 dark:hover:bg-indigo-900/60 press-scale shadow-xs min-h-[48px]"
               >
-                <Printer size={15} className="text-indigo-600 dark:text-indigo-400 shrink-0" /> <span className="truncate">چاپ پرونده</span>
+                <Printer size={14} className="text-indigo-600 dark:text-indigo-400 shrink-0" /> <span className="truncate">چاپ پرونده</span>
               </button>
 
               {/* Edit File */}
@@ -2028,7 +2034,7 @@ export default function PatientDetail() {
                 }}
                 className="flex items-center justify-center gap-1.5 px-3 py-2.5 rounded-2xl text-xs font-bold bg-sky-50 dark:bg-sky-950/40 text-sky-700 dark:text-sky-300 border border-sky-200 dark:border-sky-800 hover:bg-sky-100 dark:hover:bg-sky-900/60 press-scale min-h-[48px]"
               >
-                <Edit2 size={15} className="shrink-0" /> <span className="truncate">ویرایش پرونده</span>
+                <Edit2 size={14} className="shrink-0" /> <span className="truncate">ویرایش پرونده</span>
               </button>
             </div>
           </div>
@@ -2140,7 +2146,7 @@ export default function PatientDetail() {
               value={patient.medical_history ? (
                 <span>{patient.medical_history}</span>
               ) : (
-                <span className="text-[11px] text-slate-400 dark:text-slate-500 font-normal">فاقد سوابق جراحی یا بستری قبلی</span>
+                <span className="text-2xs text-slate-400 dark:text-slate-500 font-normal">فاقد سوابق جراحی یا بستری قبلی</span>
               )}
             />
             <InfoRow
@@ -2148,8 +2154,8 @@ export default function PatientDetail() {
               value={patient.allergies ? (
                 <span className="text-rose-600 dark:text-rose-400 font-bold">{patient.allergies}</span>
               ) : (
-                <span className="inline-flex items-center gap-1 text-[11px] font-bold text-emerald-700 dark:text-emerald-300 bg-emerald-50 dark:bg-emerald-950/40 px-2 py-0.5 rounded-lg border border-emerald-200/60 dark:border-emerald-800/40">
-                  <CheckCircle2 size={11} className="text-emerald-600" /> فاقد حساسیت دارویی گزارش‌شده
+                <span className="inline-flex items-center gap-1 text-2xs font-bold text-emerald-700 dark:text-emerald-300 bg-emerald-50 dark:bg-emerald-950/40 px-2 py-0.5 rounded-lg border border-emerald-200/60 dark:border-emerald-800/40">
+                  <CheckCircle2 size={12} className="text-emerald-600" /> فاقد حساسیت دارویی گزارش‌شده
                 </span>
               )}
             />
@@ -2158,7 +2164,7 @@ export default function PatientDetail() {
               value={patient.medications ? (
                 <span className="text-sky-700 dark:text-sky-300 font-semibold">{patient.medications}</span>
               ) : (
-                <span className="text-[11px] text-slate-400 dark:text-slate-500 font-normal">عدم مصرف داروی مزمن</span>
+                <span className="text-2xs text-slate-400 dark:text-slate-500 font-normal">عدم مصرف داروی مزمن</span>
               )}
             />
             <InfoRow
@@ -2166,8 +2172,8 @@ export default function PatientDetail() {
               value={patient.medical_conditions ? (
                 <span className="text-amber-600 dark:text-amber-400 font-bold">{patient.medical_conditions}</span>
               ) : (
-                <span className="inline-flex items-center gap-1 text-[11px] font-bold text-emerald-700 dark:text-emerald-300 bg-emerald-50 dark:bg-emerald-950/40 px-2 py-0.5 rounded-lg border border-emerald-200/60 dark:border-emerald-800/40">
-                  <CheckCircle2 size={11} className="text-emerald-600" /> بدون بیماری سیستمیک ثبت‌شده
+                <span className="inline-flex items-center gap-1 text-2xs font-bold text-emerald-700 dark:text-emerald-300 bg-emerald-50 dark:bg-emerald-950/40 px-2 py-0.5 rounded-lg border border-emerald-200/60 dark:border-emerald-800/40">
+                  <CheckCircle2 size={12} className="text-emerald-600" /> بدون بیماری سیستمیک ثبت‌شده
                 </span>
               )}
             />
@@ -2230,11 +2236,11 @@ export default function PatientDetail() {
             <div className="pt-3 mt-3 border-t border-slate-100 dark:border-slate-800">
               <div className="grid grid-cols-2 gap-2.5">
                 <div className="p-3 rounded-2xl bg-gradient-to-br from-emerald-50 to-teal-50 dark:from-emerald-950/30 dark:to-teal-950/20 border border-emerald-200/60 dark:border-emerald-800/40 text-center">
-                  <p className="text-[11px] font-semibold text-emerald-800 dark:text-emerald-300 mb-0.5">پرداختی کل بیمار</p>
+                  <p className="text-2xs font-semibold text-emerald-800 dark:text-emerald-300 mb-0.5">پرداختی کل بیمار</p>
                   <p className="text-sm sm:text-base font-black text-emerald-700 dark:text-emerald-400 font-mono">{formatCurrency(totalPaid)} ت</p>
                 </div>
                 <div className="p-3 rounded-2xl bg-gradient-to-br from-sky-50 to-blue-50 dark:from-sky-950/30 dark:to-blue-950/20 border border-sky-200/60 dark:border-sky-800/40 text-center">
-                  <p className="text-[11px] font-semibold text-sky-800 dark:text-sky-300 mb-0.5">کل هزینه درمان‌ها</p>
+                  <p className="text-2xs font-semibold text-sky-800 dark:text-sky-300 mb-0.5">کل هزینه درمان‌ها</p>
                   <p className="text-sm sm:text-base font-black text-sky-700 dark:text-sky-400 font-mono">{formatCurrency(totalTreatmentCost)} ت</p>
                 </div>
               </div>
@@ -2318,7 +2324,7 @@ export default function PatientDetail() {
                               {relationshipLabel}
                             </Badge>
                           </div>
-                          <div className="flex items-center gap-2 text-[11px] text-slate-400 mt-0.5">
+                          <div className="flex items-center gap-2 text-2xs text-slate-400 mt-0.5">
                             <span>پرونده: {m.file_number || '—'}</span>
                             {m.phone && <span>• {toPersianDigits(m.phone)}</span>}
                           </div>
@@ -2391,7 +2397,7 @@ export default function PatientDetail() {
     if (timeline.length === 0) {
       return (
         <Card className="p-6">
-          <EmptyState icon={<Clock size={32} />} title="رویدادی ثبت نشده" description="تایم‌لاین این بیمار خالی است" />
+          <EmptyState icon={<Clock size={56} />} title="رویدادی ثبت نشده" description="تایم‌لاین این بیمار خالی است" />
         </Card>
       )
     }
@@ -2448,7 +2454,7 @@ export default function PatientDetail() {
       return (
         <Card className="p-6">
           <EmptyState
-            icon={<Activity size={32} />}
+            icon={<Activity size={56} />}
             title="درمانی ثبت نشده"
             description="هنوز درمانی برای این بیمار ثبت نشده است"
             action={
@@ -2593,7 +2599,7 @@ export default function PatientDetail() {
                           date, the doctor and the surfaces were on the record
                           and never shown. A history that cannot say who did
                           it or when is a list, not a history. */}
-                      <p className="text-[11px] text-slate-500 mt-1">
+                      <p className="text-2xs text-slate-500 mt-1">
                         {toJalaliStringPretty(String(t.created_at).slice(0, 10))}
                         {t.doctor_id && ` · ${getDoctorName(t.doctor_id)}`}
                         {t.tooth_surface && ` · سطح ${formatSurfaces(t.tooth_surface)}`}
@@ -2622,7 +2628,7 @@ export default function PatientDetail() {
       return (
         <Card className="p-6">
           <EmptyState
-            icon={<Bone size={32} />}
+            icon={<Bone size={56} />}
             title="موردی ثبت نشده"
             description="هنوز پرونده‌ی ایمپلنتی برای این بیمار ثبت نشده است"
             action={
@@ -2715,7 +2721,7 @@ export default function PatientDetail() {
           <div className="flex items-center gap-3">
             <div className="text-right">
               <h3 className="text-base font-extrabold text-slate-800 dark:text-slate-100">لابراتوار</h3>
-              <p className="text-[11px] text-slate-500 font-medium">پرونده #{patient?.id.slice(0, 4).toUpperCase()} - {patient?.first_name} {patient?.last_name}</p>
+              <p className="text-2xs text-slate-500 font-medium">پرونده #{patient?.id.slice(0, 4).toUpperCase()} - {patient?.first_name} {patient?.last_name}</p>
             </div>
             <div className="w-10 h-10 rounded-full bg-amber-100 dark:bg-amber-900/30 flex items-center justify-center text-amber-600">
               <FlaskConical size={20} />
@@ -2739,11 +2745,11 @@ export default function PatientDetail() {
         {labOrders.length > 0 && (
           <div className="grid grid-cols-2 gap-3">
             <div className="bg-white dark:bg-slate-900 rounded-2xl p-4 border border-slate-100 dark:border-slate-800 shadow-sm flex flex-col items-center justify-center min-h-[80px]">
-              <span className="text-[11px] font-bold text-slate-500 mb-1">سفارش‌های باز</span>
+              <span className="text-2xs font-bold text-slate-500 mb-1">سفارش‌های باز</span>
               <span className="text-2xl font-extrabold text-slate-800 dark:text-slate-100">{toPersianDigits(openCount)}</span>
             </div>
             <div className="bg-white dark:bg-slate-900 rounded-2xl p-4 border border-slate-100 dark:border-slate-800 shadow-sm flex flex-col items-center justify-center min-h-[80px]">
-              <span className="text-[11px] font-bold text-slate-500 mb-1">تحویل‌شده</span>
+              <span className="text-2xs font-bold text-slate-500 mb-1">تحویل‌شده</span>
               <span className="text-2xl font-extrabold text-slate-800 dark:text-slate-100">{toPersianDigits(deliveredCount)}</span>
             </div>
           </div>
@@ -2774,11 +2780,11 @@ export default function PatientDetail() {
               return (
                 <div key={o.id} className="bg-white dark:bg-slate-900 rounded-2xl p-4 border border-slate-100 dark:border-slate-800 shadow-sm flex items-start justify-between gap-3">
                   <div className="flex flex-col items-start gap-2 shrink-0">
-                    <span className={`px-2.5 py-1 rounded-lg text-[11px] font-bold ${badgeColor}`}>
+                    <span className={`px-2.5 py-1 rounded-lg text-2xs font-bold ${badgeColor}`}>
                       {badgeText}
                     </span>
                     {o.deadline && (
-                      <span className="text-[11px] text-slate-500 font-medium whitespace-nowrap">
+                      <span className="text-2xs text-slate-500 font-medium whitespace-nowrap">
                         تحویل: {toJalaliStringPretty(o.deadline)}
                       </span>
                     )}
@@ -2984,7 +2990,7 @@ export default function PatientDetail() {
                             فاز {toPersianDigits(ph.phase_number)}: {ph.title}
                           </span>
                           {ph.estimated_duration_days && (
-                            <span className="text-[10px] text-slate-400 block">
+                            <span className="text-3xs text-slate-400 block">
                               طول دوره: {toPersianDigits(ph.estimated_duration_days)} روز
                             </span>
                           )}
@@ -3012,11 +3018,11 @@ export default function PatientDetail() {
         {selectedPlanOption !== 'compare' && displayedPhases.length > 0 && (
           <div className="grid grid-cols-2 gap-2.5">
             <Card className="p-3">
-              <p className="text-[11px] text-slate-400">هزینه‌ی تخمینی کل</p>
+              <p className="text-2xs text-slate-400">هزینه‌ی تخمینی کل</p>
               <p className="text-base font-extrabold text-primary-700">{formatCurrency(totalEstimated)} ت</p>
             </Card>
             <Card className="p-3">
-              <p className="text-[11px] text-slate-400">هزینه‌ی واقعی تا الان</p>
+              <p className="text-2xs text-slate-400">هزینه‌ی واقعی تا الان</p>
               <p className="text-base font-extrabold text-slate-700 dark:text-slate-200">{formatCurrency(totalActual)} ت</p>
             </Card>
           </div>
@@ -3024,14 +3030,14 @@ export default function PatientDetail() {
 
         {selectedPlanOption !== 'compare' && displayedPhases.length > 0 && !costCheck.ok && (
           <p className="text-xs text-amber-700">
-            <AlertTriangle size={13} className="inline-block ml-1" /> {costCheck.message} ({formatCurrency(Math.abs(costCheck.difference))} ت اختلاف)
+            <AlertTriangle size={14} className="inline-block ml-1" /> {costCheck.message} ({formatCurrency(Math.abs(costCheck.difference))} ت اختلاف)
           </p>
         )}
 
         {/* Phase Cards */}
         {selectedPlanOption !== 'compare' && displayedPhases.length === 0 ? (
           <EmptyState
-            icon={<Layers size={40} />}
+            icon={<Layers size={56} />}
             title="فاز درمانی ثبت نشده"
             description="برای طرح‌های درمانی چندمرحله‌ای فازها را اینجا تعریف کنید"
           />
@@ -3080,11 +3086,11 @@ export default function PatientDetail() {
                         {p.description && (
                           <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">{p.description}</p>
                         )}
-                        {doc && <p className="text-[11px] text-slate-400 mt-1">دکتر {doc.name}</p>}
+                        {doc && <p className="text-2xs text-slate-400 mt-1">دکتر {doc.name}</p>}
                       </div>
                       <Badge color={meta.color}>{meta.label}</Badge>
                     </div>
-                    <div className="flex items-center gap-3 mt-2 flex-wrap text-[11px] text-slate-500 dark:text-slate-400">
+                    <div className="flex items-center gap-3 mt-2 flex-wrap text-2xs text-slate-500 dark:text-slate-400">
                       {p.estimated_cost != null && <span>هزینه تخمینی: {formatCurrency(p.estimated_cost)} ت</span>}
                       {p.estimated_duration_days != null && (
                         <span>مدت: {toPersianDigits(p.estimated_duration_days)} روز</span>
@@ -3125,7 +3131,7 @@ export default function PatientDetail() {
       </div>
 
       {consentForms.length === 0 ? (
-        <EmptyState icon={<FileSignature size={40} />} title="فرم رضایت‌نامه ثبت نشده" description="پیش از درمان‌های جراحی یا پرخطر (ایمپلنت، کشیدن، جراحی) رضایت آگاهانه‌ی بیمار را اینجا ثبت و چاپ کنید" />
+        <EmptyState icon={<FileSignature size={56} />} title="فرم رضایت‌نامه ثبت نشده" description="پیش از درمان‌های جراحی یا پرخطر (ایمپلنت، کشیدن، جراحی) رضایت آگاهانه‌ی بیمار را اینجا ثبت و چاپ کنید" />
       ) : (
         <div className="space-y-2">
           {consentForms.map((c) => {
@@ -3135,11 +3141,11 @@ export default function PatientDetail() {
                 <div className="flex items-start justify-between gap-2">
                   <div className="min-w-0 flex-1">
                     <p className="text-sm font-bold text-slate-800 dark:text-slate-100 truncate">{c.treatment_description}</p>
-                    <p className="text-[11px] text-slate-400 mt-0.5">{doc ? `دکتر ${doc.name || doc.specialty}` : 'بدون پزشک'} — {toJalaliStringPretty(c.created_at)}</p>
+                    <p className="text-2xs text-slate-400 mt-0.5">{doc ? `دکتر ${doc.name || doc.specialty}` : 'بدون پزشک'} — {toJalaliStringPretty(c.created_at)}</p>
                     {c.signature_data && (
                       <div className="mt-2 inline-flex items-center gap-2 px-2 py-1 rounded-lg bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700">
                         <img src={c.signature_data} alt="امضا" className="h-6 max-w-[80px] object-contain" />
-                        <span className="text-[10px] text-success-600 dark:text-success-400 font-bold">دارای امضای دیجیتال</span>
+                        <span className="text-3xs text-success-600 dark:text-success-400 font-bold">دارای امضای دیجیتال</span>
                       </div>
                     )}
                   </div>
@@ -3177,7 +3183,7 @@ export default function PatientDetail() {
       return (
         <Card className="p-6 text-center">
           <EmptyState
-            icon={<Calendar size={32} />}
+            icon={<Calendar size={56} />}
             title="نوبتی ثبت نشده"
             description="برای این بیمار هنوز نوبتی ثبت نشده است"
             action={
@@ -3360,7 +3366,7 @@ export default function PatientDetail() {
           // cannot be tied to a doctor, and spreading it across them
           // would produce a table that balances and is wrong.
           <p className="mt-3 text-xs text-amber-700">
-            <AlertTriangle size={13} className="inline-block ml-1" /> بخشی از پرداخت‌ها به هیچ ویزیتی وصل نیست، پس قابل انتساب به پزشک نبود و در ردیف «نامشخص» آمده.
+            <AlertTriangle size={14} className="inline-block ml-1" /> بخشی از پرداخت‌ها به هیچ ویزیتی وصل نیست، پس قابل انتساب به پزشک نبود و در ردیف «نامشخص» آمده.
           </p>
         )}
       </Card>
@@ -3581,7 +3587,7 @@ export default function PatientDetail() {
       return (
         <Card className="p-6 text-center">
           <EmptyState
-            icon={<Pill size={32} />}
+            icon={<Pill size={56} />}
             title="نسخه‌ای ثبت نشده"
             description="برای این بیمار هنوز نسخه‌ای ثبت نشده است"
             action={
@@ -3637,7 +3643,7 @@ export default function PatientDetail() {
                       onClick={() => handlePrintPrescription(pres)}
                       className="text-xs text-slate-500 hover:text-primary-600 flex items-center gap-1"
                     >
-                      <Printer size={13} /> چاپ نسخه
+                      <Printer size={14} /> چاپ نسخه
                     </Button>
                     <Button
                       size="sm"
@@ -3646,7 +3652,7 @@ export default function PatientDetail() {
                       className="text-xs text-teal-600 hover:text-teal-700 flex items-center gap-1"
                       title="چاپ برگه راهنمای دارویی و مراقبت‌های پس از درمان بیمار"
                     >
-                      <FileHeart size={13} /> راهنمای بیمار
+                      <FileHeart size={14} /> راهنمای بیمار
                     </Button>
                     <Badge color={pres.status === 'active' ? 'success' : 'slate'}>{pres.status === 'active' ? 'فعال' : pres.status}</Badge>
                   </div>
@@ -3654,7 +3660,7 @@ export default function PatientDetail() {
                 {medList.length > 0 && (
                   <div className="flex items-center gap-1.5 flex-wrap mt-2">
                     {medList.map((m, i) => m && (
-                      <span key={i} className="px-2 py-1 rounded-md bg-slate-100 text-slate-700 text-xs font-medium">{m}</span>
+                      <span key={i} className="px-2 py-1 rounded-lg bg-slate-100 text-slate-700 text-xs font-medium">{m}</span>
                     ))}
                   </div>
                 )}
@@ -3675,7 +3681,7 @@ export default function PatientDetail() {
     if (radiologyImages.length === 0) {
       return (
         <Card className="p-6">
-          <EmptyState icon={<ImageIcon size={32} />} title="تصویر رادیولوژی ثبت نشده" description="برای این بیمار تصویر رادیولوژی ثبت نشده است" />
+          <EmptyState icon={<ImageIcon size={56} />} title="تصویر رادیولوژی ثبت نشده" description="برای این بیمار تصویر رادیولوژی ثبت نشده است" />
         </Card>
       )
     }
@@ -3845,7 +3851,7 @@ export default function PatientDetail() {
                 className="px-2.5 py-1.5 rounded-xl text-xs font-medium bg-slate-50 dark:bg-slate-800/60 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-700 hover:bg-slate-100 flex items-center gap-1 mr-2"
                 title={selectedRadIds.size === filteredImages.length ? 'لغو انتخاب همه' : 'انتخاب همه تصاویر جاری'}
               >
-                {selectedRadIds.size === filteredImages.length ? <CheckSquare size={13} className="text-primary-600" /> : <Square size={13} />}
+                {selectedRadIds.size === filteredImages.length ? <CheckSquare size={14} className="text-primary-600" /> : <Square size={14} />}
                 <span>{selectedRadIds.size === filteredImages.length ? 'لغو انتخاب همه' : 'انتخاب همه'}</span>
               </button>
             )}
@@ -3974,7 +3980,7 @@ export default function PatientDetail() {
         {filteredImages.length === 0 ? (
           <Card className="p-6">
             <EmptyState
-              icon={<ImageIcon size={32} />}
+              icon={<ImageIcon size={56} />}
               title="تصویری برای این دندان یافت نشد"
               description={`برای دندان ${toothLabel(radToothFilter)} تصویری ثبت نشده است`}
               action={
@@ -3991,7 +3997,11 @@ export default function PatientDetail() {
               return (
                 <Card
                   key={img.id}
-                  className={`p-3 cursor-pointer transition-all-smooth press-scale group relative ${
+                  role="button"
+                  tabIndex={0}
+                  aria-label={`مشاهده تصویر رادیولوژی ${img.description || ''}`.trim()}
+                  onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setSelectedRadImage(img) } }}
+                  className={`p-3 cursor-pointer transition-all-smooth press-scale group relative focus:outline-none focus:ring-2 focus:ring-primary-400 ${
                     isSelected ? 'ring-2 ring-primary-500 border-primary-500 bg-primary-50/10' : 'hover:border-primary-400 dark:hover:border-primary-600'
                   }`}
                   onClick={() => setSelectedRadImage(img)}
@@ -4007,6 +4017,8 @@ export default function PatientDetail() {
                     >
                       <button
                         type="button"
+                        aria-label={isSelected ? 'لغو انتخاب تصویر' : 'انتخاب تصویر جهت عملیات دسته‌ای'}
+                        aria-pressed={isSelected}
                         className={`w-6 h-6 rounded-lg flex items-center justify-center transition-all ${
                           isSelected
                             ? 'bg-primary-600 text-white shadow-sm'
@@ -4066,7 +4078,7 @@ export default function PatientDetail() {
                   placeholder="مثال: 16 یا 14, 15, 16"
                   dir="ltr"
                 />
-                <span className="text-[11px] text-slate-400 mt-1 block">
+                <span className="text-2xs text-slate-400 mt-1 block">
                   می‌توانید چند شماره دندان را با کاما جدا نمایید.
                 </span>
               </div>
@@ -4157,7 +4169,7 @@ export default function PatientDetail() {
                         >
                           <img src={img.image_url!} alt="" className="w-full h-full object-cover" />
                           {img.tooth_number && (
-                            <span className="absolute bottom-0 right-0 left-0 bg-black/60 text-white text-[9px] text-center">
+                            <span className="absolute bottom-0 right-0 left-0 bg-black/60 text-white text-4xs text-center">
                               {toothLabel(img.tooth_number)}
                             </span>
                           )}
@@ -4183,7 +4195,7 @@ export default function PatientDetail() {
                         >
                           <img src={img.image_url!} alt="" className="w-full h-full object-cover" />
                           {img.tooth_number && (
-                            <span className="absolute bottom-0 right-0 left-0 bg-black/60 text-white text-[9px] text-center">
+                            <span className="absolute bottom-0 right-0 left-0 bg-black/60 text-white text-4xs text-center">
                               {toothLabel(img.tooth_number)}
                             </span>
                           )}
@@ -4239,7 +4251,7 @@ export default function PatientDetail() {
     if (!hasInsurance) {
       return (
         <Card className="p-6">
-          <EmptyState icon={<Shield size={32} />} title="اطلاعات بیمه ثبت نشده" description="برای این بیمار اطلاعات بیمه‌ای ثبت نشده است" />
+          <EmptyState icon={<Shield size={56} />} title="اطلاعات بیمه ثبت نشده" description="برای این بیمار اطلاعات بیمه‌ای ثبت نشده است" />
         </Card>
       )
     }
@@ -4341,7 +4353,7 @@ export default function PatientDetail() {
     return (
       <div className="space-y-4">
         {/* Controls & Scanner Action Header */}
-        <div className="flex items-center justify-between gap-3 flex-wrap bg-white dark:bg-slate-900 p-4 rounded-3xl border border-slate-100 dark:border-slate-800 shadow-sm">
+        <div className="flex items-center justify-between gap-3 flex-wrap bg-white dark:bg-slate-900 p-4 rounded-2xl border border-slate-100 dark:border-slate-800 shadow-sm">
           <div>
             <h3 className="text-sm sm:text-base font-black text-slate-900 dark:text-slate-50 flex items-center gap-2">
               <Camera size={18} className="text-primary-600 dark:text-primary-400" />
@@ -4392,7 +4404,7 @@ export default function PatientDetail() {
               }`}
             >
               <span>{cat.label}</span>
-              <span className="font-mono text-[11px] mr-1.5 opacity-80">({toPersianDigits(cat.count)})</span>
+              <span className="font-mono text-2xs mr-1.5 opacity-80">({toPersianDigits(cat.count)})</span>
             </button>
           ))}
         </div>
@@ -4401,7 +4413,7 @@ export default function PatientDetail() {
         {filteredDocs.length === 0 ? (
           <Card className="p-8 text-center">
             <EmptyState
-              icon={<Camera size={40} className="text-primary-500" />}
+              icon={<Camera size={56} className="text-primary-500" />}
               title="هیچ سند یا عکسی ثبت نشده است"
               description="با دوربین گوشی یا تبلت از پرونده کاغذی، عکس‌های رادیولوژی یا برگه‌های آزمایش عکس بگیرید تا مستقیماً به پرونده متصل و در تمام دستگاه‌ها سینک شود."
               action={
@@ -4448,7 +4460,7 @@ export default function PatientDetail() {
 
                     {/* Category Capsule on Image */}
                     <div className="absolute top-2 right-2">
-                      <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-lg border text-[10px] font-bold backdrop-blur-md shadow-xs ${meta.color}`}>
+                      <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-lg border text-3xs font-bold backdrop-blur-md shadow-xs ${meta.color}`}>
                         <span>{meta.icon}</span>
                         <span>{meta.label}</span>
                       </span>
@@ -4457,7 +4469,7 @@ export default function PatientDetail() {
                     {/* Tooth Number Capsule if present */}
                     {img.tooth_number && (
                       <div className="absolute bottom-2 right-2">
-                        <span className="inline-flex items-center px-2 py-0.5 rounded-md bg-black/70 text-white font-mono text-[10px] font-bold">
+                        <span className="inline-flex items-center px-2 py-0.5 rounded-lg bg-black/70 text-white font-mono text-3xs font-bold">
                           دندان {toothLabel(img.tooth_number)}
                         </span>
                       </div>
@@ -4466,7 +4478,7 @@ export default function PatientDetail() {
                     {/* Date on Image */}
                     {img.taken_at && (
                       <div className="absolute bottom-2 left-2">
-                        <span className="inline-flex items-center px-2 py-0.5 rounded-md bg-black/70 text-slate-200 font-mono text-[10px]">
+                        <span className="inline-flex items-center px-2 py-0.5 rounded-lg bg-black/70 text-slate-200 font-mono text-3xs">
                           {toJalaliString(img.taken_at)}
                         </span>
                       </div>
@@ -4479,7 +4491,7 @@ export default function PatientDetail() {
                       {img.description || meta.label}
                     </h4>
                     {img.notes && (
-                      <p className="text-[11px] text-slate-500 dark:text-slate-400 line-clamp-2 leading-relaxed">
+                      <p className="text-2xs text-slate-500 dark:text-slate-400 line-clamp-2 leading-relaxed">
                         {img.notes}
                       </p>
                     )}
@@ -4487,7 +4499,7 @@ export default function PatientDetail() {
 
                   {/* Action Buttons Bar */}
                   <div className="flex items-center justify-between pt-2.5 mt-2 border-t border-slate-100 dark:border-slate-800/80 text-xs">
-                    <span className="text-[10px] text-primary-600 dark:text-primary-400 font-bold group-hover:underline">
+                    <span className="text-3xs text-primary-600 dark:text-primary-400 font-bold group-hover:underline">
                       مشاهده و بزرگنمایی
                     </span>
 
@@ -4529,7 +4541,7 @@ export default function PatientDetail() {
                   <div key={e.id} className="flex items-center justify-between gap-3 p-2.5 rounded-xl border border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-800/40">
                     <div>
                       <p className="text-xs font-bold text-slate-800 dark:text-slate-200">{e.chief_complaint || 'ویزیت عمومی'}</p>
-                      <p className="text-[11px] text-slate-400 font-mono mt-0.5">{toJalaliStringPretty(e.encounter_date)}</p>
+                      <p className="text-2xs text-slate-400 font-mono mt-0.5">{toJalaliStringPretty(e.encounter_date)}</p>
                     </div>
                     <Badge color={e.status === 'completed' ? 'success' : 'warning'}>
                       {e.status === 'completed' ? 'تکمیل شده' : e.status === 'in_progress' ? 'در حال انجام' : e.status}
@@ -4553,7 +4565,7 @@ export default function PatientDetail() {
                       <p className="text-xs font-bold text-slate-800 dark:text-slate-200">
                         {typeof p.medications === 'string' ? p.medications : p.notes || 'نسخه دارویی'}
                       </p>
-                      <p className="text-[11px] text-slate-400 font-mono mt-0.5">{toJalaliStringPretty(p.created_at)}</p>
+                      <p className="text-2xs text-slate-400 font-mono mt-0.5">{toJalaliStringPretty(p.created_at)}</p>
                     </div>
                     <Pill size={14} className="text-primary-500 shrink-0" />
                   </div>
@@ -4652,7 +4664,7 @@ export default function PatientDetail() {
                     />
                     مصرف بیس‌فسفونات‌ها
                   </label>
-                  <p className="text-[11px] text-slate-500">خطر استئونکروز فک (ONJ) در جراحی</p>
+                  <p className="text-2xs text-slate-500">خطر استئونکروز فک (ONJ) در جراحی</p>
                 </div>
 
                 <div className="space-y-1.5 p-2.5 rounded-xl bg-white/80 dark:bg-slate-800/80 border border-rose-100 dark:border-rose-900/40">
@@ -4665,7 +4677,7 @@ export default function PatientDetail() {
                     />
                     ریسک اندوکاردیت
                   </label>
-                  <p className="text-[11px] text-slate-500">نیاز به پروفیلاکسی آنتی‌بیوتیک</p>
+                  <p className="text-2xs text-slate-500">نیاز به پروفیلاکسی آنتی‌بیوتیک</p>
                 </div>
 
                 <div className="space-y-1.5 p-2.5 rounded-xl bg-white/80 dark:bg-slate-800/80 border border-rose-100 dark:border-rose-900/40">
@@ -4790,7 +4802,7 @@ export default function PatientDetail() {
           {label}
         </span>
         {isDash ? (
-          <span className="text-[11px] font-medium px-2 py-0.5 rounded-lg bg-slate-100/80 dark:bg-slate-800/60 text-slate-400 dark:text-slate-500">
+          <span className="text-2xs font-medium px-2 py-0.5 rounded-lg bg-slate-100/80 dark:bg-slate-800/60 text-slate-400 dark:text-slate-500">
             ثبت نشده
           </span>
         ) : (
@@ -4828,10 +4840,10 @@ export default function PatientDetail() {
               setMainTab(t.id)
               setSubView(null)
             }}
-            className={`patient-tile min-w-0 rounded-2xl py-2.5 flex flex-col items-center gap-1.5 text-[11px] sm:text-sm font-bold min-h-[76px] ${patientConcepts[t.concept].color} ${mainTab === t.id ? 'ring-2 ring-current ring-offset-2' : 'opacity-85'}`}
+            className={`patient-tile min-w-0 rounded-2xl py-2.5 flex flex-col items-center gap-1.5 text-2xs sm:text-sm font-bold min-h-[76px] ${patientConcepts[t.concept].color} ${mainTab === t.id ? 'ring-2 ring-current ring-offset-2' : 'opacity-85'}`}
             aria-label={t.label}
           >
-            <span className="concept-icon icon-blink w-9 h-9 rounded-xl flex items-center justify-center"><Icon size={20} /></span>
+            <span className="concept-icon icon-blink w-10 h-10 rounded-xl flex items-center justify-center"><Icon size={20} /></span>
             <span>{t.label}</span>
           </button>
         )})}
@@ -4857,7 +4869,7 @@ export default function PatientDetail() {
             className="patient-tile w-full min-w-0 flex items-center gap-2 sm:gap-3 px-2.5 sm:px-4 py-3 min-h-[84px] rounded-2xl group"
           >
             <div className={`concept-icon w-10 h-10 rounded-2xl flex items-center justify-center shrink-0 ${patientConcepts[concept].color} transition-transform group-active:scale-90`}>
-              <Icon size={22} strokeWidth={2} />
+              <Icon size={20} strokeWidth={2} />
             </div>
             <span className="flex-1 min-w-0 text-right text-xs sm:text-sm font-bold text-slate-800 dark:text-slate-200 leading-snug">
               {item.label}
@@ -4876,8 +4888,15 @@ export default function PatientDetail() {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center py-20">
-        <Spinner size={32} />
+      <div className="space-y-4" aria-busy="true" aria-live="polite">
+        <div className="skeleton h-20 rounded-2xl" />
+        <div className="grid grid-cols-3 gap-2.5">
+          {[0, 1, 2].map((i) => <div key={i} className="skeleton h-16 rounded-2xl" />)}
+        </div>
+        <div className="skeleton h-12 rounded-xl" />
+        <div className="space-y-2">
+          {[0, 1, 2, 3].map((i) => <div key={i} className="skeleton h-24 rounded-2xl" />)}
+        </div>
       </div>
     )
   }
@@ -4885,7 +4904,7 @@ export default function PatientDetail() {
   if (!patient) {
     return (
       <Card className="p-6">
-        <EmptyState icon={<AlertCircle size={32} />} title="بیمار یافت نشد" />
+        <EmptyState icon={<AlertCircle size={56} />} title="بیمار یافت نشد" />
       </Card>
     )
   }
@@ -4893,7 +4912,7 @@ export default function PatientDetail() {
   const pageTheme = tileThemes[getHashColor(patient.id)]
 
   return (
-    <div className={`relative min-h-screen p-2.5 sm:p-5 pb-24 sm:pb-8 bg-gradient-to-br ${pageTheme.bg} overflow-hidden space-y-4 rounded-3xl transition-all duration-500`} style={{ paddingBottom: 'calc(6rem + env(safe-area-inset-bottom))' }}>
+    <div className={`relative min-h-screen p-2.5 sm:p-5 pb-24 sm:pb-8 bg-gradient-to-br ${pageTheme.bg} overflow-hidden space-y-4 rounded-2xl transition-all duration-500`} style={{ paddingBottom: 'calc(6rem + env(safe-area-inset-bottom))' }}>
       {/* Dynamic Gemini Breathing Aura */}
       <div className={`absolute -top-24 -right-24 w-[32rem] h-[32rem] rounded-full bg-gradient-to-br ${pageTheme.blob} pointer-events-none breathe-slow opacity-65 blur-3xl`} />
       <div className={`absolute top-1/3 -left-28 w-[28rem] h-[28rem] rounded-full bg-gradient-to-tr ${pageTheme.blob} pointer-events-none breathe-slow opacity-55 blur-3xl`} style={{ animationDelay: '-4s' }} />
@@ -4910,9 +4929,9 @@ export default function PatientDetail() {
       {/* Header */}
       {renderHeader()}
 
-      <div className="module-surface sm:backdrop-blur-xl rounded-3xl overflow-hidden min-h-[500px]">
+      <div className="module-surface sm:backdrop-blur-xl rounded-2xl min-h-[500px]">
         {subView ? (
-           <div className="flex items-center gap-3 px-4 py-3 border-b border-slate-100 dark:border-slate-800 bg-white/98 dark:bg-slate-900/98 sticky top-[calc(60px+env(safe-area-inset-top,0px))] sm:top-[calc(64px+env(safe-area-inset-top,0px))] z-30 shadow-md backdrop-blur-xl">
+           <div className="flex items-center gap-3 px-4 py-3 border-b border-slate-100 dark:border-slate-800 bg-white/98 dark:bg-slate-900/98 sticky-below-header z-30 shadow-md backdrop-blur-xl rounded-t-2xl">
              <button
                onClick={() => {
                  h.tap()
@@ -4928,7 +4947,7 @@ export default function PatientDetail() {
                <span className="font-black text-base text-slate-900 dark:text-slate-100 block truncate">
                  {tabs.find(t => t.key === subView)?.label || 'بازگشت'}
                </span>
-               <span className="text-[11px] font-bold text-slate-400 dark:text-slate-500">
+               <span className="text-2xs font-bold text-slate-400 dark:text-slate-500">
                  {patient?.first_name} {patient?.last_name}
                </span>
              </div>
@@ -4937,6 +4956,7 @@ export default function PatientDetail() {
           renderMainMenu()
         )}
 
+        <div className="overflow-hidden rounded-b-2xl">
         <div className="p-3 sm:p-6">
           {!subView && mainTab === 'overview' && renderOverview()}
           {!subView && mainTab === 'appointments' && renderAppointments()}
@@ -5018,6 +5038,7 @@ export default function PatientDetail() {
           {subView === 'radiology' && renderRadiology()}
           {subView === 'insurance' && renderInsurance()}
           {subView === 'documents' && renderDocuments()}
+        </div>
         </div>
       </div>
 
@@ -5131,7 +5152,7 @@ export default function PatientDetail() {
                   </div>
                 )}
                 {prereqAlert.evalResult.recommendation && (
-                  <p className="text-[11px] text-amber-700 dark:text-amber-400 mt-2 italic">
+                  <p className="text-2xs text-amber-700 dark:text-amber-400 mt-2 italic">
                     توصیه بالینی: {prereqAlert.evalResult.recommendation}
                   </p>
                 )}
@@ -5426,7 +5447,7 @@ export default function PatientDetail() {
                       <span>{toJalaliStringPretty(row.due_date)}</span>
                     </div>
                     <p className="font-extrabold text-primary-600 dark:text-primary-400 mt-1">
-                      {formatCurrency(row.amount)} <span className="text-[10px] font-normal">ت</span>
+                      {formatCurrency(row.amount)} <span className="text-3xs font-normal">ت</span>
                     </p>
                   </div>
                 ))}
@@ -5516,7 +5537,7 @@ export default function PatientDetail() {
                 <span className="text-xs font-bold text-slate-800 dark:text-slate-100">
                   این بیمار سرپرست خانواده است (Head of Household)
                 </span>
-                <p className="text-[11px] text-slate-400 mt-0.5">
+                <p className="text-2xs text-slate-400 mt-0.5">
                   سایر اعضای خانواده می‌توانند به عنوان وابسته به این پرونده متصل شوند.
                 </p>
               </div>
@@ -5583,7 +5604,7 @@ export default function PatientDetail() {
               <FileText size={20} />
             </div>
             <div>
-              <span className="text-[11px] font-bold text-teal-800 dark:text-teal-300">شماره پرونده بالینی بیمار:</span>
+              <span className="text-2xs font-bold text-teal-800 dark:text-teal-300">شماره پرونده بالینی بیمار:</span>
               <p className="text-base font-extrabold text-teal-900 dark:text-teal-100 font-mono">
                 {patient?.file_number || 'بدون شماره پرونده'}
               </p>
@@ -5628,7 +5649,7 @@ export default function PatientDetail() {
           {/* Clinical Triage & High-Risk Factors (استاندارد بین‌المللی ADA CDT / نظام پزشکی) */}
           <div className="p-4 rounded-2xl bg-rose-50/60 dark:bg-rose-950/20 border border-rose-200/80 dark:border-rose-900/50 space-y-3">
             <h4 className="text-xs font-bold text-rose-800 dark:text-rose-300 flex items-center gap-1.5">
-              <AlertCircle size={15} className="text-rose-600" />
+              <AlertCircle size={14} className="text-rose-600" />
               غربالگری بالینی، تریاژ و عوامل پرخطر دندانپزشکی (Clinical Triage & Risk Markers)
             </h4>
 
@@ -5662,7 +5683,7 @@ export default function PatientDetail() {
                   />
                   مصرف بیس‌فسفونات‌ها
                 </label>
-                <p className="text-[11px] text-slate-500 leading-relaxed">ریسک استئونکروز فک (ONJ) در کشیدن و ایمپلنت</p>
+                <p className="text-2xs text-slate-500 leading-relaxed">ریسک استئونکروز فک (ONJ) در کشیدن و ایمپلنت</p>
               </div>
 
               <div className="space-y-1.5 p-3 rounded-xl bg-white/90 dark:bg-slate-850/90 border border-rose-100 dark:border-rose-900/40">
@@ -5675,7 +5696,7 @@ export default function PatientDetail() {
                   />
                   ریسک اندوکاردیت عفونی
                 </label>
-                <p className="text-[11px] text-slate-500 leading-relaxed">ضرورت مصرف آنتی‌بیوتیک پروفیلاکسی ۱ ساعت پیش از کار</p>
+                <p className="text-2xs text-slate-500 leading-relaxed">ضرورت مصرف آنتی‌بیوتیک پروفیلاکسی ۱ ساعت پیش از کار</p>
               </div>
 
               <div className="space-y-1.5 p-3 rounded-xl bg-white/90 dark:bg-slate-850/90 border border-rose-100 dark:border-rose-900/40">
@@ -5705,7 +5726,7 @@ export default function PatientDetail() {
                   placeholder="مثال: ۶.۸"
                   dir="ltr"
                 />
-                <p className="text-[11px] text-slate-500">کنترل التیام زخم و استئواینتگریشن ایمپلنت</p>
+                <p className="text-2xs text-slate-500">کنترل التیام زخم و استئواینتگریشن ایمپلنت</p>
               </div>
 
               <div className="space-y-1.5 p-3 rounded-xl bg-white/90 dark:bg-slate-850/90 border border-rose-100 dark:border-rose-900/40">

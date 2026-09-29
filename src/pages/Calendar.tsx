@@ -188,12 +188,12 @@ export default function CalendarPage() {
           module, not just to the specific events already listed below. */}
       <div className="flex items-center gap-2 overflow-x-auto dock-scroll pb-1 -mx-1 px-1">
         {[
-          { path: '/patients', label: 'بیماران', icon: <Users size={15} /> },
-          { path: '/appointments', label: 'نوبت‌دهی', icon: <CalendarPlus size={15} /> },
-          { path: '/billing', label: 'مالی', icon: <DollarSign size={15} /> },
-          { path: '/laboratory', label: 'لابراتوار', icon: <FlaskConical size={15} /> },
-          { path: '/implants', label: 'ایمپلنت', icon: <Bone size={15} /> },
-          { path: '/reminders', label: 'یادآوری‌ها', icon: <BellRing size={15} /> },
+          { path: '/patients', label: 'بیماران', icon: <Users size={14} /> },
+          { path: '/appointments', label: 'نوبت‌دهی', icon: <CalendarPlus size={14} /> },
+          { path: '/billing', label: 'مالی', icon: <DollarSign size={14} /> },
+          { path: '/laboratory', label: 'لابراتوار', icon: <FlaskConical size={14} /> },
+          { path: '/implants', label: 'ایمپلنت', icon: <Bone size={14} /> },
+          { path: '/reminders', label: 'یادآوری‌ها', icon: <BellRing size={14} /> },
         ].map((m) => (
           <button
             key={m.path}
@@ -217,7 +217,7 @@ export default function CalendarPage() {
         <div className="space-y-2">
           <div className="flex items-center justify-between">
             <h3 className="text-sm font-bold text-slate-700 dark:text-slate-200 flex items-center gap-2">
-              <Stethoscope size={15} className="text-primary-600" />
+              <Stethoscope size={14} className="text-primary-600" />
               کشیک و شیفت پزشکان در {weekdayNames[selectedDayOfWeek]} ({toJalaliStringPretty(selectedDate)})
             </h3>
             <span className="text-xs text-slate-400">
@@ -287,7 +287,7 @@ export default function CalendarPage() {
                     }}
                     className="w-full mt-2 text-xs flex items-center justify-center gap-1 bg-primary-50 text-primary-700 hover:bg-primary-100 border-primary-200"
                   >
-                    <CalendarPlus size={13} /> ثبت نوبت با دکتر {doctor.name}
+                    <CalendarPlus size={14} /> ثبت نوبت با دکتر {doctor.name}
                   </Button>
                 )}
               </Card>
@@ -305,14 +305,21 @@ export default function CalendarPage() {
         </h3>
 
         {eventsOnSelectedDate.length === 0 ? (
-          <Card className="p-4"><EmptyState icon={<CalIcon size={24} />} title="رویدادی در این روز نیست" /></Card>
+          <Card className="p-4"><EmptyState icon={<CalIcon size={56} />} title="رویدادی در این روز نیست" /></Card>
         ) : (
           <div className="space-y-2" style={{ paddingBottom: 'calc(6rem + env(safe-area-inset-bottom, 0px))' }}>
             {eventsOnSelectedDate.map((e) => {
               const meta = eventTypeMeta[e.type]
               return (
                 <Card key={e.id} className="p-3 cursor-pointer hover:shadow-md transition-all-smooth">
-                  <div className="flex items-center gap-3" onClick={() => navigate(eventTarget(e))}>
+                  <div
+                    className="flex items-center gap-3 focus:outline-none focus:ring-2 focus:ring-primary-400 rounded-xl"
+                    role="button"
+                    tabIndex={0}
+                    aria-label={e.title || meta.label}
+                    onClick={() => navigate(eventTarget(e))}
+                    onKeyDown={(ev) => { if (ev.key === 'Enter' || ev.key === ' ') { ev.preventDefault(); navigate(eventTarget(e)) } }}
+                  >
                     <div
                       className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 ${e.doctorColorHex ? '' : meta.color}`}
                       style={e.doctorColorHex ? { background: `${e.doctorColorHex}22`, color: e.doctorColorHex } : undefined}

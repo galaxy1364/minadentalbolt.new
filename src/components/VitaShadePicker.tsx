@@ -171,7 +171,7 @@ export function VitaShadePicker({
       )}
 
       {selectedShade && !customMode && (
-        <p className="text-[11px] text-slate-500 dark:text-slate-400 bg-slate-50 dark:bg-slate-800/40 p-2 rounded-lg">
+        <p className="text-2xs text-slate-500 dark:text-slate-400 bg-slate-50 dark:bg-slate-800/40 p-2 rounded-lg">
           <span className="font-bold text-slate-700 dark:text-slate-300">{selectedShade.code}: </span>
           {selectedShade.description} ({selectedShade.groupName})
         </p>

@@ -1,5 +1,15 @@
 import React, { useState, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { useBackDismiss } from '../lib/useBackDismiss'
+
+// iOS edge-swipe-back / Android back gesture closes the AI modal instead of
+// navigating the page underneath it away. A separate component so the hook
+// (which must run unconditionally) doesn't have to sit above the early
+// `isOpen &&` render branches below.
+function AiModalBackDismiss({ open, onClose }: { open: boolean; onClose: () => void }) {
+  useBackDismiss(open, onClose)
+  return null
+}
 import {
   Sparkles,
   Mic,
@@ -461,15 +471,15 @@ export function PersianClinicAiAssistant() {
   const getIntentIcon = (intent: ClinicAiIntentType) => {
     switch (intent) {
       case 'create_appointment':
-        return <Calendar className="text-sky-500" size={22} />
+        return <Calendar className="text-sky-500" size={20} />
       case 'record_payment':
-        return <CreditCard className="text-emerald-500" size={22} />
+        return <CreditCard className="text-emerald-500" size={20} />
       case 'create_installment_plan':
-        return <Layers className="text-violet-500" size={22} />
+        return <Layers className="text-violet-500" size={20} />
       case 'record_treatment':
-        return <Activity className="text-amber-500" size={22} />
+        return <Activity className="text-amber-500" size={20} />
       default:
-        return <Sparkles className="text-primary-500" size={22} />
+        return <Sparkles className="text-primary-500" size={20} />
     }
   }
 
@@ -526,7 +536,7 @@ export function PersianClinicAiAssistant() {
 
               {/* 5. Central AI Star / Sparkles Icon with Glow */}
               <div className="relative flex items-center justify-center text-white drop-shadow-[0_0_8px_rgba(255,255,255,0.9)] pointer-events-none">
-                <Sparkles size={21} className="animate-spin-slow" />
+                <Sparkles size={20} className="animate-spin-slow" />
               </div>
 
               {/* 6. Discreet Micro-Grip Dots on bottom edge */}
@@ -541,10 +551,11 @@ export function PersianClinicAiAssistant() {
       )}
 
       {/* iOS 27 Ultra-Modern AI Modal */}
+      <AiModalBackDismiss open={isOpen} onClose={() => setIsOpen(false)} />
       {isOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/60 backdrop-blur-md animate-fade-in">
           <div
-            className="w-full max-w-xl rounded-3xl bg-white/95 dark:bg-slate-900/95 backdrop-blur-2xl border border-slate-200/80 dark:border-slate-800/80 shadow-2xl overflow-hidden flex flex-col max-h-[90vh] animate-scale-in"
+            className="w-full max-w-xl rounded-2xl bg-white/95 dark:bg-slate-900/95 backdrop-blur-2xl border border-slate-200/80 dark:border-slate-800/80 shadow-2xl overflow-hidden flex flex-col max-h-[90vh] animate-scale-in"
             dir="rtl"
           >
             {/* Modal Header */}
@@ -557,7 +568,7 @@ export function PersianClinicAiAssistant() {
                   <h3 className="text-sm font-extrabold text-slate-900 dark:text-slate-100">
                     دستیار گفتگویی هوش مصنوعی مینا
                   </h3>
-                  <p className="text-[11px] text-slate-400">
+                  <p className="text-2xs text-slate-400">
                     ثبت هوشمند نوبت، پرداخت، اقساط و درمان با گفتگوی فارسی عامیانه
                   </p>
                 </div>
@@ -568,6 +579,7 @@ export function PersianClinicAiAssistant() {
                   chimes.playPop()
                   setIsOpen(false)
                 }}
+                aria-label="بستن دستیار هوش مصنوعی"
                 className="w-8 h-8 rounded-full flex items-center justify-center text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition press-scale"
               >
                 <X size={18} />
@@ -596,6 +608,8 @@ export function PersianClinicAiAssistant() {
                     <button
                       type="button"
                       onClick={toggleListening}
+                      aria-label={isListening ? 'توقف ضبط صدا' : 'فعال‌سازی ضبط صدا'}
+                      aria-pressed={isListening}
                       className={`w-9 h-9 rounded-xl flex items-center justify-center transition-all ${
                         isListening
                           ? 'bg-red-500 text-white animate-pulse shadow-lg'
@@ -611,9 +625,10 @@ export function PersianClinicAiAssistant() {
                       type="button"
                       onClick={() => handleParse(inputText)}
                       disabled={!inputText.trim()}
+                      aria-label="ارسال پیام"
                       className="w-9 h-9 rounded-xl bg-primary-600 hover:bg-primary-700 text-white flex items-center justify-center transition disabled:opacity-40"
                     >
-                      <Send size={15} />
+                      <Send size={14} />
                     </button>
                   </div>
                 </div>
@@ -628,7 +643,7 @@ export function PersianClinicAiAssistant() {
 
               {/* Suggested Quick Prompt Chips */}
               <div className="space-y-1.5">
-                <span className="text-[11px] font-bold text-slate-400">
+                <span className="text-2xs font-bold text-slate-400">
                   نمونه دستورات پرکاربرد کلینیک:
                 </span>
                 <div className="flex flex-wrap gap-1.5">
@@ -641,7 +656,7 @@ export function PersianClinicAiAssistant() {
                     <button
                       key={idx}
                       onClick={() => handleQuickPrompt(chip)}
-                      className="text-[11px] px-2.5 py-1.5 rounded-xl bg-slate-100 hover:bg-primary-50 dark:bg-slate-800 dark:hover:bg-primary-950/40 text-slate-600 dark:text-slate-300 hover:text-primary-600 dark:hover:text-primary-400 border border-slate-200/60 dark:border-slate-700/60 transition text-right press-scale"
+                      className="text-2xs px-2.5 py-1.5 rounded-xl bg-slate-100 hover:bg-primary-50 dark:bg-slate-800 dark:hover:bg-primary-950/40 text-slate-600 dark:text-slate-300 hover:text-primary-600 dark:hover:text-primary-400 border border-slate-200/60 dark:border-slate-700/60 transition text-right press-scale"
                     >
                       {chip}
                     </button>
@@ -661,12 +676,12 @@ export function PersianClinicAiAssistant() {
                         <h4 className="text-xs font-black text-slate-900 dark:text-slate-100">
                           {parsedAction.title}
                         </h4>
-                        <p className="text-[11px] text-slate-500 dark:text-slate-400">
+                        <p className="text-2xs text-slate-500 dark:text-slate-400">
                           {parsedAction.description}
                         </p>
                       </div>
                     </div>
-                    <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-primary-100 dark:bg-primary-900/60 text-primary-700 dark:text-primary-300">
+                    <span className="text-3xs font-bold px-2 py-0.5 rounded-full bg-primary-100 dark:bg-primary-900/60 text-primary-700 dark:text-primary-300">
                       دقت هوش مصنوعی: ۹۵٪
                     </span>
                   </div>
@@ -675,7 +690,7 @@ export function PersianClinicAiAssistant() {
                   <div className="grid grid-cols-2 gap-2 p-3 rounded-xl bg-white/80 dark:bg-slate-800/80 border border-slate-200/60 dark:border-slate-700/60 text-xs">
                     {parsedAction.details.map((d, i) => (
                       <div key={i} className="flex flex-col">
-                        <span className="text-[10px] text-slate-400">{d.label}</span>
+                        <span className="text-3xs text-slate-400">{d.label}</span>
                         <span className="font-bold text-slate-800 dark:text-slate-200">
                           {d.value}
                         </span>
@@ -685,7 +700,7 @@ export function PersianClinicAiAssistant() {
 
                   {/* Security Confirmation Callout */}
                   <div className="flex items-start gap-2 p-2.5 rounded-xl bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800/50 text-amber-800 dark:text-amber-200 text-xs">
-                    <AlertTriangle size={15} className="shrink-0 mt-0.5 text-amber-500" />
+                    <AlertTriangle size={14} className="shrink-0 mt-0.5 text-amber-500" />
                     <span>
                       جهت رعایت استانداردهای ایمنی بالینی، لطفاً پارامترهای استخراج‌شده فوق را
                       بررسی کرده و در صورت تأیید، دکمه ثبت نهایی را بفشارید.
@@ -737,7 +752,7 @@ export function PersianClinicAiAssistant() {
                           setIsOpen(false)
                           navigate(`/patients/${executionResult.patientId}`)
                         }}
-                        className="flex items-center gap-1 px-3 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-[11px] shadow transition"
+                        className="flex items-center gap-1 px-3 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-2xs shadow transition"
                       >
                         <span>مشاهده پرونده بیمار</span>
                         <ChevronRight size={14} className="rotate-180" />

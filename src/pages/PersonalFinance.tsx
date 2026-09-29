@@ -232,7 +232,7 @@ export default function PersonalFinance() {
       </div>
 
       {itemsForTab.length === 0 ? (
-        <EmptyState icon={<PiggyBank size={40} />} title="موردی ثبت نشده" description="وام، اجاره، چک یا بدهی شخصی خود را اینجا ثبت و پیگیری کنید" />
+        <EmptyState icon={<PiggyBank size={56} />} title="موردی ثبت نشده" description="وام، اجاره، چک یا بدهی شخصی خود را اینجا ثبت و پیگیری کنید" />
       ) : (
         <div className="space-y-2">
           {itemsForTab.map((item) => {
@@ -244,12 +244,12 @@ export default function PersonalFinance() {
                 <div className="flex items-start justify-between gap-2">
                   <div className="min-w-0 flex-1">
                     <p className="text-sm font-bold text-slate-800 dark:text-slate-100 truncate">{item.title}</p>
-                    {item.counterparty && <p className="text-[11px] text-slate-400">{item.counterparty}</p>}
+                    {item.counterparty && <p className="text-2xs text-slate-400">{item.counterparty}</p>}
                   </div>
                   <Badge color={meta.color}>{meta.label}</Badge>
                 </div>
                 <div className="mt-2">
-                  <div className="flex items-center justify-between text-[11px] text-slate-500 dark:text-slate-400 mb-1">
+                  <div className="flex items-center justify-between text-2xs text-slate-500 dark:text-slate-400 mb-1">
                     <span>{formatCurrency(item.paid_amount)} از {formatCurrency(item.total_amount)} ت</span>
                     {item.due_date && <span>سررسید: {toJalaliStringPretty(item.due_date)}</span>}
                   </div>
@@ -257,8 +257,8 @@ export default function PersonalFinance() {
                     <div className="h-full rounded-full bg-success-500 transition-all-smooth" style={{ width: `${progress}%` }} />
                   </div>
                 </div>
-                {item.monthly_amount != null && <p className="text-[11px] text-slate-400 mt-1.5">قسط ماهانه: {formatCurrency(item.monthly_amount)} ت</p>}
-                {item.cheque_number && <p className="text-[11px] text-slate-400 mt-0.5">شماره چک: {toPersianDigits(item.cheque_number)} {item.bank_name && `— ${item.bank_name}`}</p>}
+                {item.monthly_amount != null && <p className="text-2xs text-slate-400 mt-1.5">قسط ماهانه: {formatCurrency(item.monthly_amount)} ت</p>}
+                {item.cheque_number && <p className="text-2xs text-slate-400 mt-0.5">شماره چک: {toPersianDigits(item.cheque_number)} {item.bank_name && `— ${item.bank_name}`}</p>}
                 <div className="flex flex-wrap gap-2 mt-2.5 pt-2.5 border-t border-slate-100 dark:border-slate-800">
                   {remaining > 0 && item.status === 'active' && (
                     <button onClick={() => quickMarkPaid(item)} className="px-2.5 py-1 rounded-lg bg-success-50 dark:bg-success-950/40 text-success-700 dark:text-success-300 text-xs font-medium hover:bg-success-100 transition-colors">تسویه کامل</button>

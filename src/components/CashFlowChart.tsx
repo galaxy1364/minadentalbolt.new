@@ -2,6 +2,7 @@
 import React from 'react'
 import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, Legend } from 'recharts'
 import { toJalaliStringPretty, formatCurrency } from '../lib/persianDate'
+import { colorTokens, CHART_AXIS_COLOR } from '../lib/colorTokens'
 import type { Payment } from '../types'
 
 interface CashFlowData {
@@ -24,8 +25,12 @@ export function CashFlowChart({ payments, expenses, startDate, endDate }: CashFl
     const dataMap: Record<string, { income: number; expense: number }> = {}
 
     // Process payments (income)
+    // Only 'completed' payments count as realized income — this must match
+    // the Income tab's revenueStats.totalRevenue calculation in Reports.tsx,
+    // otherwise the Income and Liquidity tabs show different totals for the
+    // same period. Pending/other statuses have not actually been collected yet.
     payments.forEach((payment) => {
-      if (payment.status !== 'cancelled') {
+      if (payment.status === 'completed') {
         const monthKey = payment.payment_date?.slice(0, 7) || '' // YYYY-MM
         if (monthKey) {
           dataMap[monthKey] = dataMap[monthKey] || { income: 0, expense: 0 }
@@ -34,14 +39,13 @@ export function CashFlowChart({ payments, expenses, startDate, endDate }: CashFl
       }
     })
 
-    // Process expenses
+    // Process expenses (Expense has no status field; all recorded expenses count,
+    // matching revenueStats.totalExpenses in Reports.tsx)
     expenses?.forEach((expense: any) => {
-      if (expense.status !== 'cancelled') {
-        const monthKey = expense.date?.slice(0, 7) || ''
-        if (monthKey) {
-          dataMap[monthKey] = dataMap[monthKey] || { income: 0, expense: 0 }
-          dataMap[monthKey].expense += Number(expense.amount) || 0
-        }
+      const monthKey = expense.date?.slice(0, 7) || ''
+      if (monthKey) {
+        dataMap[monthKey] = dataMap[monthKey] || { income: 0, expense: 0 }
+        dataMap[monthKey].expense += Number(expense.amount) || 0
       }
     })
 
@@ -112,12 +116,12 @@ export function CashFlowChart({ payments, expenses, startDate, endDate }: CashFl
         <AreaChart data={filteredData} margin={{ top: 10, right: 30, left: 0, bottom: 0 }}>
           <defs>
             <linearGradient id="incomeGradient" x1="0" y1="0" x2="0" y2="1">
-              <stop offset="5%" stopColor="#10b981" stopOpacity={0.3}/>
-              <stop offset="95%" stopColor="#10b981" stopOpacity={0}/>
+              <stop offset="5%" stopColor={colorTokens.success[500]} stopOpacity={0.3}/>
+              <stop offset="95%" stopColor={colorTokens.success[500]} stopOpacity={0}/>
             </linearGradient>
             <linearGradient id="expenseGradient" x1="0" y1="0" x2="0" y2="1">
-              <stop offset="5%" stopColor="#ef4444" stopOpacity={0.3}/>
-              <stop offset="95%" stopColor="#ef4444" stopOpacity={0}/>
+              <stop offset="5%" stopColor={colorTokens.error[500]} stopOpacity={0.3}/>
+              <stop offset="95%" stopColor={colorTokens.error[500]} stopOpacity={0}/>
             </linearGradient>
           </defs>
           <CartesianGrid 
@@ -128,13 +132,13 @@ export function CashFlowChart({ payments, expenses, startDate, endDate }: CashFl
           <XAxis 
             dataKey="date" 
             tickFormatter={(value) => toJalaliStringPretty(value).slice(0, 7)}
-            tick={{ fontSize: 10, fill: '#94a3b8' }}
+            tick={{ fontSize: 10, fill: CHART_AXIS_COLOR }}
             tickLine={false}
             axisLine={false}
           />
           <YAxis 
             tickFormatter={(value) => formatCurrency(value)}
-            tick={{ fontSize: 10, fill: '#94a3b8' }}
+            tick={{ fontSize: 10, fill: CHART_AXIS_COLOR }}
             tickLine={false}
             axisLine={false}
           />
@@ -143,7 +147,7 @@ export function CashFlowChart({ payments, expenses, startDate, endDate }: CashFl
           <Area 
             type="monotone" 
             dataKey="income" 
-            stroke="#10b981" 
+            stroke={colorTokens.success[500]} 
             strokeWidth={2}
             fill="url(#incomeGradient)" 
             name="درآمد"
@@ -151,7 +155,7 @@ export function CashFlowChart({ payments, expenses, startDate, endDate }: CashFl
           <Area 
             type="monotone" 
             dataKey="expense" 
-            stroke="#ef4444" 
+            stroke={colorTokens.error[500]} 
             strokeWidth={2}
             fill="url(#expenseGradient)" 
             name="هزینه"

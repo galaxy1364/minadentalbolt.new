@@ -800,7 +800,7 @@ export default function Appointments() {
         <div className="pull-indicator" style={{ opacity: ptr.isRefreshing ? 1 : ptr.pullProgress, top: -4 }}>
           <div className="flex flex-col items-center gap-1">
             <div className={`w-7 h-7 rounded-full border-2 border-primary-300 dark:border-primary-600 border-t-primary-600 dark:border-t-primary-400 ${ptr.isRefreshing ? 'animate-spin' : ''}`} style={{ transform: `scale(${0.6 + ptr.pullProgress * 0.4})` }} />
-            <span className="text-[10px] text-primary-500 font-medium">{ptr.isRefreshing ? 'در حال به‌روزرسانی...' : 'برای به‌روزرسانی بکشید'}</span>
+            <span className="text-3xs text-primary-500 font-medium">{ptr.isRefreshing ? 'در حال به‌روزرسانی...' : 'برای به‌روزرسانی بکشید'}</span>
           </div>
         </div>
       )}
@@ -830,16 +830,16 @@ export default function Appointments() {
               <div key={req.id} className="flex items-center gap-2 p-2.5 rounded-xl bg-white dark:bg-slate-800">
                 <div className="flex-1 min-w-0">
                   <p className="text-sm font-bold text-slate-800 dark:text-slate-100 break-words leading-tight">{req.full_name}</p>
-                  <p className="text-[11px] text-slate-400">
+                  <p className="text-2xs text-slate-400">
                     {toPersianDigits(req.phone)}
                     {req.preferred_date && ` — ${toJalaliStringPretty(req.preferred_date)}`}
                     {req.preferred_time && ` ساعت ${toPersianDigits(req.preferred_time)}`}
                   </p>
                 </div>
-                <button onClick={() => openWizardFromRequest(req)} className="px-2.5 py-1.5 rounded-lg bg-primary-600 text-white text-[11px] font-bold shrink-0">تبدیل به نوبت</button>
+                <button onClick={() => openWizardFromRequest(req)} className="px-2.5 py-1.5 rounded-lg bg-primary-600 text-white text-2xs font-bold shrink-0">تبدیل به نوبت</button>
                 <button
                   onClick={async () => { h.warning(); await rejectBookingRequest(req.id); await loadData() }}
-                  className="px-2.5 py-1.5 rounded-lg bg-slate-100 dark:bg-slate-700 text-slate-500 dark:text-slate-300 text-[11px] font-bold shrink-0"
+                  className="px-2.5 py-1.5 rounded-lg bg-slate-100 dark:bg-slate-700 text-slate-500 dark:text-slate-300 text-2xs font-bold shrink-0"
                 >
                   رد
                 </button>
@@ -851,7 +851,7 @@ export default function Appointments() {
 
       {/* ── Filter tabs + search + view toggle ── */}
       <div className="card-tactile-3d flex flex-wrap items-center justify-between gap-2.5 p-2 rounded-2xl bg-white/95 dark:bg-slate-800/95 border border-slate-200/60 dark:border-slate-700/60 shadow-xs">
-        <div className="flex items-center gap-1.5 overflow-x-auto dock-scroll py-0.5">
+        <div className="flex items-center gap-1.5 overflow-x-auto dock-scroll scroll-rail-affordance py-0.5">
           {filterTabs.map((t) => (
             <button
               key={t.key}
@@ -863,7 +863,7 @@ export default function Appointments() {
           ))}
         </div>
 
-        <div className="flex items-center gap-2 flex-wrap shrink-0">
+        <div className="flex items-center gap-2 overflow-x-auto dock-scroll scroll-rail-affordance py-0.5 w-full sm:w-auto">
           {/* ── Print Button ── */}
           <button
             onClick={() => {
@@ -905,7 +905,7 @@ export default function Appointments() {
             title="پرینت نوبت‌نامه امروز"
             aria-label="پرینت نوبت‌نامه امروز"
           >
-            <Printer size={17} />
+            <Printer size={18} />
           </button>
 
           {/* ── Search Button ── */}
@@ -915,7 +915,7 @@ export default function Appointments() {
             aria-label="جستجو در نوبت‌ها"
             title="جستجوی نوبت‌ها"
           >
-            <Search size={17} />
+            <Search size={18} />
           </button>
 
           {/* ── 3-way View Mode Toggle ── */}
@@ -926,7 +926,7 @@ export default function Appointments() {
               className={`appt-view appt-view-list flex items-center gap-1.5 min-h-[40px] px-3 rounded-lg text-xs font-extrabold transition-all press-scale ${viewMode === 'list' ? 'appt-view-selected' : ''}`}
               title="نمای لیست نوبت‌ها"
             >
-              <List size={15} />
+              <List size={14} />
               <span>لیست</span>
             </button>
             <button
@@ -935,7 +935,7 @@ export default function Appointments() {
               className={`appt-view appt-view-calendar flex items-center gap-1.5 min-h-[40px] px-3 rounded-lg text-xs font-extrabold transition-all press-scale ${viewMode === 'calendar' ? 'appt-view-selected' : ''}`}
               title="تقویم ماهانه"
             >
-              <Calendar size={15} />
+              <Calendar size={14} />
               <span>تقویم</span>
             </button>
             <button
@@ -944,7 +944,7 @@ export default function Appointments() {
               className={`appt-view appt-view-chairs flex items-center gap-1.5 min-h-[40px] px-3 rounded-lg text-xs font-extrabold transition-all press-scale ${viewMode === 'operatory' ? 'appt-view-selected' : ''}`}
               title="جدول ستونی یونیت‌ها و صندلی‌ها"
             >
-              <Grid size={15} />
+              <Grid size={14} />
               <span>صندلی‌ها</span>
             </button>
           </div>
@@ -959,7 +959,7 @@ export default function Appointments() {
             className="appt-tool appt-tool-monitor flex items-center gap-1.5 min-h-[44px] px-3.5 rounded-xl font-extrabold text-xs hover:brightness-105 active:scale-95 transition-all press-scale"
             title="باز کردن مانیتور سالن انتظار (مخصوص تلویزیون و نمایشگر عمومی)"
           >
-            <Tv size={19} strokeWidth={2.6} />
+            <Tv size={18} strokeWidth={2.6} />
             <span>مانیتور سالن</span>
           </button>
         </div>
@@ -995,13 +995,22 @@ export default function Appointments() {
               )}
             </h3>
             {appointments.filter((a) => a.date === selectedCalDate).length === 0 ? (
-              <Card className="p-4"><EmptyState icon={<Calendar size={24} />} title="نوبتی در این روز نیست" /></Card>
+              <Card className="p-4"><EmptyState icon={<Calendar size={56} />} title="نوبتی در این روز نیست" /></Card>
             ) : (
               appointments.filter((a) => a.date === selectedCalDate).sort((a, b) => a.start_time.localeCompare(b.start_time)).map((appt) => {
                 const tm = getType(appt.type)
                 const sm = getStatus(appt.status)
                 return (
-                  <div key={appt.id} className="appt-card p-3.5" style={{ borderRight: `3px solid ${doctorColor(doctors.find((d) => d.id === appt.doctor_id)?.color, 0)}` }} onClick={() => openWizard(appt)}>
+                  <div
+                    key={appt.id}
+                    role="button"
+                    tabIndex={0}
+                    aria-label={`نوبت ${patientName(appt)} ساعت ${toPersianDigits(appt.start_time)}`}
+                    className="appt-card p-3.5 focus:outline-none focus:ring-2 focus:ring-primary-400"
+                    style={{ borderRight: `3px solid ${doctorColor(doctors.find((d) => d.id === appt.doctor_id)?.color, 0)}` }}
+                    onClick={() => openWizard(appt)}
+                    onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); openWizard(appt) } }}
+                  >
                     <div className="flex items-center gap-3">
                       <div className="time-badge !min-w-[50px] !text-sm">
                         {toPersianDigits(appt.start_time)}
@@ -1029,7 +1038,7 @@ export default function Appointments() {
                                 if (appt.patient_id) navigate(`/patients/${appt.patient_id}`)
                               }}
                               title="شماره پرونده بیمار"
-                              className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md bg-slate-900 dark:bg-primary-950 text-white dark:text-primary-200 text-[10px] font-mono font-bold hover:scale-105 active:scale-95 transition-all cursor-pointer"
+                              className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-lg bg-slate-900 dark:bg-primary-950 text-white dark:text-primary-200 text-3xs font-mono font-bold hover:scale-105 active:scale-95 transition-all cursor-pointer"
                               dir="ltr"
                             >
                               <FileText size={10} className="text-primary-400" />
@@ -1081,7 +1090,7 @@ export default function Appointments() {
       {viewMode === 'list' && (filtered.length === 0 ? (
         <Card className="p-6">
           <EmptyState
-            icon={<Calendar size={32} />}
+            icon={<Calendar size={56} />}
             title="نوبتی یافت نشد"
             description="برای ثبت نوبت جدید روی «نوبت جدید» بزنید"
             action={<Button size="sm" onClick={() => openWizard()}><Plus size={16} /> افزودن نوبت</Button>}
@@ -1098,21 +1107,25 @@ export default function Appointments() {
             return (
               <div
                 key={appt.id}
+                role="button"
+                tabIndex={0}
+                aria-label={`نوبت ${patientName(appt)}`}
                 className={`stagger-item relative overflow-hidden p-3.5 rounded-2xl cursor-pointer hover:shadow-md border border-slate-100 dark:border-slate-700 bg-gradient-to-br ${theme.bg} ${theme.ring} focus:outline-none focus:ring-4 transition-all duration-300 group`}
                 style={{ animationDelay: `${Math.min(idx, 15) * 30}ms` }}
                 onClick={() => openWizard(appt)}
+                onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); openWizard(appt) } }}
               >
                 <div className={`absolute -bottom-6 -right-6 w-24 h-24 rounded-full bg-gradient-to-br ${theme.blob} to-transparent blur-xl pointer-events-none breathe-slow opacity-50 group-hover:opacity-80 transition-opacity duration-700`} />
                 <div className="flex items-start gap-3 relative z-10">
                   {/* Time badge */}
                   {isToday && appt.status === 'scheduled' ? (
                     <div className="time-badge">
-                      <div className="text-[9px] opacity-80 leading-none">{timeParts(appt.start_time).period}</div>
+                      <div className="text-4xs opacity-80 leading-none">{timeParts(appt.start_time).period}</div>
                       <div className="text-lg font-extrabold leading-tight">{timeParts(appt.start_time).clock}</div>
                     </div>
                   ) : (
                     <div className="waiting-badge">
-                      <div className="text-[9px] text-accent-600 leading-none">{timeParts(appt.start_time).period}</div>
+                      <div className="text-4xs text-accent-600 leading-none">{timeParts(appt.start_time).period}</div>
                       <div className="text-lg font-extrabold text-accent-700 leading-tight">{timeParts(appt.start_time).clock}</div>
                     </div>
                   )}
@@ -1141,7 +1154,7 @@ export default function Appointments() {
                             if (appt.patient_id) navigate(`/patients/${appt.patient_id}`)
                           }}
                           title="شماره پرونده بیمار"
-                          className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg bg-slate-900 dark:bg-primary-950 text-white dark:text-primary-200 text-[10px] font-mono font-bold hover:scale-105 active:scale-95 transition-all cursor-pointer"
+                          className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg bg-slate-900 dark:bg-primary-950 text-white dark:text-primary-200 text-3xs font-mono font-bold hover:scale-105 active:scale-95 transition-all cursor-pointer"
                           dir="ltr"
                         >
                           <FileText size={10} className="text-primary-400" />
@@ -1154,23 +1167,23 @@ export default function Appointments() {
                         <span className={`w-1.5 h-1.5 rounded-full ${tm.dot} ml-1`} />
                         {tm.label}
                       </span>
-                      <span className={`text-[10px] px-2 py-0.5 rounded-lg border font-bold ${spec.badgeClass}`}>
+                      <span className={`text-3xs px-2 py-0.5 rounded-lg border font-bold ${spec.badgeClass}`}>
                         {spec.label}
                       </span>
                       <span className={`status-pill ${sm.bg} ${sm.color}`}>{sm.label}</span>
                       {appt.status === 'arrived' && appt.check_in_time && (
-                        <span className="text-[10px] px-2 py-0.5 rounded-lg font-bold bg-teal-50 dark:bg-teal-950/40 text-teal-700 dark:text-teal-300 border border-teal-200 dark:border-teal-800 animate-pulse">
+                        <span className="text-3xs px-2 py-0.5 rounded-lg font-bold bg-teal-50 dark:bg-teal-950/40 text-teal-700 dark:text-teal-300 border border-teal-200 dark:border-teal-800 animate-pulse">
                           ⏳ {formatWaitingTime(computeWaitingTimeMinutes(appt.check_in_time))}
                         </span>
                       )}
                     </div>
-                    <div className="flex items-center gap-3 text-[11px] text-slate-500 flex-wrap">
+                    <div className="flex items-center gap-3 text-2xs text-slate-500 flex-wrap">
                       <span className="flex items-center gap-1 font-medium text-slate-700 dark:text-slate-300">
-                        <User size={11} className="text-primary-500" /> دکتر {doctorName(appt)}
+                        <User size={12} className="text-primary-500" /> دکتر {doctorName(appt)}
                       </span>
                       {unitName(appt) && (
                         <span className="flex items-center gap-1 font-medium text-slate-600 dark:text-slate-400">
-                          <Armchair size={11} className="text-teal-500" /> {unitName(appt)}
+                          <Armchair size={12} className="text-teal-500" /> {unitName(appt)}
                         </span>
                       )}
                       {appt.estimated_fee != null && (
@@ -1184,7 +1197,7 @@ export default function Appointments() {
                           title="مشاهده تعرفه و صورت‌حساب در پرونده"
                           className="flex items-center gap-1 font-mono font-bold text-slate-700 dark:text-slate-200 hover:text-primary-600 transition-colors cursor-pointer"
                         >
-                          <DollarSign size={11} className="text-emerald-500" />
+                          <DollarSign size={12} className="text-emerald-500" />
                           <span>{formatCurrency(appt.estimated_fee)} ت</span>
                         </button>
                       )}
@@ -1227,7 +1240,7 @@ export default function Appointments() {
                               className="flex items-center gap-1 px-3 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-black shadow-sm transition-all-smooth press-scale"
                               title="تسویه سریع و ثبت پرداخت"
                             >
-                              <DollarSign size={13} className="stroke-[3]" />
+                              <DollarSign size={14} className="stroke-[3]" />
                               <span>تسویه و پرداخت</span>
                             </button>
                           </div>
@@ -1317,7 +1330,7 @@ export default function Appointments() {
 
                 {/* Notes */}
                 {appt.notes && (
-                  <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-2 pt-2 border-t border-slate-100/50 dark:border-slate-700/50 line-clamp-1 relative z-10">{appt.notes}</p>
+                  <p className="text-2xs text-slate-500 dark:text-slate-400 mt-2 pt-2 border-t border-slate-100/50 dark:border-slate-700/50 line-clamp-1 relative z-10">{appt.notes}</p>
                 )}
               </div>
             )
@@ -1344,7 +1357,7 @@ export default function Appointments() {
                   }`}>
                     {i < wizardStep ? <CheckCircle2 size={18} /> : toPersianDigits(i + 1)}
                   </div>
-                  <span className={`text-[11px] font-semibold ${i <= wizardStep ? 'text-slate-700' : 'text-slate-400'}`}>{label}</span>
+                  <span className={`text-2xs font-semibold ${i <= wizardStep ? 'text-slate-700' : 'text-slate-400'}`}>{label}</span>
                 </button>
               ))}
             </div>
@@ -1428,7 +1441,7 @@ export default function Appointments() {
                           <div className="flex-1 min-w-0">
                             <p className="font-medium text-sm text-slate-800 truncate flex items-center gap-1.5">
                               {p.first_name} {p.last_name}
-                              {!p.is_active && <span className="text-[10px] px-1.5 py-0.5 rounded-md bg-slate-100 text-slate-500 font-bold shrink-0">بایگانی</span>}
+                              {!p.is_active && <span className="text-3xs px-1.5 py-0.5 rounded-lg bg-slate-100 text-slate-500 font-bold shrink-0">بایگانی</span>}
                             </p>
                             <p className="text-xs text-slate-500">{p.file_number || 'بدون پرونده'}{p.phone ? ` • ${toPersianDigits(p.phone)}` : ''}</p>
                             {/* Both facts already sat on the record and
@@ -1446,12 +1459,12 @@ export default function Appointments() {
                               return (
                                 <div className="flex items-center gap-1 flex-wrap mt-1">
                                   {hint.debt > 0 && (
-                                    <span className="text-[10px] px-1.5 py-0.5 rounded-md bg-amber-100 text-amber-800 font-bold">
+                                    <span className="text-3xs px-1.5 py-0.5 rounded-lg bg-amber-100 text-amber-800 font-bold">
                                       بدهکار {formatCurrency(hint.debt)} ت
                                     </span>
                                   )}
                                   {hint.clinical.map((c) => (
-                                    <span key={c} className="text-[10px] px-1.5 py-0.5 rounded-md bg-error-100 text-error-700 font-bold">
+                                    <span key={c} className="text-3xs px-1.5 py-0.5 rounded-lg bg-error-100 text-error-700 font-bold">
                                       {c}
                                     </span>
                                   ))}
@@ -1731,7 +1744,7 @@ export default function Appointments() {
                         <button
                           key={v}
                           onClick={() => { h.select(); setWizardData((p) => ({ ...p, recurrence: v })) }}
-                          className={`filter-tab !text-[11px] ${wizardData.recurrence === v ? 'active' : ''}`}
+                          className={`filter-tab !text-2xs ${wizardData.recurrence === v ? 'active' : ''}`}
                         >
                           {label}
                         </button>
@@ -1740,7 +1753,7 @@ export default function Appointments() {
                     {wizardData.recurrence !== 'none' && (
                       <div className="mt-2.5">
                         <Input label="تعداد جلسات" type="number" value={wizardData.recurrenceCount} onChange={(v) => setWizardData((p) => ({ ...p, recurrenceCount: v }))} placeholder="4" />
-                        <p className="text-[11px] text-slate-400 mt-1">مجموعاً {toPersianDigits(wizardData.recurrenceCount || '0')} نوبت با همین ساعت و پزشک ساخته می‌شود — هرکدام جدا برای تداخل زمانی بررسی می‌شوند.</p>
+                        <p className="text-2xs text-slate-400 mt-1">مجموعاً {toPersianDigits(wizardData.recurrenceCount || '0')} نوبت با همین ساعت و پزشک ساخته می‌شود — هرکدام جدا برای تداخل زمانی بررسی می‌شوند.</p>
                       </div>
                     )}
                   </div>
@@ -1803,7 +1816,7 @@ export default function Appointments() {
                         <button
                           type="button"
                           onClick={() => { h.tap(); navigate('/laboratory') }}
-                          className="inline-flex items-center gap-1 text-[11px] font-bold text-cyan-700 dark:text-cyan-300 hover:underline"
+                          className="inline-flex items-center gap-1 text-2xs font-bold text-cyan-700 dark:text-cyan-300 hover:underline"
                         >
                           <span>مشاهده کارتابل لابراتوار</span>
                           <ChevronLeft size={12} />
@@ -1882,7 +1895,7 @@ export default function Appointments() {
                     }`}
                   >
                     <span>{r.label}</span>
-                    {cancelReason === r.label && <CheckCircle2 size={15} className="text-rose-600" />}
+                    {cancelReason === r.label && <CheckCircle2 size={14} className="text-rose-600" />}
                   </button>
                 ))}
               </div>
@@ -1902,7 +1915,7 @@ export default function Appointments() {
                 انصراف
               </Button>
               <Button variant="danger" onClick={confirmCancelWithReason}>
-                <Ban size={15} /> تایید لغو نوبت
+                <Ban size={14} /> تایید لغو نوبت
               </Button>
             </div>
           </div>
@@ -1923,7 +1936,7 @@ export default function Appointments() {
                 <Sparkles size={16} className="text-amber-600 shrink-0" />
                 وقت نوبت زیر با لغو آزاد شد:
               </p>
-              <div className="flex items-center gap-3 font-medium text-[11px] pt-1 text-slate-600 dark:text-slate-300 flex-wrap">
+              <div className="flex items-center gap-3 font-medium text-2xs pt-1 text-slate-600 dark:text-slate-300 flex-wrap">
                 <span>📅 {toJalaliStringPretty(freedSlotInfo.date)}</span>
                 <span>⏰ ساعت {toPersianDigits(freedSlotInfo.start_time)}</span>
                 {freedSlotInfo.doctor_id && (
@@ -1953,11 +1966,11 @@ export default function Appointments() {
                           {cand.entry.priority === 4 ? 'فوری' : cand.entry.priority === 3 ? 'بالا' : 'عادی'}
                         </Badge>
                       </div>
-                      <p className="text-[11px] text-teal-600 dark:text-teal-400 mt-1 font-medium truncate">
+                      <p className="text-2xs text-teal-600 dark:text-teal-400 mt-1 font-medium truncate">
                         {cand.matchReason}
                       </p>
                       {cand.entry.reason && (
-                        <p className="text-[11px] text-slate-400 truncate mt-0.5">
+                        <p className="text-2xs text-slate-400 truncate mt-0.5">
                           علت: {cand.entry.reason}
                         </p>
                       )}
@@ -2045,7 +2058,7 @@ export default function Appointments() {
                 انصراف
               </Button>
               <Button variant="primary" onClick={handleQuickCheckout} disabled={checkoutSubmitting || (parseInt(checkoutAmount, 10) || 0) <= 0}>
-                {checkoutSubmitting ? <Spinner size={15} /> : <CheckCircle2 size={15} />}
+                {checkoutSubmitting ? <Spinner size={14} /> : <CheckCircle2 size={14} />}
                 {checkoutSubmitting ? 'در حال ثبت...' : 'ثبت پرداخت و تسویه نهایی'}
               </Button>
             </div>

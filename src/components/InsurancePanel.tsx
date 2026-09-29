@@ -147,7 +147,7 @@ export function InsurancePanel({ patientId, previewCost }: Props) {
             </div>
             {preview.warning && (
               <p className="mt-2 flex items-start gap-1.5 text-amber-800">
-                <AlertTriangle size={15} className="shrink-0 mt-0.5" /> {preview.warning}
+                <AlertTriangle size={14} className="shrink-0 mt-0.5" /> {preview.warning}
               </p>
             )}
           </div>

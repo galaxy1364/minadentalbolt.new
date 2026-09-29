@@ -78,13 +78,13 @@ export function AppLockScreen({ onUnlock }: { onUnlock: () => void }) {
           <button key={d} onClick={() => press(d)} className="w-16 h-16 rounded-full bg-slate-100 dark:bg-slate-800 text-xl font-bold text-slate-700 dark:text-slate-200 mx-auto press-scale">{toPersianDigits(d)}</button>
         ))}
         {hasBiometricRegistered() ? (
-          <button onClick={tryBiometric} disabled={tryingBiometric} className="w-16 h-16 rounded-full flex items-center justify-center text-primary-600 mx-auto press-scale">
-            <Fingerprint size={26} />
+          <button onClick={tryBiometric} disabled={tryingBiometric} aria-label="ورود با اثر انگشت" className="w-16 h-16 rounded-full flex items-center justify-center text-primary-600 mx-auto press-scale">
+            <Fingerprint size={28} />
           </button>
         ) : <div />}
         <button onClick={() => press('0')} className="w-16 h-16 rounded-full bg-slate-100 dark:bg-slate-800 text-xl font-bold text-slate-700 dark:text-slate-200 mx-auto press-scale">{toPersianDigits('0')}</button>
-        <button onClick={backspace} className="w-16 h-16 rounded-full flex items-center justify-center text-slate-400 mx-auto press-scale">
-          <Delete size={22} />
+        <button onClick={backspace} aria-label="حذف آخرین رقم" className="w-16 h-16 rounded-full flex items-center justify-center text-slate-400 mx-auto press-scale">
+          <Delete size={20} />
         </button>
       </div>
     </div>

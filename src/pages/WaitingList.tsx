@@ -1,7 +1,9 @@
 // WaitingList.tsx - Persian RTL Dental Clinic Waiting List Management
 import { useState, useEffect, useCallback, useMemo } from 'react'
+import { usePullToRefresh } from '../lib/usePullToRefresh'
 import { PatientSelect } from '../components/PatientSelect'
 import { PatientAlerts } from '../components/PatientAlerts'
+import { CHART_AXIS_COLOR_STRONG } from '../lib/colorTokens'
 import { useNavigate } from 'react-router-dom'
 import { Clock, Search, Plus, Phone, Bell, CheckCircle2, XCircle, Calendar, Smile, AlertCircle, Edit2, Ban, MessageSquare } from 'lucide-react'
 import { BarChart, Bar, XAxis, YAxis, Tooltip as RTooltip, ResponsiveContainer, Cell } from 'recharts'
@@ -112,6 +114,7 @@ export default function WaitingList() {
   useEffect(() => {
     loadData()
   }, [loadData])
+  const ptr = usePullToRefresh(async () => { await loadData() })
 
   // ===========================================================================
   // Derived Data
@@ -411,14 +414,25 @@ export default function WaitingList() {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center py-20">
-        <Spinner size={32} />
+      <div className="space-y-4" aria-busy="true" aria-live="polite">
+        <div className="skeleton h-12 rounded-xl" />
+        <div className="space-y-2">
+          {[0, 1, 2, 3].map((i) => <div key={i} className="skeleton h-20 rounded-2xl" />)}
+        </div>
       </div>
     )
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6" style={{ paddingBottom: 'calc(6rem + env(safe-area-inset-bottom, 0px))' }} {...ptr.handlers}>
+      {ptr.pullDistance > 0 && (
+        <div className="pull-indicator" style={{ opacity: ptr.isRefreshing ? 1 : ptr.pullProgress, top: -4 }}>
+          <div className="flex flex-col items-center gap-1">
+            <div className={`w-7 h-7 rounded-full border-2 border-teal-300 dark:border-teal-600 border-t-teal-600 dark:border-t-teal-400 ${ptr.isRefreshing ? 'animate-spin' : ''}`} style={{ transform: `scale(${0.6 + ptr.pullProgress * 0.4})` }} />
+            <span className="text-3xs text-teal-600 font-medium">{ptr.isRefreshing ? 'در حال به‌روزرسانی...' : 'برای به‌روزرسانی بکشید'}</span>
+          </div>
+        </div>
+      )}
       <ModuleHeader
         moduleKey="waitingList"
         title="لیست انتظار"
@@ -452,6 +466,7 @@ export default function WaitingList() {
           <select
             value={filterStatus}
             onChange={(e) => setFilterStatus(e.target.value)}
+            aria-label="فیلتر وضعیت لیست انتظار"
             className="px-3 py-2 rounded-xl border border-slate-200 bg-slate-50 text-sm focus:outline-none focus:ring-2 focus:ring-primary-400"
           >
             <option value="">همه وضعیت‌ها</option>
@@ -473,7 +488,7 @@ export default function WaitingList() {
           {filteredEntries.length === 0 ? (
             <Card className="p-5">
               <EmptyState
-                icon={<Clock size={28} />}
+                icon={<Clock size={56} />}
                 title="ورودی در لیست انتظار نیست"
                 description="با افزودن بیمار به لیست شروع کنید"
                 action={<Button onClick={openCreateModal} variant="primary" size="sm" className="press-scale"><Plus size={14} className="inline ml-1" />افزودن</Button>}
@@ -497,7 +512,7 @@ export default function WaitingList() {
                     <div className="relative z-10 p-4">
                       <div className="flex items-start justify-between gap-3">
                         <div className="flex items-center gap-3 min-w-0 flex-1">
-                          <div className={`w-11 h-11 rounded-xl ${theme.iconBg} flex items-center justify-center text-white flex-shrink-0 shadow-inner`}>
+                          <div className={`w-10 h-10 rounded-xl ${theme.iconBg} flex items-center justify-center text-white flex-shrink-0 shadow-inner`}>
                             <Clock size={20} />
                           </div>
                           <div className="min-w-0 flex-1">
@@ -523,7 +538,7 @@ export default function WaitingList() {
                                     if (e.patient_id) navigate(`/patients/${e.patient_id}`)
                                   }}
                                   title="شماره پرونده بیمار"
-                                  className="inline-flex items-center gap-1 px-1.5 py-0.2 rounded bg-slate-900 dark:bg-primary-950 text-white dark:text-primary-300 text-[10px] font-mono font-bold hover:scale-105 active:scale-95 transition-all cursor-pointer"
+                                  className="inline-flex items-center gap-1 px-1.5 py-0.2 rounded bg-slate-900 dark:bg-primary-950 text-white dark:text-primary-300 text-3xs font-mono font-bold hover:scale-105 active:scale-95 transition-all cursor-pointer"
                                   dir="ltr"
                                 >
                                   <span>{toPersianDigits(e.patient.file_number)}</span>
@@ -563,7 +578,7 @@ export default function WaitingList() {
                             target="_blank"
                             rel="noopener noreferrer"
                             onClick={(ev) => { ev.stopPropagation(); h.tap(); chimes.playPop() }}
-                            className="flex items-center gap-1 text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50 dark:hover:bg-emerald-950/30 px-2 py-0.5 rounded-lg text-[11px] font-medium transition-colors press-scale"
+                            className="flex items-center gap-1 text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50 dark:hover:bg-emerald-950/30 px-2 py-0.5 rounded-lg text-2xs font-medium transition-colors press-scale"
                             title="ارسال پیام سریع در پیام‌رسان / واتساپ"
                           >
                             <MessageSquare size={12} />
@@ -647,12 +662,12 @@ export default function WaitingList() {
         <Card className="p-5">
           <h3 className="text-sm font-bold text-slate-800 mb-4">توزیع بر اساس اولویت</h3>
           {priorityChartData.every((d) => d.count === 0) ? (
-            <EmptyState icon={<AlertCircle size={28} />} title="داده‌ای موجود نیست" />
+            <EmptyState icon={<AlertCircle size={56} />} title="داده‌ای موجود نیست" />
           ) : (
             <ResponsiveContainer width="100%" height={300}>
               <BarChart data={priorityChartData} margin={{ top: 10, right: 10, left: 10, bottom: 0 }}>
-                <XAxis dataKey="name" tick={{ fontSize: 11, fill: '#64748b' }} />
-                <YAxis tick={{ fontSize: 11, fill: '#64748b' }} allowDecimals={false} />
+                <XAxis dataKey="name" tick={{ fontSize: 11, fill: CHART_AXIS_COLOR_STRONG }} />
+                <YAxis tick={{ fontSize: 11, fill: CHART_AXIS_COLOR_STRONG }} allowDecimals={false} />
                 <RTooltip formatter={(v: number) => [formatNumber(v), 'تعداد']} contentStyle={{ direction: 'rtl', fontSize: 12, borderRadius: 12, border: 'none', boxShadow: '0 4px 12px rgba(0,0,0,0.1)' }} />
                 <Bar dataKey="count" radius={[6, 6, 0, 0]}>
                   {priorityChartData.map((_, i) => <Cell key={i} fill={CHART_COLORS[i % CHART_COLORS.length]} />)}

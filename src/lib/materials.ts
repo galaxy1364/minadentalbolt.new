@@ -35,7 +35,7 @@ export const MATERIAL_VALUES: Record<MaterialLevel, { blur: number; opacity: num
   solid:    { blur: 0,  opacity: 1.00, saturate: 100 },
   subtle:   { blur: 6, opacity: 0.97, saturate: 125 },
   standard: { blur: 10, opacity: 0.94, saturate: 145 },
-  vivid:    { blur: 14, opacity: 0.88, saturate: 160 },
+  vivid:    { blur: 44, opacity: 0.62, saturate: 220 },
 }
 
 const STORAGE_KEY = 'minadent_material_level'

@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react'
+import { colorTokens } from '../lib/colorTokens'
 import { useNavigate } from 'react-router-dom'
 import {
   X,
@@ -126,8 +127,21 @@ export function useClinicAlarmSummary() {
 
   useEffect(() => {
     refresh()
-    const timer = setInterval(refresh, 45000)
-    return () => clearInterval(timer)
+    // MOD-FIX: only poll while the tab/app is actually visible — a hidden
+    // or backgrounded app has no reason to keep re-fetching nine tables
+    // every 45s, and that's exactly the kind of always-on work that keeps
+    // a phone's CPU/radio busy and drains its battery for no visible gain.
+    const timer = setInterval(() => {
+      if (document.visibilityState === 'visible') refresh()
+    }, 45000)
+    const onVisible = () => {
+      if (document.visibilityState === 'visible') refresh()
+    }
+    document.addEventListener('visibilitychange', onVisible)
+    return () => {
+      clearInterval(timer)
+      document.removeEventListener('visibilitychange', onVisible)
+    }
   }, [refresh])
 
   return { bundle, loading, refresh }
@@ -241,8 +255,12 @@ export function ClinicalAlarmCenter({ open, onClose }: ClinicalAlarmCenterProps)
 
       {/* Drawer content */}
       <div className="relative w-full max-w-md h-full bg-white dark:bg-slate-900 shadow-2xl flex flex-col border-l border-slate-200 dark:border-slate-800 animate-in slide-in-from-left duration-300">
-        {/* Header */}
-        <div className="flex items-center justify-between px-4 py-3.5 border-b border-slate-100 dark:border-slate-800 bg-slate-50/80 dark:bg-slate-900/80 backdrop-blur-md">
+        {/* Header — MOD-FIX: pad for the iPhone notch/status bar so the
+            title, refresh, and close (X) buttons never sit under it. */}
+        <div
+          className="flex items-center justify-between px-4 pb-3.5 border-b border-slate-100 dark:border-slate-800 bg-slate-50/80 dark:bg-slate-900/80 backdrop-blur-md"
+          style={{ paddingTop: 'calc(0.875rem + env(safe-area-inset-top, 0px))' }}
+        >
           <div className="flex items-center gap-2.5">
             <div className="relative w-9 h-9 rounded-xl bg-gradient-to-tr from-amber-500 to-red-500 text-white flex items-center justify-center shadow-md">
               <Bell size={18} />
@@ -254,7 +272,7 @@ export function ClinicalAlarmCenter({ open, onClose }: ClinicalAlarmCenterProps)
               <h2 id="alarm-center-title" className="text-sm font-bold text-slate-900 dark:text-slate-100">
                 مرکز آلارم و هشدارهای بالینی
               </h2>
-              <p className="text-[11px] text-slate-500 dark:text-slate-400">
+              <p className="text-2xs text-slate-500 dark:text-slate-400">
                 {bundle.total > 0
                   ? `${toPersianDigits(bundle.total)} مورد نیازمند پیگیری فوری`
                   : 'امور بالینی و مالی به‌روز هستند'}
@@ -273,7 +291,7 @@ export function ClinicalAlarmCenter({ open, onClose }: ClinicalAlarmCenterProps)
               title="بروزرسانی داده‌ها"
               className="w-8 h-8 rounded-lg flex items-center justify-center text-slate-500 hover:text-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors disabled:opacity-50 press-scale"
             >
-              <RefreshCw size={15} className={loading ? 'animate-spin' : ''} />
+              <RefreshCw size={14} className={loading ? 'animate-spin' : ''} />
             </button>
             <button
               onClick={() => {
@@ -291,7 +309,7 @@ export function ClinicalAlarmCenter({ open, onClose }: ClinicalAlarmCenterProps)
         {/* Search bar */}
         <div className="p-3 border-b border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/40">
           <div className="relative">
-            <Search size={15} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400" />
+            <Search size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400" />
             <input
               type="text"
               value={search}
@@ -334,7 +352,7 @@ export function ClinicalAlarmCenter({ open, onClose }: ClinicalAlarmCenterProps)
                 <span>{tab.label}</span>
                 {count > 0 && (
                   <span
-                    className={`text-[10px] px-1.5 py-0.2 rounded-full font-bold ${
+                    className={`text-3xs px-1.5 py-0.2 rounded-full font-bold ${
                       active
                         ? 'bg-white/20 text-white dark:bg-slate-900/20 dark:text-slate-900'
                         : 'bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-300'
@@ -367,7 +385,7 @@ export function ClinicalAlarmCenter({ open, onClose }: ClinicalAlarmCenterProps)
               const meta = REMINDER_CATEGORY_META[item.category] || {
                 label: 'هشدار',
                 icon: '⚠️',
-                color: '#64748b',
+                color: colorTokens.secondary[500],
               }
               const itemKey = item.id || `${item.patient.id}-${item.category}`
 
@@ -404,7 +422,7 @@ export function ClinicalAlarmCenter({ open, onClose }: ClinicalAlarmCenterProps)
                         >
                           {item.title}
                         </button>
-                        <p className="text-[10px] text-slate-400">
+                        <p className="text-3xs text-slate-400">
                           {meta.label}
                           {item.extraInfo ? ` · ${item.extraInfo}` : ''}
                         </p>
@@ -412,13 +430,13 @@ export function ClinicalAlarmCenter({ open, onClose }: ClinicalAlarmCenterProps)
                     </div>
 
                     {isCritical ? (
-                      <span className="flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full bg-red-100 text-red-700 dark:bg-red-950/60 dark:text-red-300 shrink-0">
-                        <AlertTriangle size={11} />
+                      <span className="flex items-center gap-1 text-3xs font-bold px-2 py-0.5 rounded-full bg-red-100 text-red-700 dark:bg-red-950/60 dark:text-red-300 shrink-0">
+                        <AlertTriangle size={12} />
                         فوری
                       </span>
                     ) : item.dueDate ? (
-                      <span className="flex items-center gap-1 text-[10px] text-slate-500 dark:text-slate-400 shrink-0">
-                        <Clock size={11} />
+                      <span className="flex items-center gap-1 text-3xs text-slate-500 dark:text-slate-400 shrink-0">
+                        <Clock size={12} />
                         {toJalaliStringPretty(item.dueDate)}
                       </span>
                     ) : null}
@@ -433,7 +451,7 @@ export function ClinicalAlarmCenter({ open, onClose }: ClinicalAlarmCenterProps)
                     <div className="flex items-center gap-1">
                       <button
                         onClick={() => handleNavigate(`/patients/${item.patient.id}`)}
-                        className="px-2.5 py-1 rounded-lg text-[11px] font-semibold bg-slate-100 hover:bg-slate-200 dark:bg-slate-700 dark:hover:bg-slate-600 text-slate-700 dark:text-slate-200 transition-colors"
+                        className="px-2.5 py-1 rounded-lg text-2xs font-semibold bg-slate-100 hover:bg-slate-200 dark:bg-slate-700 dark:hover:bg-slate-600 text-slate-700 dark:text-slate-200 transition-colors"
                       >
                         مشاهده پرونده
                       </button>
@@ -442,10 +460,10 @@ export function ClinicalAlarmCenter({ open, onClose }: ClinicalAlarmCenterProps)
                         <a
                           href={`tel:${item.patient.phone}`}
                           onClick={(e) => { e.stopPropagation(); h.tap() }}
-                          className="flex items-center gap-1 px-2 py-1 rounded-lg text-[11px] font-semibold bg-emerald-50 hover:bg-emerald-100 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 transition-colors press-scale"
+                          className="flex items-center gap-1 px-2 py-1 rounded-lg text-2xs font-semibold bg-emerald-50 hover:bg-emerald-100 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 transition-colors press-scale"
                           title={`تماس مستقیم با ${item.patient.phone}`}
                         >
-                          <Phone size={11} />
+                          <Phone size={12} />
                           <span className="hidden sm:inline">تماس</span>
                         </a>
                       )}
@@ -456,10 +474,10 @@ export function ClinicalAlarmCenter({ open, onClose }: ClinicalAlarmCenterProps)
                           target="_blank"
                           rel="noopener noreferrer"
                           onClick={(e) => { e.stopPropagation(); chimes.playPop() }}
-                          className="flex items-center gap-1 px-2 py-1 rounded-lg text-[11px] font-semibold bg-emerald-600/10 hover:bg-emerald-600/20 text-emerald-600 dark:text-emerald-400 transition-colors press-scale"
+                          className="flex items-center gap-1 px-2 py-1 rounded-lg text-2xs font-semibold bg-emerald-600/10 hover:bg-emerald-600/20 text-emerald-600 dark:text-emerald-400 transition-colors press-scale"
                           title={`ارسال پیام در واتساپ به ${item.patient.phone}`}
                         >
-                          <MessageSquare size={11} />
+                          <MessageSquare size={12} />
                           <span className="hidden sm:inline">واتساپ</span>
                         </a>
                       )}
@@ -467,10 +485,10 @@ export function ClinicalAlarmCenter({ open, onClose }: ClinicalAlarmCenterProps)
                       {item.actionPath && (
                         <button
                           onClick={() => handleNavigate(item.actionPath!)}
-                          className="flex items-center gap-1 px-2.5 py-1 rounded-lg text-[11px] font-semibold text-primary-600 hover:bg-primary-50 dark:hover:bg-primary-950/40 transition-colors press-scale"
+                          className="flex items-center gap-1 px-2.5 py-1 rounded-lg text-2xs font-semibold text-primary-600 hover:bg-primary-50 dark:hover:bg-primary-950/40 transition-colors press-scale"
                         >
                           <span>اقدام مستقیم</span>
-                          <ExternalLink size={11} />
+                          <ExternalLink size={12} />
                         </button>
                       )}
                     </div>
@@ -480,9 +498,9 @@ export function ClinicalAlarmCenter({ open, onClose }: ClinicalAlarmCenterProps)
                         onClick={() => handleSendSms(item)}
                         disabled={sendingId === itemKey}
                         title={`ارسال پیامک به ${item.patient.phone}`}
-                        className="flex items-center gap-1 px-2.5 py-1 rounded-lg text-[11px] font-bold bg-primary-500 hover:bg-primary-600 active:scale-95 text-white transition-all-smooth disabled:opacity-50"
+                        className="flex items-center gap-1 px-2.5 py-1 rounded-lg text-2xs font-bold bg-primary-500 hover:bg-primary-600 active:scale-95 text-white transition-all-smooth disabled:opacity-50"
                       >
-                        <Send size={11} className={sendingId === itemKey ? 'animate-bounce' : ''} />
+                        <Send size={12} className={sendingId === itemKey ? 'animate-bounce' : ''} />
                         <span>ارسال پیامک</span>
                       </button>
                     ) : null}
@@ -500,7 +518,7 @@ export function ClinicalAlarmCenter({ open, onClose }: ClinicalAlarmCenterProps)
             className="w-full flex items-center justify-center gap-2 py-2 rounded-xl text-xs font-bold text-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-800 transition-colors"
           >
             <span>مشاهده صفحه کامل یادآوری‌ها و پیگیری‌ها</span>
-            <ArrowLeft size={13} />
+            <ArrowLeft size={14} />
           </button>
         </div>
       </div>

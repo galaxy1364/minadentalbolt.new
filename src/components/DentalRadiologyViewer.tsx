@@ -1,6 +1,7 @@
 // DentalRadiologyViewer.tsx — Advanced Diagnostic Dental Image & X-Ray Viewer
 // Features: Brightness/Contrast, Negative/Invert, Grayscale, Pan & Zoom, Digital Caliper measurement
 import React, { useState, useRef, useEffect, useCallback, useMemo } from 'react'
+import { createPortal } from 'react-dom'
 import {
   ZoomIn,
   ZoomOut,
@@ -175,7 +176,7 @@ export function DentalRadiologyViewer({
     ${isGrayscale ? 'grayscale(100%)' : ''}
   `.trim()
 
-  return (
+  const viewer = (
     <div
       className={`flex flex-col bg-slate-950 text-slate-100 rounded-2xl overflow-hidden border border-slate-800 shadow-2xl transition-all ${
         isFullscreen ? 'fixed inset-0 z-50 rounded-none' : 'w-full'
@@ -188,7 +189,7 @@ export function DentalRadiologyViewer({
             {title || 'نمایشگر تشخیصی رادیولوژی'}
           </span>
           {toothNumber && (
-            <span className="px-2 py-0.5 rounded-md bg-primary-950/80 text-primary-300 border border-primary-800 font-mono font-bold">
+            <span className="px-2 py-0.5 rounded-lg bg-primary-950/80 text-primary-300 border border-primary-800 font-mono font-bold">
               دندان #{toothNumber}
             </span>
           )}
@@ -196,32 +197,32 @@ export function DentalRadiologyViewer({
 
         {/* Quick Presets */}
         <div className="flex items-center gap-1 bg-slate-950/60 p-1 rounded-xl border border-slate-800">
-          <span className="text-[10px] text-slate-400 px-1 font-medium">فیلتر بالینی:</span>
+          <span className="text-3xs text-slate-400 px-1 font-medium">فیلتر بالینی:</span>
           <button
             type="button"
             onClick={() => applyPreset('endo')}
-            className="px-2 py-1 rounded-lg text-[11px] font-medium bg-slate-800 hover:bg-slate-700 text-amber-300 transition-all press-scale"
+            className="px-2 py-1 rounded-lg text-2xs font-medium bg-slate-800 hover:bg-slate-700 text-amber-300 transition-all press-scale"
           >
             کانال/ریشه (Endo)
           </button>
           <button
             type="button"
             onClick={() => applyPreset('perio')}
-            className="px-2 py-1 rounded-lg text-[11px] font-medium bg-slate-800 hover:bg-slate-700 text-cyan-300 transition-all press-scale"
+            className="px-2 py-1 rounded-lg text-2xs font-medium bg-slate-800 hover:bg-slate-700 text-cyan-300 transition-all press-scale"
           >
             تحلیل استخوان (Perio)
           </button>
           <button
             type="button"
             onClick={() => applyPreset('bone')}
-            className="px-2 py-1 rounded-lg text-[11px] font-medium bg-slate-800 hover:bg-slate-700 text-emerald-300 transition-all press-scale"
+            className="px-2 py-1 rounded-lg text-2xs font-medium bg-slate-800 hover:bg-slate-700 text-emerald-300 transition-all press-scale"
           >
             تراکم استخوان
           </button>
           <button
             type="button"
             onClick={() => applyPreset('normal')}
-            className="px-2 py-1 rounded-lg text-[11px] font-medium bg-slate-800 hover:bg-slate-700 text-slate-300 transition-all press-scale"
+            className="px-2 py-1 rounded-lg text-2xs font-medium bg-slate-800 hover:bg-slate-700 text-slate-300 transition-all press-scale"
           >
             عادی
           </button>
@@ -235,7 +236,7 @@ export function DentalRadiologyViewer({
             className="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 transition-all press-scale"
             title={isFullscreen ? 'خروج از تمام‌صفحه' : 'تمام‌صفحه'}
           >
-            {isFullscreen ? <Minimize2 size={15} /> : <Maximize2 size={15} />}
+            {isFullscreen ? <Minimize2 size={14} /> : <Maximize2 size={14} />}
           </button>
           {onClose && (
             <button
@@ -353,7 +354,7 @@ export function DentalRadiologyViewer({
             <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
               <div className="w-5 h-px bg-sky-400/80" />
               <div className="w-px h-5 bg-sky-400/80 absolute" />
-              <span className="absolute bottom-1.5 text-[9px] font-bold text-sky-200 bg-black/75 px-1.5 py-0.5 rounded-full border border-sky-400/50">
+              <span className="absolute bottom-1.5 text-4xs font-bold text-sky-200 bg-black/75 px-1.5 py-0.5 rounded-full border border-sky-400/50">
                 2.5×
               </span>
             </div>
@@ -376,7 +377,7 @@ export function DentalRadiologyViewer({
                   e.stopPropagation()
                   setCaliperPoints([])
                 }}
-                className="text-[10px] bg-slate-800 hover:bg-slate-700 px-1.5 py-0.5 rounded text-slate-300"
+                className="text-3xs bg-slate-800 hover:bg-slate-700 px-1.5 py-0.5 rounded text-slate-300"
               >
                 پاک کردن
               </button>
@@ -392,9 +393,9 @@ export function DentalRadiologyViewer({
             className="p-1.5 rounded-lg hover:bg-slate-800 text-slate-200 transition-all press-scale"
             title="بزرگنمایی"
           >
-            <ZoomIn size={15} />
+            <ZoomIn size={14} />
           </button>
-          <span className="text-[11px] font-mono px-1 text-slate-400">
+          <span className="text-2xs font-mono px-1 text-slate-400">
             {Math.round(scale * 100)}%
           </span>
           <button
@@ -403,7 +404,7 @@ export function DentalRadiologyViewer({
             className="p-1.5 rounded-lg hover:bg-slate-800 text-slate-200 transition-all press-scale"
             title="کوچکنمایی"
           >
-            <ZoomOut size={15} />
+            <ZoomOut size={14} />
           </button>
 
           <div className="h-4 w-px bg-slate-700 mx-0.5" />
@@ -420,14 +421,14 @@ export function DentalRadiologyViewer({
                 setIsLoupeActive(false)
               }
             }}
-            className={`p-1.5 rounded-lg transition-all flex items-center gap-1 text-[11px] press-scale ${
+            className={`p-1.5 rounded-lg transition-all flex items-center gap-1 text-2xs press-scale ${
               isCaliperActive
                 ? 'bg-sky-600 text-white font-bold'
                 : 'hover:bg-slate-800 text-slate-300'
             }`}
             title="خط‌کش کالیپر تشخیصی"
           >
-            <Ruler size={15} />
+            <Ruler size={14} />
             <span>خط‌کش</span>
           </button>
 
@@ -448,14 +449,14 @@ export function DentalRadiologyViewer({
                 setLoupePos(null)
               }
             }}
-            className={`p-1.5 rounded-lg transition-all flex items-center gap-1 text-[11px] press-scale ${
+            className={`p-1.5 rounded-lg transition-all flex items-center gap-1 text-2xs press-scale ${
               isLoupeActive
                 ? 'bg-sky-500 text-white font-bold ring-2 ring-sky-300 shadow-sm'
                 : 'hover:bg-slate-800 text-slate-300'
             }`}
             title="ذره‌بین تشخیصی ۲.۵ برابر برای آپکس ریشه و مارجین"
           >
-            <Search size={15} />
+            <Search size={14} />
             <span>ذره‌بین ۲.۵×</span>
           </button>
 
@@ -464,6 +465,7 @@ export function DentalRadiologyViewer({
           <button
             type="button"
             onClick={handleReset}
+            aria-label="بازنشانی به حالت پیش‌فرض"
             className="p-1.5 rounded-lg hover:bg-slate-800 text-slate-400 hover:text-slate-200 transition-all press-scale"
             title="بازنشانی به حالت پیش‌فرض"
           >
@@ -478,10 +480,10 @@ export function DentalRadiologyViewer({
         <div className="space-y-1">
           <div className="flex items-center justify-between text-slate-400">
             <span className="flex items-center gap-1">
-              <Sun size={13} className="text-amber-400" />
+              <Sun size={14} className="text-amber-400" />
               روشنایی (Brightness)
             </span>
-            <span className="font-mono text-[11px] text-slate-300">{brightness}%</span>
+            <span className="font-mono text-2xs text-slate-300">{brightness}%</span>
           </div>
           <input
             type="range"
@@ -497,10 +499,10 @@ export function DentalRadiologyViewer({
         <div className="space-y-1">
           <div className="flex items-center justify-between text-slate-400">
             <span className="flex items-center gap-1">
-              <Contrast size={13} className="text-cyan-400" />
+              <Contrast size={14} className="text-cyan-400" />
               کنتراست (Contrast)
             </span>
-            <span className="font-mono text-[11px] text-slate-300">{contrast}%</span>
+            <span className="font-mono text-2xs text-slate-300">{contrast}%</span>
           </div>
           <input
             type="range"
@@ -516,18 +518,18 @@ export function DentalRadiologyViewer({
         <div className="space-y-1">
           <div className="flex items-center justify-between text-slate-400">
             <span className="flex items-center gap-1">
-              <RotateCw size={13} className="text-emerald-400" />
+              <RotateCw size={14} className="text-emerald-400" />
               زاویه محور گرافی (Tilt)
             </span>
             <div className="flex items-center gap-1">
-              <span className={`font-mono text-[11px] px-1 rounded ${rotation !== 0 ? 'bg-emerald-950 text-emerald-300 border border-emerald-800 font-bold' : 'text-slate-300'}`}>
+              <span className={`font-mono text-2xs px-1 rounded ${rotation !== 0 ? 'bg-emerald-950 text-emerald-300 border border-emerald-800 font-bold' : 'text-slate-300'}`}>
                 {rotation > 0 ? `+${rotation}°` : `${rotation}°`}
               </span>
               {rotation !== 0 && (
                 <button
                   type="button"
                   onClick={() => { h.tap(); setRotation(0) }}
-                  className="text-[10px] text-slate-400 hover:text-white px-1 py-0.2 rounded bg-slate-800 hover:bg-slate-700"
+                  className="text-3xs text-slate-400 hover:text-white px-1 py-0.2 rounded bg-slate-800 hover:bg-slate-700"
                   title="ریست به زاویه صفر"
                 >
                   ۰°
@@ -539,7 +541,7 @@ export function DentalRadiologyViewer({
             <button
               type="button"
               onClick={() => { h.tap(); setRotation((r) => Math.max(r - 1, -180)) }}
-              className="p-1 rounded bg-slate-800 hover:bg-slate-700 text-[10px] font-mono text-slate-300 shrink-0 press-scale"
+              className="p-1 rounded bg-slate-800 hover:bg-slate-700 text-3xs font-mono text-slate-300 shrink-0 press-scale"
               title="۱ درجه چرخش پادساعتگرد"
             >
               -۱°
@@ -556,7 +558,7 @@ export function DentalRadiologyViewer({
             <button
               type="button"
               onClick={() => { h.tap(); setRotation((r) => Math.min(r + 1, 180)) }}
-              className="p-1 rounded bg-slate-800 hover:bg-slate-700 text-[10px] font-mono text-slate-300 shrink-0 press-scale"
+              className="p-1 rounded bg-slate-800 hover:bg-slate-700 text-3xs font-mono text-slate-300 shrink-0 press-scale"
               title="۱ درجه چرخش ساعتگرد"
             >
               +۱°
@@ -615,4 +617,6 @@ export function DentalRadiologyViewer({
       </div>
     </div>
   )
+
+  return isFullscreen ? createPortal(viewer, document.body) : viewer
 }

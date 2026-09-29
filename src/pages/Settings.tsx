@@ -614,8 +614,8 @@ export default function Settings() {
                 <div className="relative z-10 flex items-center justify-between w-full">
                   <div className="flex-1 min-w-0">{renderItem(item)}</div>
                   <div className="flex gap-1 flex-shrink-0">
-                    <button onClick={() => onEdit(item)} className="p-1.5 rounded-lg text-slate-400 hover:text-primary-600 hover:bg-primary-50 transition-colors"><Edit2 size={15} /></button>
-                    <button onClick={() => onDelete(item)} aria-label="غیرفعال کردن" title="غیرفعال کردن" className="p-1.5 rounded-lg text-slate-400 hover:text-error-600 hover:bg-error-50 transition-colors"><Archive size={15} /></button>
+                    <button onClick={() => onEdit(item)} className="p-1.5 rounded-lg text-slate-400 hover:text-primary-600 hover:bg-primary-50 transition-colors"><Edit2 size={14} /></button>
+                    <button onClick={() => onDelete(item)} aria-label="غیرفعال کردن" title="غیرفعال کردن" className="p-1.5 rounded-lg text-slate-400 hover:text-error-600 hover:bg-error-50 transition-colors"><Archive size={14} /></button>
                   </div>
                 </div>
               </Card>
@@ -626,10 +626,21 @@ export default function Settings() {
     )
   }
 
-  if (loading) return <div className="flex items-center justify-center py-20"><Spinner size={32} /></div>
+  if (loading) return (
+    <div className="space-y-4 max-w-2xl mx-auto" aria-busy="true" aria-live="polite">
+      <div className="skeleton h-10 w-48 rounded-xl" />
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-2.5">
+        {[0, 1, 2, 3].map((i) => <div key={i} className="skeleton h-16 rounded-2xl" />)}
+      </div>
+      <div className="skeleton h-12 rounded-xl" />
+      <div className="space-y-2">
+        {[0, 1, 2, 3].map((i) => <div key={i} className="skeleton h-16 rounded-2xl" />)}
+      </div>
+    </div>
+  )
 
   return (
-    <div className="space-y-4 max-w-2xl mx-auto">
+    <div className="space-y-4 max-w-2xl mx-auto" style={{ paddingBottom: 'calc(6rem + env(safe-area-inset-bottom, 0px))' }}>
       <div>
         <h1 className="text-xl font-extrabold text-slate-800">تنظیمات</h1>
         <p className="text-xs text-slate-500 mt-0.5">پیکربندی و مدیریت کلینیک</p>
@@ -637,41 +648,41 @@ export default function Settings() {
 
       <div className="grid grid-cols-2 md:grid-cols-4 gap-2.5">
         <div className="quick-stat">
-          <div className="flex items-center gap-1.5 mb-1"><Building2 size={14} className="text-primary-600" /><span className="text-[10px] text-slate-500">کلینیک</span></div>
+          <div className="flex items-center gap-1.5 mb-1"><Building2 size={14} className="text-primary-600" /><span className="text-3xs text-slate-500">کلینیک</span></div>
           <p className="text-sm font-bold text-slate-800 truncate">{generalForm.clinic_name}</p>
         </div>
         <div className="quick-stat">
-          <div className="flex items-center gap-1.5 mb-1"><Stethoscope size={14} className="text-accent-600" /><span className="text-[10px] text-slate-500">پزشکان</span></div>
+          <div className="flex items-center gap-1.5 mb-1"><Stethoscope size={14} className="text-accent-600" /><span className="text-3xs text-slate-500">پزشکان</span></div>
           <p className="text-lg font-extrabold text-slate-800">{toPersianDigits(stats.doctors)}</p>
         </div>
         <div className="quick-stat">
-          <div className="flex items-center gap-1.5 mb-1"><ListOrdered size={14} className="text-warning-600" /><span className="text-[10px] text-slate-500">رویه‌ها</span></div>
+          <div className="flex items-center gap-1.5 mb-1"><ListOrdered size={14} className="text-warning-600" /><span className="text-3xs text-slate-500">رویه‌ها</span></div>
           <p className="text-lg font-extrabold text-slate-800">{toPersianDigits(stats.procedures)}</p>
         </div>
         <div className="quick-stat">
-          <div className="flex items-center gap-1.5 mb-1"><Database size={14} className="text-success-600" /><span className="text-[10px] text-slate-500">رکوردها</span></div>
+          <div className="flex items-center gap-1.5 mb-1"><Database size={14} className="text-success-600" /><span className="text-3xs text-slate-500">رکوردها</span></div>
           <p className="text-lg font-extrabold text-slate-800">{toPersianDigits(totalRecords)}</p>
         </div>
       </div>
 
       <div className="grid grid-cols-4 gap-2">
         {[
-          { key: 'general', label: 'عمومی', icon: <Building2 size={17} />, color: '#0d9488' },
-          { key: 'doctors', label: 'پزشکان و یونیت‌ها', icon: <Stethoscope size={17} />, color: '#2563eb' },
-          { key: 'procedures', label: 'رویه‌ها', icon: <ListOrdered size={17} />, color: '#d97706' },
-          { key: 'backup', label: 'پشتیبان', icon: <Cloud size={17} />, color: '#0891b2' },
-          { key: 'appearance', label: 'ظاهر و شفافیت', icon: <Sparkles size={17} />, color: '#7c3aed' },
-          { key: 'haptics', label: 'لرزش و صدا', icon: <Vibrate size={17} />, color: '#c026d3' },
-          { key: 'app_lock', label: 'قفل امنیتی', icon: <Fingerprint size={17} />, color: '#e11d48' },
-          { key: 'file_number', label: 'شماره پرونده', icon: <Hash size={17} />, color: '#475569' },
-          { key: 'pos', label: 'کارتخوان (PC-POS)', icon: <CreditCard size={17} />, color: '#16a34a' },
-          { key: 'packages', label: 'پکیج درمان', icon: <Package size={17} />, color: '#ea580c' },
-          { key: 'categories', label: 'دسته‌بندی انبار', icon: <Tag size={17} />, color: '#0284c7' },
-          { key: 'errors', label: 'گزارش خطاها', icon: <AlertTriangle size={17} />, color: '#dc2626' },
-          { key: 'audit', label: 'گزارش فعالیت‌ها', icon: <History size={17} />, color: '#4338ca' },
-          { key: 'rbac', label: 'دسترسی نقش‌ها', icon: <Shield size={17} />, color: '#9d174d' },
-          { key: 'failed_sync', label: 'همگام‌سازی ناموفق', icon: <CloudOff size={17} />, color: '#b45309' },
-          { key: 'updates', label: 'به‌روزرسانی', icon: <Sparkles size={17} />, color: '#059669' },
+          { key: 'general', label: 'عمومی', icon: <Building2 size={18} />, color: '#0d9488' },
+          { key: 'doctors', label: 'پزشکان و یونیت‌ها', icon: <Stethoscope size={18} />, color: '#2563eb' },
+          { key: 'procedures', label: 'رویه‌ها', icon: <ListOrdered size={18} />, color: '#d97706' },
+          { key: 'backup', label: 'پشتیبان', icon: <Cloud size={18} />, color: '#0891b2' },
+          { key: 'appearance', label: 'ظاهر و شفافیت', icon: <Sparkles size={18} />, color: '#7c3aed' },
+          { key: 'haptics', label: 'لرزش و صدا', icon: <Vibrate size={18} />, color: '#c026d3' },
+          { key: 'app_lock', label: 'قفل امنیتی', icon: <Fingerprint size={18} />, color: '#e11d48' },
+          { key: 'file_number', label: 'شماره پرونده', icon: <Hash size={18} />, color: '#475569' },
+          { key: 'pos', label: 'کارتخوان (PC-POS)', icon: <CreditCard size={18} />, color: '#16a34a' },
+          { key: 'packages', label: 'پکیج درمان', icon: <Package size={18} />, color: '#ea580c' },
+          { key: 'categories', label: 'دسته‌بندی انبار', icon: <Tag size={18} />, color: '#0284c7' },
+          { key: 'errors', label: 'گزارش خطاها', icon: <AlertTriangle size={18} />, color: '#dc2626' },
+          { key: 'audit', label: 'گزارش فعالیت‌ها', icon: <History size={18} />, color: '#4338ca' },
+          { key: 'rbac', label: 'دسترسی نقش‌ها', icon: <Shield size={18} />, color: '#9d174d' },
+          { key: 'failed_sync', label: 'همگام‌سازی ناموفق', icon: <CloudOff size={18} />, color: '#b45309' },
+          { key: 'updates', label: 'به‌روزرسانی', icon: <Sparkles size={18} />, color: '#059669' },
         ].filter((t) =>
           // MOD-FIX-019: «به‌روزرسانی» is about the installed app itself,
           // not clinic data, so it stays open like the personal
@@ -683,7 +694,7 @@ export default function Settings() {
             type="button"
             onClick={() => { h.select(); setSubView(t.key as SettingsSection) }}
             aria-pressed={subView === t.key}
-            className={`settings-tab flex flex-col items-center justify-center gap-1 min-h-[56px] rounded-xl px-1 py-1.5 text-[10px] font-extrabold leading-tight text-center press-scale transition-all ${subView === t.key ? 'settings-tab-active' : ''}`}
+            className={`settings-tab flex flex-col items-center justify-center gap-1 min-h-[56px] rounded-xl px-1 py-1.5 text-3xs font-extrabold leading-tight text-center press-scale transition-all ${subView === t.key ? 'settings-tab-active' : ''}`}
             style={{ '--tab-color': t.color } as React.CSSProperties}
           >
             {t.icon}
@@ -703,7 +714,7 @@ export default function Settings() {
               <Input label="تلفن" value={generalForm.phone} onChange={(v) => setGeneralForm({ ...generalForm, phone: v })} placeholder="شماره تلفن" dir="ltr" />
               <Input label="ایمیل" value={generalForm.email} onChange={(v) => setGeneralForm({ ...generalForm, email: v })} placeholder="email@example.com" dir="ltr" />
             </div>
-            <Button onClick={handleSaveGeneral} variant="primary" size="sm"><Save size={15} className="inline ml-1" /> ذخیره تنظیمات</Button>
+            <Button onClick={handleSaveGeneral} variant="primary" size="sm"><Save size={14} className="inline ml-1" /> ذخیره تنظیمات</Button>
           </div>
         </Card>
       )}
@@ -721,13 +732,13 @@ export default function Settings() {
                 <div>
                   <p className="font-bold text-sm text-slate-800">{d.name || 'بدون نام'}</p>
                   <div className="flex items-center gap-2 mt-0.5">
-                    {d.specialty && <span className="text-[11px] text-slate-500">{d.specialty}</span>}
-                    {d.license_number && <span className="text-[11px] text-slate-400">پروانه: {toPersianDigits(d.license_number)}</span>}
+                    {d.specialty && <span className="text-2xs text-slate-500">{d.specialty}</span>}
+                    {d.license_number && <span className="text-2xs text-slate-400">پروانه: {toPersianDigits(d.license_number)}</span>}
                     <Badge color={d.is_active ? 'success' : 'slate'}>{d.is_active ? 'فعال' : 'غیرفعال'}</Badge>
                   </div>
                 </div>
               ),
-              openCreateDoctor, 'پزشک جدید', <Stethoscope size={28} />, 'پزشکی ثبت نشده است',
+              openCreateDoctor, 'پزشک جدید', <Stethoscope size={56} />, 'پزشکی ثبت نشده است',
             )}
           </Card>
 
@@ -741,12 +752,12 @@ export default function Settings() {
                 <div>
                   <p className="font-bold text-sm text-slate-800">{u.name || `یونیت ${u.number}`}</p>
                   <div className="flex items-center gap-2 mt-0.5">
-                    <span className="text-[11px] text-slate-500">شماره: {toPersianDigits(u.number || 0)}</span>
+                    <span className="text-2xs text-slate-500">شماره: {toPersianDigits(u.number || 0)}</span>
                     <Badge color={u.is_active ? 'success' : 'slate'}>{u.is_active ? 'فعال' : 'غیرفعال'}</Badge>
                   </div>
                 </div>
               ),
-              openCreateUnit, 'یونیت جدید', <Wrench size={28} />, 'یونیتی ثبت نشده است',
+              openCreateUnit, 'یونیت جدید', <Wrench size={56} />, 'یونیتی ثبت نشده است',
             )}
           </Card>
         </div>
@@ -763,15 +774,15 @@ export default function Settings() {
                 <div className="flex-1 min-w-0">
                   <p className="font-bold text-sm text-slate-800 truncate">{p.name}</p>
                   <div className="flex items-center gap-2 mt-0.5">
-                    <span className="text-[11px] text-slate-500 font-mono">{toPersianDigits(p.code)}</span>
+                    <span className="text-2xs text-slate-500 font-mono">{toPersianDigits(p.code)}</span>
                     <Badge color="primary">{getCatLabel(p.category)}</Badge>
-                    {p.default_price != null && <span className="text-[11px] text-success-600 font-medium">{formatCurrency(p.default_price)} ت</span>}
+                    {p.default_price != null && <span className="text-2xs text-success-600 font-medium">{formatCurrency(p.default_price)} ت</span>}
                   </div>
                 </div>
                 {!p.is_active && <Badge color="slate">غیرفعال</Badge>}
               </div>
             ),
-            openCreateProc, 'رویه جدید', <ListOrdered size={28} />, 'رویه‌ای ثبت نشده است',
+            openCreateProc, 'رویه جدید', <ListOrdered size={56} />, 'رویه‌ای ثبت نشده است',
           )}
         </Card>
       )}
@@ -796,8 +807,8 @@ export default function Settings() {
           <Card className="p-5">
             <h2 className="text-base font-bold text-slate-800 mb-4 flex items-center gap-2"><Cloud size={18} className="text-primary-600" /> پشتیبان‌گیری ابری</h2>
             <div className="grid grid-cols-2 gap-3 mb-4">
-              <div className="p-3 rounded-xl bg-primary-50 text-center"><p className="text-2xl font-extrabold text-primary-700">{toPersianDigits(totalRecords)}</p><p className="text-[10px] text-slate-500">کل رکوردها</p></div>
-              <div className="p-3 rounded-xl bg-accent-50 text-center"><p className="text-2xl font-extrabold text-accent-700">{toPersianDigits(TABLE_NAMES.length)}</p><p className="text-[10px] text-slate-500">جداول</p></div>
+              <div className="p-3 rounded-xl bg-primary-50 text-center"><p className="text-2xl font-extrabold text-primary-700">{toPersianDigits(totalRecords)}</p><p className="text-3xs text-slate-500">کل رکوردها</p></div>
+              <div className="p-3 rounded-xl bg-accent-50 text-center"><p className="text-2xl font-extrabold text-accent-700">{toPersianDigits(TABLE_NAMES.length)}</p><p className="text-3xs text-slate-500">جداول</p></div>
             </div>
             <Button variant="primary" onClick={handleCloudBackup} disabled={backing} className="w-full">{backing ? <Spinner size={16} /> : <Cloud size={16} className="inline ml-1" />}{backing ? 'در حال پشتیبان‌گیری...' : 'پشتیبان‌گیری ابری'}</Button>
           </Card>
@@ -923,7 +934,7 @@ export default function Settings() {
               })}
             </div>
             {prefersReducedTransparency() && (
-              <p className="text-[11px] text-amber-600 mt-3 leading-relaxed">
+              <p className="text-2xs text-amber-600 mt-3 leading-relaxed">
                 ⚠️ در تنظیمات دستگاه شما «کاهش شفافیت» فعال است، بنابراین برنامه
                 همیشه حالت مات را نشان می‌دهد — این ترجیح دسترس‌پذیری بر انتخاب
                 بالا اولویت دارد.
@@ -941,14 +952,14 @@ export default function Settings() {
               <button onClick={toggleHaptics} className="w-full flex items-center justify-between p-4 rounded-xl bg-slate-50 hover:bg-slate-100 transition-all-smooth press-scale">
                 <div className="flex items-center gap-3">
                   <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${hapticsOn ? 'bg-primary-100 text-primary-600' : 'bg-slate-200 text-slate-400'}`}><Vibrate size={20} /></div>
-                  <div className="text-right"><p className="text-sm font-bold text-slate-800">لرزش هپتیک</p><p className="text-[11px] text-slate-500">بازخورد لمسی</p></div>
+                  <div className="text-right"><p className="text-sm font-bold text-slate-800">لرزش هپتیک</p><p className="text-2xs text-slate-500">بازخورد لمسی</p></div>
                 </div>
                 <div className={`w-12 h-7 rounded-full transition-all-smooth relative ${hapticsOn ? 'bg-primary-500' : 'bg-slate-300'}`}><div className={`absolute top-0.5 w-6 h-6 rounded-full bg-white shadow-md transition-all-smooth ${hapticsOn ? 'left-0.5' : 'right-0.5'}`} /></div>
               </button>
               <button onClick={toggleSound} className="w-full flex items-center justify-between p-4 rounded-xl bg-slate-50 hover:bg-slate-100 transition-all-smooth press-scale">
                 <div className="flex items-center gap-3">
                   <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${soundOn ? 'bg-accent-100 text-accent-600' : 'bg-slate-200 text-slate-400'}`}><Volume2 size={20} /></div>
-                  <div className="text-right"><p className="text-sm font-bold text-slate-800">صدای رابط</p><p className="text-[11px] text-slate-500">افکت‌های صوتی</p></div>
+                  <div className="text-right"><p className="text-sm font-bold text-slate-800">صدای رابط</p><p className="text-2xs text-slate-500">افکت‌های صوتی</p></div>
                 </div>
                 <div className={`w-12 h-7 rounded-full transition-all-smooth relative ${soundOn ? 'bg-accent-500' : 'bg-slate-300'}`}><div className={`absolute top-0.5 w-6 h-6 rounded-full bg-white shadow-md transition-all-smooth ${soundOn ? 'left-0.5' : 'right-0.5'}`} /></div>
               </button>
@@ -957,7 +968,7 @@ export default function Settings() {
           <Card className="p-5">
             <div className="flex items-center justify-between mb-3">
               <h3 className="text-sm font-bold text-slate-800">تست بازخورد بالینی و هپتیک</h3>
-              <span className="text-[11px] text-slate-400">لرزش و افکت‌های صوتی کلینیک</span>
+              <span className="text-2xs text-slate-400">لرزش و افکت‌های صوتی کلینیک</span>
             </div>
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
               <button
@@ -966,7 +977,7 @@ export default function Settings() {
                 className="p-3.5 rounded-xl bg-slate-50 hover:bg-slate-100 text-slate-700 text-xs font-bold text-center transition-all-smooth press-scale border border-slate-200/60 flex flex-col items-center gap-1.5"
               >
                 <span>👆 کلیک نرم</span>
-                <span className="text-[10px] font-normal text-slate-400">Pop Chime</span>
+                <span className="text-3xs font-normal text-slate-400">Pop Chime</span>
               </button>
               <button
                 type="button"
@@ -974,7 +985,7 @@ export default function Settings() {
                 className="p-3.5 rounded-xl bg-success-50 hover:bg-success-100 text-success-700 text-xs font-bold text-center transition-all-smooth press-scale border border-success-200/60 flex flex-col items-center gap-1.5"
               >
                 <span>✅ موفقیت</span>
-                <span className="text-[10px] font-normal text-success-500">Success Chime</span>
+                <span className="text-3xs font-normal text-success-500">Success Chime</span>
               </button>
               <button
                 type="button"
@@ -982,7 +993,7 @@ export default function Settings() {
                 className="p-3.5 rounded-xl bg-warning-50 hover:bg-warning-100 text-warning-700 text-xs font-bold text-center transition-all-smooth press-scale border border-warning-200/60 flex flex-col items-center gap-1.5"
               >
                 <span>⚠️ هشدار</span>
-                <span className="text-[10px] font-normal text-warning-500">Warning Chime</span>
+                <span className="text-3xs font-normal text-warning-500">Warning Chime</span>
               </button>
               <button
                 type="button"
@@ -990,7 +1001,7 @@ export default function Settings() {
                 className="p-3.5 rounded-xl bg-error-50 hover:bg-error-100 text-error-700 text-xs font-bold text-center transition-all-smooth press-scale border border-error-200/60 flex flex-col items-center gap-1.5"
               >
                 <span>🚨 آلارم بحرانی</span>
-                <span className="text-[10px] font-normal text-error-500">Alarm Chime</span>
+                <span className="text-3xs font-normal text-error-500">Alarm Chime</span>
               </button>
             </div>
           </Card>
@@ -1054,13 +1065,13 @@ export default function Settings() {
               <div>
                 <p className="font-bold text-sm text-slate-800">{p.name}</p>
                 <div className="flex items-center gap-2 mt-0.5">
-                  {p.total_price != null && <span className="text-[11px] text-success-600 font-medium">{formatCurrency(p.total_price)} ت</span>}
+                  {p.total_price != null && <span className="text-2xs text-success-600 font-medium">{formatCurrency(p.total_price)} ت</span>}
                   {p.discount_percentage != null && p.discount_percentage > 0 && <Badge color="success">{toPersianDigits(p.discount_percentage)}٪ تخفیف</Badge>}
                   <Badge color={p.is_active ? 'success' : 'slate'}>{p.is_active ? 'فعال' : 'غیرفعال'}</Badge>
                 </div>
               </div>
             ),
-            openCreatePkg, 'پکیج جدید', <Package size={28} />, 'پکیج درمانی ثبت نشده است',
+            openCreatePkg, 'پکیج جدید', <Package size={56} />, 'پکیج درمانی ثبت نشده است',
           )}
         </Card>
       )}
@@ -1074,10 +1085,10 @@ export default function Settings() {
             (c: InventoryCategory) => (
               <div>
                 <p className="font-bold text-sm text-slate-800">{c.name}</p>
-                {c.description && <p className="text-[11px] text-slate-500 truncate">{c.description}</p>}
+                {c.description && <p className="text-2xs text-slate-500 truncate">{c.description}</p>}
               </div>
             ),
-            openCreateCat, 'دسته‌بندی جدید', <Tag size={28} />, 'دسته‌بندی ثبت نشده است',
+            openCreateCat, 'دسته‌بندی جدید', <Tag size={56} />, 'دسته‌بندی ثبت نشده است',
           )}
         </Card>
       )}
@@ -1116,7 +1127,7 @@ export default function Settings() {
                 <button
                   type="button"
                   onClick={applyDefaultWeek}
-                  className="shrink-0 text-[11px] font-bold text-primary-700 bg-primary-50 dark:bg-primary-900/20 px-2.5 py-1.5 rounded-lg press-scale"
+                  className="shrink-0 text-2xs font-bold text-primary-700 bg-primary-50 dark:bg-primary-900/20 px-2.5 py-1.5 rounded-lg press-scale"
                 >
                   همه‌ی روزها ۸ تا ۲۳
                 </button>
@@ -1148,7 +1159,7 @@ export default function Settings() {
                   )
                 })}
               </div>
-              <p className="text-[11px] text-slate-400 mt-2">با دکمه‌ی «ذخیره» پایین پنجره، برنامه هم ذخیره می‌شود.</p>
+              <p className="text-2xs text-slate-400 mt-2">با دکمه‌ی «ذخیره» پایین پنجره، برنامه هم ذخیره می‌شود.</p>
             </div>
           )}
           <div className="flex justify-end gap-2 pt-2 border-t border-slate-100"><Button variant="secondary" onClick={() => setDoctorModal(false)}>انصراف</Button><Button variant="primary" onClick={handleSaveDoctor} disabled={savingDoctor}>{savingDoctor ? <Spinner size={16} /> : editingDoctor ? 'ذخیره' : 'افزودن'}</Button></div>
@@ -1266,7 +1277,7 @@ export default function Settings() {
               <p className="font-bold">هشدار جایگزینی اطلاعات:</p>
               <p>با تأیید بازیابی، تمام اطلاعات فعلی کلینیک با محتوای این فایل بازنویسی خواهند شد.</p>
               {encryptedFileToRestore && (
-                <p className="font-mono text-[11px] text-amber-700 dark:text-amber-400">
+                <p className="font-mono text-2xs text-amber-700 dark:text-amber-400">
                   فایل انتخابی: {encryptedFileToRestore.name}
                 </p>
               )}
@@ -1362,9 +1373,9 @@ function ErrorLogTab() {
                     <p className="text-xs font-bold text-error-700 dark:text-error-300 break-words flex-1">{err.message}</p>
                     <Badge color="slate">{err.source}</Badge>
                   </div>
-                  <p className="text-[10px] text-slate-400 mt-1">{toJalaliStringPretty(err.timestamp)}</p>
+                  <p className="text-3xs text-slate-400 mt-1">{toJalaliStringPretty(err.timestamp)}</p>
                   {expandedId === err.id && err.stack && (
-                    <pre className="text-[10px] text-slate-500 dark:text-slate-400 mt-2 whitespace-pre-wrap break-all bg-white dark:bg-slate-900 rounded-lg p-2 max-h-[200px] overflow-y-auto">{err.stack}</pre>
+                    <pre className="text-3xs text-slate-500 dark:text-slate-400 mt-2 whitespace-pre-wrap break-all bg-white dark:bg-slate-900 rounded-lg p-2 max-h-[200px] overflow-y-auto">{err.stack}</pre>
                   )}
                 </div>
               ))}
@@ -1406,7 +1417,9 @@ function AutoBackupCard() {
         هر روز که برنامه باز می‌شود، یک نسخه‌ی کامل از داده‌ها به‌صورت خودکار داخل همین دستگاه ذخیره می‌شود (۷ روز آخر نگه داشته می‌شود).
       </p>
       {loading ? (
-        <Spinner size={20} />
+        <div className="space-y-2" aria-busy="true" aria-live="polite">
+          {[0, 1, 2].map((i) => <div key={i} className="skeleton h-14 rounded-xl" />)}
+        </div>
       ) : snapshots.length === 0 ? (
         <p className="text-xs text-slate-400 text-center py-4">هنوز نسخه‌ی خودکاری ساخته نشده — فردا که برنامه باز شود، اولین نسخه ساخته می‌شود.</p>
       ) : (
@@ -1415,7 +1428,7 @@ function AutoBackupCard() {
             <div key={snap.id} className="flex items-center justify-between gap-2 p-3 rounded-xl bg-slate-50 dark:bg-slate-800/60">
               <div className="min-w-0">
                 <p className="text-sm font-semibold text-slate-700 dark:text-slate-200">{toJalaliStringPretty(snap.created_at)}</p>
-                <p className="text-[11px] text-slate-400">{toPersianDigits(snap.record_count)} رکورد</p>
+                <p className="text-2xs text-slate-400">{toPersianDigits(snap.record_count)} رکورد</p>
               </div>
               <Button size="sm" variant="secondary" onClick={() => handleRestoreSnapshot(snap)} disabled={restoring !== null}>
                 {restoring === snap.id ? <Spinner size={14} /> : 'بازیابی'}
@@ -1557,7 +1570,11 @@ function RbacMatrixTab() {
   const activeRoleMeta = allRoleEntries.find((r) => r.key === activeRole)
 
   if (loading) {
-    return <Card className="p-6 flex items-center justify-center"><Spinner /></Card>
+    return (
+      <Card className="p-6 space-y-2" aria-busy="true" aria-live="polite">
+        {[0, 1, 2, 3].map((i) => <div key={i} className="skeleton h-10 rounded-xl" />)}
+      </Card>
+    )
   }
 
   return (
@@ -1607,7 +1624,7 @@ function RbacMatrixTab() {
               >
                 {isSaving ? <Spinner size={14} /> : allowed ? <CheckCircle2 size={14} className="text-success-600 shrink-0" /> : <div className="w-3.5 h-3.5 rounded-full border border-slate-300 shrink-0" />}
                 <span className={`text-xs font-medium ${allowed ? 'text-success-700 dark:text-success-400' : 'text-slate-400'}`}>{m.label}</span>
-                {isLockedOwnerSettings && <span className="text-[9px] text-slate-400 mr-auto">قفل</span>}
+                {isLockedOwnerSettings && <span className="text-4xs text-slate-400 mr-auto">قفل</span>}
               </button>
             )
           })}
@@ -1702,7 +1719,7 @@ function AppLockTab() {
               <div className="flex items-center justify-between p-3 rounded-xl bg-slate-50 dark:bg-slate-800/60 mb-3">
                 <div>
                   <p className="text-sm font-bold text-slate-700 dark:text-slate-200">فیس‌آیدی / اثرانگشت</p>
-                  <p className="text-[11px] text-slate-400">باز کردن سریع‌تر بدون تایپ رمز</p>
+                  <p className="text-2xs text-slate-400">باز کردن سریع‌تر بدون تایپ رمز</p>
                 </div>
                 {bioRegistered ? <Badge color="success">فعال</Badge> : <Button size="sm" variant="secondary" onClick={handleRegisterBiometric}>فعال‌سازی</Button>}
               </div>
@@ -1799,13 +1816,15 @@ function AuditLogTab() {
         </p>
         <Input value={search} onChange={setSearch} placeholder="جستجو در متن لاگ یا نام کاربر..." className="mb-2.5" />
         <div className="flex items-center gap-1.5 flex-wrap mb-3">
-          <button onClick={() => setCategory('all')} className={`px-2.5 py-1 rounded-full text-[11px] font-medium ${category === 'all' ? 'bg-primary-600 text-white' : 'bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300'}`}>همه</button>
+          <button onClick={() => setCategory('all')} className={`px-2.5 py-1 rounded-full text-2xs font-medium ${category === 'all' ? 'bg-primary-600 text-white' : 'bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300'}`}>همه</button>
           {AUDIT_CATEGORIES.map((c) => (
-            <button key={c.key} onClick={() => setCategory(c.key)} className={`px-2.5 py-1 rounded-full text-[11px] font-medium ${category === c.key ? 'bg-primary-600 text-white' : 'bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300'}`}>{c.label}</button>
+            <button key={c.key} onClick={() => setCategory(c.key)} className={`px-2.5 py-1 rounded-full text-2xs font-medium ${category === c.key ? 'bg-primary-600 text-white' : 'bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300'}`}>{c.label}</button>
           ))}
         </div>
         {loading ? (
-          <Spinner size={20} />
+          <div className="space-y-1.5" aria-busy="true" aria-live="polite">
+            {[0, 1, 2, 3, 4].map((i) => <div key={i} className="skeleton h-10 rounded-xl" />)}
+          </div>
         ) : filteredEntries.length === 0 ? (
           <p className="text-xs text-slate-400 text-center py-6">{entries.length === 0 ? 'هنوز فعالیتی ثبت نشده' : 'نتیجه‌ای برای این فیلتر نیست'}</p>
         ) : (
@@ -1814,7 +1833,7 @@ function AuditLogTab() {
               <div key={e.id} className="flex items-center gap-3 p-2.5 rounded-xl bg-slate-50 dark:bg-slate-800/60">
                 <Badge color={opColor[e.operation] || 'slate'}>{e.summary}</Badge>
                 <span className="text-xs text-slate-500 dark:text-slate-400 flex-1 truncate">{e.actor_name}</span>
-                <span className="text-[10px] text-slate-400">{toJalaliStringPretty(e.created_at)}</span>
+                <span className="text-3xs text-slate-400">{toJalaliStringPretty(e.created_at)}</span>
               </div>
             ))}
           </div>
@@ -1984,7 +2003,7 @@ function FailedSyncTab() {
           }`}>
             <span className="font-medium">{pingResult.status}</span>
             {pingResult.latencyMs !== undefined && (
-              <span className="dir-ltr font-mono text-[11px] bg-white/60 dark:bg-black/30 px-2 py-0.5 rounded">
+              <span className="dir-ltr font-mono text-2xs bg-white/60 dark:bg-black/30 px-2 py-0.5 rounded">
                 {toPersianDigits(pingResult.latencyMs)} ms
               </span>
             )}
@@ -2014,7 +2033,9 @@ function FailedSyncTab() {
           این موارد تغییراتی هستند که روی همین دستگاه با موفقیت ثبت شده و <b>به صورت محلی کاملاً محفوظ هستند</b>. در صورت استفاده از حساب کاربری ابری با اتصال مجدد فرستاده می‌شوند.
         </p>
         {loading ? (
-          <Spinner size={20} />
+          <div className="space-y-2" aria-busy="true" aria-live="polite">
+            {[0, 1, 2].map((i) => <div key={i} className="skeleton h-14 rounded-xl" />)}
+          </div>
         ) : entries.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-10 text-center">
             <div className="w-14 h-14 rounded-2xl bg-success-50 dark:bg-success-900/20 flex items-center justify-center mb-3">
@@ -2029,13 +2050,13 @@ function FailedSyncTab() {
                 <div className="flex items-center justify-between gap-2 cursor-pointer" onClick={() => setExpandedId(expandedId === entry.id ? null : (entry.id ?? null))}>
                   <div className="min-w-0">
                     <p className="text-sm font-bold text-error-700 dark:text-error-300">{OP_LABELS_FA[entry.operation]} {TABLE_LABELS_FA[entry.table_name] || entry.table_name}</p>
-                    <p className="text-[11px] text-slate-400 truncate">{entry.last_error || 'خطای اتصال یا احراز هویت'}</p>
-                    <p className="text-[11px] text-slate-500 mt-0.5">{explainSyncError(entry.last_error || '')}</p>
+                    <p className="text-2xs text-slate-400 truncate">{entry.last_error || 'خطای اتصال یا احراز هویت'}</p>
+                    <p className="text-2xs text-slate-500 mt-0.5">{explainSyncError(entry.last_error || '')}</p>
                   </div>
                   <Badge color="error">{toPersianDigits(entry.retry_count)} بار تلاش</Badge>
                 </div>
                 {expandedId === entry.id && (
-                  <pre className="text-[10px] text-slate-500 dark:text-slate-400 mt-2 whitespace-pre-wrap break-all bg-white dark:bg-slate-900 rounded-lg p-2 max-h-[160px] overflow-y-auto">{JSON.stringify(entry.data, null, 2)}</pre>
+                  <pre className="text-3xs text-slate-500 dark:text-slate-400 mt-2 whitespace-pre-wrap break-all bg-white dark:bg-slate-900 rounded-lg p-2 max-h-[160px] overflow-y-auto">{JSON.stringify(entry.data, null, 2)}</pre>
                 )}
                 <div className="flex gap-2 mt-2">
                   <Button size="sm" variant="primary" onClick={() => entry.id && handleRetry(entry.id)} disabled={busyId !== null}>
@@ -2046,7 +2067,7 @@ function FailedSyncTab() {
                       اصلاح و ارسال
                     </Button>
                   )}
-                  <Button size="sm" variant="secondary" onClick={() => handleCopy(entry)}><Copy size={13} className="inline ml-1" /> کپی داده</Button>
+                  <Button size="sm" variant="secondary" onClick={() => handleCopy(entry)}><Copy size={14} className="inline ml-1" /> کپی داده</Button>
                   <Button size="sm" variant="danger" onClick={() => handleDiscard(entry)}>نادیده بگیر</Button>
                 </div>
               </div>
@@ -2113,11 +2134,11 @@ function UpdatesTab() {
 
         <div className="grid grid-cols-2 gap-2.5 mb-4">
           <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-100 dark:border-slate-800">
-            <p className="text-[11px] text-slate-400 mb-0.5">نسخه‌ی جاری نرم‌افزار</p>
+            <p className="text-2xs text-slate-400 mb-0.5">نسخه‌ی جاری نرم‌افزار</p>
             <p className="text-base font-extrabold text-slate-800 dark:text-slate-100">v{APP_VERSION}</p>
           </div>
           <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-100 dark:border-slate-800">
-            <p className="text-[11px] text-slate-400 mb-0.5">تاریخ ساخت و انتشار</p>
+            <p className="text-2xs text-slate-400 mb-0.5">تاریخ ساخت و انتشار</p>
             <p className="text-sm font-bold text-slate-700 dark:text-slate-200">{toJalaliStringPretty(BUILD_DATE)}</p>
           </div>
         </div>
@@ -2138,23 +2159,24 @@ function UpdatesTab() {
         )}
 
         <Button variant="secondary" onClick={handleCheck} disabled={checking} className="w-full justify-center mb-3">
-          {checking ? <Spinner size={16} /> : <><RefreshCw size={15} className="inline ml-1.5" /> بررسی دستی وضعیت نسخه</>}
+          {checking ? <Spinner size={16} /> : <><RefreshCw size={14} className="inline ml-1.5" /> بررسی دستی وضعیت نسخه</>}
         </Button>
 
         {lastChecked && (
-          <p className="text-[11px] text-slate-400 text-center mb-4">آخرین استعلام سرور: {toJalaliStringPretty(lastChecked.toISOString())}</p>
+          <p className="text-2xs text-slate-400 text-center mb-4">آخرین استعلام سرور: {toJalaliStringPretty(lastChecked.toISOString())}</p>
         )}
 
         <div className="space-y-3 pt-2 border-t border-slate-100 dark:border-slate-800">
           <label className="flex items-center justify-between p-3 rounded-xl bg-slate-50 dark:bg-slate-800/60 cursor-pointer">
             <div>
               <span className="text-sm font-medium text-slate-700 dark:text-slate-200 block">بررسی خودکار نسخه‌ها</span>
-              <span className="text-[11px] text-slate-400">استعلام پس‌زمینه هر ۳ دقیقه و هنگام بازگشت به تب برنامه</span>
+              <span className="text-2xs text-slate-400">استعلام پس‌زمینه هر ۳ دقیقه و هنگام بازگشت به تب برنامه</span>
             </div>
             <button
               onClick={toggleAutoCheck}
               role="switch"
               aria-checked={autoCheck}
+              aria-label="بررسی خودکار نسخه‌ها"
               className={`relative w-11 h-6 rounded-full transition-colors shrink-0 mr-2 ${autoCheck ? 'bg-primary-600' : 'bg-slate-300 dark:bg-slate-600'}`}
             >
               <span className={`absolute top-0.5 w-5 h-5 rounded-full bg-white shadow transition-transform ${autoCheck ? 'right-0.5' : 'right-5'}`} />
@@ -2164,12 +2186,13 @@ function UpdatesTab() {
           <label className="flex items-center justify-between p-3 rounded-xl bg-slate-50 dark:bg-slate-800/60 cursor-pointer">
             <div>
               <span className="text-sm font-medium text-slate-700 dark:text-slate-200 block">اعمال خودکار به‌روزرسانی (Auto-Update)</span>
-              <span className="text-[11px] text-slate-400">به‌روزرسانی خودکار هوشمند به محض انتشار نسخه با مهلت شمارش معکوس جهت اتمام کار</span>
+              <span className="text-2xs text-slate-400">به‌روزرسانی خودکار هوشمند به محض انتشار نسخه با مهلت شمارش معکوس جهت اتمام کار</span>
             </div>
             <button
               onClick={toggleAutoApply}
               role="switch"
               aria-checked={autoApply}
+              aria-label="به‌روزرسانی خودکار"
               className={`relative w-11 h-6 rounded-full transition-colors shrink-0 mr-2 ${autoApply ? 'bg-primary-600' : 'bg-slate-300 dark:bg-slate-600'}`}
             >
               <span className={`absolute top-0.5 w-5 h-5 rounded-full bg-white shadow transition-transform ${autoApply ? 'right-0.5' : 'right-5'}`} />
@@ -2200,7 +2223,7 @@ function UpdatesTab() {
               </div>
               <div>
                 <p className="text-sm font-bold text-slate-800 dark:text-slate-100">فایل نصبی اندروید (APK)</p>
-                <p className="text-[10px] text-emerald-700 dark:text-emerald-400">دانلود و نصب مستقیم روی گوشی‌ها و تبلت‌های اندروید</p>
+                <p className="text-3xs text-emerald-700 dark:text-emerald-400">دانلود و نصب مستقیم روی گوشی‌ها و تبلت‌های اندروید</p>
               </div>
             </div>
           </a>
@@ -2214,7 +2237,7 @@ function UpdatesTab() {
               </div>
               <div>
                 <p className="text-sm font-bold text-slate-800 dark:text-slate-100">نصب روی آیفون/آیپد</p>
-                <p className="text-[10px] text-sky-700 dark:text-sky-400">اپل اجازه توزیع IPA خارج از App Store را نمی‌دهد؛ در Safari دکمه اشتراک‌گذاری را بزنید و «Add to Home Screen» را انتخاب کنید</p>
+                <p className="text-3xs text-sky-700 dark:text-sky-400">اپل اجازه توزیع IPA خارج از App Store را نمی‌دهد؛ در Safari دکمه اشتراک‌گذاری را بزنید و «Add to Home Screen» را انتخاب کنید</p>
               </div>
             </div>
           </div>
@@ -2223,4 +2246,3 @@ function UpdatesTab() {
     </div>
   )
 }
-

@@ -1,8 +1,9 @@
-import { createContext, useContext, useEffect, useState, createElement, type ReactNode } from 'react'
+import { createContext, useContext, useEffect, useRef, useState, createElement, type ReactNode } from 'react'
 import type { Session, User } from '@supabase/supabase-js'
 import { supabase } from './supabase'
 import { currentActor } from './auditLog'
 import { logError } from './errorLog'
+import { enqueueSync } from './sync'
 
 export interface StaffProfile {
   id: string
@@ -29,6 +30,21 @@ interface AuthState {
   notice: string | null
   clearNotice: () => void
   isOffline: boolean
+  /**
+   * MOD-SEC-011: an earlier revision of this fix added real, seeded
+   * per-role Supabase Auth accounts with credentials shipped in client
+   * source, so the Login page's "quick login" buttons could authenticate
+   * for real and get RBAC-enforced sessions. That was rejected in review:
+   * baking a real, permanently-valid `owner` credential (and others) into
+   * the public client is itself a critical access-control hole — anyone
+   * reading the bundle gets a genuine, server-verifiable privileged
+   * session against the live clinic, worse than the local-only fake
+   * session it replaced. There is no way to make a password-free one-tap
+   * login both real (DB-verifiable) and safe, so it is removed entirely;
+   * every real login now requires the user's own credentials. Only
+   * signInOffline (local-only, cached-identity reuse, see
+   * offlineFallbackSignIn) remains for the no-network case.
+   */
   signInOffline: (role?: string, name?: string, email?: string) => boolean
 }
 
@@ -36,6 +52,58 @@ export const AuthContext = createContext<AuthState | null>(null)
 
 export const CACHED_PROFILE_KEY = 'minadent_cached_profile'
 export const OFFLINE_AUTH_KEY = 'minadent_offline_auth_active'
+/**
+ * MOD-SEC-013: the last real (non-synthetic) refresh token Supabase issued
+ * for this device, kept so that when connectivity returns we can try a
+ * silent supabase.auth.refreshSession() before forcing a password prompt.
+ * A refresh token stays valid for a long time (until explicitly revoked or
+ * its own expiry), so most staff who briefly lose connection get their
+ * real, RBAC-enforced session back with zero interruption; only an
+ * actually-expired/revoked token falls through to asking for a password.
+ */
+export const REAL_REFRESH_TOKEN_KEY = 'minadent_real_refresh_token'
+
+/**
+ * MOD-FIX-011: while a reconnect is mid-retry, the synthetic offline
+ * session (`offline-token`, never a real Supabase Auth JWT) is still the
+ * active session and the device is back online — the exact combination
+ * that lets requests go out unauthenticated (anon role, not RBAC-scoped
+ * to the cached role). Before the retry loop existed this window was one
+ * failed attempt wide; the retries make it wider, so sync.ts must check
+ * this gate and refuse to push/pull while it is active, resuming only
+ * once a real session is restored or the user is sent back to the login
+ * screen (at which point there is no session for it to run under).
+ */
+export const reconnectGate = { active: false }
+
+/**
+ * MOD-FIX-011: distinguishes a transient network hiccup during the
+ * refreshSession() call itself from a genuinely invalid/expired/revoked
+ * refresh token. Only the former is worth retrying — Supabase's
+ * "Invalid Refresh Token" / "refresh_token_not_found" responses mean the
+ * token itself is dead and no retry will ever succeed.
+ */
+function isTransientRefreshError(err: unknown): boolean {
+  if (!err) return false
+  const message = (err as any)?.message ? String((err as any).message) : String(err)
+  const status = (err as any)?.status
+  if (/invalid refresh token|refresh_token_not_found|already used|revoked|invalid grant|user not found/i.test(message)) {
+    return false
+  }
+  if (status === 400 || status === 401 || status === 403) return false
+  if (/failed to fetch|network|load failed|timeout|connection|aborterror|fetch failed|reach/i.test(message)) {
+    return true
+  }
+  if (status === 0 || status === 502 || status === 503 || status === 504) return true
+  // Unknown shape: default to transient so a temporary hiccup doesn't
+  // immediately force a password prompt; retries are capped either way.
+  return true
+}
+
+function storeRealRefreshToken(session: Session | null | undefined) {
+  if (!session || session.access_token === 'offline-token' || !session.refresh_token) return
+  try { localStorage.setItem(REAL_REFRESH_TOKEN_KEY, session.refresh_token) } catch {}
+}
 
 export function getCachedProfile(): StaffProfile | null {
   try {
@@ -83,6 +151,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true)
   const [notice, setNotice] = useState<string | null>(null)
   const [isOffline, setIsOffline] = useState<boolean>(typeof navigator !== 'undefined' ? !navigator.onLine : false)
+  // Mirrors `session` synchronously so the 'online' handler can read the
+  // current session type immediately, without waiting on React's state
+  // update batching (a functional setSession updater can be deferred,
+  // which let the reconnect check silently no-op — see MOD-SEC-013).
+  const sessionRef = useRef<Session | null>(session)
+  useEffect(() => { sessionRef.current = session }, [session])
 
   async function loadProfile(userId: string) {
     try {
@@ -140,6 +214,110 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const handleOnlineStatus = () => {
       const online = navigator.onLine
       setIsOffline(!online)
+      // MOD-SEC-012: closing the remaining piece of the offline gap. A
+      // synthetic offline session (access_token === 'offline-token') never
+      // carries a real Supabase Auth JWT, so every request it makes goes
+      // out as the unrestricted `anon` role (see migration 20260918_038's
+      // documented single-clinic tradeoff) — not scoped to the cached
+      // role by has_module_permission() (migration 20260928_040). That is
+      // an acceptable, unavoidable gap while genuinely offline (no
+      // network means no Postgres request can succeed either way), but it
+      // must not silently continue once the network returns: from that
+      // point on, every module the cached role should NOT have becomes a
+      // live, DB-reachable bypass again. So the moment connectivity comes
+      // back, end the synthetic session and require the user's own
+      // credentials for a real, RBAC-enforced sign-in.
+      if (online) {
+        (async () => {
+          // Only act if we're currently in a synthetic offline session.
+          // Read from the ref (kept in sync synchronously with `session`
+          // via committed renders), not a setSession updater — an updater
+          // callback can be deferred by React's batching and silently
+          // no-op the whole reconnect check.
+          const wasOffline = sessionRef.current?.access_token === 'offline-token'
+          if (!wasOffline) return
+
+          reconnectGate.active = true
+
+          let realRefreshToken: string | null = null
+          try { realRefreshToken = localStorage.getItem(REAL_REFRESH_TOKEN_KEY) } catch {}
+
+          if (realRefreshToken) {
+            // MOD-FIX-011: a refresh attempt can fail for two very
+            // different reasons — the token itself is genuinely
+            // invalid/expired/revoked (no amount of retrying helps, the
+            // user must re-enter their password), or the refresh *call*
+            // itself hit a transient network hiccup (the connection just
+            // came back and may still be flaky — a DNS blip, a dropped
+            // TLS handshake, a slow captive-portal redirect). Treating
+            // both the same forced a password prompt on staff whose
+            // network was still settling, even though their saved login
+            // was perfectly valid. So a network-shaped failure gets a
+            // couple of retries with backoff before giving up.
+            const MAX_ATTEMPTS = 3
+            for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
+              try {
+                const { data, error } = await supabase.auth.refreshSession({ refresh_token: realRefreshToken })
+                if (!error && data.session) {
+                  // Silent success: swap the synthetic session for the real,
+                  // RBAC-enforced one with no visible interruption.
+                  setSession(data.session)
+                  storeRealRefreshToken(data.session)
+                  try { localStorage.setItem(OFFLINE_AUTH_KEY, 'true') } catch {}
+                  if (data.session.user) await loadProfile(data.session.user.id)
+                  reconnectGate.active = false
+                  try { enqueueSync(0) } catch {}
+                  return
+                }
+                if (error && !isTransientRefreshError(error) ) {
+                  // Genuinely invalid/expired/revoked token — retrying
+                  // will not help, stop immediately and fall through to
+                  // the password prompt below.
+                  console.warn('[auth] refreshSession rejected (non-transient):', error.message)
+                  break
+                }
+                console.warn(`[auth] refreshSession transient failure (attempt ${attempt}/${MAX_ATTEMPTS}):`, error?.message)
+              } catch (err) {
+                if (!isTransientRefreshError(err)) {
+                  console.warn('[auth] silent refreshSession on reconnect failed (non-transient):', err)
+                  break
+                }
+                console.warn(`[auth] silent refreshSession exception, transient (attempt ${attempt}/${MAX_ATTEMPTS}):`, err)
+              }
+
+              if (attempt < MAX_ATTEMPTS) {
+                const backoffMs = 1000 * 2 ** (attempt - 1) // 1s, 2s
+                await new Promise((resolve) => setTimeout(resolve, backoffMs))
+                // If we went offline again mid-retry, stop and let the
+                // next 'online' event restart this whole flow instead of
+                // burning retries against a dead connection.
+                if (!navigator.onLine) {
+                  console.warn('[auth] connection dropped again during retry backoff, aborting retries')
+                  reconnectGate.active = false
+                  return
+                }
+              }
+            }
+          }
+
+          // Silent refresh unavailable, or failed non-transiently (no
+          // cached token, or it's expired/revoked after exhausting
+          // retries) — fall back to requiring a real password.
+          reconnectGate.active = false
+          setSession((prev) => {
+            if (prev?.access_token !== 'offline-token') return prev
+            setProfile(null)
+            currentActor.name = null
+            currentActor.role = null
+            try {
+              localStorage.removeItem(OFFLINE_AUTH_KEY)
+              localStorage.removeItem(REAL_REFRESH_TOKEN_KEY)
+            } catch {}
+            setNotice('اتصال اینترنت برقرار شد — برای ادامه با رمز عبور خود دوباره وارد شوید')
+            return null
+          })
+        })()
+      }
     }
     window.addEventListener('online', handleOnlineStatus)
     window.addEventListener('offline', handleOnlineStatus)
@@ -152,6 +330,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     supabase.auth.getSession().then(async ({ data }) => {
       if (data.session) {
         setSession(data.session)
+        storeRealRefreshToken(data.session)
         if (data.session.user) await loadProfile(data.session.user.id)
       } else {
         // If Supabase session is empty or offline, check if we have an active cached profile
@@ -178,6 +357,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const { data: sub } = supabase.auth.onAuthStateChange(async (_event, newSession) => {
       if (newSession) {
         setSession(newSession)
+        storeRealRefreshToken(newSession)
         if (newSession.user) {
           await loadProfile(newSession.user.id)
         }
@@ -259,6 +439,30 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return true
   }
 
+  /**
+   * MOD-SEC-010: the previous fallback here read
+   * `signInOffline(isOwner ? 'owner' : 'owner', ...)` — both branches
+   * resolved to 'owner' no matter who was signing in, so any staff
+   * member's network hiccup during login handed them a full owner
+   * session. This restores an actual non-owner identifier to the role of
+   * their own last-cached login (if any); it never invents a role, and
+   * never grants owner to anyone but the real owner identifier.
+   */
+  function offlineFallbackSignIn(normalizedIdentifier: string, isOwner: boolean): { error: string | null } {
+    if (isOwner) {
+      signInOffline('owner', 'مصطفی حسن‌وند', normalizedIdentifier)
+      return { error: null }
+    }
+    const cached = getCachedProfile()
+    if (cached && ((cached as any).email || '').toLowerCase() === normalizedIdentifier) {
+      signInOffline(cached.role || 'receptionist', cached.full_name || undefined, normalizedIdentifier)
+      return { error: null }
+    }
+    return {
+      error: 'اتصال به سرور برقرار نشد — برای ورود بدون اینترنت باید حداقل یک‌بار قبلاً با همین حساب و اینترنت متصل وارد شده باشید',
+    }
+  }
+
   async function signIn(rawIdentifier: string, password: string) {
     setNotice(null)
     const identifier = rawIdentifier.trim()
@@ -266,10 +470,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const normalizedIdentifier = isPhone ? identifier : identifier.toLowerCase()
     const isOwner = normalizedIdentifier === 'mostafa.hasanvand@gmail.com'
 
-    // If offline, enter offline mode immediately with real credentials
+    // If offline, enter offline mode immediately — but only into a role we
+    // actually have evidence for (see offlineFallbackSignIn above).
     if (typeof navigator !== 'undefined' && !navigator.onLine) {
-      signInOffline(isOwner ? 'owner' : 'owner', isOwner ? 'مصطفی حسن‌وند' : undefined, normalizedIdentifier)
-      return { error: null }
+      return offlineFallbackSignIn(normalizedIdentifier, isOwner)
     }
 
     try {
@@ -284,8 +488,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
         if (isNetworkErr) {
           console.warn('[auth] Supabase network disruption detected, activating resilient offline session:', error.message)
-          signInOffline(isOwner ? 'owner' : 'owner', isOwner ? 'مصطفی حسن‌وند' : undefined, normalizedIdentifier)
-          return { error: null }
+          return offlineFallbackSignIn(normalizedIdentifier, isOwner)
         }
         console.error('[auth] signIn failed:', error.status, error.message)
         logError(error, 'react', `signIn status=${error.status ?? 'none'}`)
@@ -299,10 +502,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
       return { error: null }
     } catch (err: any) {
-      // Network exception fallback: never lock staff out
+      // Network exception fallback: never lock staff out, but never
+      // invent a role either.
       console.warn('[auth] signIn exception fallback to offline:', err)
-      signInOffline(isOwner ? 'owner' : 'owner', isOwner ? 'مصطفی حسن‌وند' : undefined, normalizedIdentifier)
-      return { error: null }
+      return offlineFallbackSignIn(normalizedIdentifier, isOwner)
     }
   }
 
@@ -322,6 +525,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     try {
       localStorage.removeItem('minadent-auth')
       localStorage.removeItem(CACHED_PROFILE_KEY)
+      localStorage.removeItem(REAL_REFRESH_TOKEN_KEY)
       sessionStorage.removeItem('minadent-auth')
       for (let i = localStorage.length - 1; i >= 0; i--) {
         const key = localStorage.key(i)

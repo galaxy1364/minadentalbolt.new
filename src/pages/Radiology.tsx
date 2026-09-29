@@ -1,6 +1,6 @@
 // Radiology.tsx - Persian RTL Dental Clinic Radiology Management
 import { useState, useEffect, useCallback, useMemo } from 'react'
-import { createPortal } from 'react-dom'
+import { usePullToRefresh } from '../lib/usePullToRefresh'
 import { useNavigate } from 'react-router-dom'
 import { Image, Search, Filter, Eye, XCircle, Smile, Camera, Calendar, User, FileText, Download, ZoomIn, Plus, Edit2, Archive, MessageSquare, CheckSquare, Square, Tags } from 'lucide-react'
 import { PieChart, Pie, Cell, XAxis, YAxis, Tooltip as RTooltip, ResponsiveContainer, Legend } from 'recharts'
@@ -323,6 +323,7 @@ export default function Radiology() {
   useEffect(() => {
     loadData()
   }, [loadData])
+  const ptr = usePullToRefresh(async () => { await loadData() })
 
   // ===========================================================================
   // Derived Data
@@ -394,14 +395,25 @@ export default function Radiology() {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center py-20">
-        <Spinner size={32} />
+      <div className="space-y-4" aria-busy="true" aria-live="polite">
+        <div className="skeleton h-12 rounded-xl" />
+        <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+          {[0, 1, 2, 3, 4, 5].map((i) => <div key={i} className="skeleton h-32 rounded-2xl" />)}
+        </div>
       </div>
     )
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6" style={{ paddingBottom: 'calc(6rem + env(safe-area-inset-bottom, 0px))' }} {...ptr.handlers}>
+      {ptr.pullDistance > 0 && (
+        <div className="pull-indicator" style={{ opacity: ptr.isRefreshing ? 1 : ptr.pullProgress, top: -4 }}>
+          <div className="flex flex-col items-center gap-1">
+            <div className={`w-7 h-7 rounded-full border-2 border-teal-300 dark:border-teal-600 border-t-teal-600 dark:border-t-teal-400 ${ptr.isRefreshing ? 'animate-spin' : ''}`} style={{ transform: `scale(${0.6 + ptr.pullProgress * 0.4})` }} />
+            <span className="text-3xs text-teal-600 font-medium">{ptr.isRefreshing ? 'در حال به‌روزرسانی...' : 'برای به‌روزرسانی بکشید'}</span>
+          </div>
+        </div>
+      )}
       <ModuleHeader
         moduleKey="radiology"
         title="رادیولوژی"
@@ -435,6 +447,7 @@ export default function Radiology() {
           <select
             value={filterType}
             onChange={(e) => setFilterType(e.target.value)}
+            aria-label="فیلتر نوع تصویر رادیولوژی"
             className="px-3 py-2 rounded-xl border border-slate-200 bg-slate-50 text-sm focus:outline-none focus:ring-2 focus:ring-primary-400"
           >
             <option value="">همه انواع</option>
@@ -462,7 +475,7 @@ export default function Radiology() {
                   className="px-2.5 py-1.5 rounded-xl text-xs font-medium bg-slate-50 dark:bg-slate-800 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-700 hover:bg-slate-100 flex items-center gap-1"
                   title={selectedRadIds.size === filteredImages.length ? 'لغو انتخاب همه' : 'انتخاب همه تصاویر جاری'}
                 >
-                  {selectedRadIds.size === filteredImages.length ? <CheckSquare size={13} className="text-primary-600" /> : <Square size={13} />}
+                  {selectedRadIds.size === filteredImages.length ? <CheckSquare size={14} className="text-primary-600" /> : <Square size={14} />}
                   <span>{selectedRadIds.size === filteredImages.length ? 'لغو انتخاب' : 'انتخاب همه'}</span>
                 </button>
               )}
@@ -474,7 +487,7 @@ export default function Radiology() {
                 className="text-xs flex items-center gap-1 text-emerald-700 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/40 border-emerald-200 dark:border-emerald-800"
                 title="دانلود تمامی تصاویر فیلترشده در یک فایل ZIP"
               >
-                {zippingArchive ? <Spinner size={12} /> : <Download size={13} />}
+                {zippingArchive ? <Spinner size={12} /> : <Download size={14} />}
                 دانلود ZIP
               </Button>
             </div>
@@ -534,7 +547,7 @@ export default function Radiology() {
 
           {filteredImages.length === 0 ? (
             <EmptyState
-              icon={<Image size={28} />}
+              icon={<Image size={56} />}
               title="تصویری یافت نشد"
               description="تصاویر رادیولوژی بیماران در اینجا نمایش داده می‌شوند"
             />
@@ -546,7 +559,11 @@ export default function Radiology() {
                 return (
                   <div
                     key={img.id}
-                    className={`rounded-xl border overflow-hidden transition-all-smooth cursor-pointer relative ${
+                    role="button"
+                    tabIndex={0}
+                    aria-label={`مشاهده تصویر رادیولوژی ${img.description || meta?.label || ''}`.trim()}
+                    onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setSelectedImage(img) } }}
+                    className={`rounded-xl border overflow-hidden transition-all-smooth cursor-pointer relative focus:outline-none focus:ring-2 focus:ring-primary-400 ${
                       isSelected ? 'ring-2 ring-primary-500 border-primary-500 bg-primary-50/10' : 'border-slate-100 hover:card-shadow'
                     }`}
                     onClick={() => setSelectedImage(img)}
@@ -561,6 +578,8 @@ export default function Radiology() {
                     >
                       <button
                         type="button"
+                        aria-label={isSelected ? 'لغو انتخاب تصویر' : 'انتخاب تصویر جهت عملیات دسته‌ای'}
+                        aria-pressed={isSelected}
                         className={`w-6 h-6 rounded-lg flex items-center justify-center transition-all ${
                           isSelected
                             ? 'bg-primary-600 text-white shadow-sm'
@@ -606,7 +625,7 @@ export default function Radiology() {
                                 if (img.patient_id) navigate(`/patients/${img.patient_id}`)
                               }}
                               title="شماره پرونده بیمار"
-                              className="inline-flex items-center gap-1 px-1.5 py-0.2 rounded bg-slate-900 dark:bg-primary-950 text-white dark:text-primary-300 text-[10px] font-mono font-bold hover:scale-105 active:scale-95 transition-all cursor-pointer"
+                              className="inline-flex items-center gap-1 px-1.5 py-0.2 rounded bg-slate-900 dark:bg-primary-950 text-white dark:text-primary-300 text-3xs font-mono font-bold hover:scale-105 active:scale-95 transition-all cursor-pointer"
                               dir="ltr"
                             >
                               <span>{toPersianDigits(pat.file_number)}</span>
@@ -650,7 +669,7 @@ export default function Radiology() {
           <Card className="p-5">
             <h3 className="text-sm font-bold text-slate-800 mb-4">توزیع تصاویر بر اساس نوع</h3>
             {typeDistributionChart.length === 0 ? (
-              <EmptyState icon={<Image size={28} />} title="داده‌ای موجود نیست" />
+              <EmptyState icon={<Image size={56} />} title="داده‌ای موجود نیست" />
             ) : (
               <ResponsiveContainer width="100%" height={280}>
                 <PieChart>
@@ -699,14 +718,9 @@ export default function Radiology() {
       </div>
 
       {/* Image Detail Modal */}
-      {selectedImage && createPortal(
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm" onClick={() => setSelectedImage(null)}>
-          <div className="w-full max-w-4xl bg-white dark:bg-slate-900 rounded-2xl card-shadow-lg max-h-[95vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
-            <div className="flex items-center justify-between px-5 py-3.5 border-b border-slate-100 dark:border-slate-800 sticky top-0 bg-white dark:bg-slate-900 rounded-t-2xl z-10">
-              <h3 className="text-base font-bold text-slate-800 dark:text-slate-100">نمایشگر تشخیصی تصویر رادیولوژی</h3>
-              <button onClick={() => setSelectedImage(null)} className="p-1.5 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition-all-smooth text-slate-500">✕</button>
-            </div>
-            <div className="p-5 space-y-4">
+      {selectedImage && (
+        <Modal open={!!selectedImage} onClose={() => setSelectedImage(null)} title="نمایشگر تشخیصی تصویر رادیولوژی" size="xl">
+          <div className="space-y-4">
               {/* Diagnostic Radiology Viewer */}
               {selectedImage.image_url ? (
                 <DentalRadiologyViewer
@@ -822,10 +836,8 @@ export default function Radiology() {
                   آرشیو
                 </Button>
               </div>
-            </div>
           </div>
-        </div>,
-        document.body
+        </Modal>
       )}
 
       {/* Upload Wizard */}
@@ -906,7 +918,7 @@ export default function Radiology() {
                 placeholder="مثال: 16 یا 14, 15, 16"
                 dir="ltr"
               />
-              <span className="text-[11px] text-slate-400 mt-1 block">
+              <span className="text-2xs text-slate-400 mt-1 block">
                 می‌توانید چند شماره دندان را با کاما جدا نمایید.
               </span>
             </div>

@@ -75,12 +75,12 @@ function IncisorBiteVisualizer({ overjetMm, overbitePercent }: { overjetMm: numb
 
   return (
     <div className="p-3 bg-slate-900 text-slate-100 rounded-2xl border border-slate-700/80 shadow-inner flex flex-col items-center select-none">
-      <div className="w-full flex items-center justify-between text-[11px] font-semibold text-slate-300 pb-1.5 border-b border-slate-800">
+      <div className="w-full flex items-center justify-between text-2xs font-semibold text-slate-300 pb-1.5 border-b border-slate-800">
         <span className="flex items-center gap-1.5 text-indigo-400">
-          <Eye size={13} />
+          <Eye size={14} />
           نمایشگر شماتیک مقطع قدامی (Incisor Sagittal Section)
         </span>
-        <span className="font-mono text-[10px] px-1.5 py-0.5 rounded bg-slate-800 text-slate-300">
+        <span className="font-mono text-3xs px-1.5 py-0.5 rounded bg-slate-800 text-slate-300">
           OJ: {overjetMm}mm | OB: {overbitePercent}%
         </span>
       </div>
@@ -150,7 +150,7 @@ function IncisorBiteVisualizer({ overjetMm, overbitePercent }: { overjetMm: numb
       </div>
 
       {/* Clinical Status Badges under Visualizer */}
-      <div className="flex items-center gap-1.5 flex-wrap justify-center text-[10px] pt-1">
+      <div className="flex items-center gap-1.5 flex-wrap justify-center text-3xs pt-1">
         {isCrossbite ? (
           <span className="px-2 py-0.5 rounded-full bg-rose-500/20 text-rose-300 font-bold border border-rose-500/40">
             کراس‌بایت معکوس (Crossbite)
@@ -397,6 +397,7 @@ export function OrthodonticChart({
             <button
               type="button"
               onClick={toggleVoiceDictation}
+              aria-pressed={isListening}
               className={`min-h-[44px] px-3.5 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 shadow-sm ${
                 isListening
                   ? 'bg-rose-600 text-white animate-pulse shadow-rose-500/30'
@@ -442,7 +443,7 @@ export function OrthodonticChart({
             </div>
             <button
               onClick={toggleVoiceDictation}
-              className="px-2.5 py-1 rounded-lg bg-indigo-800 hover:bg-indigo-700 text-[11px] font-bold text-indigo-200 shrink-0"
+              className="px-2.5 py-1 rounded-lg bg-indigo-800 hover:bg-indigo-700 text-2xs font-bold text-indigo-200 shrink-0"
             >
               توقف شنود
             </button>
@@ -453,7 +454,7 @@ export function OrthodonticChart({
         <div className="mt-5 pt-4 border-t border-indigo-100/80 dark:border-slate-700/80 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
           {/* OCS Complexity Score */}
           <div className="p-3 bg-white/80 dark:bg-slate-800/80 rounded-xl border border-slate-200/80 dark:border-slate-700">
-            <span className="text-[11px] text-slate-400 font-medium">شاخص پیچیدگی درمان (OCS)</span>
+            <span className="text-2xs text-slate-400 font-medium">شاخص پیچیدگی درمان (OCS)</span>
             <div className="flex items-center justify-between mt-1">
               <span className="text-base font-bold text-indigo-700 dark:text-indigo-400">
                 {toPersianDigits(complexity.score)} / ۱۰۰
@@ -476,9 +477,9 @@ export function OrthodonticChart({
 
           {/* IOTN Treatment Need Index */}
           <div className="p-3 bg-white/80 dark:bg-slate-800/80 rounded-xl border border-slate-200/80 dark:border-slate-700">
-            <span className="text-[11px] text-slate-400 font-medium flex items-center justify-between">
+            <span className="text-2xs text-slate-400 font-medium flex items-center justify-between">
               <span>شاخص نیاز ارتودنسی</span>
-              <span className="font-mono text-[10px] text-indigo-500 font-bold">IOTN-DHC</span>
+              <span className="font-mono text-3xs text-indigo-500 font-bold">IOTN-DHC</span>
             </span>
             <div className="flex items-center justify-between mt-1">
               <span className="text-sm font-bold text-slate-800 dark:text-slate-100 flex items-center gap-1">
@@ -492,7 +493,7 @@ export function OrthodonticChart({
           </div>
 
           <div className="p-3 bg-white/80 dark:bg-slate-800/80 rounded-xl border border-slate-200/80 dark:border-slate-700">
-            <span className="text-[11px] text-slate-400 font-medium">طول دوره تخمینی</span>
+            <span className="text-2xs text-slate-400 font-medium">طول دوره تخمینی</span>
             <div className="flex items-center gap-2 mt-1">
               <Clock className="w-4 h-4 text-emerald-600" />
               <span className="text-base font-bold text-slate-800 dark:text-slate-100">
@@ -502,12 +503,13 @@ export function OrthodonticChart({
           </div>
 
           <div className="p-3 bg-white/80 dark:bg-slate-800/80 rounded-xl border border-slate-200/80 dark:border-slate-700">
-            <span className="text-[11px] text-slate-400 font-medium">پزشک معالج / متخصص</span>
+            <span className="text-2xs text-slate-400 font-medium">پزشک معالج / متخصص</span>
             <div className="flex items-center gap-2 mt-1">
               <Stethoscope className="w-4 h-4 text-indigo-600" />
               <select
                 value={formData.doctor_id || ''}
                 onChange={(e) => updateField('doctor_id', e.target.value || null)}
+                aria-label="پزشک معالج / متخصص"
                 className="w-full bg-transparent text-xs font-semibold text-slate-800 dark:text-slate-100 focus:outline-none"
               >
                 <option value="">(انتخاب پزشک ارتودنتیست)</option>
@@ -521,12 +523,13 @@ export function OrthodonticChart({
           </div>
 
           <div className="p-3 bg-white/80 dark:bg-slate-800/80 rounded-xl border border-slate-200/80 dark:border-slate-700">
-            <span className="text-[11px] text-slate-400 font-medium">مرحله بالینی درمان</span>
+            <span className="text-2xs text-slate-400 font-medium">مرحله بالینی درمان</span>
             <div className="flex items-center gap-2 mt-1">
               <Layers className="w-4 h-4 text-sky-600" />
               <select
                 value={formData.treatment_stage}
                 onChange={(e) => updateField('treatment_stage', e.target.value as OrthoTreatmentStage)}
+                aria-label="مرحله بالینی درمان"
                 className="w-full bg-transparent text-xs font-semibold text-slate-800 dark:text-slate-100 focus:outline-none"
               >
                 {Object.entries(TREATMENT_STAGE_LABELS).map(([key, label]) => (
@@ -554,7 +557,7 @@ export function OrthodonticChart({
           <div className="space-y-2 p-3 bg-slate-50 dark:bg-slate-800/50 rounded-xl border border-slate-100 dark:border-slate-700">
             <label className="text-xs font-bold text-slate-700 dark:text-slate-200 flex justify-between items-center">
               <span>مولار اول سمت راست (Right First Molar):</span>
-              <span className="text-[11px] text-indigo-600 font-mono">
+              <span className="text-2xs text-indigo-600 font-mono">
                 {ANGLE_MOLAR_LABELS[formData.molar_class_right]?.short}
               </span>
             </label>
@@ -586,7 +589,7 @@ export function OrthodonticChart({
           <div className="space-y-2 p-3 bg-slate-50 dark:bg-slate-800/50 rounded-xl border border-slate-100 dark:border-slate-700">
             <label className="text-xs font-bold text-slate-700 dark:text-slate-200 flex justify-between items-center">
               <span>مولار اول سمت چپ (Left First Molar):</span>
-              <span className="text-[11px] text-indigo-600 font-mono">
+              <span className="text-2xs text-indigo-600 font-mono">
                 {ANGLE_MOLAR_LABELS[formData.molar_class_left]?.short}
               </span>
             </label>
@@ -699,7 +702,7 @@ export function OrthodonticChart({
               className="w-full h-2 bg-slate-200 dark:bg-slate-700 rounded-lg appearance-none cursor-pointer accent-indigo-600"
             />
 
-            <div className="flex justify-between text-[10px] text-slate-400 font-mono">
+            <div className="flex justify-between text-3xs text-slate-400 font-mono">
               <span>-6mm (معکوس)</span>
               <span>0 (Edge)</span>
               <span>+2mm (نرمال)</span>
@@ -732,7 +735,7 @@ export function OrthodonticChart({
               className="w-full h-2 bg-slate-200 dark:bg-slate-700 rounded-lg appearance-none cursor-pointer accent-indigo-600"
             />
 
-            <div className="flex justify-between text-[10px] text-slate-400 font-mono">
+            <div className="flex justify-between text-3xs text-slate-400 font-mono">
               <span>-50% (اپن بایت)</span>
               <span>0%</span>
               <span>25% (نرمال)</span>
@@ -773,7 +776,7 @@ export function OrthodonticChart({
                 />
               </div>
 
-              <div className="text-[11px] text-slate-400 mt-1">
+              <div className="text-2xs text-slate-400 mt-1">
                 {formData.midline_shift_upper_mm === 0 && formData.midline_shift_lower_mm === 0
                   ? 'خطوط میانی کاملاً منطبق (Coincident)'
                   : 'دارای شیفت خط میانی نسبت به پلن صورتی'}
@@ -791,7 +794,7 @@ export function OrthodonticChart({
           <div className="lg:col-span-2 p-4 bg-indigo-50/50 dark:bg-indigo-950/20 border border-indigo-100 dark:border-indigo-900/50 rounded-2xl space-y-2">
             <div className="flex items-center justify-between">
               <span className="text-xs font-bold text-indigo-950 dark:text-indigo-200 flex items-center gap-1.5">
-                <Award size={15} className="text-indigo-600" />
+                <Award size={14} className="text-indigo-600" />
                 ارزیابی شاخص نیاز درمان ارتودنسی (IOTN Grade {toPersianDigits(iotn.grade)} - {iotn.needText}):
               </span>
               <Badge color={iotn.color === 'error' ? 'error' : iotn.color === 'warning' ? 'warning' : iotn.color === 'info' ? 'accent' : 'success'}>
@@ -843,7 +846,7 @@ export function OrthodonticChart({
                   {active ? (
                     <AlertTriangle className="w-4 h-4 text-rose-600" />
                   ) : (
-                    <span className="text-[10px] text-slate-400">ندارد</span>
+                    <span className="text-3xs text-slate-400">ندارد</span>
                   )}
                 </button>
               )
@@ -860,7 +863,7 @@ export function OrthodonticChart({
             </span>
             <div className="space-y-2">
               <div>
-                <span className="text-[11px] text-slate-500 block mb-1">فک بالا (Maxillary):</span>
+                <span className="text-2xs text-slate-500 block mb-1">فک بالا (Maxillary):</span>
                 <div className="grid grid-cols-4 gap-1">
                   {(['none', 'mild', 'moderate', 'severe'] as ArchDiscrepancyDegree[]).map((deg) => (
                     <button
@@ -880,7 +883,7 @@ export function OrthodonticChart({
               </div>
 
               <div>
-                <span className="text-[11px] text-slate-500 block mb-1">فک پایین (Mandibular):</span>
+                <span className="text-2xs text-slate-500 block mb-1">فک پایین (Mandibular):</span>
                 <div className="grid grid-cols-4 gap-1">
                   {(['none', 'mild', 'moderate', 'severe'] as ArchDiscrepancyDegree[]).map((deg) => (
                     <button
@@ -921,7 +924,7 @@ export function OrthodonticChart({
               </div>
 
               <div>
-                <span className="text-[11px] text-slate-500 block mb-1">اسپیسینگ فک بالا:</span>
+                <span className="text-2xs text-slate-500 block mb-1">اسپیسینگ فک بالا:</span>
                 <div className="grid grid-cols-4 gap-1">
                   {(['none', 'mild', 'moderate', 'severe'] as ArchDiscrepancyDegree[]).map((deg) => (
                     <button
@@ -941,7 +944,7 @@ export function OrthodonticChart({
               </div>
 
               <div>
-                <span className="text-[11px] text-slate-500 block mb-1">اسپیسینگ فک پایین:</span>
+                <span className="text-2xs text-slate-500 block mb-1">اسپیسینگ فک پایین:</span>
                 <div className="grid grid-cols-4 gap-1">
                   {(['none', 'mild', 'moderate', 'severe'] as ArchDiscrepancyDegree[]).map((deg) => (
                     <button
@@ -1030,6 +1033,7 @@ export function OrthodonticChart({
             <select
               value={formData.tmj_status}
               onChange={(e) => updateField('tmj_status', e.target.value as TmjStatusType)}
+              aria-label="معاینه مفصل گیجگاهی فکی (TMJ)"
               className="w-full p-2.5 rounded-lg bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs font-semibold text-slate-800 dark:text-slate-100 min-h-[44px]"
             >
               {Object.entries(TMJ_STATUS_LABELS).map(([key, label]) => (
@@ -1038,7 +1042,7 @@ export function OrthodonticChart({
                 </option>
               ))}
             </select>
-            <div className="text-[11px] text-slate-500 p-2 rounded bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700">
+            <div className="text-2xs text-slate-500 p-2 rounded bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700">
               بررسی انحراف مندیبل در باز کردن، کلیک، کریپتاسیون و تندرنس تریگوئید لترال
             </div>
           </div>
@@ -1090,6 +1094,7 @@ export function OrthodonticChart({
             <select
               value={formData.appliance_type}
               onChange={(e) => updateField('appliance_type', e.target.value as OrthoApplianceType)}
+              aria-label="دستگاه درمانی انتخابی (Appliance)"
               className="w-full p-2.5 rounded-lg bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs font-semibold text-slate-800 dark:text-slate-100 min-h-[44px]"
             >
               {Object.entries(APPLIANCE_TYPE_LABELS).map(([key, label]) => (
@@ -1121,7 +1126,7 @@ export function OrthodonticChart({
             <label className="text-xs font-bold text-slate-700 dark:text-slate-200">
               یادداشت‌های اختصاصی و پلن بیومکانیک:
             </label>
-            <span className="text-[11px] text-indigo-600 dark:text-indigo-400 font-medium">
+            <span className="text-2xs text-indigo-600 dark:text-indigo-400 font-medium">
               الگوهای آماده بالینی:
             </span>
           </div>
@@ -1142,7 +1147,7 @@ export function OrthodonticChart({
                   chimes.playPop()
                   updateField('notes', formData.notes ? `${formData.notes}\n• ${preset}` : `• ${preset}`)
                 }}
-                className="px-2.5 py-1 rounded-lg bg-indigo-50 dark:bg-indigo-950/40 text-indigo-700 dark:text-indigo-300 hover:bg-indigo-100 text-[11px] font-medium border border-indigo-200 dark:border-indigo-800 transition-all press-scale"
+                className="px-2.5 py-1 rounded-lg bg-indigo-50 dark:bg-indigo-950/40 text-indigo-700 dark:text-indigo-300 hover:bg-indigo-100 text-2xs font-medium border border-indigo-200 dark:border-indigo-800 transition-all press-scale"
               >
                 + {preset}
               </button>

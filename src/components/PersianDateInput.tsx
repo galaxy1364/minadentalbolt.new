@@ -4,6 +4,7 @@
 // Stores/emits the same Gregorian "YYYY-MM-DD" string everywhere else
 // in the app already expects, so no downstream logic changes.
 import { useState } from 'react'
+import { createPortal } from 'react-dom'
 import { Calendar as CalIcon, X as XIcon } from 'lucide-react'
 import { PersianCalendar } from './PersianCalendar'
 import { toJalaliStringPretty } from '../lib/persianDate'
@@ -37,7 +38,7 @@ export function PersianDateInput({ label, value, onChange, placeholder = 'انت
         <CalIcon size={16} className="text-slate-400 shrink-0" />
       </button>
 
-      {open && (
+      {open && createPortal(
         <div
           className="fixed inset-0 z-[100] flex items-end sm:items-center justify-center bg-black/40 backdrop-blur-sm"
           onClick={() => {
@@ -69,7 +70,8 @@ export function PersianDateInput({ label, value, onChange, placeholder = 'انت
               }}
             />
           </div>
-        </div>
+        </div>,
+        document.body
       )}
     </div>
   )

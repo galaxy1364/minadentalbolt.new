@@ -79,28 +79,28 @@ export default function DoctorDashboard({ doctorId, doctorName }: { doctorId: st
         <Card className="p-3.5">
           <div className="flex items-center gap-2 mb-1">
             <Calendar size={16} className="text-primary-500" />
-            <p className="text-[11px] text-slate-400">نوبت‌های امروز</p>
+            <p className="text-2xs text-slate-400">نوبت‌های امروز</p>
           </div>
           <p className="text-xl font-extrabold text-slate-800 dark:text-slate-100">{toPersianDigits(todayAppointments.length)}</p>
         </Card>
         <Card className="p-3.5">
           <div className="flex items-center gap-2 mb-1">
             <Users size={16} className="text-amber-500" />
-            <p className="text-[11px] text-slate-400">در لیست انتظار</p>
+            <p className="text-2xs text-slate-400">در لیست انتظار</p>
           </div>
           <p className="text-xl font-extrabold text-slate-800 dark:text-slate-100">{toPersianDigits(waitingList.length)}</p>
         </Card>
         <Card className="p-3.5">
           <div className="flex items-center gap-2 mb-1">
             <Wallet size={16} className="text-success-500" />
-            <p className="text-[11px] text-slate-400">کارکرد این ماه</p>
+            <p className="text-2xs text-slate-400">کارکرد این ماه</p>
           </div>
           <p className="text-sm font-extrabold text-slate-800 dark:text-slate-100">{formatCurrency(monthProduction)} ت</p>
         </Card>
         <Card className="p-3.5">
           <div className="flex items-center gap-2 mb-1">
             <Stethoscope size={16} className="text-sky-500" />
-            <p className="text-[11px] text-slate-400">درمان ناتمام</p>
+            <p className="text-2xs text-slate-400">درمان ناتمام</p>
           </div>
           <p className="text-xl font-extrabold text-slate-800 dark:text-slate-100">{toPersianDigits(pendingTreatments)}</p>
         </Card>
@@ -116,14 +116,22 @@ export default function DoctorDashboard({ doctorId, doctorName }: { doctorId: st
         ) : (
           <div className="space-y-2">
             {todayAppointments.map((a) => (
-              <Card key={a.id} className="p-3 flex items-center gap-3 hover:card-shadow-sm transition-all-smooth cursor-pointer press-scale" onClick={() => { h.select(); chimes.playPop(); if (a.patient_id) navigate(`/patients/${a.patient_id}`) }}>
-                <div className="w-11 h-11 rounded-xl bg-primary-50 dark:bg-primary-900/30 flex flex-col items-center justify-center shrink-0">
+              <Card
+                key={a.id}
+                className="p-3 flex items-center gap-3 hover:card-shadow-sm transition-all-smooth cursor-pointer press-scale focus:outline-none focus:ring-2 focus:ring-primary-400"
+                role="button"
+                tabIndex={0}
+                aria-label={`نوبت ${a.patient?.first_name || ''} ${a.patient?.last_name || ''}`.trim()}
+                onClick={() => { h.select(); chimes.playPop(); if (a.patient_id) navigate(`/patients/${a.patient_id}`) }}
+                onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); h.select(); chimes.playPop(); if (a.patient_id) navigate(`/patients/${a.patient_id}`) } }}
+              >
+                <div className="w-8 h-8 rounded-xl bg-primary-50 dark:bg-primary-900/30 flex flex-col items-center justify-center shrink-0">
                   <Clock size={12} className="text-primary-500" />
-                  <span className="text-[10px] font-bold text-primary-700 dark:text-primary-400">{timeParts(a.start_time).clock || a.start_time}</span>
+                  <span className="text-3xs font-bold text-primary-700 dark:text-primary-400">{timeParts(a.start_time).clock || a.start_time}</span>
                 </div>
                 <div className="min-w-0 flex-1">
                   <p className="text-sm font-bold text-slate-800 dark:text-slate-100 truncate">{a.patient ? `${a.patient.first_name} ${a.patient.last_name}` : 'بیمار'}</p>
-                  <p className="text-[11px] text-slate-400">{a.type || 'ویزیت'}</p>
+                  <p className="text-2xs text-slate-400">{a.type || 'ویزیت'}</p>
                 </div>
                 <Badge color={a.status === 'completed' ? 'success' : a.status === 'confirmed' ? 'primary' : 'slate'}>{statusLabels[a.status] || a.status}</Badge>
               </Card>
@@ -148,15 +156,15 @@ export default function DoctorDashboard({ doctorId, doctorName }: { doctorId: st
       <div className="grid grid-cols-3 gap-2">
         <button onClick={() => { h.tap(); chimes.playPop(); navigate('/treatments') }} className="p-3 rounded-2xl bg-white dark:bg-slate-800 border border-slate-100 dark:border-slate-700 text-center hover:bg-slate-50 dark:hover:bg-slate-700/50 transition-all-smooth press-scale">
           <Stethoscope size={18} className="mx-auto text-primary-500 mb-1" />
-          <span className="text-[11px] text-slate-600 dark:text-slate-300">درمان</span>
+          <span className="text-2xs text-slate-600 dark:text-slate-300">درمان</span>
         </button>
         <button onClick={() => { h.tap(); chimes.playPop(); navigate('/prescriptions') }} className="p-3 rounded-2xl bg-white dark:bg-slate-800 border border-slate-100 dark:border-slate-700 text-center hover:bg-slate-50 dark:hover:bg-slate-700/50 transition-all-smooth press-scale">
           <Users size={18} className="mx-auto text-fuchsia-500 mb-1" />
-          <span className="text-[11px] text-slate-600 dark:text-slate-300">نسخه</span>
+          <span className="text-2xs text-slate-600 dark:text-slate-300">نسخه</span>
         </button>
         <button onClick={() => { h.tap(); chimes.playPop(); navigate('/radiology') }} className="p-3 rounded-2xl bg-white dark:bg-slate-800 border border-slate-100 dark:border-slate-700 text-center hover:bg-slate-50 dark:hover:bg-slate-700/50 transition-all-smooth press-scale">
           <Calendar size={18} className="mx-auto text-pink-500 mb-1" />
-          <span className="text-[11px] text-slate-600 dark:text-slate-300">رادیولوژی</span>
+          <span className="text-2xs text-slate-600 dark:text-slate-300">رادیولوژی</span>
         </button>
       </div>
     </div>

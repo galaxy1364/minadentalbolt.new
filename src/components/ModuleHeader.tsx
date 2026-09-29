@@ -19,7 +19,7 @@ export function ModuleHeader({ moduleKey, title, subtitle, action }: {
 
   return (
     <div
-      className="relative overflow-hidden rounded-3xl p-4 sm:p-5 flex flex-wrap items-center justify-between gap-3.5 border border-slate-200/80 dark:border-slate-700/80 bg-white/90 dark:bg-slate-900/90 backdrop-blur-xl card-tactile-3d shadow-md"
+      className="relative overflow-hidden rounded-2xl p-4 sm:p-5 flex flex-wrap items-center justify-between gap-3.5 border border-slate-200/80 dark:border-slate-700/80 bg-white/90 dark:bg-slate-900/90 backdrop-blur-xl card-tactile-3d shadow-md"
     >
       <div
         className="absolute -top-12 -left-12 w-48 h-48 rounded-full blur-3xl pointer-events-none breathe-slow"
@@ -27,7 +27,7 @@ export function ModuleHeader({ moduleKey, title, subtitle, action }: {
       />
       <div className="relative flex items-center gap-3.5">
         <ModuleIconBadge color={mod.color} gradient={mod.gradient} size={56} rounded="rounded-2xl">
-          <Icon size={34} strokeWidth={2} />
+          <Icon size={32} strokeWidth={2} />
         </ModuleIconBadge>
         <div>
           <h1 className="text-xl font-black text-slate-900 dark:text-slate-100 leading-tight tracking-tight">{title}</h1>
@@ -57,11 +57,11 @@ export function ModuleStatCard({ moduleKey, icon, label, value }: {
         style={{ background: `radial-gradient(circle, ${mod.color}45, transparent 70%)` }}
       />
       <div className="relative flex items-center gap-3">
-        <ModuleIconBadge color={mod.color} gradient={mod.gradient} size={44} rounded="rounded-xl">
+        <ModuleIconBadge color={mod.color} gradient={mod.gradient} size={40} rounded="rounded-xl">
           {isValidElement(icon) ? cloneElement(icon as React.ReactElement<any>, { size: 26 }) : icon}
         </ModuleIconBadge>
         <div className="min-w-0">
-          <p className="text-[11px] font-bold text-slate-500 dark:text-slate-400 truncate">{label}</p>
+          <p className="text-2xs font-bold text-slate-500 dark:text-slate-400 truncate">{label}</p>
           <p className="text-base font-black text-slate-900 dark:text-slate-100 truncate">{value}</p>
         </div>
       </div>
@@ -75,7 +75,7 @@ export function ModuleStatCard({ moduleKey, icon, label, value }: {
  * card row can use it instead of a fixed grid. Order persists per
  * module in localStorage under its own storageKey.
  */
-export function ReorderableStatGrid({ storageKey, items, className = 'flex items-stretch gap-3 overflow-x-auto dock-scroll -mx-1 px-1 pb-1' }: {
+export function ReorderableStatGrid({ storageKey, items, className = 'flex items-stretch gap-3 overflow-x-auto dock-scroll scroll-rail-affordance -mx-1 px-1 pb-1' }: {
   storageKey: string
   items: { key: string; node: ReactNode }[]
   className?: string
@@ -118,7 +118,7 @@ export function ReorderableStatGrid({ storageKey, items, className = 'flex items
             h.tap()
             setEditing(!editing)
           }}
-          className={`flex items-center gap-1 text-[11px] font-bold px-2 py-1 rounded-lg transition-all-smooth press-scale ${editing ? 'bg-primary-100 dark:bg-primary-900/40 text-primary-700 dark:text-primary-300' : 'text-slate-400 dark:text-slate-500 hover:text-primary-500'}`}
+          className={`flex items-center gap-1 text-2xs font-bold px-2 py-1 rounded-lg transition-all-smooth press-scale ${editing ? 'bg-primary-100 dark:bg-primary-900/40 text-primary-700 dark:text-primary-300' : 'text-slate-400 dark:text-slate-500 hover:text-primary-500'}`}
         >
           <Settings2 size={12} />
           {editing ? 'پایان چیدمان' : 'تنظیم چیدمان'}
@@ -136,7 +136,7 @@ export function ReorderableStatGrid({ storageKey, items, className = 'flex items
                   aria-label="جابجایی به چپ"
                   className="pointer-events-auto w-6 h-6 rounded-full bg-white dark:bg-slate-900 shadow-md flex items-center justify-center text-slate-500 disabled:opacity-30 press-scale"
                 >
-                  <ChevronLeft size={13} />
+                  <ChevronLeft size={14} />
                 </button>
                 <button
                   onClick={(e) => { e.stopPropagation(); move(item.key, -1) }}
@@ -144,7 +144,7 @@ export function ReorderableStatGrid({ storageKey, items, className = 'flex items
                   aria-label="جابجایی به راست"
                   className="pointer-events-auto w-6 h-6 rounded-full bg-white dark:bg-slate-900 shadow-md flex items-center justify-center text-slate-500 disabled:opacity-30 press-scale"
                 >
-                  <ChevronLeft size={13} className="rotate-180" />
+                  <ChevronLeft size={14} className="rotate-180" />
                 </button>
               </div>
             )}

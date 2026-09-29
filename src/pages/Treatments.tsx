@@ -1,6 +1,8 @@
 // Treatments.tsx — Full Treatment Management with Encounter creation, Dental Chart, Billing & Lab referral
 import { useState, useEffect, useCallback, useMemo } from 'react'
+import { usePullToRefresh } from '../lib/usePullToRefresh'
 import { SurfaceSelect } from '../components/SurfaceSelect'
+import { colorTokens, CHART_AXIS_COLOR_STRONG } from '../lib/colorTokens'
 import { toothLabel, toothLabelWithWord } from '../lib/toothLabel'
 import { useNavigate, useLocation } from 'react-router-dom'
 import {
@@ -394,6 +396,7 @@ export default function Treatments() {
   }, [])
 
   useEffect(() => { loadData() }, [loadData])
+  const ptr = usePullToRefresh(async () => { await loadData() })
 
   // Coming from Appointments → 'تکمیل نوبت' opens the encounter it just
   // created, so staff can go straight into recording treatments instead
@@ -1276,11 +1279,26 @@ export default function Treatments() {
   // ── Render ────────────────────────────────────────────────────
 
   if (loading) {
-    return <div className="flex items-center justify-center py-20"><Spinner size={32} /></div>
+    return (
+      <div className="space-y-4" aria-busy="true" aria-live="polite">
+        <div className="skeleton h-12 rounded-xl" />
+        <div className="space-y-2">
+          {[0, 1, 2, 3].map((i) => <div key={i} className="skeleton h-20 rounded-2xl" />)}
+        </div>
+      </div>
+    )
   }
 
   return (
-    <div className="space-y-3">
+    <div className="space-y-3" {...ptr.handlers}>
+      {ptr.pullDistance > 0 && (
+        <div className="pull-indicator" style={{ opacity: ptr.isRefreshing ? 1 : ptr.pullProgress, top: -4 }}>
+          <div className="flex flex-col items-center gap-1">
+            <div className={`w-7 h-7 rounded-full border-2 border-teal-300 dark:border-teal-600 border-t-teal-600 dark:border-t-teal-400 ${ptr.isRefreshing ? 'animate-spin' : ''}`} style={{ transform: `scale(${0.6 + ptr.pullProgress * 0.4})` }} />
+            <span className="text-3xs text-teal-600 font-medium">{ptr.isRefreshing ? 'در حال به‌روزرسانی...' : 'برای به‌روزرسانی بکشید'}</span>
+          </div>
+        </div>
+      )}
       <div className="treatment-command-row" role="toolbar" aria-label="اقدام‌ها و نماهای درمان">
         <button type="button" onClick={openQuickVisitModal} className="module-tool tool-teal rounded-xl px-3 flex items-center gap-1.5"><Plus size={16}/><span>ویزیت جدید</span></button>
         <button type="button" onClick={() => { h.select(); setActiveTab('encounters') }} aria-pressed={activeTab === 'encounters'} className={`module-tool tool-blue rounded-xl px-3 flex items-center gap-1.5 ${activeTab === 'encounters' ? 'tool-active' : ''}`}><ClipboardList size={16}/><span>فهرست ویزیت‌ها</span></button>
@@ -1317,20 +1335,20 @@ export default function Treatments() {
               <button
                 type="button"
                 onClick={() => setSearchQuery('')}
-                className="p-0.5 rounded-md hover:bg-primary-200/60 dark:hover:bg-primary-900/60 text-primary-600 dark:text-primary-300 transition-colors"
+                className="p-0.5 rounded-lg hover:bg-primary-200/60 dark:hover:bg-primary-900/60 text-primary-600 dark:text-primary-300 transition-colors"
                 title="حذف فیلتر"
               >
-                <X size={13} />
+                <X size={14} />
               </button>
             </div>
           )}
           {activeTab === 'encounters' ? (
-            <select value={filterStatus} onChange={(e) => setFilterStatus(e.target.value)} className="px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-sm focus:outline-none focus:ring-2 focus:ring-primary-400 dark:text-slate-100">
+            <select value={filterStatus} onChange={(e) => setFilterStatus(e.target.value)} aria-label="فیلتر وضعیت درمان" className="px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-sm focus:outline-none focus:ring-2 focus:ring-primary-400 dark:text-slate-100">
               <option value="">همه وضعیت‌ها</option>
               {encounterStatuses.map((s) => <option key={s.value} value={s.value}>{s.label}</option>)}
             </select>
           ) : (
-            <select value={filterCategory} onChange={(e) => setFilterCategory(e.target.value)} className="px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-sm focus:outline-none focus:ring-2 focus:ring-primary-400 dark:text-slate-100">
+            <select value={filterCategory} onChange={(e) => setFilterCategory(e.target.value)} aria-label="فیلتر دسته درمان" className="px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-sm focus:outline-none focus:ring-2 focus:ring-primary-400 dark:text-slate-100">
               <option value="">همه دسته‌ها</option>
               {categoryOptions.map((c) => <option key={c.value} value={c.value}>{c.label}</option>)}
             </select>
@@ -1345,7 +1363,7 @@ export default function Treatments() {
       {activeTab === 'encounters' && (
         <div className="space-y-3">
           {patientGroups.length === 0 ? (
-            <Card className="p-5"><EmptyState icon={<ClipboardList size={28} />} title="پرونده‌ای یافت نشد" description="با شروع درمان، پرونده‌ی بیمار خودکار ساخته می‌شود" action={<Button onClick={openQuickTreatModal} className="flex items-center gap-1.5"><Stethoscope size={16} /> شروع درمان</Button>} /></Card>
+            <Card className="p-5"><EmptyState icon={<ClipboardList size={56} />} title="پرونده‌ای یافت نشد" description="با شروع درمان، پرونده‌ی بیمار خودکار ساخته می‌شود" action={<Button onClick={openQuickTreatModal} className="flex items-center gap-1.5"><Stethoscope size={16} /> شروع درمان</Button>} /></Card>
           ) : (
             patientGroups.map((g, idx) => {
               const p = patientMap.get(g.patientId)
@@ -1356,7 +1374,7 @@ export default function Treatments() {
               const settled = g.finance.balance <= 0 && g.finance.totalCost > 0
               // A file's left edge is its money status at a glance: red owes,
               // green settled, slate untouched.
-              const edge = owes ? '#dc2626' : settled ? '#0d9488' : '#cbd5e1'
+              const edge = owes ? colorTokens.error[600] : settled ? colorTokens.primary[600] : colorTokens.secondary[300]
               const theme = tileThemes[getHashColor(g.patientId)]
               const staggerDelay = Math.min(idx, 15) * 0.05
               return (
@@ -1369,7 +1387,9 @@ export default function Treatments() {
                     className="w-full flex items-center gap-3 p-3.5 text-right hover:bg-slate-50/50 dark:hover:bg-slate-700/40 transition-all-smooth cursor-pointer"
                     role="button"
                     tabIndex={0}
+                    onKeyDown={(e) => { if (e.key === 'Enter') { h.tap(); togglePatient(g.patientId) } }}
                     aria-expanded={open}
+                    aria-label={`پرونده ${name}`}
                   >
                     <button
                       type="button"
@@ -1406,14 +1426,14 @@ export default function Treatments() {
                               navigate(`/patients/${g.patientId}`)
                             }}
                             title="مشاهده پرونده با این شماره"
-                            className="patient-file-badge text-[10px] text-slate-400 font-mono shrink-0 hover:text-primary-600 dark:hover:text-primary-400"
+                            className="patient-file-badge text-3xs text-slate-400 font-mono shrink-0 hover:text-primary-600 dark:hover:text-primary-400"
                           >
                             {p.file_number}
                           </button>
                         )}
                       </div>
                       <div className="flex items-center gap-1.5 flex-wrap mt-1">
-                        <span className="text-[11px] px-1.5 py-0.5 rounded-md bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300">{toPersianDigits(g.encounters.length)} ویزیت</span>
+                        <span className="text-2xs px-1.5 py-0.5 rounded-lg bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300">{toPersianDigits(g.encounters.length)} ویزیت</span>
                         <button
                           type="button"
                           onClick={(e) => {
@@ -1422,16 +1442,16 @@ export default function Treatments() {
                             navigate(`/patients/${g.patientId}`, { state: { initialTab: 'treatments' } })
                           }}
                           title="مشاهده درمان‌ها در پرونده"
-                          className="text-[11px] px-1.5 py-0.5 rounded-md bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 hover:bg-primary-50 hover:text-primary-700 transition-colors"
+                          className="text-2xs px-1.5 py-0.5 rounded-lg bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 hover:bg-primary-50 hover:text-primary-700 transition-colors"
                         >
                           {toPersianDigits(g.treatmentCount)} درمان
                         </button>
                         {g.doctorChanged && (
-                          <span className="text-[11px] px-1.5 py-0.5 rounded-md bg-amber-100 text-amber-800 font-medium flex items-center gap-1" title={`${toPersianDigits(g.doctorIds.length)} پزشک روی این پرونده کار کرده‌اند`}>
-                            <Users size={11} /> {toPersianDigits(g.doctorIds.length)} پزشک
+                          <span className="text-2xs px-1.5 py-0.5 rounded-lg bg-amber-100 text-amber-800 font-medium flex items-center gap-1" title={`${toPersianDigits(g.doctorIds.length)} پزشک روی این پرونده کار کرده‌اند`}>
+                            <Users size={12} /> {toPersianDigits(g.doctorIds.length)} پزشک
                           </span>
                         )}
-                        {g.lastVisitDate && <span className="text-[11px] text-slate-400">آخرین ویزیت: {toJalaliDisplay(g.lastVisitDate)}</span>}
+                        {g.lastVisitDate && <span className="text-2xs text-slate-400">آخرین ویزیت: {toJalaliDisplay(g.lastVisitDate)}</span>}
                       </div>
                     </div>
                     <button
@@ -1445,7 +1465,7 @@ export default function Treatments() {
                       className="text-left shrink-0 p-1.5 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-700 transition-all hover:scale-105 active:scale-95"
                     >
                       <p className={`font-extrabold text-sm ${owes ? 'text-error-600' : 'text-success-600'}`}>{formatCurrency(Math.abs(g.finance.balance))} ت</p>
-                      <p className="text-[10px] text-slate-400">{owes ? 'بدهکار' : settled ? 'تسویه' : 'بدون هزینه'}</p>
+                      <p className="text-3xs text-slate-400">{owes ? 'بدهکار' : settled ? 'تسویه' : 'بدون هزینه'}</p>
                     </button>
                     {open ? <ChevronDown size={18} className="text-slate-400 shrink-0" /> : <ChevronRight size={18} className="text-slate-400 shrink-0 rotate-180" />}
                   </div>
@@ -1465,7 +1485,7 @@ export default function Treatments() {
                           title="مشاهده فهرست درمان‌ها و هزینه‌ها در پرونده"
                           className="bg-white dark:bg-slate-800 p-2.5 text-center hover:bg-slate-50 dark:hover:bg-slate-750 transition-colors cursor-pointer"
                         >
-                          <p className="text-[10px] text-slate-400">کل هزینه</p>
+                          <p className="text-3xs text-slate-400">کل هزینه</p>
                           <p className="text-xs font-bold text-slate-700 dark:text-slate-200 mt-0.5">{formatCurrency(g.finance.totalCost)}</p>
                         </button>
                         <button
@@ -1478,7 +1498,7 @@ export default function Treatments() {
                           title="مشاهده تاریخچه پرداخت‌ها"
                           className="bg-white dark:bg-slate-800 p-2.5 text-center hover:bg-slate-50 dark:hover:bg-slate-750 transition-colors cursor-pointer"
                         >
-                          <p className="text-[10px] text-slate-400">پرداختی</p>
+                          <p className="text-3xs text-slate-400">پرداختی</p>
                           <p className="text-xs font-bold text-success-600 mt-0.5">{formatCurrency(g.finance.paid)}</p>
                         </button>
                         <button
@@ -1491,7 +1511,7 @@ export default function Treatments() {
                           title={owes ? 'ثبت تسویه بدهی' : 'مشاهده تسویه حساب کامل'}
                           className="bg-white dark:bg-slate-800 p-2.5 text-center hover:bg-slate-50 dark:hover:bg-slate-750 transition-colors cursor-pointer"
                         >
-                          <p className="text-[10px] text-slate-400">مانده</p>
+                          <p className="text-3xs text-slate-400">مانده</p>
                           <p className={`text-xs font-bold mt-0.5 ${owes ? 'text-error-600' : 'text-success-600'}`}>{formatCurrency(Math.abs(g.finance.balance))}</p>
                         </button>
                       </div>
@@ -1506,7 +1526,7 @@ export default function Treatments() {
                                 navigate(`/patients/${g.patientId}`, { state: { initialTab: 'payments', focusSection: 'section-cheques' } })
                               }}
                               title="مشاهده چک‌های صیادی بیمار"
-                              className="text-[11px] px-2 py-1 rounded-lg bg-sky-50 text-sky-700 font-medium flex items-center gap-1 hover:scale-105 active:scale-95 transition-all cursor-pointer shadow-xs"
+                              className="text-2xs px-2 py-1 rounded-lg bg-sky-50 text-sky-700 font-medium flex items-center gap-1 hover:scale-105 active:scale-95 transition-all cursor-pointer shadow-xs"
                             >
                               <Receipt size={12} /> {toPersianDigits(g.finance.pendingChequeCount)} چک در انتظار — {formatCurrency(g.finance.pendingChequeAmount)} ت
                             </button>
@@ -1520,7 +1540,7 @@ export default function Treatments() {
                                 navigate(`/patients/${g.patientId}`, { state: { initialTab: 'payments', focusSection: 'section-payment-plans' } })
                               }}
                               title="مشاهده اقساط فعال بیمار"
-                              className="text-[11px] px-2 py-1 rounded-lg bg-violet-50 text-violet-700 font-medium flex items-center gap-1 hover:scale-105 active:scale-95 transition-all cursor-pointer shadow-xs"
+                              className="text-2xs px-2 py-1 rounded-lg bg-violet-50 text-violet-700 font-medium flex items-center gap-1 hover:scale-105 active:scale-95 transition-all cursor-pointer shadow-xs"
                             >
                               <CalendarClock size={12} /> {toPersianDigits(g.finance.remainingInstallmentCount)} قسط باقی — {formatCurrency(g.finance.remainingInstallmentAmount)} ت
                             </button>
@@ -1543,8 +1563,8 @@ export default function Treatments() {
                                   <span className="text-xs font-medium text-slate-700 dark:text-slate-200">{toJalaliDisplay(e.encounter_date)}</span>
                                   <Badge color={meta.color}>{meta.label}</Badge>
                                 </div>
-                                <p className="text-[11px] text-slate-500 mt-0.5 flex items-center gap-1 truncate">
-                                  <Stethoscope size={11} className="shrink-0" /> دکتر {docName}
+                                <p className="text-2xs text-slate-500 mt-0.5 flex items-center gap-1 truncate">
+                                  <Stethoscope size={12} className="shrink-0" /> دکتر {docName}
                                   {e.diagnosis ? ` — ${e.diagnosis}` : ''}
                                 </p>
                               </div>
@@ -1591,7 +1611,7 @@ export default function Treatments() {
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           <Card className="p-0 overflow-hidden lg:col-span-2">
             {filteredProcedures.length === 0 ? (
-              <EmptyState icon={<Stethoscope size={28} />} title="رویه‌ای یافت نشد" />
+              <EmptyState icon={<Stethoscope size={56} />} title="رویه‌ای یافت نشد" />
             ) : (
               <div className="overflow-x-auto">
                 <table className="w-full text-sm">
@@ -1622,12 +1642,12 @@ export default function Treatments() {
           <Card className="p-5">
             <h3 className="text-sm font-bold text-slate-800 mb-4">توزیع رویه‌ها بر اساس دسته</h3>
             {categoryChartData.length === 0 ? (
-              <EmptyState icon={<Activity size={28} />} title="داده‌ای موجود نیست" />
+              <EmptyState icon={<Activity size={56} />} title="داده‌ای موجود نیست" />
             ) : (
               <ResponsiveContainer width="100%" height={300}>
                 <BarChart data={categoryChartData} layout="vertical" margin={{ top: 0, right: 10, left: 10, bottom: 0 }}>
-                  <XAxis type="number" tick={{ fontSize: 11, fill: '#64748b' }} />
-                  <YAxis dataKey="name" type="category" tick={{ fontSize: 11, fill: '#64748b' }} width={80} />
+                  <XAxis type="number" tick={{ fontSize: 11, fill: CHART_AXIS_COLOR_STRONG }} />
+                  <YAxis dataKey="name" type="category" tick={{ fontSize: 11, fill: CHART_AXIS_COLOR_STRONG }} width={80} />
                   <RTooltip formatter={(v: number) => [formatNumber(v), 'تعداد']} contentStyle={{ direction: 'rtl', fontSize: 12, borderRadius: 12, border: 'none', boxShadow: '0 4px 12px rgba(0,0,0,0.1)' }} />
                   <Bar dataKey="count" radius={[0, 6, 6, 0]}>
                     {categoryChartData.map((_, i) => <Cell key={i} fill={CHART_COLORS[i % CHART_COLORS.length]} />)}
@@ -1927,7 +1947,7 @@ export default function Treatments() {
                 </div>
               </div>
               {encounterTreatments.length === 0 ? (
-                <EmptyState icon={<Stethoscope size={24} />} title="درمانی ثبت نشده" />
+                <EmptyState icon={<Stethoscope size={56} />} title="درمانی ثبت نشده" />
               ) : (
                 <div className="space-y-2">
                   {encounterTreatments.map((t) => (
@@ -2143,6 +2163,7 @@ export default function Treatments() {
                   <select
                     value={treatForm.procedure_code}
                     onChange={(e) => handleProcedureSelect(e.target.value)}
+                    aria-label="انتخاب رویه درمانی"
                     className="w-full px-3 py-2.5 rounded-xl border border-slate-200 dark:border-slate-600 bg-slate-50 dark:bg-slate-700 text-sm focus:outline-none focus:ring-2 focus:ring-primary-400"
                   >
                     <option value="">انتخاب از لیست رویه‌ها...</option>
@@ -2221,9 +2242,9 @@ export default function Treatments() {
                         />
                         <span>هشدار پیش‌نیاز بالینی: {evalRes.ruleTitle}</span>
                       </div>
-                      <p className="text-[11px] text-slate-600 dark:text-slate-400 leading-relaxed">{evalRes.message}</p>
+                      <p className="text-2xs text-slate-600 dark:text-slate-400 leading-relaxed">{evalRes.message}</p>
                       {evalRes.missingStep && (
-                        <p className="text-[10px] font-semibold text-primary-700 dark:text-primary-300">
+                        <p className="text-3xs font-semibold text-primary-700 dark:text-primary-300">
                           اقدام بالینی لازم: {evalRes.missingStep}
                         </p>
                       )}
@@ -2244,11 +2265,11 @@ export default function Treatments() {
                           <div key={idx} className="p-2 rounded-lg bg-white/80 dark:bg-slate-800/80 border border-sky-100 dark:border-sky-900 text-xs space-y-1">
                             <div className="flex items-center justify-between">
                               <span className="font-bold text-slate-800 dark:text-slate-200">گام {toPersianDigits(idx + 1)}: {st.name}</span>
-                              {st.needsLab && <span className="text-[10px] px-1.5 py-0.5 rounded bg-amber-100 text-amber-800 font-medium">لابراتوار</span>}
+                              {st.needsLab && <span className="text-3xs px-1.5 py-0.5 rounded bg-amber-100 text-amber-800 font-medium">لابراتوار</span>}
                             </div>
-                            <p className="text-[11px] text-slate-500 leading-tight">{st.description}</p>
+                            <p className="text-2xs text-slate-500 leading-tight">{st.description}</p>
                             {st.defaultDaysLater && (
-                              <span className="text-[10px] text-sky-600 font-medium block">فاصله پیشنهادی: {toPersianDigits(st.defaultDaysLater)} روز بعد</span>
+                              <span className="text-3xs text-sky-600 font-medium block">فاصله پیشنهادی: {toPersianDigits(st.defaultDaysLater)} روز بعد</span>
                             )}
                           </div>
                         ))}
@@ -2380,7 +2401,7 @@ export default function Treatments() {
                         onClick={handleAutoPopulateSupplies}
                         className="min-h-[44px] px-3.5 py-1.5 rounded-xl bg-primary-600 hover:bg-primary-700 text-white text-xs font-bold transition-all shadow-xs press-scale flex items-center gap-1.5"
                       >
-                        <Sparkles size={13} />
+                        <Sparkles size={14} />
                         تزریق خودکار مواد استاندارد
                       </button>
                     </div>
@@ -2401,7 +2422,7 @@ export default function Treatments() {
                           >
                             <div className="min-w-0 flex-1">
                               <p className="font-bold text-slate-800 dark:text-slate-100 truncate">{s.templateSupplyName}</p>
-                              <p className="text-[11px] text-slate-400">
+                              <p className="text-2xs text-slate-400">
                                 مقدار پیش‌فرض: {toPersianDigits(s.defaultQuantity)} {s.unit}
                                 {matched && (
                                   <span className={s.inStock ? ' text-emerald-600 dark:text-emerald-400 mr-1' : ' text-amber-600 dark:text-amber-400 mr-1'}>
@@ -2422,7 +2443,7 @@ export default function Treatments() {
                                   </span>
                                 )
                               ) : (
-                                <span className="text-slate-400 text-[10px]">تعریف‌نشده</span>
+                                <span className="text-slate-400 text-3xs">تعریف‌نشده</span>
                               )}
                             </span>
                           </div>
@@ -2489,7 +2510,7 @@ export default function Treatments() {
                                 className="text-red-500 hover:bg-red-50 dark:hover:bg-red-950/40 p-1.5 rounded-lg transition-colors"
                                 title="حذف"
                               >
-                                <Trash2 size={15} />
+                                <Trash2 size={14} />
                               </button>
                             </div>
                           </div>
@@ -2607,7 +2628,7 @@ export default function Treatments() {
 
           {basket.length === 0 ? (
             <Card className="p-6">
-              <EmptyState icon={<Layers size={28} />} title="سبد خالی است" description="اولین درمان را اضافه کنید" />
+              <EmptyState icon={<Layers size={56} />} title="سبد خالی است" description="اولین درمان را اضافه کنید" />
             </Card>
           ) : (
             <>
@@ -2721,7 +2742,7 @@ export default function Treatments() {
                 <p className="text-xs font-medium text-slate-700 dark:text-slate-300 mb-1">
                   رویه: {rec.procedureName}
                 </p>
-                <p className="text-[11px] text-slate-500 dark:text-slate-400 leading-relaxed mb-2.5">
+                <p className="text-2xs text-slate-500 dark:text-slate-400 leading-relaxed mb-2.5">
                   علت پزشکی: {rec.rationale}
                 </p>
                 <Button
@@ -2784,7 +2805,7 @@ export default function Treatments() {
               <label className="text-xs font-bold text-slate-700 dark:text-slate-300 flex items-center justify-between">
                 <span>پیش‌نویس پیامک خودکار مراقبت پس از جراحی:</span>
                 {postOpData.patientPhone && (
-                  <span className="text-[11px] font-normal text-slate-400 font-mono">
+                  <span className="text-2xs font-normal text-slate-400 font-mono">
                     شماره: {postOpData.patientPhone}
                   </span>
                 )}

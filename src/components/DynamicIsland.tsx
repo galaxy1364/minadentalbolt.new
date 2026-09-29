@@ -66,7 +66,7 @@ export function DynamicIsland() {
     >
       <div
         onClick={isExpanded ? dismiss : undefined}
-        className="bg-black dark:bg-black rounded-[28px] transition-all duration-500 ease-[cubic-bezier(0.32,0.72,0,1)] cursor-pointer overflow-hidden"
+        className="bg-black dark:bg-black rounded-ios-xl transition-all duration-500 ease-[cubic-bezier(0.32,0.72,0,1)] cursor-pointer overflow-hidden"
         style={{
           width: isExpanded ? 'min(340px, calc(100vw - 24px))' : isCompact ? '200px' : '120px',
           height: isExpanded ? 'auto' : '36px',
@@ -86,9 +86,9 @@ export function DynamicIsland() {
               </div>
             )}
             <div className="flex-1 min-w-0">
-              <p className="text-[13px] font-bold text-white truncate">{notification.title}</p>
+              <p className="text-sm font-bold text-white truncate">{notification.title}</p>
               {notification.message && (
-                <p className="text-[11px] text-white/70 truncate">{notification.message}</p>
+                <p className="text-2xs text-white/70 truncate">{notification.message}</p>
               )}
             </div>
           </div>
@@ -96,13 +96,13 @@ export function DynamicIsland() {
           <div className="flex items-center justify-center h-9 gap-2">
             {notification.icon && (
               <div
-                className="flex-shrink-0 w-5 h-5 rounded-md flex items-center justify-center text-white"
+                className="flex-shrink-0 w-5 h-5 rounded-lg flex items-center justify-center text-white"
                 style={{ background: notification.color || '#0d9488' }}
               >
                 {React.cloneElement(notification.icon as React.ReactElement, { size: 12 })}
               </div>
             )}
-            <span className="text-[11px] font-medium text-white/80 truncate max-w-[140px]">
+            <span className="text-2xs font-medium text-white/80 truncate max-w-[140px]">
               {notification.title}
             </span>
           </div>

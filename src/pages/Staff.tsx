@@ -1,5 +1,6 @@
 // Staff.tsx - Persian RTL Dental Clinic Staff Management with Doctor Revenue Sharing
 import { useState, useEffect, useCallback, useMemo } from 'react'
+import { usePullToRefresh } from '../lib/usePullToRefresh'
 import { useNavigate } from 'react-router-dom'
 import { Users, Search, Plus, Phone, Mail, Calendar, DollarSign, Smile, Briefcase, Edit2, Stethoscope, Calculator, Award, TrendingUp, Percent, UserCheck, ChevronDown, ChevronUp, Shield, Lock, Unlock, RotateCcw, Archive, Download } from 'lucide-react'
 import { PieChart, Pie, Cell, Tooltip as RTooltip, ResponsiveContainer } from 'recharts'
@@ -159,6 +160,7 @@ export default function Staff() {
   useEffect(() => {
     loadData()
   }, [loadData])
+  const ptr = usePullToRefresh(async () => { await loadData() })
 
   const filteredStaff = useMemo(() => {
     let result = staff.filter((s) => {
@@ -541,14 +543,25 @@ export default function Staff() {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center py-20">
-        <Spinner size={32} />
+      <div className="space-y-4" aria-busy="true" aria-live="polite">
+        <div className="skeleton h-12 rounded-xl" />
+        <div className="space-y-2">
+          {[0, 1, 2, 3].map((i) => <div key={i} className="skeleton h-20 rounded-2xl" />)}
+        </div>
       </div>
     )
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6" style={{ paddingBottom: 'calc(6rem + env(safe-area-inset-bottom, 0px))' }} {...ptr.handlers}>
+      {ptr.pullDistance > 0 && (
+        <div className="pull-indicator" style={{ opacity: ptr.isRefreshing ? 1 : ptr.pullProgress, top: -4 }}>
+          <div className="flex flex-col items-center gap-1">
+            <div className={`w-7 h-7 rounded-full border-2 border-teal-300 dark:border-teal-600 border-t-teal-600 dark:border-t-teal-400 ${ptr.isRefreshing ? 'animate-spin' : ''}`} style={{ transform: `scale(${0.6 + ptr.pullProgress * 0.4})` }} />
+            <span className="text-3xs text-teal-600 font-medium">{ptr.isRefreshing ? 'در حال به‌روزرسانی...' : 'برای به‌روزرسانی بکشید'}</span>
+          </div>
+        </div>
+      )}
       <ModuleHeader
         moduleKey="staff"
         title="پرسنل"
@@ -588,7 +601,7 @@ export default function Staff() {
 
         {showSharePanel && (
           <div className="flex items-center gap-2 mb-3">
-            <label className="text-[11px] font-medium text-slate-500 shrink-0">بازه:</label>
+            <label className="text-2xs font-medium text-slate-500 shrink-0">بازه:</label>
             <PersianDateInput value={sharePeriodStart} onChange={setSharePeriodStart} className="flex-1" />
             <span className="text-slate-400 text-xs">تا</span>
             <PersianDateInput value={sharePeriodEnd} onChange={setSharePeriodEnd} className="flex-1" />
@@ -602,7 +615,7 @@ export default function Staff() {
         </div>
 
         {doctors.length === 0 ? (
-          <EmptyState icon={<Stethoscope size={28} />} title="پزشکی ثبت نشده است" description="برای سهم‌بندی، ابتدا یک پزشک با نقش «پزشک» اضافه کنید" />
+          <EmptyState icon={<Stethoscope size={56} />} title="پزشکی ثبت نشده است" description="برای سهم‌بندی، ابتدا یک پزشک با نقش «پزشک» اضافه کنید" />
         ) : showSharePanel && shareResults.length > 0 ? (
           <div className="space-y-3">
             {/* Summary */}
@@ -676,7 +689,7 @@ export default function Staff() {
             </div>
           </div>
         ) : showSharePanel ? (
-          <EmptyState icon={<Calculator size={28} />} title="هنوز محاسبه نشده است" description="روی دکمه «محاسبه سهم» کلیک کنید" />
+          <EmptyState icon={<Calculator size={56} />} title="هنوز محاسبه نشده است" description="روی دکمه «محاسبه سهم» کلیک کنید" />
         ) : (
           <p className="text-sm text-slate-500">{formatNumber(doctors.length)} پزشک ثبت شده است. برای مشاهده سهم‌بندی، پنل را باز کنید.</p>
         )}
@@ -754,8 +767,8 @@ export default function Staff() {
             </div>
 
             {loadingAudit ? (
-              <div className="flex items-center justify-center py-8">
-                <Spinner size={24} />
+              <div className="space-y-2" aria-busy="true" aria-live="polite">
+                {[0, 1, 2].map((i) => <div key={i} className="skeleton h-14 rounded-xl" />)}
               </div>
             ) : auditLogs.length === 0 ? (
               <div className="text-center py-6 text-xs text-slate-400">
@@ -805,7 +818,7 @@ export default function Staff() {
                             </td>
                             <td className="py-2 px-3 whitespace-nowrap text-slate-600 dark:text-slate-400">
                               <span className="font-bold text-slate-700 dark:text-slate-300">{log.actor_name}</span>
-                              {log.actor_role && <span className="text-[10px] text-slate-400 mr-1">({log.actor_role})</span>}
+                              {log.actor_role && <span className="text-3xs text-slate-400 mr-1">({log.actor_role})</span>}
                             </td>
                           </tr>
                         )
@@ -833,6 +846,7 @@ export default function Staff() {
           <select
             value={filterRole}
             onChange={(e) => setFilterRole(e.target.value)}
+            aria-label="فیلتر نقش کارمند"
             className="px-3 py-2 rounded-xl border border-slate-200 bg-slate-50 text-sm focus:outline-none focus:ring-2 focus:ring-primary-400"
           >
             <option value="">همه نقش‌ها</option>
@@ -854,7 +868,7 @@ export default function Staff() {
           {filteredStaff.length === 0 ? (
             <Card className="p-5">
               <EmptyState
-                icon={<Users size={28} />}
+                icon={<Users size={56} />}
                 title="پرسنلی ثبت نشده است"
                 description="با افزودن پرسنل جدید شروع کنید"
                 action={<Button onClick={openCreateModal} variant="primary" size="sm"><Plus size={14} className="inline ml-1" />افزودن پرسنل</Button>}
@@ -893,15 +907,15 @@ export default function Staff() {
                             title={staffLoginMap.get(s.id)!.isActive ? 'تعلیق حساب ورود' : 'فعال‌سازی حساب ورود'}
                             className={`p-1.5 rounded-lg transition-colors ${staffLoginMap.get(s.id)!.isActive ? 'text-slate-400 hover:text-warning-600 hover:bg-warning-50' : 'text-warning-600 bg-warning-50'}`}
                           >
-                            {staffLoginMap.get(s.id)!.isActive ? <Lock size={15} /> : <Unlock size={15} />}
+                            {staffLoginMap.get(s.id)!.isActive ? <Lock size={14} /> : <Unlock size={14} />}
                           </button>
                         )}
                         <button onClick={() => openEditModal(s)} className="p-1.5 rounded-lg text-slate-400 hover:text-primary-600 hover:bg-primary-50 transition-colors">
-                          <Edit2 size={15} />
+                          <Edit2 size={14} />
                         </button>
                         {s.is_active ? (
                           <button onClick={() => handleDelete(s)} aria-label="غیرفعال کردن پرسنل" title="غیرفعال کردن" className="p-1.5 rounded-lg text-slate-400 hover:text-error-600 hover:bg-error-50 transition-colors">
-                            <Archive size={15} />
+                            <Archive size={14} />
                           </button>
                         ) : (
                           <button
@@ -909,7 +923,7 @@ export default function Staff() {
                             title="فعال‌سازی مجدد"
                             className="p-1.5 rounded-lg text-success-500 hover:text-success-700 hover:bg-success-50 transition-colors"
                           >
-                            <RotateCcw size={15} />
+                            <RotateCcw size={14} />
                           </button>
                         )}
                       </div>
@@ -985,7 +999,7 @@ export default function Staff() {
                             className="w-full py-1.5 px-2.5 rounded-xl bg-primary-50 dark:bg-primary-950/40 text-primary-700 dark:text-primary-300 hover:bg-primary-100 dark:hover:bg-primary-900/50 text-xs font-bold transition-all-smooth border border-primary-200/60 dark:border-primary-800/50 flex items-center justify-center gap-1.5 press-scale"
                             title="مشاهده کلیه پرونده‌ها و درمان‌های انجام‌شده توسط این پزشک"
                           >
-                            <Stethoscope size={13} />
+                            <Stethoscope size={14} />
                             <span>مشاهده پرونده‌های درمانی پزشک</span>
                           </button>
                         </div>
@@ -1003,7 +1017,7 @@ export default function Staff() {
         <Card className="p-5">
           <h3 className="text-sm font-bold text-slate-800 mb-4">توزیع پرسنل بر اساس نقش</h3>
           {roleDistributionChart.length === 0 ? (
-            <EmptyState icon={<Briefcase size={28} />} title="داده‌ای موجود نیست" />
+            <EmptyState icon={<Briefcase size={56} />} title="داده‌ای موجود نیست" />
           ) : (
             <ResponsiveContainer width="100%" height={300}>
               <PieChart>

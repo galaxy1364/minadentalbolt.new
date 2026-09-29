@@ -3,6 +3,7 @@ import { sanitiseDates } from './dateSanitise'
 import { isMissingTableError } from './syncErrors'
 import { db, TABLE_NAMES, TableName, SyncQueueEntry } from './db'
 import { logAudit } from './auditLog'
+import { reconnectGate } from './auth'
 
 export type SyncStatus = 'idle' | 'syncing' | 'online' | 'offline' | 'error'
 
@@ -177,6 +178,18 @@ async function fullSync(): Promise<SyncResult> {
       currentStatus = 'offline'
       notify()
       return { success: false, pushed: 0, pulled: 0, errors: ['دستگاه در حالت آفلاین است'] }
+    }
+
+    // MOD-FIX-011: a reconnect is mid-retry — the active session is still
+    // the synthetic offline one (no real Supabase Auth JWT), so any push
+    // or pull here would go out as the unrestricted anon role instead of
+    // the RBAC-scoped role. Wait for the real session to be restored (or
+    // for the user to be sent back to the login screen) before syncing;
+    // the reconnect flow re-triggers a sync itself once it resolves.
+    if (reconnectGate.active) {
+      currentStatus = 'online'
+      notify()
+      return { success: false, pushed: 0, pulled: 0, errors: ['در حال بازیابی نشست کاربر — همگام‌سازی به تعویق افتاد'] }
     }
 
     // Push local changes BEFORE pulling — prevents overwriting unpushed local edits

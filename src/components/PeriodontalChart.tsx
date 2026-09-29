@@ -236,23 +236,23 @@ export function PeriodontalChart({ patientId, patientName, doctors, exam, patien
         {/* Diagnosis & Metrics Bar */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-2.5 pt-2 border-t border-slate-100 dark:border-slate-700">
           <div className="p-2.5 rounded-xl bg-slate-50 dark:bg-slate-800/80">
-            <span className="text-[11px] text-slate-500 block mb-0.5">تشخیص پریودنتال</span>
+            <span className="text-2xs text-slate-500 block mb-0.5">تشخیص پریودنتال</span>
             <Badge color={stats.diagnosisGrade.color}>{stats.diagnosisGrade.title}</Badge>
           </div>
           <div className="p-2.5 rounded-xl bg-slate-50 dark:bg-slate-800/80">
-            <span className="text-[11px] text-slate-500 block mb-0.5">شاخص خونریزی (BOP)</span>
+            <span className="text-2xs text-slate-500 block mb-0.5">شاخص خونریزی (BOP)</span>
             <span className={`text-base font-bold ${stats.bopPercentage >= 10 ? 'text-error-600' : 'text-success-600'}`}>
               {toPersianDigits(stats.bopPercentage)}٪
             </span>
           </div>
           <div className="p-2.5 rounded-xl bg-slate-50 dark:bg-slate-800/80">
-            <span className="text-[11px] text-slate-500 block mb-0.5">پاکت‌های فعال (≥۴mm)</span>
+            <span className="text-2xs text-slate-500 block mb-0.5">پاکت‌های فعال (≥۴mm)</span>
             <span className={`text-base font-bold ${stats.deepPocketsCount > 0 ? 'text-warning-600' : 'text-slate-700 dark:text-slate-200'}`}>
               {toPersianDigits(stats.deepPocketsCount)} سطح
             </span>
           </div>
           <div className="p-2.5 rounded-xl bg-slate-50 dark:bg-slate-800/80">
-            <span className="text-[11px] text-slate-500 block mb-0.5">پاکت‌های پیشرفته (≥۶mm)</span>
+            <span className="text-2xs text-slate-500 block mb-0.5">پاکت‌های پیشرفته (≥۶mm)</span>
             <span className={`text-base font-bold ${stats.severePocketsCount > 0 ? 'text-error-600' : 'text-slate-700 dark:text-slate-200'}`}>
               {toPersianDigits(stats.severePocketsCount)} سطح
             </span>
@@ -266,27 +266,27 @@ export function PeriodontalChart({ patientId, patientName, doctors, exam, patien
               <span className="text-xs font-black text-indigo-900 dark:text-indigo-200">
                 طبقه‌بندی استاندارد جهانی AAP / EFP 2018:
               </span>
-              <span className="px-2 py-0.5 rounded-md text-xs font-bold bg-indigo-600 text-white shadow-sm">
+              <span className="px-2 py-0.5 rounded-lg text-xs font-bold bg-indigo-600 text-white shadow-sm">
                 {stats.aapClassification.stageLabel}
               </span>
-              <span className="px-2 py-0.5 rounded-md text-xs font-bold bg-purple-100 dark:bg-purple-900/40 text-purple-800 dark:text-purple-300 border border-purple-200 dark:border-purple-800">
+              <span className="px-2 py-0.5 rounded-lg text-xs font-bold bg-purple-100 dark:bg-purple-900/40 text-purple-800 dark:text-purple-300 border border-purple-200 dark:border-purple-800">
                 {stats.aapClassification.gradeLabel}
               </span>
-              <span className="px-2 py-0.5 rounded-md text-xs font-bold bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300">
+              <span className="px-2 py-0.5 rounded-lg text-xs font-bold bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300">
                 {stats.aapClassification.extentLabel}
               </span>
             </div>
           </div>
 
-          <p className="text-[11px] text-indigo-800 dark:text-indigo-300 leading-relaxed">
+          <p className="text-2xs text-indigo-800 dark:text-indigo-300 leading-relaxed">
             {stats.aapClassification.stageDescription}
           </p>
 
           {stats.aapClassification.riskModifiers.length > 0 && (
             <div className="flex items-center gap-1.5 flex-wrap pt-1 border-t border-indigo-200/50 dark:border-indigo-800/50">
-              <span className="text-[10px] font-bold text-amber-700 dark:text-amber-400">عوامل خطر سیستمیک (Risk Modifiers):</span>
+              <span className="text-3xs font-bold text-amber-700 dark:text-amber-400">عوامل خطر سیستمیک (Risk Modifiers):</span>
               {stats.aapClassification.riskModifiers.map((mod, idx) => (
-                <span key={idx} className="text-[10px] px-2 py-0.5 rounded-md bg-amber-100 dark:bg-amber-900/30 text-amber-900 dark:text-amber-300 font-medium">
+                <span key={idx} className="text-3xs px-2 py-0.5 rounded-lg bg-amber-100 dark:bg-amber-900/30 text-amber-900 dark:text-amber-300 font-medium">
                   ⚠️ {mod}
                 </span>
               ))}
@@ -295,12 +295,12 @@ export function PeriodontalChart({ patientId, patientName, doctors, exam, patien
 
           {stats.aapClassification.treatmentProtocols.length > 0 && (
             <div className="pt-1.5 border-t border-indigo-200/50 dark:border-indigo-800/50">
-              <span className="text-[11px] font-bold text-slate-700 dark:text-slate-200 block mb-1">
+              <span className="text-2xs font-bold text-slate-700 dark:text-slate-200 block mb-1">
                 پروتکل بالینی پیشنهادی (Clinical Protocol):
               </span>
               <div className="flex flex-wrap gap-1.5">
                 {stats.aapClassification.treatmentProtocols.map((proto, idx) => (
-                  <span key={idx} className="text-[10px] px-2 py-0.5 rounded-md bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700 font-medium">
+                  <span key={idx} className="text-3xs px-2 py-0.5 rounded-lg bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700 font-medium">
                     ✓ {proto}
                   </span>
                 ))}
@@ -314,7 +314,7 @@ export function PeriodontalChart({ patientId, patientName, doctors, exam, patien
       <Card className="p-4 space-y-3">
         <div className="flex items-center justify-between text-xs font-bold text-slate-600 dark:text-slate-300">
           <span>قوس فک بالا (Maxilla)</span>
-          <span className="text-[10px] text-slate-400">یک دندان را برای معاینه ۶ نقطه‌ای لمس کنید</span>
+          <span className="text-3xs text-slate-400">یک دندان را برای معاینه ۶ نقطه‌ای لمس کنید</span>
         </div>
         <div className="flex items-center justify-center gap-1.5 overflow-x-auto pb-1">
           {UPPER_PERIO_TEETH.map(renderToothPill)}
@@ -339,16 +339,17 @@ export function PeriodontalChart({ patientId, patientName, doctors, exam, patien
               <h3 className="text-sm font-bold text-slate-800 dark:text-slate-100">
                 معاینه پریودنتال دندان {toothLabel(selectedTooth)}
               </h3>
-              <p className="text-[11px] text-slate-400">۶ نقطه استاندارد پروبینگ (۳ نقطه باکال / بیرونی + ۳ نقطه لینگوال / داخلی)</p>
+              <p className="text-2xs text-slate-400">۶ نقطه استاندارد پروبینگ (۳ نقطه باکال / بیرونی + ۳ نقطه لینگوال / داخلی)</p>
             </div>
           </div>
 
           <div className="flex items-center gap-3">
             <div>
-              <label className="text-[11px] text-slate-500 block mb-0.5">لقی (Mobility)</label>
+              <label className="text-2xs text-slate-500 block mb-0.5">لقی (Mobility)</label>
               <select
                 value={currentToothData.mobility || 0}
                 onChange={(e) => updateToothAttr('mobility', Number(e.target.value))}
+                aria-label="لقی (Mobility)"
                 className="px-2 py-1 rounded-lg border border-slate-200 dark:border-slate-700 text-xs bg-white dark:bg-slate-800"
               >
                 <option value={0}>درجه ۰ (طبیعی)</option>
@@ -358,10 +359,11 @@ export function PeriodontalChart({ patientId, patientName, doctors, exam, patien
               </select>
             </div>
             <div>
-              <label className="text-[11px] text-slate-500 block mb-0.5">فورکا (Furcation)</label>
+              <label className="text-2xs text-slate-500 block mb-0.5">فورکا (Furcation)</label>
               <select
                 value={currentToothData.furcation || 0}
                 onChange={(e) => updateToothAttr('furcation', Number(e.target.value))}
+                aria-label="فورکا (Furcation)"
                 className="px-2 py-1 rounded-lg border border-slate-200 dark:border-slate-700 text-xs bg-white dark:bg-slate-800"
               >
                 <option value={0}>بدون درگیری</option>
@@ -387,9 +389,9 @@ export function PeriodontalChart({ patientId, patientName, doctors, exam, patien
                 const label = key === 'db' ? 'دیستوباکال (DB)' : key === 'b' ? 'میدباکال (B)' : 'مزیوباکال (MB)'
                 return (
                   <div key={key} className="p-2 rounded-lg bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 space-y-1.5">
-                    <span className="text-[10px] text-slate-500 block">{label}</span>
+                    <span className="text-3xs text-slate-500 block">{label}</span>
                     <div>
-                      <span className="text-[10px] text-slate-400 block">عمق پروب (mm)</span>
+                      <span className="text-3xs text-slate-400 block">عمق پروب (mm)</span>
                       <input
                         type="number"
                         min="1"
@@ -406,7 +408,7 @@ export function PeriodontalChart({ patientId, patientName, doctors, exam, patien
                       />
                     </div>
                     <div>
-                      <span className="text-[10px] text-slate-400 block">تحلیل لثه (GM)</span>
+                      <span className="text-3xs text-slate-400 block">تحلیل لثه (GM)</span>
                       <input
                         type="number"
                         min="-5"
@@ -416,14 +418,14 @@ export function PeriodontalChart({ patientId, patientName, doctors, exam, patien
                         className="w-full text-center py-0.5 rounded text-xs border border-slate-200 dark:border-slate-700"
                       />
                     </div>
-                    <div className="text-[10px] text-slate-500">
+                    <div className="text-3xs text-slate-500">
                       CAL: <b>{toPersianDigits(s.cal || s.pd)}mm</b>
                     </div>
                     <div className="flex justify-center gap-1 pt-1">
                       <button
                         type="button"
                         onClick={() => updateSite(key, 'bop', !s.bop)}
-                        className={`p-1 rounded-md text-[10px] flex items-center gap-0.5 font-bold ${
+                        className={`p-1 rounded-lg text-3xs flex items-center gap-0.5 font-bold ${
                           s.bop ? 'bg-error-500 text-white' : 'bg-slate-100 dark:bg-slate-700 text-slate-500'
                         }`}
                         title="خونریزی حین پروب (BOP)"
@@ -448,9 +450,9 @@ export function PeriodontalChart({ patientId, patientName, doctors, exam, patien
                 const label = key === 'dl' ? 'دیستولینگوال (DL)' : key === 'l' ? 'میدلینگوال (L)' : 'مزیولینگوال (ML)'
                 return (
                   <div key={key} className="p-2 rounded-lg bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 space-y-1.5">
-                    <span className="text-[10px] text-slate-500 block">{label}</span>
+                    <span className="text-3xs text-slate-500 block">{label}</span>
                     <div>
-                      <span className="text-[10px] text-slate-400 block">عمق پروب (mm)</span>
+                      <span className="text-3xs text-slate-400 block">عمق پروب (mm)</span>
                       <input
                         type="number"
                         min="1"
@@ -467,7 +469,7 @@ export function PeriodontalChart({ patientId, patientName, doctors, exam, patien
                       />
                     </div>
                     <div>
-                      <span className="text-[10px] text-slate-400 block">تحلیل لثه (GM)</span>
+                      <span className="text-3xs text-slate-400 block">تحلیل لثه (GM)</span>
                       <input
                         type="number"
                         min="-5"
@@ -477,14 +479,14 @@ export function PeriodontalChart({ patientId, patientName, doctors, exam, patien
                         className="w-full text-center py-0.5 rounded text-xs border border-slate-200 dark:border-slate-700"
                       />
                     </div>
-                    <div className="text-[10px] text-slate-500">
+                    <div className="text-3xs text-slate-500">
                       CAL: <b>{toPersianDigits(s.cal || s.pd)}mm</b>
                     </div>
                     <div className="flex justify-center gap-1 pt-1">
                       <button
                         type="button"
                         onClick={() => updateSite(key, 'bop', !s.bop)}
-                        className={`p-1 rounded-md text-[10px] flex items-center gap-0.5 font-bold ${
+                        className={`p-1 rounded-lg text-3xs flex items-center gap-0.5 font-bold ${
                           s.bop ? 'bg-error-500 text-white' : 'bg-slate-100 dark:bg-slate-700 text-slate-500'
                         }`}
                         title="خونریزی حین پروب (BOP)"

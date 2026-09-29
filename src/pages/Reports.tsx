@@ -4,6 +4,7 @@ import { useNavigate } from 'react-router-dom'
 import { TrendingUp, Users, Activity, Calendar, DollarSign, BarChart3, PieChart as PieIcon, Smile, ArrowUp, ArrowDown, Download, FileSpreadsheet, AlertTriangle, Printer } from 'lucide-react'
 import { AreaChart, Area, BarChart, Bar, LineChart, Line, PieChart, Pie, Cell, XAxis, YAxis, Tooltip as RTooltip, ResponsiveContainer, Legend } from 'recharts'
 import { fetchPayments, fetchPatients, fetchEncounters, fetchTreatments, fetchProcedures, fetchAppointments, fetchExpenses, fetchImplantCases } from '../lib/api'
+import { colorTokens, CHART_AXIS_COLOR_STRONG } from '../lib/colorTokens'
 import { calcAllPatientBalances } from '../lib/finance'
 import { toothCode } from '../lib/toothLabel'
 import { toJalaliString, toJalaliStringPretty, getJalaliMonthYear, formatCurrency, formatNumber, toPersianDigits, persianMonths, jsDateToPersianWeekday, toJalaliDisplay, formatTime } from '../lib/persianDate'
@@ -710,8 +711,15 @@ export default function Reports() {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center py-20">
-        <Spinner size={32} />
+      <div className="space-y-4" aria-busy="true" aria-live="polite">
+        <div className="skeleton h-12 rounded-xl" />
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+          <div className="skeleton h-64 rounded-2xl lg:col-span-2" />
+          <div className="skeleton h-64 rounded-2xl" />
+        </div>
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+          {[0, 1, 2, 3].map((i) => <div key={i} className="skeleton h-24 rounded-2xl" />)}
+        </div>
       </div>
     )
   }
@@ -719,7 +727,7 @@ export default function Reports() {
   const tooltipStyle = { direction: 'rtl' as const, fontSize: 12, borderRadius: 12, border: 'none', boxShadow: '0 4px 12px rgba(0,0,0,0.1)' }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6" style={{ paddingBottom: 'calc(6rem + env(safe-area-inset-bottom, 0px))' }}>
       <ModuleHeader
         moduleKey="reports"
         title="گزارش‌ها"
@@ -809,26 +817,26 @@ export default function Reports() {
               درآمد و هزینه‌های ۱۲ ماه اخیر
             </h2>
             {revenue12MonthData.every((d) => d.revenue === 0 && d.expenses === 0) ? (
-              <EmptyState icon={<TrendingUp size={28} />} title="داده‌ای موجود نیست" />
+              <EmptyState icon={<TrendingUp size={56} />} title="داده‌ای موجود نیست" />
             ) : (
               <ResponsiveContainer width="100%" height={300}>
                 <AreaChart data={revenue12MonthData} margin={{ top: 10, right: 10, left: 10, bottom: 0 }}>
                   <defs>
                     <linearGradient id="revGrad" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor="#10b981" stopOpacity={0.3} />
-                      <stop offset="95%" stopColor="#10b981" stopOpacity={0} />
+                      <stop offset="5%" stopColor={colorTokens.success[500]} stopOpacity={0.3} />
+                      <stop offset="95%" stopColor={colorTokens.success[500]} stopOpacity={0} />
                     </linearGradient>
                     <linearGradient id="expGrad" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor="#ef4444" stopOpacity={0.3} />
-                      <stop offset="95%" stopColor="#ef4444" stopOpacity={0} />
+                      <stop offset="5%" stopColor={colorTokens.error[500]} stopOpacity={0.3} />
+                      <stop offset="95%" stopColor={colorTokens.error[500]} stopOpacity={0} />
                     </linearGradient>
                   </defs>
-                  <XAxis dataKey="label" tick={{ fontSize: 10, fill: '#64748b' }} />
-                  <YAxis tick={{ fontSize: 11, fill: '#64748b' }} tickFormatter={(v) => formatNumber(Math.round(v / 1000000))} width={50} />
+                  <XAxis dataKey="label" tick={{ fontSize: 10, fill: CHART_AXIS_COLOR_STRONG }} />
+                  <YAxis tick={{ fontSize: 11, fill: CHART_AXIS_COLOR_STRONG }} tickFormatter={(v) => formatNumber(Math.round(v / 1000000))} width={50} />
                   <RTooltip formatter={(v: number) => `${formatCurrency(v)} ت`} contentStyle={tooltipStyle} />
                   <Legend />
-                  <Area type="monotone" dataKey="revenue" name="درآمد" stroke="#10b981" strokeWidth={2} fill="url(#revGrad)" />
-                  <Area type="monotone" dataKey="expenses" name="هزینه" stroke="#ef4444" strokeWidth={2} fill="url(#expGrad)" />
+                  <Area type="monotone" dataKey="revenue" name="درآمد" stroke={colorTokens.success[500]} strokeWidth={2} fill="url(#revGrad)" />
+                  <Area type="monotone" dataKey="expenses" name="هزینه" stroke={colorTokens.error[500]} strokeWidth={2} fill="url(#expGrad)" />
                 </AreaChart>
               </ResponsiveContainer>
             )}
@@ -840,16 +848,16 @@ export default function Reports() {
               سود ماهانه
             </h2>
             {profitBarData.every((d) => d.profit === 0) ? (
-              <EmptyState icon={<BarChart3 size={28} />} title="داده‌ای موجود نیست" />
+              <EmptyState icon={<BarChart3 size={56} />} title="داده‌ای موجود نیست" />
             ) : (
               <ResponsiveContainer width="100%" height={250}>
                 <BarChart data={profitBarData} margin={{ top: 10, right: 10, left: 10, bottom: 0 }}>
-                  <XAxis dataKey="label" tick={{ fontSize: 10, fill: '#64748b' }} />
-                  <YAxis tick={{ fontSize: 11, fill: '#64748b' }} tickFormatter={(v) => formatNumber(Math.round(v / 1000000))} width={50} />
+                  <XAxis dataKey="label" tick={{ fontSize: 10, fill: CHART_AXIS_COLOR_STRONG }} />
+                  <YAxis tick={{ fontSize: 11, fill: CHART_AXIS_COLOR_STRONG }} tickFormatter={(v) => formatNumber(Math.round(v / 1000000))} width={50} />
                   <RTooltip formatter={(v: number) => `${formatCurrency(v)} ت`} contentStyle={tooltipStyle} />
                   <Bar dataKey="profit" name="سود" radius={[6, 6, 0, 0]}>
                     {profitBarData.map((d, i) => (
-                      <Cell key={i} fill={d.profit >= 0 ? '#10b981' : '#ef4444'} />
+                      <Cell key={i} fill={d.profit >= 0 ? colorTokens.success[500] : colorTokens.error[500]} />
                     ))}
                   </Bar>
                 </BarChart>
@@ -865,7 +873,7 @@ export default function Reports() {
           <div className="grid grid-cols-2 gap-2.5">
             {(['0-30', '31-60', '61-90', '90+'] as const).map((bucket) => (
               <Card key={bucket} className={`p-3.5 ${bucket === '90+' ? 'border-2 border-error-200' : ''}`}>
-                <p className="text-[11px] text-slate-400">{bucket === '0-30' ? '۰ تا ۳۰ روز' : bucket === '31-60' ? '۳۱ تا ۶۰ روز' : bucket === '61-90' ? '۶۱ تا ۹۰ روز' : 'بیش از ۹۰ روز'}</p>
+                <p className="text-2xs text-slate-400">{bucket === '0-30' ? '۰ تا ۳۰ روز' : bucket === '31-60' ? '۳۱ تا ۶۰ روز' : bucket === '61-90' ? '۶۱ تا ۹۰ روز' : 'بیش از ۹۰ روز'}</p>
                 <p className={`text-base font-extrabold ${bucket === '90+' ? 'text-error-600' : 'text-slate-700'}`}>{formatCurrency(agingData.totals[bucket])} ت</p>
               </Card>
             ))}
@@ -877,7 +885,7 @@ export default function Reports() {
             </div>
           </Card>
           {agingData.rows.length === 0 ? (
-            <EmptyState icon={<AlertTriangle size={40} />} title="بدهی معوقی نیست" description="همه‌ی بیماران تسویه‌حساب دارند" />
+            <EmptyState icon={<AlertTriangle size={56} />} title="بدهی معوقی نیست" description="همه‌ی بیماران تسویه‌حساب دارند" />
           ) : (
             <div className="space-y-2">
               {agingData.rows.map((r, idx) => {
@@ -886,10 +894,17 @@ export default function Reports() {
                 return (
                 <Card key={r.patientId} className={`p-3.5 relative overflow-hidden transition-all duration-300 stagger-item bg-gradient-to-br ${theme.bg} ${theme.border}`} style={{ animationDelay: `${staggerDelay}s` }}>
                   <div className={`absolute -right-16 -top-16 w-32 h-32 rounded-full blur-3xl opacity-20 breathe-slow pointer-events-none ${theme.text}`} />
-                  <div className="relative z-10 flex items-center justify-between gap-2 cursor-pointer" onClick={() => navigate(`/patients/${r.patientId}`)}>
+                  <div
+                    className="relative z-10 flex items-center justify-between gap-2 cursor-pointer focus:outline-none focus:ring-2 focus:ring-primary-400 rounded-lg"
+                    role="button"
+                    tabIndex={0}
+                    aria-label={`مشاهده پرونده ${r.name}`}
+                    onClick={() => navigate(`/patients/${r.patientId}`)}
+                    onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); navigate(`/patients/${r.patientId}`) } }}
+                  >
                   <div>
                     <p className="text-sm font-bold text-slate-800">{r.name}</p>
-                    <p className="text-[11px] text-slate-400">{toPersianDigits(r.days)} روز از آخرین فعالیت</p>
+                    <p className="text-2xs text-slate-400">{toPersianDigits(r.days)} روز از آخرین فعالیت</p>
                   </div>
                   <div className="text-left flex flex-col items-end gap-1">
                     <PatientDebtBar patientId={r.patientId} balance={{ balance: r.balance, paid: 0, totalCost: 0 }} variant="compact" />
@@ -923,12 +938,12 @@ export default function Reports() {
               رشد بیماران (۱۲ ماه)
             </h2>
             {patientGrowthData.every((d) => d.total === 0) ? (
-              <EmptyState icon={<Users size={28} />} title="داده‌ای موجود نیست" />
+              <EmptyState icon={<Users size={56} />} title="داده‌ای موجود نیست" />
             ) : (
               <ResponsiveContainer width="100%" height={300}>
                 <LineChart data={patientGrowthData} margin={{ top: 10, right: 10, left: 10, bottom: 0 }}>
-                  <XAxis dataKey="label" tick={{ fontSize: 10, fill: '#64748b' }} />
-                  <YAxis tick={{ fontSize: 11, fill: '#64748b' }} tickFormatter={(v) => formatNumber(v)} width={50} />
+                  <XAxis dataKey="label" tick={{ fontSize: 10, fill: CHART_AXIS_COLOR_STRONG }} />
+                  <YAxis tick={{ fontSize: 11, fill: CHART_AXIS_COLOR_STRONG }} tickFormatter={(v) => formatNumber(v)} width={50} />
                   <RTooltip formatter={(v: number) => formatNumber(v)} contentStyle={tooltipStyle} />
                   <Line type="monotone" dataKey="total" name="کل بیماران" stroke="#0ea5e9" strokeWidth={2} dot={{ r: 3 }} />
                 </LineChart>
@@ -942,12 +957,12 @@ export default function Reports() {
               بیماران جدید ماهانه
             </h2>
             {newPatientsBarData.every((d) => d.count === 0) ? (
-              <EmptyState icon={<BarChart3 size={28} />} title="داده‌ای موجود نیست" />
+              <EmptyState icon={<BarChart3 size={56} />} title="داده‌ای موجود نیست" />
             ) : (
               <ResponsiveContainer width="100%" height={250}>
                 <BarChart data={newPatientsBarData} margin={{ top: 10, right: 10, left: 10, bottom: 0 }}>
-                  <XAxis dataKey="label" tick={{ fontSize: 10, fill: '#64748b' }} />
-                  <YAxis tick={{ fontSize: 11, fill: '#64748b' }} allowDecimals={false} width={40} />
+                  <XAxis dataKey="label" tick={{ fontSize: 10, fill: CHART_AXIS_COLOR_STRONG }} />
+                  <YAxis tick={{ fontSize: 11, fill: CHART_AXIS_COLOR_STRONG }} allowDecimals={false} width={40} />
                   <RTooltip formatter={(v: number) => formatNumber(v)} contentStyle={tooltipStyle} />
                   <Bar dataKey="count" name="بیماران جدید" fill="#8b5cf6" radius={[6, 6, 0, 0]} />
                 </BarChart>
@@ -974,7 +989,7 @@ export default function Reports() {
                 توزیع درمان‌ها
               </h2>
               {treatmentDistributionData.length === 0 ? (
-                <EmptyState icon={<PieIcon size={28} />} title="داده‌ای موجود نیست" />
+                <EmptyState icon={<PieIcon size={56} />} title="داده‌ای موجود نیست" />
               ) : (
                 <ResponsiveContainer width="100%" height={300}>
                   <PieChart>
@@ -993,12 +1008,12 @@ export default function Reports() {
                 رویه‌ها بر اساس دسته
               </h2>
               {treatmentCategoryBarData.length === 0 ? (
-                <EmptyState icon={<BarChart3 size={28} />} title="داده‌ای موجود نیست" />
+                <EmptyState icon={<BarChart3 size={56} />} title="داده‌ای موجود نیست" />
               ) : (
                 <ResponsiveContainer width="100%" height={300}>
                   <BarChart data={treatmentCategoryBarData} layout="vertical" margin={{ top: 0, right: 10, left: 10, bottom: 0 }}>
-                    <XAxis type="number" tick={{ fontSize: 11, fill: '#64748b' }} />
-                    <YAxis dataKey="name" type="category" tick={{ fontSize: 11, fill: '#64748b' }} width={80} />
+                    <XAxis type="number" tick={{ fontSize: 11, fill: CHART_AXIS_COLOR_STRONG }} />
+                    <YAxis dataKey="name" type="category" tick={{ fontSize: 11, fill: CHART_AXIS_COLOR_STRONG }} width={80} />
                     <RTooltip formatter={(v: number) => formatNumber(v)} contentStyle={tooltipStyle} />
                     <Bar dataKey="count" radius={[0, 6, 6, 0]}>
                       {treatmentCategoryBarData.map((_, i) => <Cell key={i} fill={CHART_COLORS[i % CHART_COLORS.length]} />)}
@@ -1027,12 +1042,12 @@ export default function Reports() {
               نوبت‌های هفته جاری
             </h2>
             {weeklyAppointmentData.every((d) => d.count === 0) ? (
-              <EmptyState icon={<Calendar size={28} />} title="داده‌ای موجود نیست" />
+              <EmptyState icon={<Calendar size={56} />} title="داده‌ای موجود نیست" />
             ) : (
               <ResponsiveContainer width="100%" height={250}>
                 <BarChart data={weeklyAppointmentData} margin={{ top: 10, right: 10, left: 10, bottom: 0 }}>
-                  <XAxis dataKey="day" tick={{ fontSize: 11, fill: '#64748b' }} />
-                  <YAxis tick={{ fontSize: 11, fill: '#64748b' }} allowDecimals={false} width={40} />
+                  <XAxis dataKey="day" tick={{ fontSize: 11, fill: CHART_AXIS_COLOR_STRONG }} />
+                  <YAxis tick={{ fontSize: 11, fill: CHART_AXIS_COLOR_STRONG }} allowDecimals={false} width={40} />
                   <RTooltip formatter={(v: number) => formatNumber(v)} contentStyle={tooltipStyle} />
                   <Bar dataKey="count" name="نوبت" fill="#0ea5e9" radius={[6, 6, 0, 0]} />
                 </BarChart>
@@ -1047,7 +1062,7 @@ export default function Reports() {
                 نوبت‌ها بر اساس وضعیت
               </h2>
               {appointmentStatusPieData.length === 0 ? (
-                <EmptyState icon={<PieIcon size={28} />} title="داده‌ای موجود نیست" />
+                <EmptyState icon={<PieIcon size={56} />} title="داده‌ای موجود نیست" />
               ) : (
                 <ResponsiveContainer width="100%" height={300}>
                   <PieChart>
@@ -1066,12 +1081,12 @@ export default function Reports() {
                 نوبت‌ها بر اساس نوع
               </h2>
               {appointmentTypeBarData.length === 0 ? (
-                <EmptyState icon={<BarChart3 size={28} />} title="داده‌ای موجود نیست" />
+                <EmptyState icon={<BarChart3 size={56} />} title="داده‌ای موجود نیست" />
               ) : (
                 <ResponsiveContainer width="100%" height={300}>
                   <BarChart data={appointmentTypeBarData} layout="vertical" margin={{ top: 0, right: 10, left: 10, bottom: 0 }}>
-                    <XAxis type="number" tick={{ fontSize: 11, fill: '#64748b' }} />
-                    <YAxis dataKey="name" type="category" tick={{ fontSize: 11, fill: '#64748b' }} width={80} />
+                    <XAxis type="number" tick={{ fontSize: 11, fill: CHART_AXIS_COLOR_STRONG }} />
+                    <YAxis dataKey="name" type="category" tick={{ fontSize: 11, fill: CHART_AXIS_COLOR_STRONG }} width={80} />
                     <RTooltip formatter={(v: number) => formatNumber(v)} contentStyle={tooltipStyle} />
                     <Bar dataKey="count" radius={[0, 6, 6, 0]}>
                       {appointmentTypeBarData.map((_, i) => <Cell key={i} fill={CHART_COLORS[i % CHART_COLORS.length]} />)}

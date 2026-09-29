@@ -161,11 +161,11 @@ export function PatientFinanceOverview({
                   <span className="text-xs font-bold text-slate-800 dark:text-slate-100">
                     حساب مالی خانوادگی (سرپرست: {householdProfile.head.first_name} {householdProfile.head.last_name})
                   </span>
-                  <span className="text-[10px] px-2 py-0.5 rounded-full bg-teal-100 dark:bg-teal-900/50 text-teal-800 dark:text-teal-300 font-bold">
+                  <span className="text-3xs px-2 py-0.5 rounded-full bg-teal-100 dark:bg-teal-900/50 text-teal-800 dark:text-teal-300 font-bold">
                     {toPersianDigits(householdProfile.members.length)} عضو
                   </span>
                 </div>
-                <p className="text-[11px] text-slate-500 dark:text-slate-400">
+                <p className="text-2xs text-slate-500 dark:text-slate-400">
                   مانده تجمیعی کل اعضای خانواده:{' '}
                   <b className={householdProfile.netRemaining > 0 ? 'text-error-600' : 'text-emerald-600'}>
                     {householdProfile.netRemaining > 0
@@ -184,7 +184,7 @@ export function PatientFinanceOverview({
               className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700 text-teal-700 dark:text-teal-300 text-xs font-bold border border-teal-200 dark:border-teal-800 transition-all shadow-xs press-scale"
               title="چاپ صورت‌حساب رسمی تجمیعی خانوار"
             >
-              <Printer size={13} />
+              <Printer size={14} />
               <span>صورت‌حساب خانوار</span>
             </button>
           </div>
@@ -205,11 +205,11 @@ export function PatientFinanceOverview({
                   <span>
                     {m.patient.first_name} {m.patient.last_name}
                   </span>
-                  <span className={`text-[10px] ${isCurrent ? 'text-teal-100' : 'text-slate-400'}`}>
+                  <span className={`text-3xs ${isCurrent ? 'text-teal-100' : 'text-slate-400'}`}>
                     ({m.relationshipLabel})
                   </span>
                   <span
-                    className={`font-mono text-[11px] ${
+                    className={`font-mono text-2xs ${
                       isCurrent
                         ? 'text-white'
                         : m.balance.balance > 0
@@ -335,7 +335,7 @@ export function PatientFinanceOverview({
       {(activeChip === 'all' || activeChip === 'installments') && myPlans.length > 0 && (
         <section id="section-payment-plans" className="space-y-2.5">
           <h4 className="flex items-center gap-1.5 text-xs font-bold text-slate-700 dark:text-slate-200">
-            <patientConcepts.plans.icon size={17} className="text-amber-700" />
+            <patientConcepts.plans.icon size={18} className="text-amber-700" />
             <span>طرح‌های اقساط فعال ({toPersianDigits(myPlans.length)})</span>
           </h4>
 
@@ -359,7 +359,7 @@ export function PatientFinanceOverview({
                         مبلغ کل: {formatCurrency(plan.total_amount)} ت
                       </span>
                       <span
-                        className={`text-[10px] px-2 py-0.5 rounded-full font-bold ${
+                        className={`text-3xs px-2 py-0.5 rounded-full font-bold ${
                           isAllPaid
                             ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-300'
                             : 'bg-amber-100 text-amber-800 dark:bg-amber-950/50 dark:text-amber-300'
@@ -368,7 +368,7 @@ export function PatientFinanceOverview({
                         {isAllPaid ? 'تسویه کامل' : 'در حال پرداخت'}
                       </span>
                     </div>
-                    <p className="text-[10px] text-slate-500 mt-0.5">
+                    <p className="text-3xs text-slate-500 mt-0.5">
                       شروع: {toJalaliStringPretty(plan.start_date)} · {toPersianDigits(totalCount)} قسط
                     </p>
                   </div>
@@ -377,7 +377,7 @@ export function PatientFinanceOverview({
                     <span className="text-xs font-bold text-amber-800 dark:text-amber-300">
                       {toPersianDigits(paidCount)} از {toPersianDigits(totalCount)} قسط
                     </span>
-                    <p className="text-[10px] text-slate-400">({toPersianDigits(percentPaid)}٪ پرداخت شده)</p>
+                    <p className="text-3xs text-slate-400">({toPersianDigits(percentPaid)}٪ پرداخت شده)</p>
                   </div>
                 </div>
 
@@ -410,25 +410,25 @@ export function PatientFinanceOverview({
                         }`}
                       >
                         <div className="flex items-center gap-2 min-w-0">
-                          <span className="font-bold text-[11px] shrink-0">
+                          <span className="font-bold text-2xs shrink-0">
                             قسط {toPersianDigits(inst.installment_number)}:
                           </span>
                           <span className="font-bold">{formatCurrency(inst.amount)} ت</span>
-                          <span className="text-[10px] text-slate-400 shrink-0">
+                          <span className="text-3xs text-slate-400 shrink-0">
                             (سررسید: {toJalaliStringPretty(inst.due_date)})
                           </span>
                         </div>
 
                         <div className="flex items-center gap-2 shrink-0">
                           {isPaid ? (
-                            <span className="flex items-center gap-1 text-[10px] font-bold text-emerald-600 dark:text-emerald-400">
+                            <span className="flex items-center gap-1 text-3xs font-bold text-emerald-600 dark:text-emerald-400">
                               <CheckCircle2 size={12} />
                               پرداخت شده
                             </span>
                           ) : (
                             <>
                               <span
-                                className={`text-[10px] px-2 py-0.5 rounded-full font-bold ${
+                                className={`text-3xs px-2 py-0.5 rounded-full font-bold ${
                                   isOverdue
                                     ? 'bg-red-100 text-red-700 dark:bg-red-900/60 dark:text-red-200'
                                     : isDueToday
@@ -446,7 +446,7 @@ export function PatientFinanceOverview({
                                     h.tap()
                                     onPayInstallment(inst, plan)
                                   }}
-                                  className="px-2.5 py-1 rounded-lg text-[10px] font-bold bg-violet-600 hover:bg-violet-700 active:scale-95 text-white transition-all-smooth shadow-sm press-scale"
+                                  className="px-2.5 py-1 rounded-lg text-3xs font-bold bg-violet-600 hover:bg-violet-700 active:scale-95 text-white transition-all-smooth shadow-sm press-scale"
                                 >
                                   ثبت پرداخت
                                 </button>
@@ -468,7 +468,7 @@ export function PatientFinanceOverview({
       {(activeChip === 'all' || activeChip === 'cheques') && myCheques.length > 0 && (
         <section id="section-cheques" className="space-y-2">
           <h4 className="flex items-center gap-1.5 text-xs font-bold text-slate-700 dark:text-slate-200">
-            <patientConcepts.plans.icon size={17} className="text-amber-700" />
+            <patientConcepts.plans.icon size={18} className="text-amber-700" />
             <span>چک‌های بیمار ({toPersianDigits(myCheques.length)})</span>
           </h4>
 
@@ -499,12 +499,12 @@ export function PatientFinanceOverview({
                         {formatCurrency(c.amount)} ت
                       </p>
                       {c.purpose === 'guarantee' && (
-                        <span className="text-[10px] px-1.5 py-0.2 rounded bg-slate-100 text-slate-600 dark:bg-slate-700 dark:text-slate-300 font-medium">
+                        <span className="text-3xs px-1.5 py-0.2 rounded bg-slate-100 text-slate-600 dark:bg-slate-700 dark:text-slate-300 font-medium">
                           ضمانت
                         </span>
                       )}
                       <span
-                        className={`text-[10px] px-2 py-0.5 rounded-full font-bold ${
+                        className={`text-3xs px-2 py-0.5 rounded-full font-bold ${
                           isBounced
                             ? 'bg-red-100 text-red-700 dark:bg-red-950/80 dark:text-red-300'
                             : isCleared
@@ -526,7 +526,7 @@ export function PatientFinanceOverview({
                       </span>
                     </div>
 
-                    <p className="text-[10px] text-slate-500 dark:text-slate-400 mt-1">
+                    <p className="text-3xs text-slate-500 dark:text-slate-400 mt-1">
                       {c.bank_name ? `${c.bank_name} · ` : ''}
                       {c.cheque_number ? `شماره ${c.cheque_number} · ` : ''}
                       سررسید: {toJalaliStringPretty(c.due_date)}
@@ -544,7 +544,7 @@ export function PatientFinanceOverview({
                             h.confirm()
                             onClearCheque(c)
                           }}
-                          className="px-2.5 py-1 rounded-lg text-[10px] font-bold bg-emerald-600 hover:bg-emerald-700 text-white transition-all-smooth shadow-sm press-scale"
+                          className="px-2.5 py-1 rounded-lg text-3xs font-bold bg-emerald-600 hover:bg-emerald-700 text-white transition-all-smooth shadow-sm press-scale"
                         >
                           ثبت وصول
                         </button>
@@ -557,7 +557,7 @@ export function PatientFinanceOverview({
                             h.error()
                             onBounceCheque(c)
                           }}
-                          className="px-2 py-1 rounded-lg text-[10px] font-bold bg-red-100 hover:bg-red-200 text-red-700 dark:bg-red-900/40 dark:text-red-300 transition-all-smooth press-scale"
+                          className="px-2 py-1 rounded-lg text-3xs font-bold bg-red-100 hover:bg-red-200 text-red-700 dark:bg-red-900/40 dark:text-red-300 transition-all-smooth press-scale"
                         >
                           برگشت
                         </button>
@@ -594,7 +594,7 @@ export function PatientFinanceOverview({
                         {formatCurrency(p.amount)} ت
                       </p>
                       <span
-                        className={`text-[10px] px-2 py-0.5 rounded-full shrink-0 ${
+                        className={`text-3xs px-2 py-0.5 rounded-full shrink-0 ${
                           p.status === 'cancelled'
                             ? 'bg-slate-200 text-slate-500'
                             : p.status === 'completed'
@@ -605,11 +605,11 @@ export function PatientFinanceOverview({
                         {p.status === 'cancelled' ? 'لغو شده' : p.status === 'completed' ? 'تکمیل شده' : 'در انتظار'}
                       </span>
                     </div>
-                    <p className="text-[10px] text-slate-500 mt-0.5">
+                    <p className="text-3xs text-slate-500 mt-0.5">
                       {toJalaliStringPretty(p.payment_date)}
                       {p.payment_method && ` · ${p.payment_method === 'cash' ? 'نقدی' : p.payment_method === 'card' ? 'کارتخوان' : p.payment_method === 'cheque' ? 'چک' : p.payment_method}`}
                     </p>
-                    <p className="text-[10px] text-slate-600 dark:text-slate-300 mt-0.5">{a.label}</p>
+                    <p className="text-3xs text-slate-600 dark:text-slate-300 mt-0.5">{a.label}</p>
                   </div>
                 )
               })}
@@ -653,18 +653,18 @@ export function PatientFinanceOverview({
                     </div>
                     
                     {insShare > 0 ? (
-                      <div className="flex items-center justify-between text-[11px] bg-blue-50 dark:bg-blue-900/20 px-2 py-1.5 rounded-lg border border-blue-100 dark:border-blue-900/50">
+                      <div className="flex items-center justify-between text-2xs bg-blue-50 dark:bg-blue-900/20 px-2 py-1.5 rounded-lg border border-blue-100 dark:border-blue-900/50">
                         <span className="text-blue-700 dark:text-blue-300">سهم بیمه: {formatCurrency(insShare)} ت</span>
                         <span className="text-slate-700 dark:text-slate-300 font-bold">سهم بیمار: {formatCurrency(patShare)} ت</span>
                       </div>
                     ) : (
-                      <div className="flex items-center justify-between text-[10px]">
+                      <div className="flex items-center justify-between text-3xs">
                         <span className="text-slate-500">سهم بیمار (آزاد)</span>
                         <span className="text-slate-600 dark:text-slate-300 font-bold">{formatCurrency(patShare)} ت</span>
                       </div>
                     )}
                     
-                    <p className="text-[10px] text-slate-500">{toJalaliStringPretty(t.created_at)}</p>
+                    <p className="text-3xs text-slate-500">{toJalaliStringPretty(t.created_at)}</p>
                   </div>
                 )
               })}
@@ -676,15 +676,15 @@ export function PatientFinanceOverview({
 
       {/* ── Warnings & Notes ──────────────────────────────────── */}
       {mine.some((p) => p.status === 'pending') && (
-        <p className="flex items-start gap-1.5 text-[11px] text-amber-800 bg-amber-50 dark:bg-amber-950/30 dark:text-amber-300 p-2.5 rounded-xl border border-amber-200 dark:border-amber-900/50">
-          <Clock size={13} className="shrink-0 mt-0.5" />
+        <p className="flex items-start gap-1.5 text-2xs text-amber-800 bg-amber-50 dark:bg-amber-950/30 dark:text-amber-300 p-2.5 rounded-xl border border-amber-200 dark:border-amber-900/50">
+          <Clock size={14} className="shrink-0 mt-0.5" />
           <span>پرداخت «در انتظار» هنوز تکمیل نشده و در مانده‌حساب بیمار اثر دارد.</span>
         </p>
       )}
 
       {chq.guaranteeWithoutPlan > 0 && (
-        <p className="flex items-start gap-1.5 text-[11px] text-slate-700 bg-slate-100 dark:bg-slate-800 p-2.5 rounded-xl border border-slate-200 dark:border-slate-700">
-          <ShieldAlert size={13} className="shrink-0 mt-0.5 text-amber-500" />
+        <p className="flex items-start gap-1.5 text-2xs text-slate-700 bg-slate-100 dark:bg-slate-800 p-2.5 rounded-xl border border-slate-200 dark:border-slate-700">
+          <ShieldAlert size={14} className="shrink-0 mt-0.5 text-amber-500" />
           <span>
             {toPersianDigits(chq.guaranteeWithoutPlan)} چک ضمانت بدون طرح قسطی ثبت شده است — تا اقساط
             تعریف نشود، برنامه‌ی وصولی ندارد.

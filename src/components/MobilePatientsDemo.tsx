@@ -1,4 +1,5 @@
 import React, { useState, useMemo } from 'react'
+import { createPortal } from 'react-dom'
 import { useNavigate } from 'react-router-dom'
 import {
   Search, Plus, Phone, MessageSquare, Calendar, ChevronLeft,
@@ -181,7 +182,7 @@ export function MobilePatientsDemo({
         <div className="flex items-center gap-2">
           <h2 className="text-lg sm:text-2xl font-black text-slate-800 dark:text-slate-100 flex items-center gap-2">
             <span>مرکز جامع بیماران</span>
-            <span className="text-[10px] font-black px-2 py-0.5 rounded-full bg-teal-500/15 text-teal-700 dark:text-teal-300 border border-teal-500/30">
+            <span className="text-3xs font-black px-2 py-0.5 rounded-full bg-teal-500/15 text-teal-700 dark:text-teal-300 border border-teal-500/30">
               {toPersianDigits(metrics.totalPatients)}
             </span>
           </h2>
@@ -198,7 +199,7 @@ export function MobilePatientsDemo({
                 : 'bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 border-slate-200 dark:border-slate-700'
             }`}
           >
-            {privacyMode ? <EyeOff size={17} /> : <Eye size={17} />}
+            {privacyMode ? <EyeOff size={18} /> : <Eye size={18} />}
           </button>
 
           {/* Quick Create Patient button */}
@@ -283,22 +284,22 @@ export function MobilePatientsDemo({
               }
             }}
             style={conceptStyle(card.concept)}
-            className={`patient-tile p-3.5 sm:p-5 rounded-[22px] cursor-pointer flex flex-col gap-2.5 text-right group ${card.concept === 'intake' ? 'breathing-surface' : ''}`}
+            className={`patient-tile p-3.5 sm:p-5 rounded-ios-lg cursor-pointer flex flex-col gap-2.5 text-right group ${card.concept === 'intake' ? 'breathing-surface' : ''}`}
           >
             <div className="flex items-center gap-2.5">
               <div className={`concept-icon p-2.5 sm:p-3 rounded-2xl shrink-0 ${patientConcepts[card.concept].color}`}>
-                <Icon size={26} />
+                <Icon size={28} />
               </div>
               <div className="min-w-0 flex-1 text-right">
                 <h3 className="text-sm sm:text-base font-black leading-tight text-slate-900 dark:text-slate-100 truncate">
                   {card.title}
                 </h3>
-                <p className="text-[11px] sm:text-xs font-medium text-slate-600 dark:text-slate-300 truncate mt-0.5" dir="rtl">
+                <p className="text-2xs sm:text-xs font-medium text-slate-600 dark:text-slate-300 truncate mt-0.5" dir="rtl">
                   {card.sub}
                 </p>
               </div>
             </div>
-            <span className={`concept-icon self-start text-[10px] sm:text-xs font-black px-2.5 py-1 rounded-xl ${patientConcepts[card.concept].color}`}>
+            <span className={`concept-icon self-start text-3xs sm:text-xs font-black px-2.5 py-1 rounded-xl ${patientConcepts[card.concept].color}`}>
               {card.badge}
             </span>
           </button>
@@ -313,7 +314,7 @@ export function MobilePatientsDemo({
           </span>
           <button
             onClick={() => { h.tap(); setActiveFullScreen('directory') }}
-            className="text-[11px] font-bold text-teal-600 dark:text-teal-400 flex items-center gap-0.5"
+            className="text-2xs font-bold text-teal-600 dark:text-teal-400 flex items-center gap-0.5"
           >
             <span>مشاهده همه</span>
             <ChevronLeft size={14} />
@@ -328,9 +329,13 @@ export function MobilePatientsDemo({
             return (
               <div
                 key={patient.id}
+                role="button"
+                tabIndex={0}
+                aria-label={`مشاهده پرونده ${patient.first_name} ${patient.last_name}`}
                 style={patientRecordStyle(patient.id)}
                 onClick={() => { h.tap(); navigate(`/patients/${patient.id}`) }}
-                className="patient-tile flex items-center justify-between p-3 rounded-2xl active:scale-[0.985] cursor-pointer"
+                onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); h.tap(); navigate(`/patients/${patient.id}`) } }}
+                className="patient-tile flex items-center justify-between p-3 rounded-2xl active:scale-[0.985] cursor-pointer focus:outline-none focus:ring-2 focus:ring-primary-400"
               >
                 <div className="flex items-center gap-2.5 min-w-0">
                   <div className="w-10 h-10 min-w-[40px] min-h-[40px] rounded-xl bg-gradient-to-br from-teal-500 to-emerald-600 text-white font-black text-xs flex items-center justify-center shadow-xs">
@@ -340,7 +345,7 @@ export function MobilePatientsDemo({
                     <p className="text-xs font-black text-slate-900 dark:text-slate-100 truncate">
                       {patient.first_name} {patient.last_name}
                     </p>
-                    <p className="patient-file-badge text-[10px] font-bold text-slate-700 dark:text-slate-300 font-mono bg-slate-100 dark:bg-slate-800 rounded-md px-1.5 py-0.5 mt-0.5">
+                    <p className="patient-file-badge text-3xs font-bold text-slate-700 dark:text-slate-300 font-mono bg-slate-100 dark:bg-slate-800 rounded-lg px-1.5 py-0.5 mt-0.5">
                       #{toPersianDigits(patient.file_number || '')} · {privacyMode ? maskPhoneNumber(patient.phone || '') : toPersianDigits(patient.phone || '')}
                     </p>
                   </div>
@@ -348,24 +353,26 @@ export function MobilePatientsDemo({
 
                 <div className="flex items-center gap-1.5 shrink-0" onClick={(e) => e.stopPropagation()}>
                   {isDebtor ? (
-                    <span className="text-[10px] font-black px-2 py-0.5 rounded-lg bg-rose-50 text-rose-700 border border-rose-200">
+                    <span className="text-3xs font-black px-2 py-0.5 rounded-lg bg-rose-50 text-rose-700 border border-rose-200">
                       {formatCurrency(fin.balance)}
                     </span>
                   ) : (
-                    <span className="text-[10px] font-bold px-2 py-0.5 rounded-lg bg-emerald-50 text-emerald-700">
+                    <span className="text-3xs font-bold px-2 py-0.5 rounded-lg bg-emerald-50 text-emerald-700">
                       تسویه
                     </span>
                   )}
 
                   {(patientLabOrdersMap.get(patient.id) || 0) > 0 && <button title="سفارش‌های لابراتوار" aria-label="سفارش‌های لابراتوار" onClick={() => navigate(`/patients/${patient.id}`, { state: { initialTab: 'labOrders' } })} style={conceptStyle('lab')} className="patient-tile icon-blink w-9 h-9 rounded-xl flex items-center justify-center text-cyan-700"><patientConcepts.lab.icon size={16} /></button>}
-                  {(patientImplantsMap.get(patient.id) || 0) > 0 && <button title="پرونده ایمپلنت" aria-label="پرونده ایمپلنت" onClick={() => navigate(`/patients/${patient.id}`, { state: { initialTab: 'implants' } })} style={conceptStyle('implants')} className="patient-tile icon-blink w-9 h-9 rounded-xl flex items-center justify-center text-indigo-700"><patientConcepts.implants.icon size={17} /></button>}
+                  {(patientImplantsMap.get(patient.id) || 0) > 0 && <button title="پرونده ایمپلنت" aria-label="پرونده ایمپلنت" onClick={() => navigate(`/patients/${patient.id}`, { state: { initialTab: 'implants' } })} style={conceptStyle('implants')} className="patient-tile icon-blink w-9 h-9 rounded-xl flex items-center justify-center text-indigo-700"><patientConcepts.implants.icon size={18} /></button>}
                   {patient.phone && (
                     <a
                       href={`tel:${patient.phone}`}
                       onClick={() => { h.tap(); chimes.playPop() }}
+                      title="تماس با بیمار"
+                      aria-label="تماس با بیمار"
                       className="patient-tile icon-blink w-9 h-9 min-w-[36px] min-h-[36px] rounded-xl bg-emerald-50 text-emerald-700 flex items-center justify-center press-scale"
                     >
-                      <PhoneCall size={15} />
+                      <PhoneCall size={14} />
                     </a>
                   )}
                   <button
@@ -383,9 +390,15 @@ export function MobilePatientsDemo({
         </div>
       </div>
 
-      {/* ── FULL-SCREEN DRILLDOWN VIEW (فول‌اسکرین به سبک iOS 27 بدون اسکرول سردرگم) ── */}
-      {activeFullScreen !== 'none' && (
-        <div className="fixed inset-0 z-50 bg-slate-50 dark:bg-slate-950 flex flex-col animate-in fade-in slide-in-from-bottom duration-250">
+      {/* ── FULL-SCREEN DRILLDOWN VIEW (فول‌اسکرین به سبک iOS 27 بدون اسکرول سردرگم) ──
+          MOD-FIX: portaled to document.body. This lives inside <main>, which
+          Layout.tsx marks `relative z-[1]` — that creates a stacking context,
+          so a plain `fixed z-50` here can never out-rank the app's own
+          `sticky z-40` header or `fixed z-40` bottom tab bar (both siblings
+          of <main>, outside its stacking context). Without the portal the
+          header/bottom-bar visibly bled through this "full-screen" overlay. */}
+      {activeFullScreen !== 'none' && createPortal(
+        <div className="fixed inset-0 z-[100] bg-slate-50 dark:bg-slate-950 flex flex-col animate-in fade-in slide-in-from-bottom duration-250">
           {/* Fullscreen Sticky Header */}
           <div className="px-3.5 pt-safe pb-2 bg-white/95 dark:bg-slate-900/95 backdrop-blur-md border-b border-slate-200 dark:border-slate-800 flex items-center justify-between gap-2 shrink-0">
             <button
@@ -448,7 +461,7 @@ export function MobilePatientsDemo({
                   <div
                     key={p.id}
                     style={patientRecordStyle(p.id)}
-                    className="patient-tile p-3 rounded-[20px] flex flex-col gap-2"
+                    className="patient-tile p-3 rounded-dialog flex flex-col gap-2"
                   >
                     <button type="button" onClick={() => { h.tap(); setExpandedPatientId(expanded ? null : p.id) }}
                       aria-expanded={expanded} aria-label={`جزئیات مالی و درمانی ${p.first_name} ${p.last_name}`}
@@ -461,26 +474,26 @@ export function MobilePatientsDemo({
                           <p className="text-xs font-black text-slate-900 dark:text-slate-100">
                             {p.first_name} {p.last_name}
                           </p>
-                          <p className="inline-block text-[10px] font-bold text-slate-700 dark:text-slate-200 bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg px-2 py-0.5 mt-1 font-mono">
+                          <p className="inline-block text-3xs font-bold text-slate-700 dark:text-slate-200 bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg px-2 py-0.5 mt-1 font-mono">
                             پرونده #{toPersianDigits(p.file_number || '')} · {privacyMode ? maskPhoneNumber(p.phone || '') : toPersianDigits(p.phone || '')}
                           </p>
                         </div>
                       </div>
 
                       {isDebtor ? (
-                        <span className="text-[10px] font-black px-2 py-1 rounded-xl bg-rose-50 text-rose-700 border border-rose-200 whitespace-nowrap">
+                        <span className="text-3xs font-black px-2 py-1 rounded-xl bg-rose-50 text-rose-700 border border-rose-200 whitespace-nowrap">
                           مانده {formatCurrency(fin.balance)}
                         </span>
                       ) : (
-                        <span className="text-[11px] font-bold px-2 py-0.5 rounded-lg bg-emerald-50 text-emerald-700">
+                        <span className="text-2xs font-bold px-2 py-0.5 rounded-lg bg-emerald-50 text-emerald-700">
                           تسویه
                         </span>
                       )}
-                      <ChevronLeft size={15} className={`text-teal-700 transition-transform ${expanded ? '-rotate-90' : ''}`} />
+                      <ChevronLeft size={14} className={`text-teal-700 transition-transform ${expanded ? '-rotate-90' : ''}`} />
                     </button>
 
                     {clinical && (
-                      <div className="flex flex-wrap items-center gap-1 text-[10px] font-bold leading-5">
+                      <div className="flex flex-wrap items-center gap-1 text-3xs font-bold leading-5">
                         {clinical.cheques.inFlight.count > 0 && <span className="px-2 rounded-lg bg-amber-100 text-amber-900 border border-amber-300">چک در جریان {toPersianDigits(clinical.cheques.inFlight.count)} · {formatCurrency(clinical.cheques.inFlight.total)} ت</span>}
                         {clinical.cheques.guarantee.count > 0 && <span className="px-2 rounded-lg bg-violet-100 text-violet-900 border border-violet-300">ضمانت {toPersianDigits(clinical.cheques.guarantee.count)} · {formatCurrency(clinical.cheques.guarantee.total)} ت</span>}
                         {clinical.cheques.bounced.count > 0 && <span className="px-2 rounded-lg bg-rose-100 text-rose-900 border border-rose-300">برگشتی {toPersianDigits(clinical.cheques.bounced.count)}</span>}
@@ -515,7 +528,7 @@ export function MobilePatientsDemo({
                             <a
                               href={`tel:${p.phone}`}
                               onClick={() => { h.tap(); chimes.playPop() }}
-                              className="raised-surface icon-blink px-2 min-h-[38px] rounded-xl bg-emerald-100 text-emerald-700 border border-emerald-200 flex items-center gap-1 text-[11px] font-bold"
+                              className="raised-surface icon-blink px-2 min-h-[38px] rounded-xl bg-emerald-100 text-emerald-700 border border-emerald-200 flex items-center gap-1 text-2xs font-bold"
                             >
                               <PhoneCall size={14} />
                               <span>تماس</span>
@@ -523,7 +536,7 @@ export function MobilePatientsDemo({
                             <a
                               href={`sms:${p.phone}`}
                               onClick={() => { h.tap(); chimes.playPop() }}
-                              className="raised-surface icon-blink px-2 min-h-[38px] rounded-xl bg-sky-100 text-sky-700 border border-sky-200 flex items-center gap-1 text-[11px] font-bold"
+                              className="raised-surface icon-blink px-2 min-h-[38px] rounded-xl bg-sky-100 text-sky-700 border border-sky-200 flex items-center gap-1 text-2xs font-bold"
                             >
                               <MessageSquare size={14} />
                               <span>پیامک</span>
@@ -537,7 +550,7 @@ export function MobilePatientsDemo({
                               state: { quickStartPatientId: p.id, quickStartDoctorId: p.primary_doctor_id, openWizard: true }
                             })
                           }}
-                          className="appointment-primary raised-surface icon-blink px-2 min-h-[38px] rounded-xl flex items-center gap-1 text-[11px] font-bold"
+                          className="appointment-primary raised-surface icon-blink px-2 min-h-[38px] rounded-xl flex items-center gap-1 text-2xs font-bold"
                         >
                           <Calendar size={14} />
                           <span>+ نوبت</span>
@@ -546,7 +559,7 @@ export function MobilePatientsDemo({
 
                       <button
                         onClick={() => { h.tap(); navigate(`/patients/${p.id}`) }}
-                         className="file-action breathing-surface px-2 min-h-[38px] rounded-xl flex items-center gap-1 text-[11px] font-bold press-scale"
+                         className="file-action breathing-surface px-2 min-h-[38px] rounded-xl flex items-center gap-1 text-2xs font-bold press-scale"
                       >
                          <FileSearch size={14} />
                         <span>پرونده</span>
@@ -558,7 +571,8 @@ export function MobilePatientsDemo({
               </div>
             )}
           </div>
-        </div>
+        </div>,
+        document.body
       )}
     </div>
   )

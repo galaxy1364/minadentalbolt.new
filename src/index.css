@@ -449,6 +449,25 @@ input, textarea, select { font-size: 16px !important; }
 
 /* ── Safe area padding & insets (iOS 27 & Notch resilience) ── */
 .pt-safe { padding-top: max(0.5rem, env(safe-area-inset-top, 0px)); }
+
+/* True rendered height of Layout.tsx's sticky top <header>: 60px content +
+   pt-safe padding (max(8px, safe-area-inset-top)) + 1px bottom border, and
+   64px content on sm+. Any secondary sticky bar that must sit directly
+   below the header (not overlap it) should use these instead of a
+   hardcoded top-[60px]/[64px] guess — that guess drifted from the real
+   height (missing the 8px pt-safe minimum + 1px border) and let content
+   scroll up under the header on devices with no safe-area inset. */
+:root {
+  --app-header-h: calc(61px + max(0.5rem, env(safe-area-inset-top, 0px)));
+  --app-header-h-sm: calc(65px + max(0.5rem, env(safe-area-inset-top, 0px)));
+}
+.sticky-below-header {
+  position: sticky;
+  top: var(--app-header-h);
+}
+@media (min-width: 640px) {
+  .sticky-below-header { top: var(--app-header-h-sm); }
+}
 .pb-safe { padding-bottom: max(0.5rem, env(safe-area-inset-bottom, 0px)); }
 .mt-safe { margin-top: env(safe-area-inset-top, 0px); }
 .mb-safe { margin-bottom: env(safe-area-inset-bottom, 0px); }

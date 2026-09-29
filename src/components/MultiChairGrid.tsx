@@ -1,6 +1,7 @@
 // MultiChairGrid.tsx — Multi-Chair Operatory Grid View for Dental Appointments
 // Displays appointments in parallel columns by dental chair/unit or by doctor
 import React, { useMemo } from 'react'
+import { colorTokens } from '../lib/colorTokens'
 import { useNavigate } from 'react-router-dom'
 import {
   ChevronRight,
@@ -110,7 +111,7 @@ export function MultiChairGrid({
             title="روز بعد"
             aria-label="روز بعد"
           >
-            <ChevronRight size={17} />
+            <ChevronRight size={18} />
           </button>
           <button
             type="button"
@@ -134,7 +135,7 @@ export function MultiChairGrid({
             title="روز قبل"
             aria-label="روز قبل"
           >
-            <ChevronLeft size={17} />
+            <ChevronLeft size={18} />
           </button>
 
           <div className="mr-2">
@@ -162,7 +163,7 @@ export function MultiChairGrid({
                 : 'text-slate-600 dark:text-slate-400 hover:text-slate-800'
             }`}
           >
-            <Armchair size={15} />
+            <Armchair size={14} />
             <span>یونیت‌ها (صندلی‌ها)</span>
           </button>
           <button
@@ -178,7 +179,7 @@ export function MultiChairGrid({
                 : 'text-slate-600 dark:text-slate-400 hover:text-slate-800'
             }`}
           >
-            <Stethoscope size={15} />
+            <Stethoscope size={14} />
             <span>پزشکان</span>
           </button>
         </div>
@@ -200,7 +201,7 @@ export function MultiChairGrid({
                 <p className="text-xs font-bold text-slate-800 dark:text-slate-200 truncate">
                   {col.title}
                 </p>
-                <p className="text-[10px] text-slate-400 truncate">{col.subtitle}</p>
+                <p className="text-3xs text-slate-400 truncate">{col.subtitle}</p>
               </div>
             ))}
           </div>
@@ -215,7 +216,7 @@ export function MultiChairGrid({
                   className="grid grid-cols-[70px_repeat(auto-fit,minmax(180px,1fr))] min-h-[58px]"
                 >
                   {/* Time Label */}
-                  <div className="text-[11px] font-mono text-slate-400 text-center pt-2 select-none border-l border-slate-100 dark:border-slate-800">
+                  <div className="text-2xs font-mono text-slate-400 text-center pt-2 select-none border-l border-slate-100 dark:border-slate-800">
                     {toPersianDigits(hour)}
                   </div>
 
@@ -248,15 +249,26 @@ export function MultiChairGrid({
                               return (
                                 <div
                                   key={appt.id}
+                                  role="button"
+                                  tabIndex={0}
+                                  aria-label={`نوبت ${patient?.first_name || ''} ${patient?.last_name || ''}`.trim()}
                                   onClick={() => {
                                     h.tap()
                                     chimes.playPop()
                                     onSelectAppointment(appt)
                                   }}
-                                  className="p-2 rounded-xl border border-primary-200 dark:border-primary-800 bg-white dark:bg-slate-800 shadow-sm hover:shadow-md cursor-pointer transition-all-smooth press-scale"
+                                  onKeyDown={(e) => {
+                                    if (e.key === 'Enter' || e.key === ' ') {
+                                      e.preventDefault()
+                                      h.tap()
+                                      chimes.playPop()
+                                      onSelectAppointment(appt)
+                                    }
+                                  }}
+                                  className="p-2 rounded-xl border border-primary-200 dark:border-primary-800 bg-white dark:bg-slate-800 shadow-sm hover:shadow-md cursor-pointer transition-all-smooth press-scale focus:outline-none focus:ring-2 focus:ring-primary-400"
                                   style={{
                                     borderRightWidth: '4px',
-                                    borderRightColor: docCol || '#0d9488',
+                                    borderRightColor: docCol || colorTokens.primary[600],
                                   }}
                                 >
                                   <div className="flex items-center justify-between text-xs gap-1">
@@ -274,16 +286,16 @@ export function MultiChairGrid({
                                         {patient ? `${patient.first_name} ${patient.last_name}` : 'بیمار'}
                                       </button>
                                       {patient?.file_number && (
-                                        <span className="patient-file-badge text-[9px] font-mono px-1 py-0.2 bg-slate-900 dark:bg-primary-950 text-white dark:text-primary-300 rounded font-bold" dir="ltr">
+                                        <span className="patient-file-badge text-4xs font-mono px-1 py-0.2 bg-slate-900 dark:bg-primary-950 text-white dark:text-primary-300 rounded font-bold" dir="ltr">
                                           {toPersianDigits(patient.file_number)}
                                         </span>
                                       )}
                                     </div>
-                                    <span className="text-[10px] font-mono text-slate-500 shrink-0">
+                                    <span className="text-3xs font-mono text-slate-500 shrink-0">
                                       {toPersianDigits(appt.start_time)}
                                     </span>
                                   </div>
-                                  <div className="flex items-center justify-between text-[10px] text-slate-500 mt-1 flex-wrap gap-1">
+                                  <div className="flex items-center justify-between text-3xs text-slate-500 mt-1 flex-wrap gap-1">
                                     <span className="truncate max-w-[90px]">
                                       {doc ? `دکتر ${doc.name || doc.specialty}` : 'بدون پزشک'}
                                     </span>
@@ -292,7 +304,7 @@ export function MultiChairGrid({
                                         <>
                                           {appt.check_in_time && (
                                             <span
-                                              className={`px-1.5 py-0.5 rounded text-[8px] font-bold border ${getTriageWaitingStatus(computeWaitingTimeMinutes(appt.check_in_time)).badgeClass}`}
+                                              className={`px-1.5 py-0.5 rounded text-4xs font-bold border ${getTriageWaitingStatus(computeWaitingTimeMinutes(appt.check_in_time)).badgeClass}`}
                                               title={`زمان انتظار: ${formatWaitingTime(computeWaitingTimeMinutes(appt.check_in_time))}`}
                                             >
                                               ⏳ {toPersianDigits(computeWaitingTimeMinutes(appt.check_in_time))}د
@@ -309,7 +321,7 @@ export function MultiChairGrid({
                                               className="p-1 rounded bg-indigo-50 dark:bg-indigo-950/40 text-indigo-600 dark:text-indigo-400 hover:bg-indigo-100"
                                               title="فراخوان صوتی بیمار به یونیت"
                                             >
-                                              <Volume2 size={11} />
+                                              <Volume2 size={12} />
                                             </button>
                                           )}
                                           {onQuickStatus && (
@@ -323,14 +335,14 @@ export function MultiChairGrid({
                                               className="p-1 rounded bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-400 hover:bg-amber-100"
                                               title="نشاندن بیمار روی صندلی یونیت"
                                             >
-                                              <Armchair size={11} />
+                                              <Armchair size={12} />
                                             </button>
                                           )}
                                         </>
                                       ) : (
                                         <div className="flex items-center gap-1">
                                           <span
-                                            className={`px-1.5 py-0.5 rounded text-[9px] font-medium ${
+                                            className={`px-1.5 py-0.5 rounded text-4xs font-medium ${
                                               appt.status === 'completed'
                                                 ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400'
                                                 : appt.status === 'in_chair' || appt.status === 'in_progress'
@@ -359,7 +371,7 @@ export function MultiChairGrid({
                                               className="p-1 rounded bg-teal-50 dark:bg-teal-950/40 text-teal-700 dark:text-teal-400 hover:bg-teal-100"
                                               title="اعلام حضور بیمار در کلینیک"
                                             >
-                                              <UserCheck size={11} />
+                                              <UserCheck size={12} />
                                             </button>
                                           )}
                                         </div>
@@ -383,7 +395,7 @@ export function MultiChairGrid({
                                 groupBy === 'doctor' ? col.id : undefined
                               )
                             }}
-                            className="w-full h-full min-h-[38px] rounded-lg opacity-0 group-hover:opacity-100 flex items-center justify-center gap-1 text-[10px] font-bold text-primary-600 dark:text-primary-400 hover:bg-primary-50 dark:hover:bg-primary-950/40 transition-all border border-dashed border-primary-300 dark:border-primary-700 press-scale"
+                            className="w-full h-full min-h-[38px] rounded-lg opacity-0 group-hover:opacity-100 flex items-center justify-center gap-1 text-3xs font-bold text-primary-600 dark:text-primary-400 hover:bg-primary-50 dark:hover:bg-primary-950/40 transition-all border border-dashed border-primary-300 dark:border-primary-700 press-scale"
                           >
                             <Plus size={12} />
                             رزرو {toPersianDigits(hour)}

@@ -107,9 +107,9 @@ export default function PublicBooking() {
   if (done) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-primary-50 via-white to-primary-50 p-4 sm:p-6" dir="rtl">
-        <div className="max-w-md w-full bg-white/95 backdrop-blur-xl border border-slate-200/80 rounded-3xl p-6 text-center shadow-xl space-y-5">
+        <div className="max-w-md w-full bg-white/95 backdrop-blur-xl border border-slate-200/80 rounded-2xl p-6 text-center shadow-xl space-y-5">
           <div className="w-16 h-16 rounded-2xl bg-emerald-100 flex items-center justify-center mx-auto text-emerald-600 shadow-sm animate-bounce">
-            <CheckCircle2 size={36} />
+            <CheckCircle2 size={32} />
           </div>
           <div>
             <h1 className="text-xl font-extrabold text-slate-800 mb-1">درخواست شما با موفقیت ثبت شد</h1>
@@ -121,12 +121,13 @@ export default function PublicBooking() {
           {/* کارت کد رهگیری */}
           <div className="bg-slate-50 border border-slate-200 rounded-2xl p-3 flex items-center justify-between">
             <div className="text-right">
-              <span className="text-[11px] text-slate-400 block">کد رهگیری نوبت:</span>
+              <span className="text-2xs text-slate-400 block">کد رهگیری نوبت:</span>
               <span className="font-mono font-black text-slate-800 text-base tracking-wider">{trackingCode}</span>
             </div>
             <button
               onClick={handleCopyTrackingCode}
               type="button"
+              aria-label={copied ? 'کد رهگیری کپی شد' : 'کپی کد رهگیری نوبت'}
               className="px-3 py-1.5 rounded-xl bg-white border border-slate-200 text-xs font-semibold text-slate-700 hover:bg-slate-100 flex items-center gap-1.5 transition-colors shadow-xs"
             >
               {copied ? <Check size={14} className="text-emerald-600" /> : <Copy size={14} />}
@@ -148,12 +149,12 @@ export default function PublicBooking() {
                 {CLINIC_PHONE_DISPLAY}
               </a>
             </div>
-            <div className="flex items-center gap-1.5 text-slate-600 text-[11px]">
-              <Clock size={13} className="text-slate-400" />
+            <div className="flex items-center gap-1.5 text-slate-600 text-2xs">
+              <Clock size={14} className="text-slate-400" />
               <span>شنبه تا چهارشنبه ۹:۰۰ الی ۲۰:۰۰ | پنجشنبه‌ها ۹:۰۰ الی ۱۴:۰۰</span>
             </div>
-            <div className="flex items-start gap-1.5 text-slate-600 text-[11px] pt-1 border-t border-primary-100/60">
-              <MapPin size={13} className="text-slate-400 shrink-0 mt-0.5" />
+            <div className="flex items-start gap-1.5 text-slate-600 text-2xs pt-1 border-t border-primary-100/60">
+              <MapPin size={14} className="text-slate-400 shrink-0 mt-0.5" />
               <span>{CLINIC_ADDRESS}</span>
             </div>
           </div>
@@ -213,18 +214,18 @@ export default function PublicBooking() {
           <p className="text-xs text-slate-500 mt-1">فرم زیر را پر کنید تا همکاران ما با شما تماس بگیرند</p>
         </div>
 
-        <div className="bg-white rounded-3xl shadow-ios p-5 space-y-4">
+        <div className="bg-white rounded-2xl shadow-ios p-5 space-y-4">
           <div>
-            <label className="text-xs font-medium text-slate-600 mb-1.5 flex items-center gap-1.5"><User size={13} /> نام و نام خانوادگی *</label>
+            <label className="text-xs font-medium text-slate-600 mb-1.5 flex items-center gap-1.5"><User size={14} /> نام و نام خانوادگی *</label>
             <input value={fullName} onChange={(e) => setFullName(e.target.value)} placeholder="نام کامل" className="w-full px-3 py-2.5 rounded-xl border border-slate-200 bg-slate-50 text-base focus:outline-none focus:ring-2 focus:ring-primary-400" />
           </div>
           <div>
-            <label className="text-xs font-medium text-slate-600 mb-1.5 flex items-center gap-1.5"><Phone size={13} /> شماره تماس *</label>
+            <label className="text-xs font-medium text-slate-600 mb-1.5 flex items-center gap-1.5"><Phone size={14} /> شماره تماس *</label>
             <input value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="09xxxxxxxxx" dir="ltr" className="w-full px-3 py-2.5 rounded-xl border border-slate-200 bg-slate-50 text-base text-left focus:outline-none focus:ring-2 focus:ring-primary-400" />
           </div>
 
           <div>
-            <label className="text-xs font-medium text-slate-600 mb-1.5 flex items-center gap-1.5"><Calendar size={13} /> تاریخ ترجیحی (اختیاری)</label>
+            <label className="text-xs font-medium text-slate-600 mb-1.5 flex items-center gap-1.5"><Calendar size={14} /> تاریخ ترجیحی (اختیاری)</label>
             <PersianCalendar selectedDate={date || new Date().toISOString().slice(0, 10)} onDateSelect={setDate} />
             {date && <p className="text-xs text-primary-600 mt-1.5">انتخاب‌شده: {toJalaliStringPretty(date)}</p>}
           </div>
@@ -245,7 +246,7 @@ export default function PublicBooking() {
           </div>
 
           <div>
-            <label className="text-xs font-medium text-slate-600 mb-1.5 flex items-center gap-1.5"><MessageSquare size={13} /> دلیل مراجعه (اختیاری)</label>
+            <label className="text-xs font-medium text-slate-600 mb-1.5 flex items-center gap-1.5"><MessageSquare size={14} /> دلیل مراجعه (اختیاری)</label>
             <textarea value={reason} onChange={(e) => setReason(e.target.value)} rows={3} placeholder="مثلاً: درد دندان، مشاوره ایمپلنت..." className="w-full px-3 py-2.5 rounded-xl border border-slate-200 bg-slate-50 text-sm focus:outline-none focus:ring-2 focus:ring-primary-400" />
           </div>
 
@@ -258,7 +259,7 @@ export default function PublicBooking() {
           >
             {submitting ? 'در حال ارسال...' : 'ثبت درخواست نوبت'}
           </button>
-          <p className="text-[11px] text-slate-400 text-center">این یک درخواست است، نوبت شما پس از تماس همکاران ما نهایی می‌شود.</p>
+          <p className="text-2xs text-slate-400 text-center">این یک درخواست است، نوبت شما پس از تماس همکاران ما نهایی می‌شود.</p>
         </div>
 
         {/* اطلاعات تماس پذیرش در پایین صفحه */}
@@ -269,7 +270,7 @@ export default function PublicBooking() {
               تماس با پذیرش کلینیک ({CLINIC_PHONE_DISPLAY})
             </a>
           </p>
-          <p className="text-[11px] text-slate-400">ساعات پاسخگویی: شنبه تا چهارشنبه ۹ الی ۲۰ — پنجشنبه ۹ الی ۱۴</p>
+          <p className="text-2xs text-slate-400">ساعات پاسخگویی: شنبه تا چهارشنبه ۹ الی ۲۰ — پنجشنبه ۹ الی ۱۴</p>
         </div>
       </div>
     </div>

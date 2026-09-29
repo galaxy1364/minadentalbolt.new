@@ -488,7 +488,7 @@ export default function Patients() {
         <div className="pull-indicator" style={{ opacity: ptr.isRefreshing ? 1 : ptr.pullProgress, top: -4 }}>
           <div className="flex flex-col items-center gap-1">
             <div className={`w-7 h-7 rounded-full border-2 border-teal-300 dark:border-teal-600 border-t-teal-600 dark:border-t-teal-400 ${ptr.isRefreshing ? 'animate-spin' : ''}`} style={{ transform: `scale(${0.6 + ptr.pullProgress * 0.4})` }} />
-            <span className="text-[10px] text-teal-600 font-medium">{ptr.isRefreshing ? 'در حال به‌روزرسانی...' : 'برای به‌روزرسانی بکشید'}</span>
+            <span className="text-3xs text-teal-600 font-medium">{ptr.isRefreshing ? 'در حال به‌روزرسانی...' : 'برای به‌روزرسانی بکشید'}</span>
           </div>
         </div>
       )}
@@ -517,10 +517,10 @@ export default function Patients() {
             {/* ── File number at top, always editable ── */}
             <div className="flex items-center gap-3 p-4 rounded-2xl bg-gradient-to-br from-teal-50 to-sky-50 border border-teal-100">
               <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-teal-500 to-teal-700 flex items-center justify-center text-white shadow-md flex-shrink-0">
-                <FileText size={22} />
+                <FileText size={20} />
               </div>
               <div className="flex-1">
-                <label className="block text-[10px] font-bold text-teal-700 mb-1 uppercase tracking-wider">شماره پرونده</label>
+                <label className="block text-3xs font-bold text-teal-700 mb-1 uppercase tracking-wider">شماره پرونده</label>
                 <input
                   value={formData.file_number}
                   onChange={(e) => { h.tap(); setFormData((p) => ({ ...p, file_number: e.target.value, file_number_manual: true })) }}
@@ -530,7 +530,7 @@ export default function Patients() {
                 />
               </div>
               {!editingPatient && !formData.file_number_manual && (
-                <span className="text-[10px] text-teal-600 font-medium whitespace-nowrap">خودکار پیشنهاد شد</span>
+                <span className="text-3xs text-teal-600 font-medium whitespace-nowrap">خودکار پیشنهاد شد</span>
               )}
             </div>
             <div>
@@ -601,7 +601,7 @@ export default function Patients() {
                     />
                     مصرف بیس‌فسفونات‌ها
                   </label>
-                  <p className="text-[11px] text-slate-500">ریسک استئونکروز فک در جراحی و ایمپلنت</p>
+                  <p className="text-2xs text-slate-500">ریسک استئونکروز فک در جراحی و ایمپلنت</p>
                 </div>
 
                 <div className="space-y-1.5 p-2.5 rounded-xl bg-white/80 dark:bg-slate-800/80 border border-rose-100 dark:border-rose-900/40">
@@ -614,7 +614,7 @@ export default function Patients() {
                     />
                     ریسک اندوکاردیت
                   </label>
-                  <p className="text-[11px] text-slate-500">ضرورت پروفیلاکسی آنتی‌بیوتیک پیش از ویزیت</p>
+                  <p className="text-2xs text-slate-500">ضرورت پروفیلاکسی آنتی‌بیوتیک پیش از ویزیت</p>
                 </div>
 
                 <div className="space-y-1.5 p-2.5 rounded-xl bg-white/80 dark:bg-slate-800/80 border border-rose-100 dark:border-rose-900/40">
@@ -690,7 +690,7 @@ export default function Patients() {
                   patients={patients.filter(p => p.id !== editingPatient?.id)} // Cannot be their own head
                   placeholder="بدون سرپرست (حساب مستقل)"
                 />
-                <p className="text-[11px] text-slate-500 mt-1">با انتخاب سرپرست خانواده، مانده حساب این بیمار با سرپرست او تجمیع می‌شود.</p>
+                <p className="text-2xs text-slate-500 mt-1">با انتخاب سرپرست خانواده، مانده حساب این بیمار با سرپرست او تجمیع می‌شود.</p>
               </div>
             </div>
             <Textarea label="یادداشت" value={formData.notes} onChange={(v) => setFormData((p) => ({ ...p, notes: v }))} placeholder="یادداشت‌های بیمار..." />

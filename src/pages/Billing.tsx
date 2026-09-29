@@ -1,6 +1,8 @@
 // Billing.tsx - Persian RTL Dental Clinic Billing & Payments Management
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
+import { usePullToRefresh } from '../lib/usePullToRefresh'
 import { PatientDebtBar } from '../components/PatientDebtBar'
+import { colorTokens, CHART_AXIS_COLOR } from '../lib/colorTokens'
 import { PatientSelect } from '../components/PatientSelect'
 import { PatientAlerts } from '../components/PatientAlerts'
 import { toothLabel, toothCode } from '../lib/toothLabel'
@@ -251,6 +253,7 @@ export default function Billing() {
   useEffect(() => {
     loadData()
   }, [loadData])
+  const ptr = usePullToRefresh(async () => { await loadData() })
 
   // Arrived here from a finished treatment session's 'ارسال به مالی'
   // button — carries the patient, encounter, and calculated total so
@@ -824,7 +827,7 @@ export default function Billing() {
         className="w-full flex items-center justify-between gap-2 px-4 py-3 text-right"
       >
         <span className="inline-flex items-center gap-2 text-xs font-bold text-primary-700 dark:text-primary-300 bg-primary-50 dark:bg-primary-950/40 border border-primary-200/70 dark:border-primary-800/60 rounded-full px-3 py-1.5 w-fit">
-          <TrendingUp size={15} className="text-primary-600" />
+          <TrendingUp size={14} className="text-primary-600" />
           نمودار درآمد
         </span>
         <ChevronDown
@@ -848,13 +851,13 @@ export default function Billing() {
         <h3 className="text-sm font-bold text-slate-700 mb-3">درآمد ۶ ماه اخیر</h3>
         <ResponsiveContainer width="100%" height={220}>
           <BarChart data={revenueChartData}>
-            <XAxis dataKey="month" tick={{ fontSize: 11, fill: '#94a3b8' }} axisLine={false} tickLine={false} />
-            <YAxis tick={{ fontSize: 11, fill: '#94a3b8' }} axisLine={false} tickLine={false} tickFormatter={(v) => formatNumber(v)} />
+            <XAxis dataKey="month" tick={{ fontSize: 11, fill: CHART_AXIS_COLOR }} axisLine={false} tickLine={false} />
+            <YAxis tick={{ fontSize: 11, fill: CHART_AXIS_COLOR }} axisLine={false} tickLine={false} tickFormatter={(v) => formatNumber(v)} />
             <RTooltip
               contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 4px 12px rgba(0,0,0,0.1)' }}
               formatter={(value: number) => [`${formatCurrency(value)} تومان`, 'درآمد']}
             />
-            <Bar dataKey="revenue" fill="#10b981" radius={[8, 8, 0, 0]} />
+            <Bar dataKey="revenue" fill={colorTokens.success[500]} radius={[8, 8, 0, 0]} />
           </BarChart>
         </ResponsiveContainer>
       </Card>
@@ -956,7 +959,7 @@ export default function Billing() {
       )}
 
       {filteredPayments.length === 0 ? (
-        <Card className="p-6"><EmptyState icon={<CreditCard size={32} />} title="پرداختی یافت نشد" /></Card>
+        <Card className="p-6"><EmptyState icon={<CreditCard size={56} />} title="پرداختی یافت نشد" /></Card>
       ) : (
         <div className="space-y-2">
           {filteredPayments.map((p, idx) => {
@@ -999,17 +1002,17 @@ export default function Billing() {
                               navigate(`/patients/${p.patient_id}`)
                             }}
                             title="شماره پرونده بیمار"
-                            className="inline-flex items-center gap-1 px-1.5 py-0.2 rounded bg-slate-900 dark:bg-primary-950 text-white dark:text-primary-300 text-[10px] font-mono font-bold hover:scale-105 active:scale-95 transition-all cursor-pointer"
+                            className="inline-flex items-center gap-1 px-1.5 py-0.2 rounded bg-slate-900 dark:bg-primary-950 text-white dark:text-primary-300 text-3xs font-mono font-bold hover:scale-105 active:scale-95 transition-all cursor-pointer"
                             dir="ltr"
                           >
-                            <FileText size={9} className="text-primary-400" />
+                            <FileText size={8} className="text-primary-400" />
                             <span>{toPersianDigits(patientMap.get(p.patient_id)!.file_number!)}</span>
                           </button>
                         )}
                         <button
                           type="button"
                           onClick={() => { h.tap(); setFinanceOverviewPatientId(p.patient_id) }}
-                          className="text-[10px] px-1.5 py-0.5 rounded bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 text-slate-600 dark:text-slate-300 transition-colors cursor-pointer"
+                          className="text-3xs px-1.5 py-0.5 rounded bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 text-slate-600 dark:text-slate-300 transition-colors cursor-pointer"
                           title="نمایش وضعیت مالی این بیمار در پنجره شناور"
                         >
                           خلاصه مالی
@@ -1021,7 +1024,7 @@ export default function Billing() {
                           نشده» is information, not noise: it marks exactly
                           which rows still need a human to say what they were
                           for. */}
-                      <p className="text-[11px] text-slate-400 mt-0.5">{resolveAttribution(p, treatments as never, doctors as never).label}</p>
+                      <p className="text-2xs text-slate-400 mt-0.5">{resolveAttribution(p, treatments as never, doctors as never).label}</p>
                       {/* MOD-FEAT-027: «فقط پرداختی نیست — مقدار بدهی هم
                           باید قید بشه». A payment row that shows only what
                           came in cannot answer the question actually being
@@ -1035,22 +1038,22 @@ export default function Billing() {
                               h.tap()
                               navigate(`/patients/${p.patient_id}`, { state: { initialTab: 'payments', openPaymentModal: true } })
                             }}
-                            className="text-[11px] font-bold text-error-600 mt-0.5 hover:underline flex items-center gap-1 cursor-pointer"
+                            className="text-2xs font-bold text-error-600 mt-0.5 hover:underline flex items-center gap-1 cursor-pointer"
                             title="تسویه مستقیم این مانده در پرونده بیمار"
                           >
                             <span>مانده‌حساب این بیمار: {formatCurrency(bal)} ت</span>
-                            <span className="text-[10px] underline">(تسویه سریع)</span>
+                            <span className="text-3xs underline">(تسویه سریع)</span>
                           </button>
                         ) : (
-                          <p className="text-[11px] text-success-600 mt-0.5">این بیمار تسویه است</p>
+                          <p className="text-2xs text-success-600 mt-0.5">این بیمار تسویه است</p>
                         )
                       })()}
                     </div>
                   </div>
                   <div className="flex items-center gap-2">
                     {p.pos_rrn && (
-                      <span className="flex items-center gap-1 px-2 py-0.5 rounded-md bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 font-mono text-xs border border-emerald-200 dark:border-emerald-800" title={`پایانه شاپرک: ${p.pos_bank_name || 'کارتخوان'}`}>
-                        <CreditCard size={11} className="text-emerald-600" />
+                      <span className="flex items-center gap-1 px-2 py-0.5 rounded-lg bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 font-mono text-xs border border-emerald-200 dark:border-emerald-800" title={`پایانه شاپرک: ${p.pos_bank_name || 'کارتخوان'}`}>
+                        <CreditCard size={12} className="text-emerald-600" />
                         <span dir="ltr">RRN: {toPersianDigits(p.pos_rrn)}</span>
                       </span>
                     )}
@@ -1264,11 +1267,11 @@ export default function Billing() {
             </div>
             <div className="grid grid-cols-2 gap-2.5 mb-4">
               <div className="p-3 rounded-xl bg-slate-50">
-                <p className="text-[11px] text-slate-400">موجودی اولیه</p>
+                <p className="text-2xs text-slate-400">موجودی اولیه</p>
                 <p className="text-sm font-extrabold text-slate-700">{formatCurrency(openSession.opening_balance)} ت</p>
               </div>
               <div className="p-3 rounded-xl bg-primary-50">
-                <p className="text-[11px] text-primary-500">موجودی مورد انتظار الان</p>
+                <p className="text-2xs text-primary-500">موجودی مورد انتظار الان</p>
                 <p className="text-sm font-extrabold text-primary-700">{formatCurrency(expectedCashInDrawer)} ت</p>
               </div>
             </div>
@@ -1298,12 +1301,12 @@ export default function Billing() {
                     <Badge color="error">مغایرت {formatCurrency(Math.abs(s.discrepancy || 0))} ت</Badge>
                   )}
                 </div>
-                <div className="grid grid-cols-3 gap-2 mt-2 text-[11px] text-slate-500">
+                <div className="grid grid-cols-3 gap-2 mt-2 text-2xs text-slate-500">
                   <span>اولیه: {formatCurrency(s.opening_balance)}</span>
                   <span>مورد انتظار: {formatCurrency(s.expected_closing_balance || 0)}</span>
                   <span>شمارش‌شده: {formatCurrency(s.counted_closing_balance || 0)}</span>
                 </div>
-                {s.notes && <p className="text-[11px] text-slate-400 mt-1.5">{s.notes}</p>}
+                {s.notes && <p className="text-2xs text-slate-400 mt-1.5">{s.notes}</p>}
               </Card>
             ))}
           </div>
@@ -1334,7 +1337,7 @@ export default function Billing() {
       )}
 
       {filteredCheques.length === 0 ? (
-        <Card className="p-6"><EmptyState icon={<Banknote size={32} />} title="چکی یافت نشد" /></Card>
+        <Card className="p-6"><EmptyState icon={<Banknote size={56} />} title="چکی یافت نشد" /></Card>
       ) : (
         <div className="space-y-2">
           {filteredCheques.map((c, idx) => {
@@ -1358,10 +1361,10 @@ export default function Billing() {
                       <div className="flex items-center gap-2 flex-wrap">
                         <p className="text-sm font-bold text-slate-800">{formatCurrency(c.amount)} تومان</p>
                         {c.purpose === 'guarantee' && (
-                          <span className="text-[10px] px-1.5 py-0.5 rounded-md bg-amber-100 text-amber-700 font-bold">ضمانت طرح قسطی</span>
+                          <span className="text-3xs px-1.5 py-0.5 rounded-lg bg-amber-100 text-amber-700 font-bold">ضمانت طرح قسطی</span>
                         )}
                         {(c as any).installment_id && (
-                          <span className="text-[10px] px-1.5 py-0.5 rounded-md bg-primary-100 text-primary-700 font-bold">چک قسط</span>
+                          <span className="text-3xs px-1.5 py-0.5 rounded-lg bg-primary-100 text-primary-700 font-bold">چک قسط</span>
                         )}
                       </div>
                       <div className="flex items-center gap-1.5 flex-wrap text-xs text-slate-500">
@@ -1384,10 +1387,10 @@ export default function Billing() {
                               navigate(`/patients/${c.patient_id}`)
                             }}
                             title="شماره پرونده بیمار"
-                            className="inline-flex items-center gap-1 px-1.5 py-0.2 rounded bg-slate-900 dark:bg-primary-950 text-white dark:text-primary-300 text-[10px] font-mono font-bold hover:scale-105 active:scale-95 transition-all cursor-pointer"
+                            className="inline-flex items-center gap-1 px-1.5 py-0.2 rounded bg-slate-900 dark:bg-primary-950 text-white dark:text-primary-300 text-3xs font-mono font-bold hover:scale-105 active:scale-95 transition-all cursor-pointer"
                             dir="ltr"
                           >
-                            <FileText size={9} className="text-primary-400" />
+                            <FileText size={8} className="text-primary-400" />
                             <span>{toPersianDigits(patientMap.get(c.patient_id)!.file_number!)}</span>
                           </button>
                         )}
@@ -1396,11 +1399,11 @@ export default function Billing() {
                       {c.bank_name && <p className="text-xs text-slate-400">بانک: {c.bank_name} {c.cheque_number && `- شماره: ${toPersianDigits(c.cheque_number)}`}</p>}
                       {(c as any).sayad_id && (
                         <div className="flex items-center gap-1.5 flex-wrap mt-0.5">
-                          <span className="text-[11px] text-slate-400 font-mono" dir="ltr">
+                          <span className="text-2xs text-slate-400 font-mono" dir="ltr">
                             صیاد: {formatSayadId((c as any).sayad_id)}
                           </span>
                           {c.sayad_status && SAYAD_STATUS_CONFIG[c.sayad_status as SayadCreditStatus] && (
-                            <span className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-bold border ${SAYAD_STATUS_CONFIG[c.sayad_status as SayadCreditStatus].bgClass} ${SAYAD_STATUS_CONFIG[c.sayad_status as SayadCreditStatus].borderClass} ${SAYAD_STATUS_CONFIG[c.sayad_status as SayadCreditStatus].textClass}`}>
+                            <span className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-3xs font-bold border ${SAYAD_STATUS_CONFIG[c.sayad_status as SayadCreditStatus].bgClass} ${SAYAD_STATUS_CONFIG[c.sayad_status as SayadCreditStatus].borderClass} ${SAYAD_STATUS_CONFIG[c.sayad_status as SayadCreditStatus].textClass}`}>
                               <span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: SAYAD_STATUS_CONFIG[c.sayad_status as SayadCreditStatus].color }} />
                               {SAYAD_STATUS_CONFIG[c.sayad_status as SayadCreditStatus].label.split(' ')[0]}
                             </span>
@@ -1417,6 +1420,7 @@ export default function Billing() {
                     <select
                       value={c.status}
                       onChange={(e) => quickChequeStatusChange(c, e.target.value)}
+                      aria-label="تغییر سریع وضعیت چک"
                       className="text-xs px-2 py-1 rounded-lg border border-slate-200 bg-slate-50 text-slate-600 focus:outline-none focus:ring-1 focus:ring-primary-400"
                     >
                       {chequeStatuses.map((s) => <option key={s.value} value={s.value}>{s.label}</option>)}
@@ -1465,7 +1469,7 @@ export default function Billing() {
       </div>
 
       {paymentPlans.length === 0 ? (
-        <Card className="p-6"><EmptyState icon={<Calendar size={32} />} title="طرح قسطی ثبت نشده" /></Card>
+        <Card className="p-6"><EmptyState icon={<Calendar size={56} />} title="طرح قسطی ثبت نشده" /></Card>
       ) : (
         <div className="space-y-3">
           {paymentPlans.map((plan, idx) => {
@@ -1510,10 +1514,10 @@ export default function Billing() {
                             navigate(`/patients/${plan.patient_id}`)
                           }}
                           title="شماره پرونده بیمار"
-                          className="inline-flex items-center gap-1 px-1.5 py-0.2 rounded bg-slate-900 dark:bg-primary-950 text-white dark:text-primary-300 text-[10px] font-mono font-bold hover:scale-105 active:scale-95 transition-all cursor-pointer"
+                          className="inline-flex items-center gap-1 px-1.5 py-0.2 rounded bg-slate-900 dark:bg-primary-950 text-white dark:text-primary-300 text-3xs font-mono font-bold hover:scale-105 active:scale-95 transition-all cursor-pointer"
                           dir="ltr"
                         >
-                          <FileText size={9} className="text-primary-400" />
+                          <FileText size={8} className="text-primary-400" />
                           <span>{toPersianDigits(patientMap.get(plan.patient_id)!.file_number!)}</span>
                         </button>
                       )}
@@ -1684,7 +1688,7 @@ export default function Billing() {
 
         {expenses.length === 0 ? (
           <Card className="p-5">
-            <EmptyState icon={<Receipt size={28} />} title="هزینه‌ای ثبت نشده است" description="برای ثبت هزینه جدید کلیک کنید" action={<Button size="sm" onClick={openCreateExpense}><Plus size={16} /> افزودن</Button>} />
+            <EmptyState icon={<Receipt size={56} />} title="هزینه‌ای ثبت نشده است" description="برای ثبت هزینه جدید کلیک کنید" action={<Button size="sm" onClick={openCreateExpense}><Plus size={16} /> افزودن</Button>} />
           </Card>
         ) : (
           <Card className="p-0 overflow-hidden">
@@ -1707,8 +1711,8 @@ export default function Billing() {
                       <td className="px-4 py-3 text-slate-600">{e.date ? toJalaliDisplay(e.date) : '-'}</td>
                       <td className="px-4 py-3 text-slate-500 max-w-[200px] truncate">{e.description || '-'}</td>
                       <td className="px-4 py-3">
-                        <button onClick={() => openEditExpense(e)} aria-label="ویرایش هزینه" className="text-slate-400 hover:text-primary-600 hover:bg-primary-50 p-1.5 rounded-lg transition-colors"><Edit2 size={15} /></button>
-                        <button onClick={() => handleDeleteExpense(e)} aria-label="غیرفعال کردن هزینه" title="غیرفعال کردن" className="text-slate-400 hover:text-error-600 hover:bg-error-50 p-1.5 rounded-lg transition-colors"><Archive size={15} /></button>
+                        <button onClick={() => openEditExpense(e)} aria-label="ویرایش هزینه" className="text-slate-400 hover:text-primary-600 hover:bg-primary-50 p-1.5 rounded-lg transition-colors"><Edit2 size={14} /></button>
+                        <button onClick={() => handleDeleteExpense(e)} aria-label="غیرفعال کردن هزینه" title="غیرفعال کردن" className="text-slate-400 hover:text-error-600 hover:bg-error-50 p-1.5 rounded-lg transition-colors"><Archive size={14} /></button>
                       </td>
                     </tr>
                   ))}
@@ -1764,7 +1768,7 @@ export default function Billing() {
       </div>
 
       {patientBalanceList.length === 0 ? (
-        <Card className="p-6"><EmptyState icon={<CheckCircle2 size={32} />} title="مطالبات معوقی وجود ندارد" description="همه حساب‌ها تسویه هستند" /></Card>
+        <Card className="p-6"><EmptyState icon={<CheckCircle2 size={56} />} title="مطالبات معوقی وجود ندارد" description="همه حساب‌ها تسویه هستند" /></Card>
       ) : (
         <div className="space-y-2">
           {patientBalanceList.map((b, idx) => {
@@ -1773,7 +1777,14 @@ export default function Billing() {
             return (
             <Card key={b.patientId} className={`p-4 cursor-pointer relative overflow-hidden transition-all duration-300 hover:shadow-xl hover:-translate-y-1 stagger-item bg-gradient-to-br ${theme.bg} ${theme.border}`} style={{ animationDelay: `${staggerDelay}s` }}>
               <div className={`absolute -right-16 -top-16 w-32 h-32 rounded-full blur-3xl opacity-20 breathe-slow ${theme.text}`} />
-              <div className="relative z-10 flex items-center justify-between gap-3" onClick={() => { h.tap(); navigate(`/patients/${b.patientId}`, { state: { initialTab: 'payments', openPaymentModal: true } }) }}>
+              <div
+                className="relative z-10 flex items-center justify-between gap-3 focus:outline-none focus:ring-2 focus:ring-primary-400 rounded-lg"
+                role="button"
+                tabIndex={0}
+                aria-label={`ثبت پرداخت برای ${getPatientName(b.patientId) || ''}`.trim()}
+                onClick={() => { h.tap(); navigate(`/patients/${b.patientId}`, { state: { initialTab: 'payments', openPaymentModal: true } }) }}
+                onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); h.tap(); navigate(`/patients/${b.patientId}`, { state: { initialTab: 'payments', openPaymentModal: true } }) } }}
+              >
                 <div className="flex items-center gap-3">
                   <div className="w-10 h-10 rounded-xl bg-error-50 text-error-600 flex items-center justify-center">
                     <Wallet size={18} />
@@ -1782,8 +1793,8 @@ export default function Billing() {
                     <div className="flex items-center gap-1.5 flex-wrap">
                       <p className="text-sm font-bold text-slate-800">{getPatientName(b.patientId)}</p>
                       {patientMap.get(b.patientId)?.file_number && (
-                        <span className="patient-file-badge inline-flex items-center gap-1 px-1.5 py-0.2 rounded bg-slate-900 dark:bg-primary-950 text-white dark:text-primary-300 text-[10px] font-mono font-bold" dir="ltr">
-                          <FileText size={9} className="text-primary-400" />
+                        <span className="patient-file-badge inline-flex items-center gap-1 px-1.5 py-0.2 rounded bg-slate-900 dark:bg-primary-950 text-white dark:text-primary-300 text-3xs font-mono font-bold" dir="ltr">
+                          <FileText size={8} className="text-primary-400" />
                           <span>{toPersianDigits(patientMap.get(b.patientId)!.file_number!)}</span>
                         </span>
                       )}
@@ -1835,7 +1846,7 @@ export default function Billing() {
           </div>
           <div className="flex items-center gap-3">
             <div className="text-left bg-white dark:bg-slate-800 px-3.5 py-2 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm">
-              <p className="text-[10px] text-slate-400">مجموع سهم قابل پرداخت به پزشکان</p>
+              <p className="text-3xs text-slate-400">مجموع سهم قابل پرداخت به پزشکان</p>
               <p className="text-sm font-bold text-primary-600">{formatCurrency(totalPayable)} ت</p>
             </div>
           </div>
@@ -1843,7 +1854,7 @@ export default function Billing() {
 
         {shareCards.length === 0 ? (
           <Card className="p-6">
-            <EmptyState icon={<Users size={32} />} title="پزشکی تعریف نشده است" description="در بخش کاربران و پرسنل پزشکان کلینیک را ثبت نمایید." />
+            <EmptyState icon={<Users size={56} />} title="پزشکی تعریف نشده است" description="در بخش کاربران و پرسنل پزشکان کلینیک را ثبت نمایید." />
           </Card>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -1858,7 +1869,7 @@ export default function Billing() {
                       <h4 className="text-sm font-bold text-slate-800 dark:text-slate-100">
                         {doc.name || 'پزشک'}
                       </h4>
-                      <p className="text-[11px] text-slate-500">
+                      <p className="text-2xs text-slate-500">
                         {role === 'mehdi' ? 'مالک کلینیک (فرمول ۱۰۰٪)' : role === 'mina' ? 'دکتر مینا (فرمول ۵۰٪ منهای قطعات و لابراتوار)' : `درصد کارانه: ${toPersianDigits(breakdown.commissionPercent)}٪`}
                       </p>
                     </div>
@@ -1893,13 +1904,13 @@ export default function Billing() {
 
                 <div className="pt-2 flex items-center justify-between">
                   <div>
-                    <p className="text-[10px] text-slate-400">سهم خالص قابل پرداخت</p>
+                    <p className="text-3xs text-slate-400">سهم خالص قابل پرداخت</p>
                     <p className="text-base font-bold text-emerald-600 dark:text-emerald-400">
                       {formatCurrency(breakdown.finalDoctorShare)} تومان
                     </p>
                   </div>
                   <div className="text-left">
-                    <p className="text-[10px] text-slate-400">سهم ناخالص باقیمانده برای کلینیک</p>
+                    <p className="text-3xs text-slate-400">سهم ناخالص باقیمانده برای کلینیک</p>
                     <p className="text-xs font-bold text-slate-700 dark:text-slate-300">
                       {formatCurrency(breakdown.clinicShare)} ت
                     </p>
@@ -1977,13 +1988,13 @@ export default function Billing() {
                       <button
                         type="button"
                         onClick={() => setPaymentForm((p) => ({ ...p, amount: String(fin.balance) }))}
-                        className="text-[11px] text-primary-600 font-semibold hover:underline"
+                        className="text-2xs text-primary-600 font-semibold hover:underline"
                       >
                         پر کردن مبلغ با کل بدهی
                       </button>
                     )}
                     {fin.balance <= 0 && (
-                      <div className="flex items-center gap-1.5 mt-1 text-[11px] text-warning-700 bg-warning-50 px-2 py-1.5 rounded-lg">
+                      <div className="flex items-center gap-1.5 mt-1 text-2xs text-warning-700 bg-warning-50 px-2 py-1.5 rounded-lg">
                         <AlertCircle size={12} className="shrink-0" />
                         این بیمار تسویه‌حساب کامل دارد — قبل از ثبت پرداخت جدید مطمئن شوید که این پرداخت تکراری نیست.
                       </div>
@@ -2001,7 +2012,7 @@ export default function Billing() {
                         // کنار گذاشتن وجود ندارد.
                       }, payments as never))
                       return warn ? (
-                        <div className="flex items-start gap-1.5 mt-1 text-[11px] text-error-700 bg-error-50 px-2 py-1.5 rounded-lg">
+                        <div className="flex items-start gap-1.5 mt-1 text-2xs text-error-700 bg-error-50 px-2 py-1.5 rounded-lg">
                           <AlertCircle size={12} className="shrink-0 mt-0.5" />
                           <span>{warn}</span>
                         </div>
@@ -2109,7 +2120,7 @@ export default function Billing() {
                 <div className="p-3.5 bg-slate-50 dark:bg-slate-800/60 rounded-xl border border-slate-200/80 dark:border-slate-700/80 space-y-3">
                   <div className="flex items-center justify-between text-xs font-bold text-primary-700 dark:text-primary-400">
                     <div className="flex items-center gap-1.5">
-                      <CreditCard size={15} />
+                      <CreditCard size={14} />
                       <span>مشخصات تراکنش پایانه کارتخوان شاپرک (POS)</span>
                     </div>
                     <button
@@ -2137,7 +2148,7 @@ export default function Billing() {
                           showToast('success', `تراکنش کارتخوان با کد مرجع شاپرک ${toPersianDigits(generatedRrn)} تایید شد`)
                         }, 900)
                       }}
-                      className="px-2.5 py-1 rounded-lg bg-teal-50 dark:bg-teal-950/40 text-teal-700 dark:text-teal-300 hover:bg-teal-100 text-[11px] font-bold border border-teal-200 dark:border-teal-800 transition-all flex items-center gap-1 press-scale disabled:opacity-60"
+                      className="px-2.5 py-1 rounded-lg bg-teal-50 dark:bg-teal-950/40 text-teal-700 dark:text-teal-300 hover:bg-teal-100 text-2xs font-bold border border-teal-200 dark:border-teal-800 transition-all flex items-center gap-1 press-scale disabled:opacity-60"
                       title="ارسال مستقیم مبلغ به کارتخوان PC-POS و ثبت خودکار RRN"
                     >
                       {posCommunicating ? (
@@ -2234,7 +2245,7 @@ export default function Billing() {
                         className="text-xs text-teal-700 bg-teal-50 hover:bg-teal-100 border border-teal-200 rounded-lg p-2 text-right w-full transition-colors flex items-center justify-between"
                       >
                         <span>👨‍👩‍👦 پرداخت از طرف سرپرست خانوار ({headName})</span>
-                        <span className="text-[11px] font-bold underline">درج در یادداشت</span>
+                        <span className="text-2xs font-bold underline">درج در یادداشت</span>
                       </button>
                     )
                   }
@@ -2295,7 +2306,7 @@ export default function Billing() {
                   />
                   <span className="text-sm font-bold text-slate-700 dark:text-slate-200">این چک ضمانت است</span>
                 </label>
-                <p className="mt-1.5 text-[11px] text-slate-600 dark:text-slate-400">
+                <p className="mt-1.5 text-2xs text-slate-600 dark:text-slate-400">
                   {chequeModeHint(chequeForm.isGuarantee)}
                 </p>
               </div>
@@ -2376,7 +2387,7 @@ export default function Billing() {
                         }`}
                       >
                         <span className="w-3 h-3 rounded-full mb-1" style={{ backgroundColor: cfg.color }} />
-                        <span className="text-[10px] truncate max-w-full">
+                        <span className="text-3xs truncate max-w-full">
                           {statusKey === 'white' ? 'سفید' : statusKey === 'yellow' ? 'زرد' : statusKey === 'orange' ? 'نارنجی' : statusKey === 'brown' ? 'قهوه‌ای' : 'قرمز'}
                         </span>
                       </button>
@@ -2384,7 +2395,7 @@ export default function Billing() {
                   })}
                 </div>
                 {chequeForm.sayad_status && (
-                  <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-1.5 flex items-center gap-1">
+                  <p className="text-2xs text-slate-500 dark:text-slate-400 mt-1.5 flex items-center gap-1">
                     <span>وضعیت:</span>
                     <span className="font-bold">{SAYAD_STATUS_CONFIG[chequeForm.sayad_status].label}</span>
                   </p>
@@ -2503,31 +2514,39 @@ export default function Billing() {
   // ===========================================================================
 
   if (loading) {
-    return <div className="flex items-center justify-center py-20"><Spinner size={32} /></div>
+    return (
+      <div className="space-y-4" aria-busy="true" aria-live="polite">
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+          {[0, 1, 2, 3].map((i) => <div key={i} className="skeleton h-24 rounded-2xl" />)}
+        </div>
+        <div className="skeleton h-12 rounded-xl" />
+        <div className="space-y-2">
+          {[0, 1, 2, 3].map((i) => <div key={i} className="skeleton h-20 rounded-2xl" />)}
+        </div>
+      </div>
+    )
   }
 
   const tabs = [
-    { key: 'payments', label: 'پرداخت‌ها', icon: <CreditCard size={18} /> },
-    { key: 'register', label: 'صندوق', icon: <Wallet size={18} /> },
-    { key: 'cheques', label: 'چک‌ها', icon: <Banknote size={18} /> },
-    { key: 'plans', label: 'طرح‌های قسطی', icon: <Calendar size={18} /> },
-    { key: 'expenses', label: 'هزینه‌ها', icon: <Receipt size={18} /> },
-    { key: 'balances', label: 'مانده حساب', icon: <Wallet size={18} /> },
-    { key: 'shares', label: 'سهم پزشکان', icon: <DollarSign size={18} /> },
+    { key: 'payments', label: 'پرداخت‌ها', icon: <CreditCard size={18} />, color: 'teal' },
+    { key: 'register', label: 'صندوق', icon: <Wallet size={18} />, color: 'blue' },
+    { key: 'cheques', label: 'چک‌ها', icon: <Banknote size={18} />, color: 'purple' },
+    { key: 'plans', label: 'طرح‌های قسطی', icon: <Calendar size={18} />, color: 'amber' },
+    { key: 'expenses', label: 'هزینه‌ها', icon: <Receipt size={18} />, color: 'rose' },
+    { key: 'balances', label: 'مانده حساب', icon: <Wallet size={18} />, color: 'indigo' },
+    { key: 'shares', label: 'سهم پزشکان', icon: <DollarSign size={18} />, color: 'emerald' },
   ]
 
-  const billingTabColors: Record<string, string> = {
-    payments: '#0d9488',
-    register: '#2563eb',
-    cheques: '#c026d3',
-    plans: '#d97706',
-    expenses: '#e11d48',
-    balances: '#0891b2',
-    shares: '#7c3aed',
-  }
-
   return (
-    <div className="space-y-4">
+    <div className="space-y-4" style={{ paddingBottom: 'calc(6rem + env(safe-area-inset-bottom, 0px))' }} {...ptr.handlers}>
+      {ptr.pullDistance > 0 && (
+        <div className="pull-indicator" style={{ opacity: ptr.isRefreshing ? 1 : ptr.pullProgress, top: -4 }}>
+          <div className="flex flex-col items-center gap-1">
+            <div className={`w-7 h-7 rounded-full border-2 border-teal-300 dark:border-teal-600 border-t-teal-600 dark:border-t-teal-400 ${ptr.isRefreshing ? 'animate-spin' : ''}`} style={{ transform: `scale(${0.6 + ptr.pullProgress * 0.4})` }} />
+            <span className="text-3xs text-teal-600 font-medium">{ptr.isRefreshing ? 'در حال به‌روزرسانی...' : 'برای به‌روزرسانی بکشید'}</span>
+          </div>
+        </div>
+      )}
       {renderStats()}
       {renderCharts()}
 
@@ -2558,21 +2577,7 @@ export default function Billing() {
         )}
       </Modal>
 
-      <div className="grid grid-cols-4 gap-2">
-        {tabs.map((t) => (
-          <button
-            key={t.key}
-            type="button"
-            onClick={() => { h.select(); setActiveTab(t.key) }}
-            aria-pressed={activeTab === t.key}
-            className={`billing-tab flex flex-col items-center justify-center gap-1 min-h-[56px] rounded-xl px-1 py-1.5 text-[10px] font-extrabold leading-tight text-center press-scale transition-all ${activeTab === t.key ? 'billing-tab-active' : ''}`}
-            style={{ '--tab-color': billingTabColors[t.key] || '#0d9488' } as React.CSSProperties}
-          >
-            {t.icon}
-            <span className="truncate max-w-full">{t.label}</span>
-          </button>
-        ))}
-      </div>
+      <Tabs tabs={tabs} active={activeTab} onChange={(key) => { h.select(); setActiveTab(key) }} />
 
       {activeTab === 'payments' && renderPaymentsTab()}
       {activeTab === 'register' && renderCashRegisterTab()}

@@ -171,7 +171,7 @@ function ToothDetailPanel({
   return createPortal(
     <div className="fixed inset-0 z-50 flex items-end md:items-center justify-center bg-black/30 backdrop-blur-sm" onClick={onClose}>
       <div
-        className="bg-white rounded-t-3xl md:rounded-3xl shadow-2xl w-full max-w-lg max-h-[85vh] overflow-y-auto"
+        className="bg-white rounded-t-3xl md:rounded-2xl shadow-2xl w-full max-w-lg max-h-[85vh] overflow-y-auto"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
@@ -188,7 +188,7 @@ function ToothDetailPanel({
                 first digit 1/2 = upper right/left, 3/4 = lower left/
                 right; primary (baby) teeth 5/6/7/8 map the same way. */}
             <div className="w-12 h-12 rounded-xl bg-primary-50 flex flex-col items-center justify-center px-1 text-center">
-              <span className="text-[9px] font-bold text-primary-600 leading-tight">
+              <span className="text-4xs font-bold text-primary-600 leading-tight">
                 {(() => {
                   const q = Math.floor(tooth.number / 10)
                   const norm = q >= 5 ? q - 4 : q
@@ -271,7 +271,7 @@ function ToothDetailPanel({
                       h.tap()
                       setSurfaceConditions([])
                     }}
-                    className="text-[11px] text-primary-600 hover:text-primary-700 font-bold"
+                    className="text-2xs text-primary-600 hover:text-primary-700 font-bold"
                   >
                     پاکسازی همه سطوح
                   </button>
@@ -280,7 +280,7 @@ function ToothDetailPanel({
 
               {/* Fast Clinical Presets (O, MO, DO, MOD, B, L) */}
               <div className="p-2.5 rounded-2xl bg-gradient-to-r from-teal-50/70 via-white to-teal-50/70 dark:from-slate-800/80 dark:via-slate-850 dark:to-slate-800/80 border border-teal-200/70 dark:border-teal-800/50 space-y-2">
-                <span className="text-[11px] font-bold text-teal-800 dark:text-teal-300 block">
+                <span className="text-2xs font-bold text-teal-800 dark:text-teal-300 block">
                   الگوهای سریع بالینی (تک‌کلیک):
                 </span>
                 <div className="flex flex-wrap gap-1.5">
@@ -312,7 +312,7 @@ function ToothDetailPanel({
                 {/* Quick 1-click batch actions on active surface set */}
                 {surfaceConditions.length > 0 && (
                   <div className="flex items-center gap-2 pt-1 border-t border-teal-100 dark:border-teal-800/40">
-                    <span className="text-[10px] text-slate-500">اعمال بر سطوح فعال:</span>
+                    <span className="text-3xs text-slate-500">اعمال بر سطوح فعال:</span>
                     <button
                       type="button"
                       onClick={() => {
@@ -320,7 +320,7 @@ function ToothDetailPanel({
                         chimes.playPop()
                         setSurfaceConditions((prev) => prev.map((s) => ({ ...s, condition: 'caries' })))
                       }}
-                      className="text-[10px] px-2 py-0.5 rounded-lg bg-rose-50 text-rose-700 dark:bg-rose-950/40 dark:text-rose-300 font-bold border border-rose-200"
+                      className="text-3xs px-2 py-0.5 rounded-lg bg-rose-50 text-rose-700 dark:bg-rose-950/40 dark:text-rose-300 font-bold border border-rose-200"
                     >
                       پوسیدگی
                     </button>
@@ -331,7 +331,7 @@ function ToothDetailPanel({
                         chimes.playSuccess()
                         setSurfaceConditions((prev) => prev.map((s) => ({ ...s, condition: 'restored' })))
                       }}
-                      className="text-[10px] px-2 py-0.5 rounded-lg bg-blue-50 text-blue-700 dark:bg-blue-950/40 dark:text-blue-300 font-bold border border-blue-200"
+                      className="text-3xs px-2 py-0.5 rounded-lg bg-blue-50 text-blue-700 dark:bg-blue-950/40 dark:text-blue-300 font-bold border border-blue-200"
                     >
                       ترمیم کامپوزیت
                     </button>
@@ -358,7 +358,7 @@ function ToothDetailPanel({
                       }`}
                     >
                       <span className={`w-3 h-3 rounded-full ${meta.dot}`} />
-                      <span className="text-[10px] font-bold text-slate-600 leading-tight text-center">
+                      <span className="text-3xs font-bold text-slate-600 leading-tight text-center">
                         {surfaceLabels[surface]}
                       </span>
                     </button>
@@ -368,7 +368,7 @@ function ToothDetailPanel({
 
               {activeSurface && (
                 <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 animate-scale-in">
-                  <p className="text-[11px] text-slate-500 dark:text-slate-400 mb-2">
+                  <p className="text-2xs text-slate-500 dark:text-slate-400 mb-2">
                     وضعیت سطح «{surfaceLabels[activeSurface]}»:
                   </p>
                   <div className="flex flex-wrap gap-1.5">
@@ -458,7 +458,7 @@ function ToothDetailPanel({
               here isn't asked for a second time. */}
           {(onAddTreatment || onAddLabOrder || onAddImplantCase || onViewRadiology) && (
             <div className="space-y-2">
-              <p className="text-[11px] text-slate-500 dark:text-slate-400">
+              <p className="text-2xs text-slate-500 dark:text-slate-400">
                 برای دندان {toothLabel(tooth.number)}:
               </p>
               {onAddTreatment && (
@@ -822,9 +822,19 @@ export default function DentalChart({
                 stroke="#94a3b8"
                 strokeWidth="0.6"
                 className="cursor-pointer"
+                role="button"
+                tabIndex={0}
+                aria-label={`سطح ${letter} دندان ${num} — ${conditionMeta[cond].label}`}
                 onClick={(e) => {
                   e.stopPropagation()
                   handleSurfaceToggle(String(num), sec.surface)
+                }}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault()
+                    e.stopPropagation()
+                    handleSurfaceToggle(String(num), sec.surface)
+                  }
                 }}
               >
                 <title>{`${letter} — ${conditionMeta[cond].label}`}</title>
@@ -847,10 +857,21 @@ export default function DentalChart({
     )
   }
 
-  const glyphSize = jawView === 'all' ? 36 : 44
+  // MOD-FIX-MOBILE-TOOTH-TAP: on a narrow phone screen, 8 teeth per
+  // quadrant laid out edge-to-edge at desktop sizing (36-44px each) add
+  // up to more than a 402px viewport, so the row spills sideways inside
+  // its horizontal-scroll wrapper. A tester on a real mobile viewport
+  // found taps on the far teeth failing ("element is outside of the
+  // viewport") because those teeth sit past the visible edge. Rather
+  // than rely on the user discovering they can scroll sideways to reach
+  // them, each quadrant now wraps onto two rows of 4 on small screens
+  // (a normal CSS grid, no scrolling needed to reach any tooth) and
+  // only becomes a single scrollable row again at the `sm` breakpoint
+  // and up, where there is room for it.
+  const glyphSize = jawView === 'all' ? 26 : 36
 
   const renderQuadrant = (teeth: number[], jaw: 'upper' | 'lower') => (
-    <div className="flex items-center gap-0.5 relative shrink-0">
+    <div className="grid grid-cols-4 gap-0.5 sm:flex sm:items-center sm:gap-0.5 relative shrink-0">
       {teeth.map((num) => {
         const data = getToothData(num)
         const palmerText = fdiToPalmer(num)
@@ -859,15 +880,19 @@ export default function DentalChart({
         return (
           <div
             key={num}
-            aria-label={`دندان ${toothLabel(num)}`}
+            role="button"
+            tabIndex={0}
+            aria-label={`دندان ${toothLabel(num)}${data.condition && data.condition !== 'healthy' ? ` — ${conditionMeta[data.condition]?.label ?? ''}` : ''}`}
+            aria-pressed={selectedTooth?.number === num}
             onClick={() => handleToothClick(data, num)}
-            className={`flex flex-col items-center relative rounded-xl p-1 cursor-pointer transition-all-smooth hover:bg-slate-100 dark:hover:bg-slate-800 shrink-0 press-scale ${
+            onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); handleToothClick(data, num) } }}
+            className={`flex flex-col items-center relative rounded-xl p-0.5 sm:p-1 cursor-pointer transition-all-smooth hover:bg-slate-100 dark:hover:bg-slate-800 shrink-0 press-scale focus:outline-none focus:ring-2 focus:ring-primary-400 ${
               selectedTooth?.number === num ? 'bg-primary-50 ring-2 ring-primary-400 dark:bg-primary-950/40' : ''
             } ${data.isPlannedOnly ? 'opacity-60' : ''}`}
           >
             {/* For lower jaw, Palmer number sits above the tooth toward occlusal line */}
             {jaw === 'lower' && (
-              <span className="text-[11px] font-extrabold text-slate-600 dark:text-slate-300 select-none mb-0.5 leading-none">
+              <span className="text-2xs font-extrabold text-slate-600 dark:text-slate-300 select-none mb-0.5 leading-none">
                 {displayLabel}
               </span>
             )}
@@ -880,7 +905,7 @@ export default function DentalChart({
             />
             {/* For upper jaw, Palmer number sits below the tooth toward occlusal line */}
             {jaw === 'upper' && (
-              <span className="text-[11px] font-extrabold text-slate-600 dark:text-slate-300 select-none mt-0.5 leading-none">
+              <span className="text-2xs font-extrabold text-slate-600 dark:text-slate-300 select-none mt-0.5 leading-none">
                 {displayLabel}
               </span>
             )}
@@ -922,7 +947,7 @@ export default function DentalChart({
           )
         })}
         <span className="flex items-center gap-1">
-          <span className="w-3 h-3 rounded-full bg-warning-400 flex items-center justify-center"><Clock size={7} className="text-white" /></span>
+          <span className="w-3 h-3 rounded-full bg-warning-400 flex items-center justify-center"><Clock size={8} className="text-white" /></span>
           <span className="text-slate-600">برنامه‌ریزی‌شده (انجام‌نشده)</span>
         </span>
         <span className="flex items-center gap-1">
@@ -935,7 +960,7 @@ export default function DentalChart({
       <div className="flex items-center justify-between flex-wrap gap-2">
         <div className="flex items-center gap-2 flex-wrap">
           <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-primary-50 dark:bg-primary-900/30 text-primary-700 dark:text-primary-400 text-xs font-bold">
-            <Grid3x3 size={13} /> نماد پالمر (Palmer)
+            <Grid3x3 size={14} /> نماد پالمر (Palmer)
           </div>
 
           {/* Segmented Jaw Switcher */}
@@ -1009,6 +1034,8 @@ export default function DentalChart({
           <button
             type="button"
             onClick={toggleVoiceDictation}
+            aria-label={isListening ? 'توقف ثبت گفتاری' : 'ثبت وضعیت دندان‌ها با گفتار'}
+            aria-pressed={isListening}
             className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition-all press-scale border ${
               isListening
                 ? 'bg-rose-500 text-white border-rose-400 shadow-md animate-pulse'
@@ -1048,22 +1075,22 @@ export default function DentalChart({
             </div>
             <button
               onClick={stopListening}
-              className="px-2 py-0.5 rounded-lg bg-rose-100 dark:bg-rose-900/60 text-rose-700 dark:text-rose-200 text-[11px] font-bold hover:bg-rose-200"
+              className="px-2 py-0.5 rounded-lg bg-rose-100 dark:bg-rose-900/60 text-rose-700 dark:text-rose-200 text-2xs font-bold hover:bg-rose-200"
             >
               قطع میکروفون
             </button>
           </div>
           <div className="text-xs text-slate-600 dark:text-slate-300 flex flex-wrap items-center gap-2">
             <span className="font-semibold text-slate-700 dark:text-slate-200">الگوهای قابل تشخیص:</span>
-            <code className="px-1.5 py-0.5 bg-white dark:bg-slate-800 rounded border text-[11px]">«دندان ۱۶ پوسیدگی دیستال»</code>
-            <code className="px-1.5 py-0.5 bg-white dark:bg-slate-800 rounded border text-[11px]">«دندان ۴۶ عصب‌کشی»</code>
-            <code className="px-1.5 py-0.5 bg-white dark:bg-slate-800 rounded border text-[11px]">«دندان ۳۸ کشیده شده»</code>
-            <code className="px-1.5 py-0.5 bg-white dark:bg-slate-800 rounded border text-[11px]">«دندان ۲۱ سالم»</code>
+            <code className="px-1.5 py-0.5 bg-white dark:bg-slate-800 rounded border text-2xs">«دندان ۱۶ پوسیدگی دیستال»</code>
+            <code className="px-1.5 py-0.5 bg-white dark:bg-slate-800 rounded border text-2xs">«دندان ۴۶ عصب‌کشی»</code>
+            <code className="px-1.5 py-0.5 bg-white dark:bg-slate-800 rounded border text-2xs">«دندان ۳۸ کشیده شده»</code>
+            <code className="px-1.5 py-0.5 bg-white dark:bg-slate-800 rounded border text-2xs">«دندان ۲۱ سالم»</code>
           </div>
           {(voiceTranscript || lastVoiceAction) && (
             <div className="pt-1 flex items-center gap-2 text-xs">
               <span className="text-slate-500">آخرین دریافت:</span>
-              <span className="font-bold text-slate-800 dark:text-slate-100 bg-white/70 dark:bg-slate-800/80 px-2 py-0.5 rounded-md border">
+              <span className="font-bold text-slate-800 dark:text-slate-100 bg-white/70 dark:bg-slate-800/80 px-2 py-0.5 rounded-lg border">
                 {voiceTranscript || '...'}
               </span>
               {lastVoiceAction && (
@@ -1126,7 +1153,7 @@ export default function DentalChart({
         {/* Upper Jaw */}
         {(jawView === 'all' || jawView === 'upper') && (
           <div className={jawView === 'all' ? 'mb-6' : ''}>
-            <div dir="ltr" className="flex items-center justify-between px-2 text-[10px] text-slate-400 dark:text-slate-500 mb-2 font-medium">
+            <div dir="ltr" className="flex items-center justify-between px-2 text-3xs text-slate-400 dark:text-slate-500 mb-2 font-medium">
               <span className="font-bold text-slate-600 dark:text-slate-400">راست بیمار (UR)</span>
               <span className="text-xs font-bold text-slate-700 dark:text-slate-300">فک بالا (ماکسیلاری)</span>
               <span className="font-bold text-slate-600 dark:text-slate-400">چپ بیمار (UL)</span>
@@ -1134,11 +1161,11 @@ export default function DentalChart({
             <div dir="ltr" className="flex items-center justify-center gap-0.5 sm:gap-1 px-1 py-1 overflow-x-auto dock-scroll min-w-full">
               <div className="flex items-center gap-0.5 shrink-0">
                 {renderQuadrant(upperRight, 'upper')}
-                <span className="text-2xl font-black text-primary-600 dark:text-primary-400 select-none ml-1">{palmerSymbols.upperRight}</span>
+                <span className="text-lg sm:text-2xl font-black text-primary-600 dark:text-primary-400 select-none ml-1">{palmerSymbols.upperRight}</span>
               </div>
-              <div className="w-0.5 h-12 bg-slate-300 dark:bg-slate-600 mx-1 shrink-0 rounded-full" />
+              <div className="w-0.5 h-12 bg-slate-300 dark:bg-slate-600 mx-1 shrink-0 rounded-full hidden sm:block" />
               <div className="flex items-center gap-0.5 shrink-0">
-                <span className="text-2xl font-black text-primary-600 dark:text-primary-400 select-none mr-1">{palmerSymbols.upperLeft}</span>
+                <span className="text-lg sm:text-2xl font-black text-primary-600 dark:text-primary-400 select-none mr-1">{palmerSymbols.upperLeft}</span>
                 {renderQuadrant(upperLeft, 'upper')}
               </div>
             </div>
@@ -1148,7 +1175,7 @@ export default function DentalChart({
         {/* Lower Jaw */}
         {(jawView === 'all' || jawView === 'lower') && (
           <div>
-            <div dir="ltr" className="flex items-center justify-between px-2 text-[10px] text-slate-400 dark:text-slate-500 mb-2 font-medium">
+            <div dir="ltr" className="flex items-center justify-between px-2 text-3xs text-slate-400 dark:text-slate-500 mb-2 font-medium">
               <span className="font-bold text-slate-600 dark:text-slate-400">راست بیمار (LR)</span>
               <span className="text-xs font-bold text-slate-700 dark:text-slate-300">فک پایین (ماندیبول)</span>
               <span className="font-semibold text-slate-600 dark:text-slate-400">چپ بیمار (LL)</span>
@@ -1156,11 +1183,11 @@ export default function DentalChart({
             <div dir="ltr" className="flex items-center justify-center gap-0.5 sm:gap-1 px-1 py-1 overflow-x-auto dock-scroll min-w-full">
               <div className="flex items-center gap-0.5 shrink-0">
                 {renderQuadrant(lowerRight, 'lower')}
-                <span className="text-2xl font-black text-primary-600 dark:text-primary-400 select-none ml-1">{palmerSymbols.lowerRight}</span>
+                <span className="text-lg sm:text-2xl font-black text-primary-600 dark:text-primary-400 select-none ml-1">{palmerSymbols.lowerRight}</span>
               </div>
-              <div className="w-0.5 h-12 bg-slate-300 dark:bg-slate-600 mx-1 shrink-0 rounded-full" />
+              <div className="w-0.5 h-12 bg-slate-300 dark:bg-slate-600 mx-1 shrink-0 rounded-full hidden sm:block" />
               <div className="flex items-center gap-0.5 shrink-0">
-                <span className="text-2xl font-black text-primary-600 dark:text-primary-400 select-none mr-1">{palmerSymbols.lowerLeft}</span>
+                <span className="text-lg sm:text-2xl font-black text-primary-600 dark:text-primary-400 select-none mr-1">{palmerSymbols.lowerLeft}</span>
                 {renderQuadrant(lowerLeft, 'lower')}
               </div>
             </div>
@@ -1177,11 +1204,11 @@ export default function DentalChart({
               <div dir="ltr" className="flex items-center justify-center gap-0.5 sm:gap-1 px-1 py-1 overflow-x-auto dock-scroll min-w-full">
                 <div className="flex items-center gap-0.5 shrink-0">
                   {renderQuadrant(primaryUpperRight, 'upper')}
-                  <span className="text-xl font-bold text-amber-600 select-none ml-1">{palmerSymbols.primaryUpperRight}</span>
+                  <span className="text-lg sm:text-xl font-bold text-amber-600 select-none ml-1">{palmerSymbols.primaryUpperRight}</span>
                 </div>
-                <div className="w-0.5 h-10 bg-amber-300 dark:bg-amber-700 mx-1 shrink-0 rounded-full" />
+                <div className="w-0.5 h-10 bg-amber-300 dark:bg-amber-700 mx-1 shrink-0 rounded-full hidden sm:block" />
                 <div className="flex items-center gap-0.5 shrink-0">
-                  <span className="text-xl font-bold text-amber-600 select-none mr-1">{palmerSymbols.primaryUpperLeft}</span>
+                  <span className="text-lg sm:text-xl font-bold text-amber-600 select-none mr-1">{palmerSymbols.primaryUpperLeft}</span>
                   {renderQuadrant(primaryUpperLeft, 'upper')}
                 </div>
               </div>
@@ -1192,11 +1219,11 @@ export default function DentalChart({
               <div dir="ltr" className="flex items-center justify-center gap-0.5 sm:gap-1 px-1 py-1 overflow-x-auto dock-scroll min-w-full">
                 <div className="flex items-center gap-0.5 shrink-0">
                   {renderQuadrant(primaryLowerRight, 'lower')}
-                  <span className="text-xl font-bold text-amber-600 select-none ml-1">{palmerSymbols.primaryLowerRight}</span>
+                  <span className="text-lg sm:text-xl font-bold text-amber-600 select-none ml-1">{palmerSymbols.primaryLowerRight}</span>
                 </div>
-                <div className="w-0.5 h-10 bg-amber-300 dark:bg-amber-700 mx-1 shrink-0 rounded-full" />
+                <div className="w-0.5 h-10 bg-amber-300 dark:bg-amber-700 mx-1 shrink-0 rounded-full hidden sm:block" />
                 <div className="flex items-center gap-0.5 shrink-0">
-                  <span className="text-xl font-bold text-amber-600 select-none mr-1">{palmerSymbols.primaryLowerLeft}</span>
+                  <span className="text-lg sm:text-xl font-bold text-amber-600 select-none mr-1">{palmerSymbols.primaryLowerLeft}</span>
                   {renderQuadrant(primaryLowerLeft, 'lower')}
                 </div>
               </div>

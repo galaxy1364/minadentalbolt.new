@@ -322,14 +322,14 @@ export default function Roadmap() {
                   <div>
                     <div className="flex items-start justify-between gap-2 mb-3">
                       <div className="flex items-center gap-2.5">
-                        <div className={`w-9 h-9 rounded-xl bg-gradient-to-br ${pillar.color} text-white flex items-center justify-center shadow-sm`}>
+                        <div className={`w-10 h-10 rounded-xl bg-gradient-to-br ${pillar.color} text-white flex items-center justify-center shadow-sm`}>
                           <IconComp size={18} />
                         </div>
                         <div>
                           <h3 className="text-sm font-bold text-slate-800 dark:text-slate-100">
                             {pillar.title}
                           </h3>
-                          <p className="text-[11px] text-slate-400 mt-0.5">
+                          <p className="text-2xs text-slate-400 mt-0.5">
                             {pillar.subtitle}
                           </p>
                         </div>
@@ -344,16 +344,16 @@ export default function Roadmap() {
                         <div key={idx} className="p-2.5 rounded-xl bg-slate-50 dark:bg-slate-900/50 border border-slate-100 dark:border-slate-800/80 space-y-1">
                           <div className="flex items-center justify-between">
                             <span className="text-xs font-semibold text-slate-700 dark:text-slate-200 flex items-center gap-1.5">
-                              <CheckCircle2 size={13} className="text-emerald-500 shrink-0" />
+                              <CheckCircle2 size={14} className="text-emerald-500 shrink-0" />
                               {f.name}
                             </span>
                             {f.highlight && (
-                              <span className="text-[9px] px-1.5 py-0.5 rounded bg-violet-100 dark:bg-violet-950/60 text-violet-700 dark:text-violet-300 font-mono">
+                              <span className="text-4xs px-1.5 py-0.5 rounded bg-violet-100 dark:bg-violet-950/60 text-violet-700 dark:text-violet-300 font-mono">
                                 {f.highlight}
                               </span>
                             )}
                           </div>
-                          <p className="text-[11px] text-slate-500 dark:text-slate-400 leading-relaxed pr-4">
+                          <p className="text-2xs text-slate-500 dark:text-slate-400 leading-relaxed pr-4">
                             {f.description}
                           </p>
                         </div>
@@ -394,7 +394,7 @@ export default function Roadmap() {
               <p className="text-2xl font-bold text-emerald-700 dark:text-emerald-400 mt-2">
                 {toPersianDigits(healthStatus.dbCount)} رکورد
               </p>
-              <p className="text-[11px] text-emerald-600/80 mt-1">همگام‌سازی ابری فعال</p>
+              <p className="text-2xs text-emerald-600/80 mt-1">همگام‌سازی ابری فعال</p>
             </div>
 
             <div className="p-4 rounded-2xl bg-violet-50/60 dark:bg-violet-950/20 border border-violet-200 dark:border-violet-900/40">
@@ -405,7 +405,7 @@ export default function Roadmap() {
               <p className="text-2xl font-bold text-violet-700 dark:text-violet-400 mt-2">
                 ۳۲ دندان
               </p>
-              <p className="text-[11px] text-violet-600/80 mt-1">شماره‌گذاری اکلوزال و سطوح MODBL</p>
+              <p className="text-2xs text-violet-600/80 mt-1">شماره‌گذاری اکلوزال و سطوح MODBL</p>
             </div>
 
             <div className="p-4 rounded-2xl bg-blue-50/60 dark:bg-blue-950/20 border border-blue-200 dark:border-blue-900/40">
@@ -416,7 +416,7 @@ export default function Roadmap() {
               <p className="text-2xl font-bold text-blue-700 dark:text-blue-400 mt-2">
                 فعال و برخط
               </p>
-              <p className="text-[11px] text-blue-600/80 mt-1">بررسی خودکار موعد تحویل در نوبت‌دهی</p>
+              <p className="text-2xs text-blue-600/80 mt-1">بررسی خودکار موعد تحویل در نوبت‌دهی</p>
             </div>
 
             <div className="p-4 rounded-2xl bg-amber-50/60 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-900/40">
@@ -427,7 +427,7 @@ export default function Roadmap() {
               <p className="text-2xl font-bold text-amber-700 dark:text-amber-400 mt-2">
                 یکپارچه با ویزیت
               </p>
-              <p className="text-[11px] text-amber-600/80 mt-1">تطبیق کارپول، کامپوزیت و بخیه</p>
+              <p className="text-2xs text-amber-600/80 mt-1">تطبیق کارپول، کامپوزیت و بخیه</p>
             </div>
           </div>
         </Card>

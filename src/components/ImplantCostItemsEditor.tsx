@@ -88,7 +88,7 @@ export function ImplantCostItemsEditor({ items, onChange, doctors, fixturePrice 
       {/* ── چیپ‌ها: چه کاری شد ──────────────────────────────── */}
       {GROUP_ORDER.map((group) => (
         <div key={group}>
-          <p className="text-[11px] font-bold text-slate-500 mb-1.5">{GROUP_LABELS[group]}</p>
+          <p className="text-2xs font-bold text-slate-500 mb-1.5">{GROUP_LABELS[group]}</p>
           <div className="flex flex-wrap gap-1.5">
             {COST_KINDS.filter((k) => k.group === group && k.kind !== 'other').map((k) => {
               const on = isOn(k.kind)
@@ -154,7 +154,7 @@ export function ImplantCostItemsEditor({ items, onChange, doctors, fixturePrice 
                   <Select label="" value={item.doctor_id || ''} onChange={(v) => update(item._key, { doctor_id: v || null })} options={doctorOptions} placeholder="دستمزد مال کدام پزشک" />
                 )}
                 {meta.countable && item.quantity > 1 && (
-                  <p className="text-[11px] text-slate-500">{toPersianDigits(item.quantity)} × {formatCurrency(item.unit_price)} = {formatCurrency(lineTotal(item))} ت</p>
+                  <p className="text-2xs text-slate-500">{toPersianDigits(item.quantity)} × {formatCurrency(item.unit_price)} = {formatCurrency(lineTotal(item))} ت</p>
                 )}
               </div>
             )

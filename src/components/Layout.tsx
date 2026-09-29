@@ -6,6 +6,7 @@ import {
 } from 'lucide-react'
 import { Spinner, ToastContainer, Button, Modal, showToast } from './ui'
 import { usePrivacyMode } from '../lib/privacyMask'
+import { colorTokens } from '../lib/colorTokens'
 import AICommandBar from './AICommandBar'
 import { DynamicIsland, pushIslandNotification } from './DynamicIsland'
 import { ErrorBoundary } from './ErrorBoundary'
@@ -110,12 +111,30 @@ function UpdateBanner() {
   const [countdown, setCountdown] = useState<number | null>(null)
   const [paused, setPaused] = useState(false)
 
+  const notifiedRef = useRef(false)
+
   const runCheck = useCallback(async () => {
     if (!isAutoCheckEnabled()) return
     const result = await checkForUpdate()
     if (result.updateAvailable) {
       setAvailable(true)
       setRemoteVersion(result.remoteVersion)
+      // Fire a Dynamic-Island-style notification once per session: it
+      // appears immediately and fades away on its own after being seen.
+      // The persistent banner below stays up so the user can still tap
+      // "به‌روزرسانی فوری" manually if auto-apply doesn't fire (e.g. it
+      // already ran once this session, or auto-apply is disabled).
+      if (!notifiedRef.current) {
+        notifiedRef.current = true
+        pushIslandNotification({
+          id: 'app-update-available',
+          title: 'نسخه‌ی جدید آماده است',
+          message: result.remoteVersion ? `نسخه ${result.remoteVersion} — برای نصب دوباره بزنید` : 'برای به‌روزرسانی دوباره بزنید',
+          icon: <Sparkles size={16} />,
+          color: '#7c3aed',
+          duration: 5000,
+        })
+      }
       if (isAutoApplyEnabled() && countdown === null && !paused && !hasAutoApplyBeenAttempted()) {
         setCountdown(6)
       }
@@ -162,7 +181,7 @@ function UpdateBanner() {
           <p className="text-xs font-bold leading-tight">
             نسخه‌ی جدیدی موجود است{remoteVersion ? ` (${toPersianDigits(remoteVersion)})` : ''}
           </p>
-          <p className="text-[10px] text-white/80 truncate">
+          <p className="text-3xs text-white/80 truncate">
             {autoApply && countdown !== null && !paused
               ? `به‌روزرسانی خودکار تا ${toPersianDigits(countdown)} ثانیه دیگر...`
               : 'شامل آخرین قابلیت‌ها و استانداردهای جهانی دندانپزشکی'}
@@ -182,7 +201,7 @@ function UpdateBanner() {
               onClick={() => { h.tap(); setPaused(true); setCountdown(null) }}
               title="مکث به‌روزرسانی خودکار جهت اتمام کار جاری"
               aria-label="مکث به‌روزرسانی خودکار"
-              className="px-2 py-2 min-h-[40px] rounded-xl bg-white/10 hover:bg-white/20 text-[11px] font-medium touch-manipulation"
+              className="px-2 py-2 min-h-[40px] rounded-xl bg-white/10 hover:bg-white/20 text-2xs font-medium touch-manipulation"
             >
               مکث
             </button>
@@ -192,7 +211,7 @@ function UpdateBanner() {
             aria-label="بعداً یادآوری کن"
             className="p-2 min-h-[40px] min-w-[40px] rounded-lg hover:bg-white/20 flex items-center justify-center touch-manipulation"
           >
-            <X size={15} />
+            <X size={14} />
           </button>
         </div>
       </div>
@@ -214,7 +233,7 @@ function SyncIndicator() {
     const unsub = subscribeSync((s, p, _lastSync, f) => {
       setStatus(s); setPending(p); setSpinning(s === 'syncing'); setFailed(f)
       if (f > prevFailed.current) {
-        pushIslandNotification({ id: 'sync-failed', title: 'نیاز به بررسی همگام‌سازی', message: `${f} مورد همگام‌سازی نشد — تنظیمات را ببینید`, icon: <AlertTriangle size={16} />, color: '#dc2626', duration: 6000 })
+        pushIslandNotification({ id: 'sync-failed', title: 'نیاز به بررسی همگام‌سازی', message: `${f} مورد همگام‌سازی نشد — تنظیمات را ببینید`, icon: <AlertTriangle size={16} />, color: colorTokens.error[600], duration: 6000 })
       }
       prevStatus.current = s
       prevFailed.current = f
@@ -255,7 +274,7 @@ function SyncIndicator() {
 
       {countBadge > 0 && (
         <span
-          className={`absolute -top-1.5 -right-1.5 min-w-[16px] h-[16px] px-1 rounded-full text-[9px] font-black flex items-center justify-center border border-white dark:border-slate-900 shadow-xs ${
+          className={`absolute -top-1.5 -right-1.5 min-w-[16px] h-[16px] px-1 rounded-full text-4xs font-black flex items-center justify-center border border-white dark:border-slate-900 shadow-xs ${
             hasFailed ? 'bg-rose-600 text-white animate-pulse' : 'bg-amber-500 text-white'
           }`}
         >
@@ -267,6 +286,24 @@ function SyncIndicator() {
 }
 
 // ── Offline banner ──────────────────────────────────────
+// Small persistent strip shown whenever the device has no network
+// connection, so staff always know why data may be stale/unsynced
+// instead of the app silently looking fine while offline.
+function OfflineBanner() {
+  const { isOffline } = useAuth()
+  if (!isOffline) return null
+  return (
+    <div
+      role="status"
+      aria-live="polite"
+      className="relative z-[1] flex items-center justify-center gap-1.5 px-3 py-1.5 text-2xs font-bold text-amber-900 dark:text-amber-100 bg-amber-200/90 dark:bg-amber-900/60 border-b border-amber-300/80 dark:border-amber-700/60"
+    >
+      <WifiOff size={14} strokeWidth={2.6} />
+      <span>آفلاین — در انتظار اتصال</span>
+    </div>
+  )
+}
+
 function LogoutConfirmModal({
   open,
   onClose,
@@ -285,7 +322,7 @@ function LogoutConfirmModal({
     <Modal open={open} onClose={onClose} title="خروج از حساب کاربری" size="sm">
       <div className="text-center py-2 space-y-4">
         <div className="w-14 h-14 mx-auto rounded-2xl bg-error-50 dark:bg-error-900/30 text-error-600 dark:text-error-400 flex items-center justify-center">
-          <LogOut size={26} />
+          <LogOut size={28} />
         </div>
         <div>
           <p className="text-sm font-bold text-slate-800 dark:text-slate-100 mb-1">
@@ -416,11 +453,11 @@ function MoreDrawer({ open, onClose }: { open: boolean; onClose: () => void }) {
             <div>
               <h3 className="text-base font-extrabold text-slate-900 dark:text-slate-100 flex items-center gap-2">
                 مرکز خدمات و ماژول‌های کلینیک
-                <span className="text-[11px] font-bold px-2 py-0.5 rounded-full bg-primary-100 dark:bg-primary-950/60 text-primary-700 dark:text-primary-300">
+                <span className="text-2xs font-bold px-2 py-0.5 rounded-full bg-primary-100 dark:bg-primary-950/60 text-primary-700 dark:text-primary-300">
                   {toPersianDigits(filteredModules.length)} ماژول
                 </span>
               </h3>
-              <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">
+              <p className="text-2xs text-slate-500 dark:text-slate-400 mt-0.5">
                 دسترسی سریع و استاندارد به تمام بخش‌های بالینی، مدیریتی و هوشمندی مطب
               </p>
             </div>
@@ -443,7 +480,7 @@ function MoreDrawer({ open, onClose }: { open: boolean; onClose: () => void }) {
                 placeholder="جستجوی سریع در خدمات، انبار، بیمه، رادیولوژی، گزارش‌ها..."
                 className="w-full h-11 pr-10 pl-9 rounded-2xl bg-slate-100/90 dark:bg-slate-800/90 border border-slate-200/80 dark:border-slate-700/80 text-xs font-medium text-slate-800 dark:text-slate-100 placeholder:text-slate-400 dark:placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-primary-500/30 focus:border-primary-500 transition-all"
               />
-              <Search size={17} className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
+              <Search size={18} className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
               {searchQuery && (
                 <button
                   onClick={() => setSearchQuery('')}
@@ -505,15 +542,15 @@ function MoreDrawer({ open, onClose }: { open: boolean; onClose: () => void }) {
                     }`}
                   >
                     <div className="flex items-center gap-3 min-w-0">
-                      <ModuleIconBadge color={item.color} size={46}>
-                        <Icon size={35} strokeWidth={2.2} />
+                      <ModuleIconBadge color={item.color} size={48}>
+                        <Icon size={32} strokeWidth={2.2} />
                       </ModuleIconBadge>
                       <div className="min-w-0">
                         <p className="text-sm font-bold text-slate-800 dark:text-slate-100 truncate flex items-center gap-1.5">
                           {item.label}
                           {active && <span className="w-1.5 h-1.5 rounded-full bg-primary-500 animate-pulse" />}
                         </p>
-                        <p className="text-[11px] text-slate-500 dark:text-slate-400 truncate mt-0.5">
+                        <p className="text-2xs text-slate-500 dark:text-slate-400 truncate mt-0.5">
                           {meta?.description || 'امکانات و ابزارهای ماژول'}
                         </p>
                       </div>
@@ -537,7 +574,7 @@ function MoreDrawer({ open, onClose }: { open: boolean; onClose: () => void }) {
                 <p className="text-xs font-extrabold text-slate-800 dark:text-slate-100 truncate">
                   {profile?.full_name || 'کاربر سیستم مینادنت'}
                 </p>
-                <p className="text-[10px] text-slate-500 dark:text-slate-400 truncate">
+                <p className="text-3xs text-slate-500 dark:text-slate-400 truncate">
                   {roleLabel(effectiveRole)} · <span className="font-mono">v{APP_VERSION}</span>
                 </p>
               </div>
@@ -546,7 +583,7 @@ function MoreDrawer({ open, onClose }: { open: boolean; onClose: () => void }) {
               onClick={() => { h.tap(); setLogoutConfirmOpen(true) }}
               className="btn-tactile-3d flex items-center gap-1.5 px-3 py-2 min-h-[40px] rounded-xl text-xs font-bold text-rose-600 dark:text-rose-400 bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-900/50 hover:bg-rose-100 transition-all press-scale touch-manipulation"
             >
-              <LogOut size={13} />
+              <LogOut size={14} />
               <span>خروج از حساب</span>
             </button>
           </div>
@@ -605,7 +642,7 @@ function BottomTabBar() {
 
   return (
     <>
-      <nav className="raised-surface fixed bottom-0 left-0 right-0 z-40 tab-bar pb-safe sm:bottom-4 sm:left-1/2 sm:-translate-x-1/2 sm:w-[94%] sm:max-w-2xl sm:rounded-3xl sm:pb-0 transition-all duration-300" role="navigation" aria-label="ناوبری اصلی">
+      <nav className="raised-surface fixed bottom-0 left-0 right-0 z-40 tab-bar pb-safe sm:bottom-4 sm:left-1/2 sm:-translate-x-1/2 sm:w-[94%] sm:max-w-2xl sm:rounded-2xl sm:pb-0 transition-all duration-300" role="navigation" aria-label="ناوبری اصلی">
         <div className="flex items-stretch h-[4.75rem] max-w-2xl mx-auto px-1 sm:px-2">
           {visiblePrimary.map((item: ModuleIdentity) => {
             const Icon = item.icon
@@ -652,7 +689,7 @@ function BottomTabBar() {
                     if (!w || w.count === 0) return null
                     return (
                       <span
-                        className="absolute -top-1 -left-1 min-w-[17px] h-[17px] px-1 rounded-full text-white text-[10px] font-black flex items-center justify-center border border-white dark:border-slate-900 shadow-sm animate-pulse"
+                        className="absolute -top-1 -left-1 min-w-[17px] h-[17px] px-1 rounded-full text-white text-3xs font-black flex items-center justify-center border border-white dark:border-slate-900 shadow-sm animate-pulse"
                         style={{ backgroundColor: LEVEL_COLORS[w.level] }}
                         aria-label={`${w.count} کار باز`}
                       >
@@ -662,7 +699,7 @@ function BottomTabBar() {
                   })()}
                 </div>
                 <span
-                  className={`tab-bar-label text-[11px] leading-tight tracking-tight transition-all ${
+                  className={`tab-bar-label text-2xs leading-tight tracking-tight transition-all ${
                     active ? 'font-black' : 'font-bold group-hover:opacity-100'
                   }`}
                   style={{ color: `color-mix(in srgb, ${item.color} 50%, #183044)` }}
@@ -706,7 +743,7 @@ function BottomTabBar() {
                   <MoreHorizontal size={isMoreActive ? 29 : 26} strokeWidth={isMoreActive ? 2.5 : 2.2} style={{ color: isMoreActive && currentMod ? currentMod.color : moreColor }} />
                 </div>
                 <span
-                  className={`tab-bar-label text-[11px] leading-tight tracking-tight transition-all ${
+                  className={`tab-bar-label text-2xs leading-tight tracking-tight transition-all ${
                     isMoreActive ? 'font-black' : 'font-bold group-hover:opacity-100'
                   }`}
                   style={{ color: isMoreActive && currentMod ? currentMod.color : moreColor }}
@@ -747,9 +784,9 @@ function LogoutButton() {
         onClick={() => { h.tap(); setConfirmOpen(true) }}
         aria-label="خروج از حساب کاربری"
         title={profile?.full_name ? `خروج (${profile.full_name})` : 'خروج از حساب'}
-        className="header-icon-control header-icon-exit flex items-center justify-center w-14 h-14 min-w-[56px] min-h-[56px] rounded-xl text-rose-900 dark:text-rose-200 transition-all press-scale touch-manipulation"
+        className="header-icon-control header-icon-exit flex items-center justify-center w-11 h-11 min-w-[44px] min-h-[44px] rounded-xl text-rose-900 dark:text-rose-200 transition-all press-scale touch-manipulation"
       >
-        <LogOut size={30} strokeWidth={2.6} />
+        <LogOut size={18} strokeWidth={2.6} />
       </button>
       <LogoutConfirmModal
         open={confirmOpen}
@@ -773,12 +810,12 @@ function HeaderAlarmButton({ onClick }: { onClick: () => void }) {
       }}
       aria-label={hasUrgent ? `مرکز آلارم — ${toPersianDigits(bundle.total)} هشدار فعال` : 'مرکز آلارم و هشدارهای بالینی'}
       title={hasUrgent ? `${toPersianDigits(bundle.total)} هشدار فعال بالینی و مالی` : 'مرکز آلارم و هشدارها'}
-      className="header-icon-control header-icon-bell relative flex items-center justify-center w-14 h-14 min-w-[56px] min-h-[56px] rounded-xl text-amber-900 dark:text-amber-200 transition-all press-scale touch-manipulation overflow-visible"
+      className="header-icon-control header-icon-bell relative flex items-center justify-center w-11 h-11 min-w-[44px] min-h-[44px] rounded-xl text-amber-900 dark:text-amber-200 transition-all press-scale touch-manipulation overflow-visible"
     >
-      <Bell size={30} strokeWidth={2.6} className={hasUrgent ? 'text-amber-800 dark:text-amber-300' : ''} />
+      <Bell size={18} strokeWidth={2.6} className={hasUrgent ? 'text-amber-800 dark:text-amber-300' : ''} />
       {hasUrgent && (
         <span
-          className="absolute -top-1.5 -right-1.5 min-w-[18px] h-[18px] px-1 rounded-full bg-red-500 text-white text-[10px] font-bold flex items-center justify-center border-2 border-white dark:border-slate-900 shadow-sm"
+          className="absolute -top-1.5 -right-1.5 min-w-[18px] h-[18px] px-1 rounded-full bg-red-500 text-white text-3xs font-bold flex items-center justify-center border-2 border-white dark:border-slate-900 shadow-sm"
           aria-hidden="true"
         >
           {bundle.total > 99 ? '+۹۹' : toPersianDigits(bundle.total)}
@@ -873,7 +910,7 @@ function LayoutInner({ children }: { children: React.ReactNode }) {
               aria-label="بازگشت به فهرست بیماران"
               className="flex items-center gap-1.5 px-3 py-2 rounded-2xl bg-white/95 dark:bg-slate-800/95 text-primary-700 dark:text-primary-300 font-black text-xs border border-primary-200/80 dark:border-primary-800/80 shadow-md press-scale btn-tactile-3d shrink-0 min-h-[44px]"
             >
-              <ChevronRight size={19} strokeWidth={2.6} />
+              <ChevronRight size={18} strokeWidth={2.6} />
               <span>فهرست بیماران</span>
             </button>
           ) : (
@@ -881,13 +918,13 @@ function LayoutInner({ children }: { children: React.ReactNode }) {
               onClick={() => { h.tap(); navigate('/') }}
               className="flex items-center gap-2 active:opacity-80 transition-opacity press-scale shrink-0"
             >
-              <MinadentLogo size={44} className="shrink-0" />
+              <MinadentLogo size={40} className="shrink-0" />
               <div className="text-right">
-                <p className="text-[14px] font-extrabold text-slate-800 dark:text-slate-100 leading-none">
+                <p className="text-sm font-extrabold text-slate-800 dark:text-slate-100 leading-none">
                   مینادنتال
                 </p>
                 {currentItem && (
-                  <p className="text-[10px] font-semibold leading-none mt-1" style={{ color: currentItem.color }}>
+                  <p className="text-3xs font-semibold leading-none mt-1" style={{ color: currentItem.color }}>
                     {currentItem.label}
                   </p>
                 )}
@@ -903,23 +940,20 @@ function LayoutInner({ children }: { children: React.ReactNode }) {
               }}
               aria-label="دستیار هوشمند بالینی مینادنت"
               title="دستیار هوشمند صوتی و متنی مینادنت"
-              className="header-icon-control header-icon-ai relative flex items-center justify-center w-14 h-14 min-w-[56px] min-h-[56px] rounded-xl text-sky-900 dark:text-sky-200 transition-all press-scale touch-manipulation"
+              className="header-icon-control header-icon-ai relative flex items-center justify-center w-11 h-11 min-w-[44px] min-h-[44px] rounded-xl text-sky-900 dark:text-sky-200 transition-all press-scale touch-manipulation"
             >
-              <Sparkles size={30} strokeWidth={2.6} />
+              <Sparkles size={18} strokeWidth={2.6} />
             </button>
 
             <HeaderAlarmButton onClick={() => setAlarmCenterOpen(true)} />
-            {/* SyncIndicator & DarkModeToggle: hidden on mobile to reduce header clutter
-                (5 buttons in ~200px was too cramped for gloved-finger operation) */}
-            <span className="hidden sm:contents">
-              <SyncIndicator />
-              <DarkModeToggle />
-            </span>
+            <SyncIndicator />
+            <DarkModeToggle />
             <LogoutButton />
           </div>
         </div>
       </header>
 
+      <OfflineBanner />
       <UpdateBanner />
 
       <main id="main-content" className="relative z-[1] flex-1 min-w-0 max-w-full px-3 pt-3 pb-[calc(6rem+env(safe-area-inset-bottom,0px))] sm:pb-[calc(6.5rem+env(safe-area-inset-bottom,0px))]" role="main">
@@ -1012,8 +1046,11 @@ function LL({ children, path }: { children: React.ReactNode; path: string }) {
 
   return (
     <React.Suspense fallback={
-      <div className="flex items-center justify-center h-64">
-        <Spinner size={32} />
+      <div className="space-y-4" aria-busy="true" aria-live="polite">
+        <div className="skeleton h-12 rounded-xl" />
+        <div className="space-y-2">
+          {[0, 1, 2, 3].map((i) => <div key={i} className="skeleton h-20 rounded-2xl" />)}
+        </div>
       </div>
     }>
       <ErrorBoundary>
@@ -1041,7 +1078,7 @@ function NotFound() {
 // and the role-based nav filtering read from that same flag.
 
 export function Layout() {
-  const { session, loading } = useAuth()
+  const { session, loading, isOffline } = useAuth()
   const [locked, setLocked] = useState(isAppLockEnabled())
 
   // Re-lock when returning to the app after being backgrounded — the
@@ -1062,7 +1099,16 @@ export function Layout() {
   // always show the login screen first for an unauthenticated visitor.
   if (window.location.hash.startsWith('#/book')) {
     return (
-      <React.Suspense fallback={<div className="min-h-screen flex items-center justify-center"><Spinner size={32} /></div>}>
+      <React.Suspense fallback={
+        <div className="min-h-screen p-4 space-y-4" aria-busy="true" aria-live="polite">
+          <div className="skeleton h-14 rounded-2xl max-w-xl mx-auto" />
+          <div className="max-w-xl mx-auto space-y-3">
+            <div className="skeleton h-40 rounded-2xl" />
+            <div className="skeleton h-12 rounded-xl" />
+            <div className="skeleton h-12 rounded-xl" />
+          </div>
+        </div>
+      }>
         <PublicBooking />
       </React.Suspense>
     )
@@ -1071,13 +1117,34 @@ export function Layout() {
   // Public Waiting Room Lounge TV screen (مانیتور سالن انتظار و فراخوان بیمار)
   if (window.location.hash.startsWith('#/waiting-room')) {
     return (
-      <React.Suspense fallback={<div className="min-h-screen flex items-center justify-center bg-slate-950 text-white"><Spinner size={32} /></div>}>
+      <React.Suspense fallback={
+        <div className="min-h-screen p-6 space-y-4 bg-slate-950" aria-busy="true" aria-live="polite">
+          <div className="skeleton h-16 rounded-2xl opacity-30" />
+          <div className="grid grid-cols-2 gap-4">
+            {[0, 1, 2, 3].map((i) => <div key={i} className="skeleton h-40 rounded-2xl opacity-30" />)}
+          </div>
+        </div>
+      }>
         <WaitingRoomDisplay />
       </React.Suspense>
     )
   }
 
-  if (REQUIRE_LOGIN && loading) {
+  // While genuinely offline, an already-restored cached session (set
+  // synchronously in AuthProvider's useState initializer, see auth.ts)
+  // means there is nothing left to wait for — `loading` only reflects
+  // whether the network-bound supabase.auth.getSession() call has
+  // settled yet, which is irrelevant once a synthetic offline session
+  // already exists and no network call can ever resolve it. Blocking on
+  // it anyway showed a blank spinner for up to STARTUP_BUDGET_MS (4s) on
+  // every offline reload despite the Dexie-backed pages below being able
+  // to render their cached data immediately.
+  //
+  // This must stay scoped to `isOffline` — while online, `getSession()`
+  // (or a slow session refresh) is still authoritative and may replace a
+  // stale cached identity/role, so the gate must keep withholding the UI
+  // until that settles, same as before this fix.
+  if (REQUIRE_LOGIN && loading && !(isOffline && session)) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-slate-50 dark:bg-slate-900">
         <Spinner size={32} />
@@ -1095,7 +1162,7 @@ export function Layout() {
         <div className="min-h-screen flex items-center justify-center p-6 bg-slate-50 dark:bg-slate-900">
           <div className="max-w-sm text-center space-y-3">
             <div className="w-14 h-14 mx-auto rounded-2xl bg-warning-100 flex items-center justify-center">
-              <CloudOff size={26} className="text-warning-600" />
+              <CloudOff size={28} className="text-warning-600" />
             </div>
             <h1 className="text-base font-bold text-slate-800 dark:text-slate-100">
               پیکربندی سرور ناقص است

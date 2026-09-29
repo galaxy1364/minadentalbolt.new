@@ -1,5 +1,6 @@
 // SMS.tsx — Dedicated پیامک module: template management + bulk campaign sending + delivery logs
 import { useState, useEffect, useMemo } from 'react'
+import { usePullToRefresh } from '../lib/usePullToRefresh'
 import {
   Megaphone, MessageSquareText, Plus, Edit2, Archive, History,
   CheckCheck, Clock, AlertCircle, Search, RefreshCw, Trash2, Send
@@ -135,13 +136,22 @@ export default function SMS() {
   }
 
   useEffect(loadData, [])
+  const ptr = usePullToRefresh(async () => { loadData() })
 
   const handleLogsUpdated = () => {
     setDeliveryLogs(getStoredSmsLogs())
   }
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-4" {...ptr.handlers}>
+      {ptr.pullDistance > 0 && (
+        <div className="pull-indicator" style={{ opacity: ptr.isRefreshing ? 1 : ptr.pullProgress, top: -4 }}>
+          <div className="flex flex-col items-center gap-1">
+            <div className={`w-7 h-7 rounded-full border-2 border-teal-300 dark:border-teal-600 border-t-teal-600 dark:border-t-teal-400 ${ptr.isRefreshing ? 'animate-spin' : ''}`} style={{ transform: `scale(${0.6 + ptr.pullProgress * 0.4})` }} />
+            <span className="text-3xs text-teal-600 font-medium">{ptr.isRefreshing ? 'در حال به‌روزرسانی...' : 'برای به‌روزرسانی بکشید'}</span>
+          </div>
+        </div>
+      )}
       <ModuleHeader moduleKey="sms" title="پیامک" subtitle="قالب‌ها، ارسال انبوه و گزارش دلیوری مخابراتی" />
       <Tabs
         tabs={[
@@ -153,7 +163,9 @@ export default function SMS() {
         onChange={setActiveTab}
       />
       {loading ? (
-        <div className="flex justify-center py-10"><Spinner size={24} /></div>
+        <div className="space-y-2" aria-busy="true" aria-live="polite">
+          {[0, 1, 2].map((i) => <div key={i} className="skeleton h-16 rounded-2xl" />)}
+        </div>
       ) : activeTab === 'campaign' ? (
         <CampaignTab patients={patients} templates={templates} onSent={handleLogsUpdated} />
       ) : activeTab === 'templates' ? (
@@ -310,7 +322,7 @@ function CampaignTab({
         ) : (
           <div className="flex items-center gap-1.5 flex-wrap mb-3">
             {allTags.map((t) => (
-              <button key={t} onClick={() => setTargetTag(t)} className={`px-2.5 py-1 rounded-full text-[11px] font-medium ${targetTag === t ? 'bg-primary-600 text-white' : 'bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300'}`}>{t}</button>
+              <button key={t} onClick={() => setTargetTag(t)} className={`px-2.5 py-1 rounded-full text-2xs font-medium ${targetTag === t ? 'bg-primary-600 text-white' : 'bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300'}`}>{t}</button>
             ))}
           </div>
         )
@@ -320,7 +332,7 @@ function CampaignTab({
       )}
       <div className="p-3 rounded-2xl bg-primary-50 dark:bg-primary-900/20 mb-3">
         <p className="text-sm font-bold text-primary-700 dark:text-primary-400">{toPersianDigits(recipients.length)} گیرنده</p>
-        <p className="text-[11px] text-primary-600 dark:text-primary-500">فقط بیماران فعال با شماره تلفن ثبت‌شده</p>
+        <p className="text-2xs text-primary-600 dark:text-primary-500">فقط بیماران فعال با شماره تلفن ثبت‌شده</p>
       </div>
       {templates.filter((t) => t.is_active).length > 0 && (
         <Select
@@ -414,7 +426,7 @@ function TemplatesTab({ templates, onChange }: { templates: SmsTemplate[]; onCha
         <Button onClick={openCreate}><Plus size={16} className="inline ml-1" /> قالب جدید</Button>
       </div>
       {templates.length === 0 ? (
-        <EmptyState icon={<MessageSquareText size={28} />} title="قالب پیامکی ثبت نشده است" />
+        <EmptyState icon={<MessageSquareText size={56} />} title="قالب پیامکی ثبت نشده است" />
       ) : (
         <div className="space-y-2">
           {templates.map((t) => (
@@ -426,7 +438,7 @@ function TemplatesTab({ templates, onChange }: { templates: SmsTemplate[]; onCha
                     <Badge color="accent">{getTemplateTypeLabel(t.type)}</Badge>
                     <Badge color={t.is_active ? 'success' : 'slate'}>{t.is_active ? 'فعال' : 'غیرفعال'}</Badge>
                   </div>
-                  <p className="text-[11px] text-slate-400 truncate mt-1">{t.template}</p>
+                  <p className="text-2xs text-slate-400 truncate mt-1">{t.template}</p>
                 </div>
                 <div className="flex gap-1 shrink-0">
                   <button onClick={() => openEdit(t)} className="p-1.5 rounded-lg text-slate-400 hover:text-primary-600 hover:bg-primary-50"><Edit2 size={14} /></button>
@@ -500,29 +512,29 @@ function DeliveryLogsTab({
     switch (status) {
       case 'delivered':
         return (
-          <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-bold bg-emerald-100 dark:bg-emerald-950/60 text-emerald-800 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-800">
-            <CheckCheck size={13} className="text-emerald-600 dark:text-emerald-400" />
+          <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-2xs font-bold bg-emerald-100 dark:bg-emerald-950/60 text-emerald-800 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-800">
+            <CheckCheck size={14} className="text-emerald-600 dark:text-emerald-400" />
             تحویل به گوشی (موفق)
           </span>
         )
       case 'queued':
         return (
-          <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-bold bg-amber-100 dark:bg-amber-950/60 text-amber-800 dark:text-amber-300 border border-amber-300 dark:border-amber-800">
-            <Clock size={13} className="text-amber-600 dark:text-amber-400" />
+          <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-2xs font-bold bg-amber-100 dark:bg-amber-950/60 text-amber-800 dark:text-amber-300 border border-amber-300 dark:border-amber-800">
+            <Clock size={14} className="text-amber-600 dark:text-amber-400" />
             در صف ارسال مخابرات
           </span>
         )
       case 'failed':
         return (
-          <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-bold bg-rose-100 dark:bg-rose-950/60 text-rose-800 dark:text-rose-300 border border-rose-300 dark:border-rose-800">
-            <AlertCircle size={13} className="text-rose-600 dark:text-rose-400" />
+          <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-2xs font-bold bg-rose-100 dark:bg-rose-950/60 text-rose-800 dark:text-rose-300 border border-rose-300 dark:border-rose-800">
+            <AlertCircle size={14} className="text-rose-600 dark:text-rose-400" />
             نرسیده / ناموفق
           </span>
         )
       default:
         return (
-          <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-bold bg-blue-100 dark:bg-blue-950/60 text-blue-800 dark:text-blue-300 border border-blue-300 dark:border-blue-800">
-            <Send size={13} className="text-blue-600 dark:text-blue-400" />
+          <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-2xs font-bold bg-blue-100 dark:bg-blue-950/60 text-blue-800 dark:text-blue-300 border border-blue-300 dark:border-blue-800">
+            <Send size={14} className="text-blue-600 dark:text-blue-400" />
             ارسال‌شده به مرکز
           </span>
         )
@@ -555,7 +567,7 @@ function DeliveryLogsTab({
       <Card className="p-4 space-y-3">
         <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
           <div className="relative flex-1">
-            <Search size={15} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400" />
+            <Search size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400" />
             <input
               type="text"
               value={search}
@@ -567,10 +579,10 @@ function DeliveryLogsTab({
 
           <div className="flex items-center gap-1.5 shrink-0">
             <Button size="sm" variant="secondary" onClick={onRefresh} className="text-xs">
-              <RefreshCw size={13} className="inline ml-1" /> به‌روزرسانی وضعیت
+              <RefreshCw size={14} className="inline ml-1" /> به‌روزرسانی وضعیت
             </Button>
             <Button size="sm" variant="danger" onClick={handleClearLogs} className="text-xs">
-              <Trash2 size={13} className="inline ml-1" /> پاک‌سازی
+              <Trash2 size={14} className="inline ml-1" /> پاک‌سازی
             </Button>
           </div>
         </div>
@@ -624,7 +636,7 @@ function DeliveryLogsTab({
       {/* Log Entries Table / List */}
       {filteredLogs.length === 0 ? (
         <EmptyState
-          icon={<History size={36} />}
+          icon={<History size={56} />}
           title="هیچ گزارشی با این شرایط یافت نشد"
           description="فیلتر وضعیت یا متن جستجو را تغییر دهید."
         />
@@ -641,7 +653,7 @@ function DeliveryLogsTab({
                     {toPersianDigits(log.recipientPhone)}
                   </span>
                   {log.carrier && (
-                    <span className="text-[10px] text-slate-400 font-medium">
+                    <span className="text-3xs text-slate-400 font-medium">
                       ({log.carrier})
                     </span>
                   )}
@@ -657,7 +669,7 @@ function DeliveryLogsTab({
                 <p className="text-xs text-slate-700 dark:text-slate-300 leading-relaxed">
                   {log.message}
                 </p>
-                <div className="flex items-center justify-between mt-2 pt-1 text-[11px] text-slate-400">
+                <div className="flex items-center justify-between mt-2 pt-1 text-2xs text-slate-400">
                   <span>ارسال: {toJalaliStringPretty(log.sentAt)}</span>
                   {log.deliveredAt && (
                     <span className="text-emerald-600 dark:text-emerald-400">

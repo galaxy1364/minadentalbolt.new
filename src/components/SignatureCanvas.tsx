@@ -3,6 +3,7 @@ import React, { useRef, useState, useEffect, useCallback } from 'react'
 import { RotateCcw, Check, PenTool } from 'lucide-react'
 import { h } from '../lib/haptics'
 import { chimes } from '../lib/chimes'
+import { colorTokens } from '../lib/colorTokens'
 
 interface SignatureCanvasProps {
   value?: string | null
@@ -34,7 +35,7 @@ export function SignatureCanvas({ value, onChange, label = 'امضای دیجی�
     ctx.scale(dpr, dpr)
     ctx.lineCap = 'round'
     ctx.lineJoin = 'round'
-    ctx.strokeStyle = '#0f172a'
+    ctx.strokeStyle = colorTokens.secondary[900]
     ctx.lineWidth = 2.5
 
     if (value) {
@@ -165,7 +166,7 @@ export function SignatureCanvas({ value, onChange, label = 'امضای دیجی�
     ctx.scale(dpr, dpr)
     ctx.lineCap = 'round'
     ctx.lineJoin = 'round'
-    ctx.strokeStyle = '#0f172a'
+    ctx.strokeStyle = colorTokens.secondary[900]
     ctx.lineWidth = 2.5
     lastDrawnValueRef.current = null
     setHasSignature(false)
@@ -176,14 +177,14 @@ export function SignatureCanvas({ value, onChange, label = 'امضای دیجی�
     <div className="space-y-1.5">
       <div className="flex items-center justify-between">
         <label className="text-xs font-bold text-slate-700 dark:text-slate-300 flex items-center gap-1.5">
-          <PenTool size={13} className="text-primary-600" />
+          <PenTool size={14} className="text-primary-600" />
           {label}
         </label>
         {hasSignature && (
           <button
             type="button"
             onClick={handleClear}
-            className="flex items-center gap-1 text-[11px] text-error-500 hover:text-error-600 font-medium transition-colors press-scale"
+            className="flex items-center gap-1 text-2xs text-error-500 hover:text-error-600 font-medium transition-colors press-scale"
           >
             <RotateCcw size={12} />
             پاک کردن امضا
@@ -202,13 +203,13 @@ export function SignatureCanvas({ value, onChange, label = 'امضای دیجی�
         {!hasSignature && (
           <div className="absolute inset-0 pointer-events-none flex flex-col items-center justify-center text-slate-400 text-xs">
             <span className="font-medium">با قلم یا انگشت در این کادر امضا کنید</span>
-            <span className="text-[10px] mt-0.5 opacity-70">امضای دیجیتال جهت ثبت قانونی در پرونده</span>
+            <span className="text-3xs mt-0.5 opacity-70">امضای دیجیتال جهت ثبت قانونی در پرونده</span>
           </div>
         )}
       </div>
       {hasSignature && (
-        <p className="text-[11px] text-success-600 dark:text-success-400 flex items-center gap-1 font-medium">
-          <Check size={13} /> امضا ثبت شد
+        <p className="text-2xs text-success-600 dark:text-success-400 flex items-center gap-1 font-medium">
+          <Check size={14} /> امضا ثبت شد
         </p>
       )}
     </div>

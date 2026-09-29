@@ -4,6 +4,7 @@ import { ImplantCostItemsEditor, type EditableCostItem } from '../components/Imp
 import { suggestOpgDate, caseTotal, costKindMeta, describeItem, lineTotal, deriveLabOrderFromImplant } from '../lib/implantCosting'
 import { clinicMilestones, nextClinicAction } from '../lib/labClinicMilestones'
 import { PatientDebtBar } from '../components/PatientDebtBar'
+import { colorTokens } from '../lib/colorTokens'
 import { implantMilestones, nextImplantAction, implantDeadline, IMPLANT_MILESTONE_COLORS, healingEndDate, implantPhase } from '../lib/implantMilestones'
 import { PatientSelect } from '../components/PatientSelect'
 import { PatientAlerts } from '../components/PatientAlerts'
@@ -701,12 +702,12 @@ export default function Implants() {
               key={m.key}
               title={m.label + (m.date ? ` — ${toJalaliStringPretty(m.date)}` : '')}
               className="flex-1 h-1.5 rounded-full"
-              style={{ backgroundColor: m.done ? (late ? '#dc2626' : IMPLANT_MILESTONE_COLORS[m.key]) : 'rgb(226 232 240)' }}
+              style={{ backgroundColor: m.done ? (late ? colorTokens.error[600] : IMPLANT_MILESTONE_COLORS[m.key]) : 'rgb(226 232 240)' }}
             />
           ))}
         </div>
         <div className="flex items-center justify-between gap-2">
-          <span className="text-[11px] text-slate-500">
+          <span className="text-2xs text-slate-500">
             {doneCount ? chain.filter((m) => m.done).slice(-1)[0].label : 'هنوز شروع نشده'}
             <span className="text-slate-400"> · {toPersianDigits(doneCount)}/{toPersianDigits(chain.length)}</span>
           </span>
@@ -718,13 +719,13 @@ export default function Implants() {
               label, because there is nothing to press during healing. */}
           {next && (
             next.key === 'wait' || next.key === 'surgery'
-              ? <span className="text-[11px] text-violet-700 font-medium">{next.label}</span>
+              ? <span className="text-2xs text-violet-700 font-medium">{next.label}</span>
               : (
                 <button
                   type="button"
                   onClick={() => advanceImplantStep(c, next.key)}
-                  style={{ backgroundColor: IMPLANT_MILESTONE_COLORS[next.key as keyof typeof IMPLANT_MILESTONE_COLORS] ?? '#0f766e' }}
-                  className="text-[11px] font-bold text-white px-3 py-1.5 rounded-lg flex items-center gap-1 press-scale shadow-sm"
+                  style={{ backgroundColor: IMPLANT_MILESTONE_COLORS[next.key as keyof typeof IMPLANT_MILESTONE_COLORS] ?? colorTokens.primary[700] }}
+                  className="text-2xs font-bold text-white px-3 py-1.5 rounded-lg flex items-center gap-1 press-scale shadow-sm"
                 >
                   {next.label} <ChevronLeft size={12} />
                 </button>
@@ -741,7 +742,7 @@ export default function Implants() {
           const done = clinicMilestones(order as never).filter((m) => m.done)
           const labNext = nextClinicAction(order as never)
           return (
-            <div className="mt-2 px-2.5 py-2 rounded-xl bg-emerald-50 dark:bg-emerald-900/20 text-[11px] flex items-center justify-between gap-2">
+            <div className="mt-2 px-2.5 py-2 rounded-xl bg-emerald-50 dark:bg-emerald-900/20 text-2xs flex items-center justify-between gap-2">
               <span className="text-emerald-800 dark:text-emerald-300">
                 لابراتوار: {done.length ? done[done.length - 1].label : 'ثبت شده'}
               </span>
@@ -783,8 +784,11 @@ export default function Implants() {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center py-20">
-        <Spinner size={32} />
+      <div className="space-y-4" aria-busy="true" aria-live="polite">
+        <div className="skeleton h-12 rounded-xl" />
+        <div className="space-y-2">
+          {[0, 1, 2, 3].map((i) => <div key={i} className="skeleton h-20 rounded-2xl" />)}
+        </div>
       </div>
     )
   }
@@ -826,6 +830,7 @@ export default function Implants() {
           <select
             value={filterStage}
             onChange={(e) => setFilterStage(e.target.value)}
+            aria-label="فیلتر مرحله ایمپلنت"
             className="px-3 py-2 rounded-xl border border-slate-200 bg-slate-50 text-sm focus:outline-none focus:ring-2 focus:ring-primary-400"
           >
             <option value="">همه مراحل</option>
@@ -836,6 +841,7 @@ export default function Implants() {
           <select
             value={filterBrand}
             onChange={(e) => setFilterBrand(e.target.value)}
+            aria-label="فیلتر برند ایمپلنت"
             className="px-3 py-2 rounded-xl border border-slate-200 bg-slate-50 text-sm focus:outline-none focus:ring-2 focus:ring-primary-400"
           >
             <option value="">همه برندها</option>
@@ -846,6 +852,7 @@ export default function Implants() {
           <select
             value={filterSuccess}
             onChange={(e) => setFilterSuccess(e.target.value)}
+            aria-label="فیلتر وضعیت نتیجه ایمپلنت"
             className="px-3 py-2 rounded-xl border border-slate-200 bg-slate-50 text-sm focus:outline-none focus:ring-2 focus:ring-primary-400"
           >
             <option value="">همه وضعیت‌ها</option>
@@ -865,7 +872,7 @@ export default function Implants() {
       {filteredCases.length === 0 ? (
         <Card className="p-5">
           <EmptyState
-            icon={<Smile size={28} />}
+            icon={<Smile size={56} />}
             title="مورد ایمپلنتی ثبت نشده است"
             description="با ایجاد مورد جدید شروع کنید"
             action={<Button onClick={openCreateCaseModal} variant="primary" size="sm"><Plus size={14} className="inline ml-1" />ایجاد مورد</Button>}
@@ -910,7 +917,7 @@ export default function Implants() {
                               if (c.patient_id) navigate(`/patients/${c.patient_id}`)
                             }}
                             title="شماره پرونده بیمار"
-                            className="inline-flex items-center gap-1 px-1.5 py-0.2 rounded bg-slate-900 dark:bg-primary-950 text-white dark:text-primary-300 text-[10px] font-mono font-bold hover:scale-105 active:scale-95 transition-all cursor-pointer"
+                            className="inline-flex items-center gap-1 px-1.5 py-0.2 rounded bg-slate-900 dark:bg-primary-950 text-white dark:text-primary-300 text-3xs font-mono font-bold hover:scale-105 active:scale-95 transition-all cursor-pointer"
                             dir="ltr"
                           >
                             <span>{toPersianDigits(c.patient.file_number)}</span>
@@ -966,13 +973,13 @@ export default function Implants() {
                   )}
                   {c.torque_ncm != null && (
                     <div className="bg-teal-50/70 rounded-lg p-2 border border-teal-100/60">
-                      <span className="text-teal-600 text-[11px]">تورک: </span>
+                      <span className="text-teal-600 text-2xs">تورک: </span>
                       <span className="text-teal-800 font-bold">{toPersianDigits(c.torque_ncm)} N.cm</span>
                     </div>
                   )}
                   {c.isq_value != null && (
                     <div className="bg-teal-50/70 rounded-lg p-2 border border-teal-100/60">
-                      <span className="text-teal-600 text-[11px]">ISQ: </span>
+                      <span className="text-teal-600 text-2xs">ISQ: </span>
                       <span className="text-teal-800 font-bold">{toPersianDigits(c.isq_value)}</span>
                     </div>
                   )}
@@ -1095,8 +1102,8 @@ export default function Implants() {
                         <div key={comp.id} className="flex items-center justify-between gap-2 p-1.5 rounded-lg bg-slate-50 dark:bg-slate-700/50">
                           <div className="flex items-center gap-2 min-w-0">
                             <Badge color="secondary">{getComponentTypeLabel(comp.component_type)}</Badge>
-                            {comp.cost != null && <span className="text-[11px] text-slate-500 dark:text-slate-400 shrink-0">{formatCurrency(comp.cost)} ت</span>}
-                            {comp.brand && <span className="text-[11px] text-slate-400 truncate">{comp.brand}</span>}
+                            {comp.cost != null && <span className="text-2xs text-slate-500 dark:text-slate-400 shrink-0">{formatCurrency(comp.cost)} ت</span>}
+                            {comp.brand && <span className="text-2xs text-slate-400 truncate">{comp.brand}</span>}
                           </div>
                           <button onClick={() => handleDeleteComponent(comp)} aria-label="غیرفعال کردن کامپوننت" className="shrink-0 p-1 rounded-lg text-slate-400 hover:text-error-600 hover:bg-error-50 transition-colors"><Ban size={12} /></button>
                         </div>
@@ -1370,7 +1377,7 @@ export default function Implants() {
                     <Award size={14} className="text-teal-600" />
                     استاندارد بین‌المللی ITI Consensus & EAO
                   </p>
-                  <p className="text-[11px] text-teal-700 dark:text-teal-400">
+                  <p className="text-2xs text-teal-700 dark:text-teal-400">
                     ثبت پارامترهای بیومکانیکی ثبات اولیه و بارکد ردیابی قطعه جهت صدور شناسنامه رسمی ایمپلنت (Passport) و گارانتی بیمار.
                   </p>
                 </div>
@@ -1493,7 +1500,7 @@ export default function Implants() {
                   fixturePrice={Number(caseForm.total_cost) || 0}
                 />
                 {!editingCase && caseForm.total_cost && cases.some((c) => c.brand === caseForm.brand && c.total_cost) && (
-                  <p className="text-[11px] text-slate-400 -mt-2">پیشنهاد خودکار بر اساس میانگین موارد قبلی همین برند در همین کلینیک — قابل تغییر است</p>
+                  <p className="text-2xs text-slate-400 -mt-2">پیشنهاد خودکار بر اساس میانگین موارد قبلی همین برند در همین کلینیک — قابل تغییر است</p>
                 )}
                 {/* MOD-FEAT-040: every surgical extra priced, not just two of
                     six. One list, one sum, and a new option needs no

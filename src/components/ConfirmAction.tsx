@@ -6,6 +6,7 @@ import {
 } from 'lucide-react'
 import { h, startContinuousHaptic, stopContinuousHaptic } from '../lib/haptics'
 import { chimes } from '../lib/chimes'
+import { useBackDismiss } from '../lib/useBackDismiss'
 
 // ─────────────────────────────────────────────────────────────────
 // Enterprise Multi-Step Wizard System
@@ -37,9 +38,9 @@ export interface ConfirmActionConfig {
 }
 
 const typeMeta = {
-  create: { icon: <Plus size={26} />, color: 'from-teal-500 to-teal-700', bg: 'bg-teal-50', text: 'text-teal-700', ring: 'ring-teal-200', label: 'ثبت جدید' },
-  edit:   { icon: <Edit2 size={26} />, color: 'from-sky-500 to-sky-700', bg: 'bg-sky-50', text: 'text-sky-700', ring: 'ring-sky-200', label: 'ویرایش' },
-  status: { icon: <Check size={26} />, color: 'from-emerald-500 to-emerald-700', bg: 'bg-emerald-50', text: 'text-emerald-700', ring: 'ring-emerald-200', label: 'تغییر وضعیت' },
+  create: { icon: <Plus size={28} />, color: 'from-teal-500 to-teal-700', bg: 'bg-teal-50', text: 'text-teal-700', ring: 'ring-teal-200', label: 'ثبت جدید' },
+  edit:   { icon: <Edit2 size={28} />, color: 'from-sky-500 to-sky-700', bg: 'bg-sky-50', text: 'text-sky-700', ring: 'ring-sky-200', label: 'ویرایش' },
+  status: { icon: <Check size={28} />, color: 'from-emerald-500 to-emerald-700', bg: 'bg-emerald-50', text: 'text-emerald-700', ring: 'ring-emerald-200', label: 'تغییر وضعیت' },
 }
 
 type WizardStep = 'preview' | 'confirm' | 'executing' | 'done'
@@ -72,6 +73,10 @@ export function ConfirmAction({ config, onClose }: { config: ConfirmActionConfig
     window.addEventListener('keydown', onKeyDown)
     return () => window.removeEventListener('keydown', onKeyDown)
   }, [config, step, onClose])
+
+  // iOS edge-swipe-back / Android back gesture closes the dialog instead of
+  // navigating the page underneath it away, unless a save is mid-flight.
+  useBackDismiss(!!config, () => { if (step !== 'executing') onClose() })
 
   // ── Progress bar animation during execution ──
   useEffect(() => {
@@ -159,7 +164,7 @@ export function ConfirmAction({ config, onClose }: { config: ConfirmActionConfig
       <div className="absolute inset-0 bg-slate-900/50 backdrop-blur-md" onClick={executing ? undefined : onClose} />
 
       <div
-        className="relative w-full sm:max-w-md bg-white rounded-t-[32px] sm:rounded-[32px] shadow-ios-xl overflow-hidden wizard-enter"
+        className="relative w-full sm:max-w-md bg-white rounded-t-dialog sm:rounded-dialog shadow-ios-xl overflow-hidden wizard-enter"
         onClick={(e) => e.stopPropagation()}
       >
         {/* ── Header with gradient + glass ── */}
@@ -170,10 +175,10 @@ export function ConfirmAction({ config, onClose }: { config: ConfirmActionConfig
 
           <div className="relative flex items-center gap-3">
             <div className={`w-14 h-14 rounded-2xl bg-gradient-to-br ${meta.color} flex items-center justify-center text-white shadow-lg press-scale-lg ring-4 ring-white/50`}>
-              {step === 'done' ? <Check size={26} /> : step === 'executing' ? <Loader2 size={26} className="animate-spin" /> : meta.icon}
+              {step === 'done' ? <Check size={28} /> : step === 'executing' ? <Loader2 size={28} className="animate-spin" /> : meta.icon}
             </div>
             <div className="flex-1">
-              <p className={`text-[10px] font-bold uppercase tracking-wider ${meta.text}`}>{meta.label}</p>
+              <p className={`text-3xs font-bold uppercase tracking-wider ${meta.text}`}>{meta.label}</p>
               <h3 className="text-lg font-extrabold text-slate-800 leading-tight">{config.title}</h3>
             </div>
             {!executing && step !== 'done' && (
@@ -196,7 +201,7 @@ export function ConfirmAction({ config, onClose }: { config: ConfirmActionConfig
                   </React.Fragment>
                 )
               })}
-              <span className="text-[10px] font-bold text-slate-500 mr-auto">{stepLabels[currentStepIdx]}</span>
+              <span className="text-3xs font-bold text-slate-500 mr-auto">{stepLabels[currentStepIdx]}</span>
             </div>
           )}
         </div>
@@ -225,7 +230,7 @@ export function ConfirmAction({ config, onClose }: { config: ConfirmActionConfig
                 >
                   {f.icon && <div className={`flex-shrink-0 ${f.highlight ? meta.text : 'text-slate-400'}`}>{f.icon}</div>}
                   <div className="flex-1 min-w-0">
-                    <p className="text-[10px] text-slate-500 font-medium">{f.label}</p>
+                    <p className="text-3xs text-slate-500 font-medium">{f.label}</p>
                     <p className={`text-sm font-bold ${f.highlight ? 'text-slate-800' : 'text-slate-700'} truncate`}>{f.value}</p>
                   </div>
                 </div>
@@ -255,7 +260,7 @@ export function ConfirmAction({ config, onClose }: { config: ConfirmActionConfig
           <div className="px-6 py-6 wizard-slide-up">
             <div className="flex flex-col items-center text-center mb-5">
               <div className={`w-16 h-16 rounded-full ${meta.bg} flex items-center justify-center mb-3 ring-4 ring-white shadow-lg`}>
-                <ShieldCheck size={30} className={meta.text} />
+                <ShieldCheck size={28} className={meta.text} />
               </div>
               <p className="text-sm font-bold text-slate-800 mb-1">تایید نهایی</p>
               <p className="text-xs text-slate-500 leading-relaxed max-w-[260px]">
@@ -266,7 +271,7 @@ export function ConfirmAction({ config, onClose }: { config: ConfirmActionConfig
             {/* Mini summary */}
             <div className="flex flex-wrap gap-1.5 mb-5 justify-center">
               {config.fields.slice(0, 3).map((f, i) => (
-                <span key={i} className="px-2.5 py-1 rounded-full bg-slate-100 text-[10px] font-medium text-slate-600">
+                <span key={i} className="px-2.5 py-1 rounded-full bg-slate-100 text-3xs font-medium text-slate-600">
                   {f.label}: {typeof f.value === 'string' ? f.value : '...'}
                 </span>
               ))}
@@ -303,7 +308,7 @@ export function ConfirmAction({ config, onClose }: { config: ConfirmActionConfig
 
               {/* Progress ring around button during hold */}
               {holdProgress > 0 && holdProgress < 100 && (
-                <div className="absolute -inset-1 rounded-[20px] pointer-events-none">
+                <div className="absolute -inset-1 rounded-dialog pointer-events-none">
                   <svg className="absolute inset-0 w-full h-full" viewBox="0 0 100 100" preserveAspectRatio="none">
                     <rect x="2" y="2" width="96" height="96" rx="18" ry="18" fill="none" stroke="currentColor" strokeWidth="1" className={meta.text} strokeDasharray={`${holdProgress * 3.84} 384`} strokeLinecap="round" opacity="0.3" />
                   </svg>
@@ -346,7 +351,7 @@ export function ConfirmAction({ config, onClose }: { config: ConfirmActionConfig
         {step === 'done' && (
           <div className="px-6 py-12 flex flex-col items-center wizard-done-pop">
             <div className={`w-20 h-20 rounded-full bg-gradient-to-br ${meta.color} flex items-center justify-center mb-4 shadow-xl ring-4 ring-white`}>
-              <Check size={36} className="text-white" />
+              <Check size={32} className="text-white" />
             </div>
             <div className="flex items-center gap-1.5 mb-1">
               <Sparkles size={14} className={meta.text} />

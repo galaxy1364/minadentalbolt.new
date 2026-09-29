@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo } from 'react'
+import { usePullToRefresh } from '../lib/usePullToRefresh'
 import { toothLabel, toothLabelWithWord } from '../lib/toothLabel'
 import { useNavigate } from 'react-router-dom'
 import { Archive as ArchiveIcon, Search, Users, IdCard, RotateCcw, User, Building2, Syringe, FlaskConical, Settings2, Download, Calendar } from 'lucide-react'
@@ -68,6 +69,7 @@ export default function Archive() {
   }
 
   useEffect(() => { loadData() }, [])
+  const ptr = usePullToRefresh(async () => { await loadData() })
 
   const availableYears = useMemo(() => {
     const years = new Set<string>()
@@ -249,7 +251,15 @@ export default function Archive() {
   }
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-4" {...ptr.handlers}>
+      {ptr.pullDistance > 0 && (
+        <div className="pull-indicator" style={{ opacity: ptr.isRefreshing ? 1 : ptr.pullProgress, top: -4 }}>
+          <div className="flex flex-col items-center gap-1">
+            <div className={`w-7 h-7 rounded-full border-2 border-teal-300 dark:border-teal-600 border-t-teal-600 dark:border-t-teal-400 ${ptr.isRefreshing ? 'animate-spin' : ''}`} style={{ transform: `scale(${0.6 + ptr.pullProgress * 0.4})` }} />
+            <span className="text-3xs text-teal-600 font-medium">{ptr.isRefreshing ? 'در حال به‌روزرسانی...' : 'برای به‌روزرسانی بکشید'}</span>
+          </div>
+        </div>
+      )}
       <ModuleHeader
         moduleKey="archive"
         title="بایگانی"
@@ -282,7 +292,7 @@ export default function Archive() {
 
       {tab === 'config' && (
         configRows.length === 0 ? (
-          <EmptyState icon={<Settings2 size={40} />} title="مورد غیرفعالی نیست" description="پزشک، یونیت، رویه، کالا، پکیج و قالب پیامکِ غیرفعال‌شده اینجا برمی‌گردند" />
+          <EmptyState icon={<Settings2 size={56} />} title="مورد غیرفعالی نیست" description="پزشک، یونیت، رویه، کالا، پکیج و قالب پیامکِ غیرفعال‌شده اینجا برمی‌گردند" />
         ) : (
           <div className="space-y-2">
             {configRows.map((r) => (
@@ -325,7 +335,7 @@ export default function Archive() {
           <div className="flex flex-wrap items-center justify-between gap-2 p-2.5 bg-slate-50 dark:bg-slate-800/60 rounded-2xl border border-slate-200/80 dark:border-slate-700/80">
             <div className="flex items-center gap-1.5 flex-wrap">
               <span className="text-xs font-semibold text-slate-500 dark:text-slate-400 flex items-center gap-1 pl-1">
-                <Calendar size={13} className="text-primary-600" />
+                <Calendar size={14} className="text-primary-600" />
                 سال پذیرش / ثبت:
               </span>
               <button
@@ -362,13 +372,13 @@ export default function Archive() {
               disabled={filteredPatients.length === 0}
               className="text-xs"
             >
-              <Download size={13} className="inline ml-1 text-primary-600" />
+              <Download size={14} className="inline ml-1 text-primary-600" />
               خروجی اکسل / CSV ({toPersianDigits(filteredPatients.length)})
             </Button>
           </div>
 
           {filteredPatients.length === 0 ? (
-            <EmptyState icon={<ArchiveIcon size={40} />} title="بیماری با این مشخصات در بایگانی یافت نشد" description="فیلتر سال یا متن جستجو را تغییر دهید" />
+            <EmptyState icon={<ArchiveIcon size={56} />} title="بیماری با این مشخصات در بایگانی یافت نشد" description="فیلتر سال یا متن جستجو را تغییر دهید" />
           ) : (
             <div className="space-y-2">
             {filteredPatients.map((p) => (
@@ -376,11 +386,18 @@ export default function Archive() {
                 <div className="w-10 h-10 rounded-xl bg-slate-100 dark:bg-slate-700 flex items-center justify-center text-slate-500 dark:text-slate-400 font-bold text-sm shrink-0">
                   {p.first_name[0]}
                 </div>
-                <div className="flex-1 min-w-0 cursor-pointer" onClick={() => navigate(`/patients/${p.id}`)}>
+                <div
+                  className="flex-1 min-w-0 cursor-pointer focus:outline-none focus:ring-2 focus:ring-primary-400 rounded-lg"
+                  role="button"
+                  tabIndex={0}
+                  aria-label={`مشاهده پرونده ${p.first_name} ${p.last_name}`}
+                  onClick={() => navigate(`/patients/${p.id}`)}
+                  onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); navigate(`/patients/${p.id}`) } }}
+                >
                   <p className="text-sm font-bold text-slate-800 dark:text-slate-100 truncate">
                     <HighlightText text={`${p.first_name} ${p.last_name}`} query={search} />
                   </p>
-                  <p className="text-[11px] text-slate-400">{p.file_number || 'بدون پرونده'} — غیرفعال از {toJalaliStringPretty(p.updated_at)}</p>
+                  <p className="text-2xs text-slate-400">{p.file_number || 'بدون پرونده'} — غیرفعال از {toJalaliStringPretty(p.updated_at)}</p>
                 </div>
                 <Button size="sm" variant="secondary" onClick={() => handleRestorePatient(p)}>
                   <RotateCcw size={14} className="inline ml-1" /> بازگردانی
@@ -394,7 +411,7 @@ export default function Archive() {
 
       {tab === 'staff' && (
         filteredStaff.length === 0 ? (
-          <EmptyState icon={<ArchiveIcon size={40} />} title="بایگانی پرسنل خالی است" description="پرسنل غیرفعال‌شده اینجا نمایش داده می‌شوند" />
+          <EmptyState icon={<ArchiveIcon size={56} />} title="بایگانی پرسنل خالی است" description="پرسنل غیرفعال‌شده اینجا نمایش داده می‌شوند" />
         ) : (
           <div className="space-y-2">
             {filteredStaff.map((s) => (
@@ -406,7 +423,7 @@ export default function Archive() {
                   <p className="text-sm font-bold text-slate-800 dark:text-slate-100 truncate">
                     <HighlightText text={s.full_name} query={search} />
                   </p>
-                  <p className="text-[11px] text-slate-400">غیرفعال از {toJalaliStringPretty(s.updated_at)}</p>
+                  <p className="text-2xs text-slate-400">غیرفعال از {toJalaliStringPretty(s.updated_at)}</p>
                 </div>
                 <Button size="sm" variant="secondary" onClick={() => handleRestoreStaff(s)}>
                   <RotateCcw size={14} className="inline ml-1" /> بازگردانی
@@ -419,7 +436,7 @@ export default function Archive() {
 
       {tab === 'insurance' && (
         filteredCompanies.length === 0 ? (
-          <EmptyState icon={<ArchiveIcon size={40} />} title="بایگانی بیمه خالی است" description="شرکت‌های بیمه‌ی غیرفعال‌شده اینجا نمایش داده می‌شوند" />
+          <EmptyState icon={<ArchiveIcon size={56} />} title="بایگانی بیمه خالی است" description="شرکت‌های بیمه‌ی غیرفعال‌شده اینجا نمایش داده می‌شوند" />
         ) : (
           <div className="space-y-2">
             {filteredCompanies.map((c) => (
@@ -431,7 +448,7 @@ export default function Archive() {
                   <p className="text-sm font-bold text-slate-800 dark:text-slate-100 truncate">
                     <HighlightText text={c.name} query={search} />
                   </p>
-                  <p className="text-[11px] text-slate-400">غیرفعال از {toJalaliStringPretty(c.updated_at)}</p>
+                  <p className="text-2xs text-slate-400">غیرفعال از {toJalaliStringPretty(c.updated_at)}</p>
                 </div>
                 <Button size="sm" variant="secondary" onClick={() => handleRestoreCompany(c)}>
                   <RotateCcw size={14} className="inline ml-1" /> بازگردانی
@@ -444,7 +461,7 @@ export default function Archive() {
 
       {tab === 'implants' && (
         filteredImplantCases.length === 0 ? (
-          <EmptyState icon={<ArchiveIcon size={40} />} title="بایگانی ایمپلنت خالی است" description="موارد ایمپلنت آرشیوشده اینجا نمایش داده می‌شوند" />
+          <EmptyState icon={<ArchiveIcon size={56} />} title="بایگانی ایمپلنت خالی است" description="موارد ایمپلنت آرشیوشده اینجا نمایش داده می‌شوند" />
         ) : (
           <div className="space-y-2">
             {filteredImplantCases.map((c) => (
@@ -452,11 +469,18 @@ export default function Archive() {
                 <div className="w-10 h-10 rounded-xl bg-slate-100 dark:bg-slate-700 flex items-center justify-center text-slate-500 dark:text-slate-400 shrink-0">
                   <Syringe size={18} />
                 </div>
-                <div className="flex-1 min-w-0 cursor-pointer" onClick={() => navigate(`/patients/${c.patient_id}`)}>
+                <div
+                  className="flex-1 min-w-0 cursor-pointer focus:outline-none focus:ring-2 focus:ring-primary-400 rounded-lg"
+                  role="button"
+                  tabIndex={0}
+                  aria-label={`مشاهده پرونده ${c.patient ? `${c.patient.first_name} ${c.patient.last_name}` : 'بیمار حذف‌شده'}`}
+                  onClick={() => navigate(`/patients/${c.patient_id}`)}
+                  onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); navigate(`/patients/${c.patient_id}`) } }}
+                >
                   <p className="text-sm font-bold text-slate-800 dark:text-slate-100 truncate">
                     <HighlightText text={c.patient ? `${c.patient.first_name} ${c.patient.last_name}` : 'بیمار حذف‌شده'} query={search} />
                   </p>
-                  <p className="text-[11px] text-slate-400">
+                  <p className="text-2xs text-slate-400">
                     {c.brand || 'بدون برند'} — دندان {toothLabel(c.tooth_number) || '-'} — {formatCurrency(c.total_cost || 0)} ت — آرشیو از {toJalaliStringPretty(c.updated_at)}
                   </p>
                 </div>
@@ -471,7 +495,7 @@ export default function Archive() {
 
       {tab === 'labs' && (
         filteredLabs.length === 0 ? (
-          <EmptyState icon={<ArchiveIcon size={40} />} title="بایگانی لابراتوار خالی است" description="لابراتوارهای غیرفعال‌شده اینجا نمایش داده می‌شوند" />
+          <EmptyState icon={<ArchiveIcon size={56} />} title="بایگانی لابراتوار خالی است" description="لابراتوارهای غیرفعال‌شده اینجا نمایش داده می‌شوند" />
         ) : (
           <div className="space-y-2">
             {filteredLabs.map((l) => (
@@ -483,7 +507,7 @@ export default function Archive() {
                   <p className="text-sm font-bold text-slate-800 dark:text-slate-100 truncate">
                     <HighlightText text={l.name} query={search} />
                   </p>
-                  <p className="text-[11px] text-slate-400">غیرفعال از {toJalaliStringPretty(l.updated_at)}</p>
+                  <p className="text-2xs text-slate-400">غیرفعال از {toJalaliStringPretty(l.updated_at)}</p>
                 </div>
                 <Button size="sm" variant="secondary" onClick={() => handleRestoreLab(l)}>
                   <RotateCcw size={14} className="inline ml-1" /> بازگردانی

@@ -72,7 +72,7 @@ export function PersianCalendar({ selectedDate, onDateSelect, appointments = [],
     <div className="bg-white rounded-2xl card-shadow p-4">
       {/* Header */}
       <div className="flex items-center justify-between mb-4">
-        <button onClick={prevMonth} className="p-2 rounded-xl hover:bg-slate-100 transition-all-smooth press-scale">
+        <button onClick={prevMonth} aria-label="ماه قبل" className="p-2 rounded-xl hover:bg-slate-100 transition-all-smooth press-scale">
           <ChevronRight size={20} className="text-slate-600" />
         </button>
         <div className="flex items-center gap-2">
@@ -81,7 +81,7 @@ export function PersianCalendar({ selectedDate, onDateSelect, appointments = [],
             {persianMonths[viewMonth - 1]} {toPersianDigitsLocal(viewYear)}
           </h3>
         </div>
-        <button onClick={nextMonth} className="p-2 rounded-xl hover:bg-slate-100 transition-all-smooth press-scale">
+        <button onClick={nextMonth} aria-label="ماه بعد" className="p-2 rounded-xl hover:bg-slate-100 transition-all-smooth press-scale">
           <ChevronLeft size={20} className="text-slate-600" />
         </button>
       </div>
@@ -89,7 +89,7 @@ export function PersianCalendar({ selectedDate, onDateSelect, appointments = [],
       {/* Weekday header */}
       <div className="grid grid-cols-7 gap-1 mb-2">
         {persianWeekdaysShort.map((wd, i) => (
-          <div key={i} className={`text-center text-[10px] font-bold py-1 ${i === 5 ? 'text-error-500' : 'text-slate-400'}`}>
+          <div key={i} className={`text-center text-3xs font-bold py-1 ${i === 5 ? 'text-error-500' : 'text-slate-400'}`}>
             {wd}
           </div>
         ))}
@@ -147,15 +147,15 @@ export function PersianCalendar({ selectedDate, onDateSelect, appointments = [],
       <div className="flex items-center gap-3 mt-3 pt-3 border-t border-slate-100">
         <div className="flex items-center gap-1">
           <div className="w-2 h-2 rounded-full bg-primary-500" />
-          <span className="text-[10px] text-slate-500">نوبت</span>
+          <span className="text-3xs text-slate-500">نوبت</span>
         </div>
         <div className="flex items-center gap-1">
           <div className="w-2 h-2 rounded-full bg-error-400" />
-          <span className="text-[10px] text-slate-500">تعطیلی</span>
+          <span className="text-3xs text-slate-500">تعطیلی</span>
         </div>
         <div className="flex items-center gap-1">
           <div className="w-2 h-2 rounded-full bg-primary-600" />
-          <span className="text-[10px] text-slate-500">انتخاب شده</span>
+          <span className="text-3xs text-slate-500">انتخاب شده</span>
         </div>
       </div>
 

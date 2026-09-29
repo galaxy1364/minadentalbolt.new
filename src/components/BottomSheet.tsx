@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { h } from '../lib/haptics'
 import { chimes } from '../lib/chimes'
+import { useBackDismiss } from '../lib/useBackDismiss'
 
 /**
  * iOS 27 Bottom Sheet with Detents
@@ -56,6 +57,10 @@ export function BottomSheet({
     window.addEventListener('keydown', onEsc)
     return () => window.removeEventListener('keydown', onEsc)
   }, [open, onClose])
+
+  // iOS edge-swipe-back / Android back gesture closes the sheet instead of
+  // navigating the page underneath it away.
+  useBackDismiss(open, onClose)
 
   const handleTouchStart = (e: React.TouchEvent) => {
     startYRef.current = e.touches[0].clientY

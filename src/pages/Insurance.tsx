@@ -1,5 +1,6 @@
 // Insurance.tsx - Persian RTL Dental Clinic Insurance Management
 import { useState, useEffect, useCallback, useMemo } from 'react'
+import { usePullToRefresh } from '../lib/usePullToRefresh'
 import { useNavigate, useLocation } from 'react-router-dom'
 import { Shield, FileText, Search, Building2, Percent, Eye, Plus, Edit2, Phone, MapPin, Wallet, CheckCircle2, Ban, Archive, MessageSquare, Printer } from 'lucide-react'
 import { generateInsuranceClaimPrintData } from '../lib/insurance'
@@ -88,6 +89,7 @@ export default function Insurance() {
   }, [])
 
   useEffect(() => { loadData() }, [loadData])
+  const ptr = usePullToRefresh(async () => { await loadData() })
 
   // Arrived here from the quick-payment wizard's 'روش پرداخت: بیمه'
   // selection — carries the patient (and suggested amount) straight
@@ -171,7 +173,6 @@ export default function Insurance() {
     setCompanyWizardStep(0)
     setCompanyModalOpen(true)
   }
-
 
 
   const handleSaveCompany = () => {
@@ -485,11 +486,26 @@ export default function Insurance() {
   }
 
   if (loading) {
-    return <div className="flex items-center justify-center py-20"><Spinner size={32} /></div>
+    return (
+      <div className="space-y-4" aria-busy="true" aria-live="polite">
+        <div className="skeleton h-12 rounded-xl" />
+        <div className="space-y-2">
+          {[0, 1, 2, 3].map((i) => <div key={i} className="skeleton h-20 rounded-2xl" />)}
+        </div>
+      </div>
+    )
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6" {...ptr.handlers}>
+      {ptr.pullDistance > 0 && (
+        <div className="pull-indicator" style={{ opacity: ptr.isRefreshing ? 1 : ptr.pullProgress, top: -4 }}>
+          <div className="flex flex-col items-center gap-1">
+            <div className={`w-7 h-7 rounded-full border-2 border-teal-300 dark:border-teal-600 border-t-teal-600 dark:border-t-teal-400 ${ptr.isRefreshing ? 'animate-spin' : ''}`} style={{ transform: `scale(${0.6 + ptr.pullProgress * 0.4})` }} />
+            <span className="text-3xs text-teal-600 font-medium">{ptr.isRefreshing ? 'در حال به‌روزرسانی...' : 'برای به‌روزرسانی بکشید'}</span>
+          </div>
+        </div>
+      )}
       <ModuleHeader
         moduleKey="insurance"
         title="بیمه"
@@ -547,7 +563,7 @@ export default function Insurance() {
         <div>
           {filteredCompanies.length === 0 ? (
             <Card className="p-5">
-              <EmptyState icon={<Building2 size={28} />} title="شرکت بیمه‌ای ثبت نشده است" description="برای افزودن شرکت بیمه کلیک کنید" action={<Button size="sm" onClick={openCreateCompany}><Plus size={16} /> افزودن</Button>} />
+              <EmptyState icon={<Building2 size={56} />} title="شرکت بیمه‌ای ثبت نشده است" description="برای افزودن شرکت بیمه کلیک کنید" action={<Button size="sm" onClick={openCreateCompany}><Plus size={16} /> افزودن</Button>} />
             </Card>
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -556,7 +572,7 @@ export default function Insurance() {
                   <div className="flex items-start justify-between mb-3">
                     <div className="flex items-center gap-3">
                       <div className="w-12 h-12 rounded-xl bg-primary-100 flex items-center justify-center text-primary-700">
-                        <Shield size={22} />
+                        <Shield size={20} />
                       </div>
                       <div>
                         <h3 className="font-bold text-slate-800">{c.name}</h3>
@@ -600,7 +616,7 @@ export default function Insurance() {
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           <Card className="p-0 overflow-hidden lg:col-span-2">
             {filteredClaims.length === 0 ? (
-              <EmptyState icon={<FileText size={28} />} title="ادعایی ثبت نشده است" description="برای ثبت ادعای جدید کلیک کنید" action={<Button size="sm" onClick={openCreateClaim}><Plus size={16} /> افزودن</Button>} />
+              <EmptyState icon={<FileText size={56} />} title="ادعایی ثبت نشده است" description="برای ثبت ادعای جدید کلیک کنید" action={<Button size="sm" onClick={openCreateClaim}><Plus size={16} /> افزودن</Button>} />
             ) : (
               <div className="overflow-x-auto">
                 <table className="w-full text-sm">
@@ -633,7 +649,7 @@ export default function Insurance() {
                                 <button
                                   type="button"
                                   onClick={() => navigate(`/patients/${c.patient_id}`)}
-                                  className="inline-flex items-center px-1.5 py-0.5 rounded-md bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 font-mono text-[10px] font-bold cursor-pointer hover:bg-primary-50 hover:text-primary-600 transition-colors"
+                                  className="inline-flex items-center px-1.5 py-0.5 rounded-lg bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 font-mono text-3xs font-bold cursor-pointer hover:bg-primary-50 hover:text-primary-600 transition-colors"
                                   title="شماره پرونده بیمار"
                                 >
                                   #{toPersianDigits(c.patient.file_number)}
@@ -673,7 +689,7 @@ export default function Insurance() {
           <Card className="p-5">
             <h3 className="text-sm font-bold text-slate-800 mb-4">توزیع ادعاها بر اساس وضعیت</h3>
             {claimsByStatusChart.length === 0 ? (
-              <EmptyState icon={<Percent size={28} />} title="داده‌ای موجود نیست" />
+              <EmptyState icon={<Percent size={56} />} title="داده‌ای موجود نیست" />
             ) : (
               <ResponsiveContainer width="100%" height={300}>
                 <PieChart>

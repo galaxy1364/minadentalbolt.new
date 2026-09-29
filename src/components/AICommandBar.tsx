@@ -416,7 +416,7 @@ export default function AICommandBar() {
       >
         <Sparkles size={14} className="animate-pulse text-sky-400" />
         <span>دستیار هوشمند</span>
-        <kbd className="hidden sm:inline text-[9px] px-1.5 py-0.5 rounded bg-white/20 font-mono">Ctrl K</kbd>
+        <kbd className="hidden sm:inline text-4xs px-1.5 py-0.5 rounded bg-white/20 font-mono">Ctrl K</kbd>
       </button>
     )
   }
@@ -488,7 +488,7 @@ export default function AICommandBar() {
                   </div>
                   <div>
                     <p className="text-sm font-bold text-slate-800">{result.label}</p>
-                    <p className="text-[11px] text-slate-500">برای اجرا کلیک کنید یا Enter بزنید</p>
+                    <p className="text-2xs text-slate-500">برای اجرا کلیک کنید یا Enter بزنید</p>
                   </div>
                 </div>
                 <ArrowRight size={18} className="text-primary-600" />

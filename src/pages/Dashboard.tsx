@@ -3,6 +3,7 @@
 // Auto-refresh • CSV export • Activity feed • Full accessibility • Responsive
 import { useState, useEffect, useCallback, useMemo, useRef, cloneElement, isValidElement } from 'react'
 import { subscribeSync, type SyncStatus } from '../lib/sync'
+import { colorTokens, CHART_AXIS_COLOR } from '../lib/colorTokens'
 import { useDataRefresh } from '../lib/realtimeSync'
 import { useNavigate } from 'react-router-dom'
 import {
@@ -220,18 +221,18 @@ function StatTile({
     >
       <div className={`absolute -top-6 -left-6 w-24 h-24 rounded-full bg-gradient-to-br ${theme.blob} to-transparent blur-xl pointer-events-none breathe-slow`} />
       <div className="relative flex items-center gap-2 mb-1.5">
-        <ModuleIconBadge color={theme.solidColor} size={42}>
+        <ModuleIconBadge color={theme.solidColor} size={40}>
           {isValidElement(icon) ? cloneElement(icon as React.ReactElement<any>, { size: 34 }) : icon}
         </ModuleIconBadge>
-        <p className="text-[11px] font-bold text-slate-700 dark:text-slate-300 truncate">{label}</p>
+        <p className="text-2xs font-bold text-slate-700 dark:text-slate-300 truncate">{label}</p>
       </div>
       <div className="relative flex items-baseline gap-1">
         <span className={`text-lg font-extrabold ${theme.text}`}>
           {toPersianDigits(formatNumber(animatedValue))}
         </span>
-        {suffix && <span className="text-[10px] font-semibold text-slate-700">{suffix}</span>}
+        {suffix && <span className="text-3xs font-semibold text-slate-700">{suffix}</span>}
         {trend && (
-          <span className={`flex items-center gap-0.5 text-[10px] font-bold mr-auto ${trend.up ? 'text-success-600 dark:text-success-400' : 'text-error-500 dark:text-error-400'}`}>
+          <span className={`flex items-center gap-0.5 text-3xs font-bold mr-auto ${trend.up ? 'text-success-600 dark:text-success-400' : 'text-error-500 dark:text-error-400'}`}>
             {trend.up ? <ArrowUpRight size={10} /> : <ArrowDownRight size={10} />}
             {trend.value}
           </span>
@@ -249,14 +250,14 @@ function StatTile({
           <div className="h-1 rounded-full bg-black/5 dark:bg-white/10 overflow-hidden">
             <div className={`h-full rounded-full ${theme.iconBg} transition-all duration-700`} style={{ width: `${goalPct}%` }} />
           </div>
-           <div className="flex items-center justify-between mt-0.5 text-[9px] font-semibold text-slate-700">
+           <div className="flex items-center justify-between mt-0.5 text-4xs font-semibold text-slate-700">
             <span>پیشرفت روزانه</span>
             <span>{toPersianDigits(goalPct)}٪</span>
           </div>
         </div>
       )}
       {narrative && (
-         <p className="relative mt-1 text-[10px] font-medium text-slate-700 dark:text-slate-300 truncate">{narrative}</p>
+         <p className="relative mt-1 text-3xs font-medium text-slate-700 dark:text-slate-300 truncate">{narrative}</p>
       )}
     </button>
   )
@@ -276,12 +277,12 @@ function QuickAction({ icon, label, color, onClick, delay }: { icon: React.React
       className={`tile-in card-lift card-tactile-3d relative overflow-hidden flex flex-col items-center justify-center gap-1.5 p-2 rounded-2xl bg-gradient-to-br ${theme.bg} border-t border-t-white/80 dark:border-t-white/10 border border-slate-200/60 dark:border-slate-700 shadow-md shadow-slate-900/5 min-h-[66px] flex-1 focus:outline-none focus:ring-4 ${theme.ring} press-scale hover:-translate-y-0.5 active:translate-y-0.5 transition-all`}
     >
       <div className={`absolute -bottom-6 -left-6 w-16 h-16 rounded-full bg-gradient-to-br ${theme.blob} to-transparent blur-lg pointer-events-none opacity-40`} />
-      <ModuleIconBadge color={theme.solidColor} size={50}>
+      <ModuleIconBadge color={theme.solidColor} size={48}>
         <div className="float-bounce">
           {isValidElement(icon) ? cloneElement(icon as React.ReactElement<any>, { size: 40 }) : icon}
         </div>
       </ModuleIconBadge>
-      <span className={`relative text-[11px] font-extrabold ${theme.text} truncate max-w-full drop-shadow-xs`}>{label}</span>
+      <span className={`relative text-2xs font-extrabold ${theme.text} truncate max-w-full drop-shadow-xs`}>{label}</span>
     </button>
   )
 }
@@ -302,10 +303,10 @@ function AlertWidget({ icon, label, value, color, onClick, delay }: { icon: Reac
         {icon}
       </div>
       <div className="min-w-0 flex-1">
-         <p className="text-[10px] font-bold truncate">{label}</p>
+         <p className="text-3xs font-bold truncate">{label}</p>
         <p className="text-sm font-extrabold truncate tabular-nums">{value}</p>
       </div>
-      <ChevronLeft size={15} className="opacity-40 group-hover:opacity-100 group-hover:-translate-x-0.5 transition-all shrink-0 mr-auto text-current" />
+      <ChevronLeft size={14} className="opacity-40 group-hover:opacity-100 group-hover:-translate-x-0.5 transition-all shrink-0 mr-auto text-current" />
     </button>
   )
 }
@@ -372,7 +373,7 @@ function AppointmentRow({ apt, index, patientName, doctorName, onClick }: {
                 if (apt.patient_id) navigate(`/patients/${apt.patient_id}`)
               }}
               title="شماره پرونده بیمار"
-              className="inline-flex items-center gap-1 px-1.5 py-0.2 rounded bg-slate-900 dark:bg-primary-950 text-white dark:text-primary-300 text-[10px] font-mono font-bold hover:scale-105 active:scale-95 transition-all cursor-pointer"
+              className="inline-flex items-center gap-1 px-1.5 py-0.2 rounded bg-slate-900 dark:bg-primary-950 text-white dark:text-primary-300 text-3xs font-mono font-bold hover:scale-105 active:scale-95 transition-all cursor-pointer"
               dir="ltr"
             >
               <span>{toPersianDigits(apt.patient.file_number)}</span>
@@ -413,8 +414,8 @@ function PatientRow({ patient, index, onClick }: { patient: Patient; index: numb
         <div className="flex items-center gap-1.5 flex-wrap">
           <p className="text-sm font-medium text-slate-800 dark:text-slate-100 truncate">{patient.first_name} {patient.last_name}</p>
           {patient.file_number && (
-            <span className="patient-file-badge inline-flex items-center gap-1 px-1.5 py-0.2 rounded bg-slate-900 dark:bg-primary-950 text-white dark:text-primary-300 text-[10px] font-mono font-bold" dir="ltr">
-              <FileText size={9} className="text-primary-400" />
+            <span className="patient-file-badge inline-flex items-center gap-1 px-1.5 py-0.2 rounded bg-slate-900 dark:bg-primary-950 text-white dark:text-primary-300 text-3xs font-mono font-bold" dir="ltr">
+              <FileText size={8} className="text-primary-400" />
               <span>{toPersianDigits(patient.file_number)}</span>
             </span>
           )}
@@ -487,6 +488,7 @@ function ActivityRow({ item, index, onClick }: { item: ActivityItem; index: numb
       role="button"
       tabIndex={0}
       onKeyDown={(e) => { if (e.key === 'Enter') { h.tap(); onClick() } }}
+      aria-label={item.title || item.description || 'رویداد فعالیت'}
       style={{ animationDelay: `${index * 40}ms` }}
       className={`stagger-item relative overflow-hidden flex items-start gap-3 p-3 rounded-xl cursor-pointer transition-all duration-300 hover:shadow-md border border-slate-100 dark:border-slate-700 bg-gradient-to-br ${theme.bg} ${theme.ring} focus:outline-none focus:ring-4 group`}
     >
@@ -502,7 +504,7 @@ function ActivityRow({ item, index, onClick }: { item: ActivityItem; index: numb
           {item.description}
         </p>
       </div>
-      <span className="text-[10px] font-medium text-slate-500 dark:text-slate-400 flex-shrink-0 relative z-10 mt-1">
+      <span className="text-3xs font-medium text-slate-500 dark:text-slate-400 flex-shrink-0 relative z-10 mt-1">
         {toJalaliStringPretty(item.event_date || item.created_at || new Date().toISOString())}
       </span>
     </div>
@@ -652,7 +654,14 @@ export default function Dashboard() {
   useEffect(() => {
     loadData()
     const clockTimer = setInterval(() => setCurrentTime(new Date()), 30000)
-    const autoTimer = autoRefresh ? setInterval(() => loadData(true, true), 90000) : null
+    // MOD-FIX: skip the network refetch while the app is hidden/backgrounded
+    // — no one is looking at the dashboard, so there is nothing to gain from
+    // re-fetching every 90s, only battery and data spent for nothing.
+    const autoTimer = autoRefresh
+      ? setInterval(() => {
+          if (document.visibilityState === 'visible') loadData(true, true)
+        }, 90000)
+      : null
     return () => {
       clearInterval(clockTimer)
       if (autoTimer) clearInterval(autoTimer)
@@ -1067,7 +1076,7 @@ export default function Dashboard() {
     return Object.entries(counts).map(([status, count]) => ({
       name: appointmentStatusLabels[status] || status,
       count,
-      fill: status === 'completed' ? '#10b981' : status === 'in_chair' ? '#f59e0b' : status === 'cancelled' || status === 'no_show' ? '#ef4444' : '#0d9488',
+      fill: status === 'completed' ? colorTokens.success[500] : status === 'in_chair' ? colorTokens.warning[500] : status === 'cancelled' || status === 'no_show' ? colorTokens.error[500] : colorTokens.primary[600],
     }))
   }, [filteredAppointments])
 
@@ -1161,9 +1170,9 @@ export default function Dashboard() {
     return (
       <div className="space-y-4" aria-busy="true" aria-live="polite">
         <div className="skeleton h-10 w-full rounded-2xl" />
-        <div className="skeleton h-28 rounded-3xl" />
+        <div className="skeleton h-28 rounded-2xl" />
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4">
-          {[0,1,2,3].map((i) => <div key={i} className="skeleton h-32 rounded-3xl" />)}
+          {[0,1,2,3].map((i) => <div key={i} className="skeleton h-32 rounded-2xl" />)}
         </div>
         <div className="skeleton h-16 rounded-2xl" />
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -1191,7 +1200,7 @@ export default function Dashboard() {
               className={`w-8 h-8 rounded-full border-2 border-primary-300 dark:border-primary-600 border-t-primary-600 dark:border-t-primary-400 ${ptr.isRefreshing ? 'animate-spin' : ''}`}
               style={{ transform: `scale(${0.6 + ptr.pullProgress * 0.4})` }}
             />
-            <span className="text-[10px] text-primary-500 font-medium">{ptr.isRefreshing ? 'در حال به‌روزرسانی...' : 'برای به‌روزرسانی بکشید'}</span>
+            <span className="text-3xs text-primary-500 font-medium">{ptr.isRefreshing ? 'در حال به‌روزرسانی...' : 'برای به‌روزرسانی بکشید'}</span>
           </div>
         </div>
       )}
@@ -1215,7 +1224,7 @@ export default function Dashboard() {
               value={doctorFilter}
               onChange={(e) => { h.tap(); setDoctorFilter(e.target.value) }}
               aria-label="فیلتر پزشک"
-              className="hidden sm:block min-h-[38px] px-2.5 py-1.5 rounded-xl text-[11px] font-bold bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-200 border border-slate-200/60 dark:border-slate-600 shadow-sm focus:ring-2 focus:ring-primary-400 cursor-pointer max-w-[120px]"
+              className="hidden sm:block min-h-[38px] px-2.5 py-1.5 rounded-xl text-2xs font-bold bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-200 border border-slate-200/60 dark:border-slate-600 shadow-sm focus:ring-2 focus:ring-primary-400 cursor-pointer max-w-[120px]"
             >
               <option value="all">همه پزشکان</option>
               {doctors.map((d) => (
@@ -1230,20 +1239,20 @@ export default function Dashboard() {
             aria-label="به‌روزرسانی"
             title="به‌روزرسانی داده‌ها"
             disabled={refreshing}
-            className="flex items-center justify-center min-w-[52px] min-h-[52px] rounded-xl bg-gradient-to-br from-teal-500 to-emerald-600 text-white shadow-lg shadow-emerald-600/40 ring-2 ring-emerald-300/60 border-t border-t-white/60 border border-emerald-700/40 hover:brightness-110 active:scale-95 transition-all press-scale disabled:opacity-50"
+            className="flex items-center justify-center w-11 h-11 min-w-[44px] min-h-[44px] rounded-xl bg-gradient-to-br from-teal-500 to-emerald-600 text-white shadow-lg shadow-emerald-600/40 ring-2 ring-emerald-300/60 border-t border-t-white/60 border border-emerald-700/40 hover:brightness-110 active:scale-95 transition-all press-scale disabled:opacity-50"
           >
-            <RefreshCw size={22} strokeWidth={2.4} className={`drop-shadow-xs ${refreshing ? 'animate-spin' : ''}`} />
+            <RefreshCw size={18} strokeWidth={2.4} className={`drop-shadow-xs ${refreshing ? 'animate-spin' : ''}`} />
           </button>
 
           {/* Notifications Bell - Vibrant Amber / Orange 3D Gradient */}
           <button
             onClick={() => { h.tap(); setNotifCenterOpen(true) }}
             aria-label={`مرکز اعلان‌ها${totalNotifCount > 0 ? `، ${totalNotifCount} مورد` : ''}`}
-            className="relative flex items-center justify-center min-w-[52px] min-h-[52px] rounded-xl bg-gradient-to-br from-amber-500 to-orange-500 text-white shadow-lg shadow-orange-600/40 ring-2 ring-amber-300/60 border-t border-t-white/60 border border-orange-700/40 hover:brightness-110 active:scale-95 transition-all press-scale"
+            className="relative flex items-center justify-center w-11 h-11 min-w-[44px] min-h-[44px] rounded-xl bg-gradient-to-br from-amber-500 to-orange-500 text-white shadow-lg shadow-orange-600/40 ring-2 ring-amber-300/60 border-t border-t-white/60 border border-orange-700/40 hover:brightness-110 active:scale-95 transition-all press-scale"
           >
-            <Bell size={24} strokeWidth={2.4} className="drop-shadow-xs" />
+            <Bell size={18} strokeWidth={2.4} className="drop-shadow-xs" />
             {totalNotifCount > 0 && (
-              <span className="absolute -top-1.5 -left-1.5 min-w-[20px] h-[20px] px-1 rounded-full bg-rose-600 text-white text-[10px] font-extrabold flex items-center justify-center border-2 border-white dark:border-slate-800 shadow-sm animate-pulse">
+              <span className="absolute -top-1.5 -left-1.5 min-w-[20px] h-[20px] px-1 rounded-full bg-rose-600 text-white text-3xs font-extrabold flex items-center justify-center border-2 border-white dark:border-slate-800 shadow-sm animate-pulse">
                 {toPersianDigits(Math.min(totalNotifCount, 99))}
               </span>
             )}
@@ -1255,7 +1264,7 @@ export default function Dashboard() {
             aria-label="نوبت جدید"
             className="flex items-center justify-center gap-1.5 min-h-[52px] min-w-[52px] px-3.5 sm:px-4 py-2.5 rounded-xl bg-gradient-to-l from-primary-600 to-violet-600 text-white text-xs font-bold btn-tactile-3d shadow-lg shadow-violet-700/40 ring-2 ring-violet-300/60 border-t border-white/60 border border-violet-800/40 hover:opacity-95 active:scale-95 transition-all shrink-0"
           >
-            <Plus size={22} strokeWidth={2.6} />
+            <Plus size={18} strokeWidth={2.6} />
             <span className="hidden sm:inline">نوبت جدید</span>
           </button>
         </div>
@@ -1263,7 +1272,7 @@ export default function Dashboard() {
 
       {/* ═══ Compact 4-Tile Stat Bento Grid ═══════════════ */}
       <div
-        className="tile-in card-tactile-3d relative overflow-hidden rounded-3xl bg-white/85 dark:bg-slate-800/85 backdrop-blur-md border border-slate-200/60 dark:border-slate-700/60 shadow-xs p-3"
+        className="tile-in card-tactile-3d relative overflow-hidden rounded-2xl bg-white/85 dark:bg-slate-800/85 backdrop-blur-md border border-slate-200/60 dark:border-slate-700/60 shadow-xs p-3"
         style={{ animationDelay: '40ms' }}
       >
 
@@ -1325,11 +1334,16 @@ export default function Dashboard() {
       <Card className="p-3.5 sm:p-4 tile-in card-tactile-3d relative overflow-hidden bg-white/95 dark:bg-slate-800/95 backdrop-blur-md shadow-xs border border-slate-200/60 dark:border-slate-700/60">
         <div
           onClick={() => { h.tap(); setTodayApptsExpanded(!todayApptsExpanded) }}
-          className="flex items-center justify-between cursor-pointer select-none"
+          role="button"
+          tabIndex={0}
+          aria-expanded={todayApptsExpanded}
+          aria-label="نوبت‌های امروز"
+          onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); h.tap(); setTodayApptsExpanded(!todayApptsExpanded) } }}
+          className="flex items-center justify-between cursor-pointer select-none focus:outline-none focus:ring-2 focus:ring-primary-400 rounded-xl"
         >
           <div className="flex items-center gap-3 min-w-0">
             <div className="shrink-0 text-primary-600 dark:text-primary-400 drop-shadow-md transform hover:scale-105 transition-transform">
-              <GlyphAppointments size={34} />
+              <GlyphAppointments size={32} />
             </div>
             <div>
               <div className="flex items-center gap-1.5">
@@ -1338,7 +1352,7 @@ export default function Dashboard() {
                   {toPersianDigits(todayAppointments.length)} نوبت
                 </span>
               </div>
-              <p className="text-[11px] text-slate-500 dark:text-slate-400">
+              <p className="text-2xs text-slate-500 dark:text-slate-400">
                 {todayAppointments.filter(a => a.status === 'in_chair').length > 0 && (
                   <span className="text-amber-600 dark:text-amber-400 font-bold ml-1.5">
                     {toPersianDigits(todayAppointments.filter(a => a.status === 'in_chair').length)} روی صندلی
@@ -1365,7 +1379,7 @@ export default function Dashboard() {
               aria-label="خروجی CSV"
               className="text-xs text-slate-400 hover:text-primary-500 font-medium hidden sm:flex items-center gap-1"
             >
-              <Download size={13} />
+              <Download size={14} />
               CSV
             </button>
             <button
@@ -1374,7 +1388,7 @@ export default function Dashboard() {
               className="text-xs text-primary-600 dark:text-primary-400 hover:text-primary-700 font-bold flex items-center gap-0.5 px-2 py-1 rounded-lg bg-primary-50 dark:bg-primary-950/40"
             >
               <span>تقویم</span>
-              <ArrowLeft size={13} />
+              <ArrowLeft size={14} />
             </button>
             <div className={`w-7 h-7 rounded-lg bg-slate-100 dark:bg-slate-700 flex items-center justify-center text-slate-500 dark:text-slate-400 transition-transform duration-200 ${todayApptsExpanded ? 'rotate-180' : ''}`}>
               <ChevronDown size={16} />
@@ -1386,7 +1400,7 @@ export default function Dashboard() {
           <div className="mt-3 pt-3 border-t border-slate-100 dark:border-slate-700/60 animate-in fade-in duration-200">
             {todayAppointments.length === 0 ? (
               <EmptyState
-                icon={<Calendar size={28} />}
+                icon={<Calendar size={56} />}
                 title="نوبتی برای امروز ثبت نشده است"
                 description="می‌توانید نوبت جدید ایجاد کنید"
               />
@@ -1411,10 +1425,10 @@ export default function Dashboard() {
       {/* ═══ Quick Actions ══════════════════════════════════════════ */}
       <div>
         <div className="flex items-center justify-between mb-1.5">
-          <span className="text-[11px] font-bold text-slate-400 dark:text-slate-500">دسترسی سریع</span>
+          <span className="text-2xs font-bold text-slate-400 dark:text-slate-500">دسترسی سریع</span>
           <button
             onClick={() => { h.tap(); setEditingLayout(!editingLayout) }}
-            className={`flex items-center gap-1 text-[11px] font-bold px-2 py-1 rounded-lg transition-all-smooth ${editingLayout ? 'bg-primary-100 dark:bg-primary-900/40 text-primary-700 dark:text-primary-300' : 'text-slate-400 dark:text-slate-500 hover:text-primary-500'}`}
+            className={`flex items-center gap-1 text-2xs font-bold px-2 py-1 rounded-lg transition-all-smooth ${editingLayout ? 'bg-primary-100 dark:bg-primary-900/40 text-primary-700 dark:text-primary-300' : 'text-slate-400 dark:text-slate-500 hover:text-primary-500'}`}
           >
             <Settings2 size={12} />
             {editingLayout ? 'پایان چیدمان' : 'تنظیم چیدمان'}
@@ -1438,7 +1452,7 @@ export default function Dashboard() {
                     aria-label="جابجایی به چپ"
                     className="pointer-events-auto w-6 h-6 rounded-full bg-white dark:bg-slate-900 shadow-md flex items-center justify-center text-slate-500 disabled:opacity-30"
                   >
-                    <ChevronLeft size={13} />
+                    <ChevronLeft size={14} />
                   </button>
                   <button
                     onClick={(e) => { e.stopPropagation(); moveQuickAction(action.key, -1) }}
@@ -1446,7 +1460,7 @@ export default function Dashboard() {
                     aria-label="جابجایی به راست"
                     className="pointer-events-auto w-6 h-6 rounded-full bg-white dark:bg-slate-900 shadow-md flex items-center justify-center text-slate-500 disabled:opacity-30"
                   >
-                    <ChevronLeft size={13} className="rotate-180" />
+                    <ChevronLeft size={14} className="rotate-180" />
                   </button>
                 </div>
               )}
@@ -1467,10 +1481,10 @@ export default function Dashboard() {
               : 'bg-amber-500/10 text-amber-800 dark:text-amber-300 hover:bg-amber-500/20 border border-amber-500/20'
           }`}
         >
-          <Bell size={15} />
+          <Bell size={14} />
           <span>هشدارهای کلینیک</span>
           {totalNotifCount > 0 && (
-            <span className={`px-1.5 py-0.5 rounded-full text-[10px] font-bold font-mono ${
+            <span className={`px-1.5 py-0.5 rounded-full text-3xs font-bold font-mono ${
               hubTab === 'alerts'
                 ? 'bg-white/25 text-white'
                 : 'bg-amber-500/20 text-amber-800 dark:text-amber-200'
@@ -1490,7 +1504,7 @@ export default function Dashboard() {
               : 'bg-emerald-500/10 text-emerald-800 dark:text-emerald-300 hover:bg-emerald-500/20 border border-emerald-500/20'
           }`}
         >
-          <TrendingUp size={15} />
+          <TrendingUp size={14} />
           <span>نمودارها و مالی</span>
         </button>
 
@@ -1504,7 +1518,7 @@ export default function Dashboard() {
               : 'bg-sky-500/10 text-sky-800 dark:text-sky-300 hover:bg-sky-500/20 border border-sky-500/20'
           }`}
         >
-          <Activity size={15} />
+          <Activity size={14} />
           <span>مراجعات و لاگ</span>
         </button>
       </div>
@@ -1515,12 +1529,12 @@ export default function Dashboard() {
           {/* Operational Action Rail (Permanently Visible) */}
           <div>
             <div className="flex items-center justify-between mb-1.5">
-              <span className="text-[11px] font-bold text-slate-400 dark:text-slate-500">کپسول‌های اقدام و پایش عملیاتی</span>
+              <span className="text-2xs font-bold text-slate-400 dark:text-slate-500">کپسول‌های اقدام و پایش عملیاتی</span>
             </div>
             <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2">
               {/* 1. چک‌های سررسید و برگشتی */}
               <AlertWidget
-                icon={<div className="w-full h-full rounded-xl bg-orange-100 dark:bg-orange-900/40 flex items-center justify-center text-orange-600 dark:text-orange-400 shadow-2xs"><Banknote size={22} /></div>}
+                icon={<div className="w-full h-full rounded-xl bg-orange-100 dark:bg-orange-900/40 flex items-center justify-center text-orange-600 dark:text-orange-400 shadow-2xs"><Banknote size={20} /></div>}
                 label="چک‌های سررسید و برگشتی"
                 value={smartReminders.cheque_due.length > 0 ? `${toPersianDigits(smartReminders.cheque_due.length)} فقره` : '۰ فقره'}
                 color={smartReminders.cheque_due.length > 0 ? "border-orange-200 dark:border-orange-700 bg-orange-50 dark:bg-orange-900/20 text-orange-800 dark:text-orange-300" : "border-slate-200 dark:border-slate-700/60 bg-white/70 dark:bg-slate-800/40 text-slate-600 dark:text-slate-400"}
@@ -1530,7 +1544,7 @@ export default function Dashboard() {
 
               {/* 2. ایمپلنت‌های آماده اقدام */}
               <AlertWidget
-                icon={<div className="w-full h-full rounded-xl bg-cyan-100 dark:bg-cyan-900/40 flex items-center justify-center text-cyan-600 dark:text-cyan-400 shadow-2xs"><GlyphImplants size={22} /></div>}
+                icon={<div className="w-full h-full rounded-xl bg-cyan-100 dark:bg-cyan-900/40 flex items-center justify-center text-cyan-600 dark:text-cyan-400 shadow-2xs"><GlyphImplants size={20} /></div>}
                 label="ایمپلنت‌های آماده اقدام"
                 value={smartReminders.implant_stage_due.length > 0 ? `${toPersianDigits(smartReminders.implant_stage_due.length)} مورد` : '۰ مورد'}
                 color={smartReminders.implant_stage_due.length > 0 ? "border-cyan-200 dark:border-cyan-700 bg-cyan-50 dark:bg-cyan-900/20 text-cyan-800 dark:text-cyan-300" : "border-slate-200 dark:border-slate-700/60 bg-white/70 dark:bg-slate-800/40 text-slate-600 dark:text-slate-400"}
@@ -1540,7 +1554,7 @@ export default function Dashboard() {
 
               {/* 3. مانده بدهی بیماران */}
               <AlertWidget
-                icon={<div className="w-full h-full rounded-xl bg-amber-100 dark:bg-amber-900/40 flex items-center justify-center text-amber-600 dark:text-amber-400 shadow-2xs"><Wallet size={22} /></div>}
+                icon={<div className="w-full h-full rounded-xl bg-amber-100 dark:bg-amber-900/40 flex items-center justify-center text-amber-600 dark:text-amber-400 shadow-2xs"><Wallet size={20} /></div>}
                 label="مانده بدهی بیماران"
                 value={outstandingBalance > 0 ? `${formatCurrency(outstandingBalance)} ت` : 'تسویه کامل'}
                 color={outstandingBalance > 0 ? "border-amber-200 dark:border-amber-700 bg-amber-50 dark:bg-amber-900/20 text-amber-800 dark:text-amber-300" : "border-slate-200 dark:border-slate-700/60 bg-white/70 dark:bg-slate-800/40 text-slate-600 dark:text-slate-400"}
@@ -1550,7 +1564,7 @@ export default function Dashboard() {
 
               {/* 4. سفارش تأخیر یافته */}
               <AlertWidget
-                icon={<div className="w-full h-full rounded-xl bg-rose-100 dark:bg-rose-900/40 flex items-center justify-center text-rose-600 dark:text-rose-400 shadow-2xs"><AlertTriangle size={22} /></div>}
+                icon={<div className="w-full h-full rounded-xl bg-rose-100 dark:bg-rose-900/40 flex items-center justify-center text-rose-600 dark:text-rose-400 shadow-2xs"><AlertTriangle size={20} /></div>}
                 label="سفارش تأخیر یافته"
                 value={overdueLabCount > 0 ? `${toPersianDigits(overdueLabCount)} مورد` : 'بدون تأخیر'}
                 color={overdueLabCount > 0 ? "border-rose-200 dark:border-rose-700 bg-rose-50 dark:bg-rose-900/20 text-rose-800 dark:text-rose-300" : "border-slate-200 dark:border-slate-700/60 bg-white/70 dark:bg-slate-800/40 text-slate-600 dark:text-slate-400"}
@@ -1560,7 +1574,7 @@ export default function Dashboard() {
 
               {/* 5. لابراتوار آماده تحویل */}
               <AlertWidget
-                icon={<div className="w-full h-full rounded-xl bg-emerald-100 dark:bg-emerald-900/40 flex items-center justify-center text-emerald-600 dark:text-emerald-400 shadow-2xs"><GlyphLaboratory size={22} /></div>}
+                icon={<div className="w-full h-full rounded-xl bg-emerald-100 dark:bg-emerald-900/40 flex items-center justify-center text-emerald-600 dark:text-emerald-400 shadow-2xs"><GlyphLaboratory size={20} /></div>}
                 label="لابراتوار آماده تحویل"
                 value={readyLabCount > 0 ? `${toPersianDigits(readyLabCount)} مورد` : '۰ مورد'}
                 color={readyLabCount > 0 ? "border-emerald-200 dark:border-emerald-700 bg-emerald-50 dark:bg-emerald-900/20 text-emerald-800 dark:text-emerald-300" : "border-slate-200 dark:border-slate-700/60 bg-white/70 dark:bg-slate-800/40 text-slate-600 dark:text-slate-400"}
@@ -1570,7 +1584,7 @@ export default function Dashboard() {
 
               {/* 6. اقساط سررسید شده */}
               <AlertWidget
-                icon={<div className="w-full h-full rounded-xl bg-violet-100 dark:bg-violet-900/40 flex items-center justify-center text-violet-600 dark:text-violet-400 shadow-2xs"><CalendarClock size={22} /></div>}
+                icon={<div className="w-full h-full rounded-xl bg-violet-100 dark:bg-violet-900/40 flex items-center justify-center text-violet-600 dark:text-violet-400 shadow-2xs"><CalendarClock size={20} /></div>}
                 label="اقساط سررسید شده"
                 value={smartReminders.installment_due.length > 0 ? `${toPersianDigits(smartReminders.installment_due.length)} قسط` : '۰ قسط'}
                 color={smartReminders.installment_due.length > 0 ? "border-violet-200 dark:border-violet-700 bg-violet-50 dark:bg-violet-900/20 text-violet-800 dark:text-violet-300" : "border-slate-200 dark:border-slate-700/60 bg-white/70 dark:bg-slate-800/40 text-slate-600 dark:text-slate-400"}
@@ -1626,7 +1640,7 @@ export default function Dashboard() {
                   </span>
                 </h2>
                 {clinicalFollowUps.hiddenCount > 0 && (
-                  <span className="text-[11px] text-slate-400">
+                  <span className="text-2xs text-slate-400">
                     {toPersianDigits(clinicalFollowUps.hiddenCount)} مورد به تعویق افتاده
                   </span>
                 )}
@@ -1648,7 +1662,7 @@ export default function Dashboard() {
                       </div>
                       <button
                         onClick={() => handleSnooze(f.key, 3)}
-                        className="shrink-0 text-[11px] px-2.5 py-1.5 rounded-lg bg-white/80 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 font-bold hover:bg-white dark:hover:bg-slate-700 transition-all press-scale"
+                        className="shrink-0 text-2xs px-2.5 py-1.5 rounded-lg bg-white/80 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 font-bold hover:bg-white dark:hover:bg-slate-700 transition-all press-scale"
                       >
                         پیگیری شد
                       </button>
@@ -1673,7 +1687,12 @@ export default function Dashboard() {
             <Card className="p-3.5 sm:p-4 tile-in relative overflow-hidden bg-white/95 dark:bg-slate-800/95 shadow-xs border border-slate-200/60 dark:border-slate-700/60">
               <div
                 onClick={() => { h.tap(); setRemindersExpanded(!remindersExpanded) }}
-                className="flex items-center justify-between cursor-pointer select-none"
+                role="button"
+                tabIndex={0}
+                aria-expanded={remindersExpanded}
+                aria-label="یادآوری‌ها"
+                onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); h.tap(); setRemindersExpanded(!remindersExpanded) } }}
+                className="flex items-center justify-between cursor-pointer select-none focus:outline-none focus:ring-2 focus:ring-primary-400 rounded-xl"
               >
                 <div className="flex items-center gap-2 min-w-0">
                   <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-amber-400 to-orange-500 flex items-center justify-center text-white shadow-xs shrink-0">
@@ -1695,7 +1714,7 @@ export default function Dashboard() {
                         smartReminders.unresolved_appointment.length
                       )}</Badge>
                     </h2>
-                    <p className="text-[11px] text-slate-500 dark:text-slate-400">ارسال پیامک و واتس‌اپ یادآوری نوبت و وضعیت (کلیک برای باز شدن)</p>
+                    <p className="text-2xs text-slate-500 dark:text-slate-400">ارسال پیامک و واتس‌اپ یادآوری نوبت و وضعیت (کلیک برای باز شدن)</p>
                   </div>
                 </div>
                 <div className={`w-7 h-7 rounded-lg bg-slate-100 dark:bg-slate-700 flex items-center justify-center text-slate-500 dark:text-slate-400 transition-transform duration-200 ${remindersExpanded ? 'rotate-180' : ''}`}>
@@ -1736,12 +1755,12 @@ export default function Dashboard() {
                                   <div className="flex items-center gap-1.5 flex-wrap">
                                     <p className="text-sm font-semibold text-slate-800 dark:text-slate-100 truncate">{r.title}</p>
                                     {r.patient.file_number && (
-                                      <span className="patient-file-badge text-[9px] font-mono px-1 py-0.2 bg-slate-900 dark:bg-primary-950 text-white dark:text-primary-300 rounded font-bold" dir="ltr">
+                                      <span className="patient-file-badge text-4xs font-mono px-1 py-0.2 bg-slate-900 dark:bg-primary-950 text-white dark:text-primary-300 rounded font-bold" dir="ltr">
                                         {toPersianDigits(r.patient.file_number)}
                                       </span>
                                     )}
                                   </div>
-                                  <p className="text-[11px] text-slate-500 dark:text-slate-400 truncate">{r.detail}</p>
+                                  <p className="text-2xs text-slate-500 dark:text-slate-400 truncate">{r.detail}</p>
                                 </div>
                                 <div className="flex items-center gap-1.5 shrink-0">
                                   {r.patient.phone && (
@@ -1750,10 +1769,10 @@ export default function Dashboard() {
                                       target="_blank"
                                       rel="noopener noreferrer"
                                       onClick={(e) => e.stopPropagation()}
-                                      className="px-2 py-1.5 rounded-lg bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-400 text-[11px] font-semibold hover:bg-emerald-100 dark:hover:bg-emerald-900/60 transition-all-smooth press-scale flex items-center gap-1"
+                                      className="px-2 py-1.5 rounded-lg bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-400 text-2xs font-semibold hover:bg-emerald-100 dark:hover:bg-emerald-900/60 transition-all-smooth press-scale flex items-center gap-1"
                                       title="ارسال پیام واتس‌اپ"
                                     >
-                                      <MessageSquare size={11} />
+                                      <MessageSquare size={12} />
                                       <span>واتس‌اپ</span>
                                     </a>
                                   )}
@@ -1761,12 +1780,12 @@ export default function Dashboard() {
                                     <button
                                       onClick={(e) => { e.stopPropagation(); handleSendReminderSms(r) }}
                                       disabled={sendingReminderId === key}
-                                      className="px-2.5 py-1.5 rounded-lg bg-primary-50 dark:bg-primary-900/30 text-primary-700 dark:text-primary-400 text-[11px] font-semibold hover:bg-primary-100 dark:hover:bg-primary-900/50 transition-all-smooth press-scale disabled:opacity-50"
+                                      className="px-2.5 py-1.5 rounded-lg bg-primary-50 dark:bg-primary-900/30 text-primary-700 dark:text-primary-400 text-2xs font-semibold hover:bg-primary-100 dark:hover:bg-primary-900/50 transition-all-smooth press-scale disabled:opacity-50"
                                     >
                                       {sendingReminderId === key ? '...' : 'ارسال پیامک'}
                                     </button>
                                   ) : (
-                                    <span className="px-2.5 py-1.5 rounded-lg bg-slate-100 dark:bg-slate-700 text-slate-500 dark:text-slate-400 text-[11px] font-semibold">
+                                    <span className="px-2.5 py-1.5 rounded-lg bg-slate-100 dark:bg-slate-700 text-slate-500 dark:text-slate-400 text-2xs font-semibold">
                                       بستن وضعیت
                                     </span>
                                   )}
@@ -1818,7 +1837,7 @@ export default function Dashboard() {
 
               {revenueChartData.every((d) => d.revenue === 0) ? (
                 <EmptyState
-                  icon={<TrendingUp size={28} />}
+                  icon={<TrendingUp size={56} />}
                   title="داده درآمدی موجود نیست"
                   description="پس از ثبت پرداخت‌ها، نمودار نمایش داده می‌شود"
                 />
@@ -1827,17 +1846,17 @@ export default function Dashboard() {
                   <AreaChart data={revenueChartData} margin={{ top: 10, right: 10, left: 10, bottom: 0 }}>
                     <defs>
                       <linearGradient id="revGradient" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="5%" stopColor="#10b981" stopOpacity={0.35} />
-                        <stop offset="95%" stopColor="#10b981" stopOpacity={0} />
+                        <stop offset="5%" stopColor={colorTokens.success[500]} stopOpacity={0.35} />
+                        <stop offset="95%" stopColor={colorTokens.success[500]} stopOpacity={0} />
                       </linearGradient>
                       <linearGradient id="revLine" x1="0" y1="0" x2="1" y2="0">
-                        <stop offset="0%" stopColor="#14b8a6" />
-                        <stop offset="100%" stopColor="#10b981" />
+                        <stop offset="0%" stopColor={colorTokens.primary[500]} />
+                        <stop offset="100%" stopColor={colorTokens.success[500]} />
                       </linearGradient>
                     </defs>
-                    <XAxis dataKey="label" tick={{ fontSize: 10, fill: '#94a3b8' }} tickLine={false} axisLine={false} />
+                    <XAxis dataKey="label" tick={{ fontSize: 10, fill: CHART_AXIS_COLOR }} tickLine={false} axisLine={false} />
                     <YAxis
-                      tick={{ fontSize: 10, fill: '#94a3b8' }}
+                      tick={{ fontSize: 10, fill: CHART_AXIS_COLOR }}
                       tickFormatter={(v) => formatNumber(Math.round(v / 1000000))}
                       width={50}
                       tickLine={false}
@@ -1853,8 +1872,8 @@ export default function Dashboard() {
                       stroke="url(#revLine)"
                       strokeWidth={3}
                       fill="url(#revGradient)"
-                      dot={{ fill: '#10b981', r: 4 }}
-                      activeDot={{ r: 6, fill: '#14b8a6' }}
+                      dot={{ fill: colorTokens.success[500], r: 4 }}
+                      activeDot={{ r: 6, fill: colorTokens.primary[500] }}
                     />
                   </AreaChart>
                 </ResponsiveContainer>
@@ -1870,7 +1889,7 @@ export default function Dashboard() {
                   </div>
                   نرخ اشغال یونیت
                 </h3>
-                <RadialProgress percent={occupancyRate} label="اشغال امروز" color="#f59e0b" />
+                <RadialProgress percent={occupancyRate} label="اشغال امروز" color={colorTokens.warning[500]} />
                 <div className="mt-3 grid grid-cols-2 gap-2 text-center">
                   <div className="p-2 rounded-xl bg-slate-50 dark:bg-slate-700/50">
                     <p className="text-xs text-slate-500 dark:text-slate-400">نوبت‌ها</p>
@@ -1916,12 +1935,12 @@ export default function Dashboard() {
               توزیع وضعیت نوبت‌های درمان
             </h3>
             {statusChartData.length === 0 ? (
-              <EmptyState icon={<Activity size={24} />} title="داده‌ای موجود نیست" />
+              <EmptyState icon={<Activity size={56} />} title="داده‌ای موجود نیست" />
             ) : (
               <ResponsiveContainer width="100%" height={150}>
                 <BarChart data={statusChartData} layout="vertical" margin={{ top: 5, right: 15, left: 5, bottom: 5 }}>
-                  <XAxis type="number" tick={{ fontSize: 10, fill: '#94a3b8' }} tickLine={false} axisLine={false} />
-                  <YAxis type="category" dataKey="name" tick={{ fontSize: 10, fill: '#94a3b8' }} tickLine={false} axisLine={false} width={70} />
+                  <XAxis type="number" tick={{ fontSize: 10, fill: CHART_AXIS_COLOR }} tickLine={false} axisLine={false} />
+                  <YAxis type="category" dataKey="name" tick={{ fontSize: 10, fill: CHART_AXIS_COLOR }} tickLine={false} axisLine={false} width={70} />
                   <RTooltip
                     formatter={(v: number) => [`${toPersianDigits(v)} نوبت`, 'تعداد']}
                     contentStyle={{ direction: 'rtl', fontSize: 12, borderRadius: 12, border: 'none', boxShadow: '0 4px 20px rgba(0,0,0,0.1)' }}
@@ -1961,7 +1980,7 @@ export default function Dashboard() {
 
             {recentPatients.length === 0 ? (
               <EmptyState
-                icon={<Users size={28} />}
+                icon={<Users size={56} />}
                 title="بیماری ثبت نشده است"
                 description="با افزودن بیمار شروع کنید"
               />
@@ -1992,7 +2011,7 @@ export default function Dashboard() {
 
             {activity.length === 0 ? (
               <EmptyState
-                icon={<Bell size={28} />}
+                icon={<Bell size={56} />}
                 title="فعالیتی ثبت نشده است"
                 description="فعالیت‌های کلینیک در اینجا نمایش داده می‌شود"
               />
@@ -2059,11 +2078,15 @@ export default function Dashboard() {
               {recentPatientsForDrill.map((p) => (
                 <div
                   key={p.id}
+                  role="button"
+                  tabIndex={0}
+                  aria-label={`مشاهده پرونده ${p.first_name} ${p.last_name}`}
                   onClick={() => {
                     h.tap()
                     setDrillDown(null)
                     navigate(`/patients/${p.id}`)
                   }}
+                  onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); h.tap(); setDrillDown(null); navigate(`/patients/${p.id}`) } }}
                   className="p-3.5 rounded-2xl bg-slate-50/90 dark:bg-slate-800/70 border border-slate-100 dark:border-slate-700/60 hover:bg-slate-100/90 dark:hover:bg-slate-800 transition-all cursor-pointer flex items-center justify-between gap-3 card-tactile-3d min-h-[52px]"
                 >
                   <div className="flex items-center gap-3 min-w-0">
@@ -2097,11 +2120,15 @@ export default function Dashboard() {
               {upcomingApptsForDrill.map((a) => (
                 <div
                   key={a.id}
+                  role="button"
+                  tabIndex={0}
+                  aria-label={`مشاهده نوبت ${patientName(a)}`}
                   onClick={() => {
                     h.tap()
                     setDrillDown(null)
                     navigate('/appointments')
                   }}
+                  onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); h.tap(); setDrillDown(null); navigate('/appointments') } }}
                   className="p-3.5 rounded-2xl bg-slate-50/90 dark:bg-slate-800/70 border border-slate-100 dark:border-slate-700/60 hover:bg-slate-100/90 dark:hover:bg-slate-800 transition-all cursor-pointer flex items-center justify-between gap-3 card-tactile-3d min-h-[52px]"
                 >
                   <div className="flex items-center gap-3 min-w-0">
@@ -2144,11 +2171,15 @@ export default function Dashboard() {
                 return (
                   <div
                     key={p.id}
+                    role="button"
+                    tabIndex={0}
+                    aria-label={`مشاهده پرداخت ${pt ? `${pt.first_name} ${pt.last_name}` : 'بیمار درمانگاه'}`}
                     onClick={() => {
                       h.tap()
                       setDrillDown(null)
                       navigate('/billing')
                     }}
+                    onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); h.tap(); setDrillDown(null); navigate('/billing') } }}
                     className="p-3.5 rounded-2xl bg-slate-50/90 dark:bg-slate-800/70 border border-slate-100 dark:border-slate-700/60 hover:bg-slate-100/90 dark:hover:bg-slate-800 transition-all cursor-pointer flex items-center justify-between gap-3 card-tactile-3d min-h-[52px]"
                   >
                     <div className="flex items-center gap-3 min-w-0">
@@ -2168,7 +2199,7 @@ export default function Dashboard() {
                       <p className="text-sm font-extrabold text-sky-700 dark:text-sky-400">
                         {formatCurrency(p.amount)} ت
                       </p>
-                      <span className="text-[10px] text-slate-400">ثبت در صندوق</span>
+                      <span className="text-3xs text-slate-400">ثبت در صندوق</span>
                     </div>
                   </div>
                 )
@@ -2187,11 +2218,15 @@ export default function Dashboard() {
                 return (
                   <div
                     key={o.id}
+                    role="button"
+                    tabIndex={0}
+                    aria-label={`مشاهده سفارش آزمایشگاه ${pt ? `${pt.first_name} ${pt.last_name}` : ''}`.trim()}
                     onClick={() => {
                       h.tap()
                       setDrillDown(null)
                       navigate('/laboratory')
                     }}
+                    onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); h.tap(); setDrillDown(null); navigate('/laboratory') } }}
                     className="p-3.5 rounded-2xl bg-slate-50/90 dark:bg-slate-800/70 border border-slate-100 dark:border-slate-700/60 hover:bg-slate-100/90 dark:hover:bg-slate-800 transition-all cursor-pointer flex items-center justify-between gap-3 card-tactile-3d min-h-[52px]"
                   >
                     <div className="flex items-center gap-3 min-w-0">
@@ -2228,7 +2263,7 @@ export default function Dashboard() {
         {drillDown === 'cheques' && (
           smartReminders.cheque_due.length === 0 ? (
             <div className="text-center py-8">
-              <CheckCircle2 size={36} className="text-emerald-500 mx-auto mb-2" />
+              <CheckCircle2 size={32} className="text-emerald-500 mx-auto mb-2" />
               <p className="text-sm font-bold text-slate-700 dark:text-slate-200">وضعیت چک‌ها به‌روز است</p>
               <p className="text-xs text-slate-400 mt-1">هیچ چک سررسید شده یا برگشتی معوقی در سیستم ثبت نشده است.</p>
             </div>
@@ -2237,7 +2272,11 @@ export default function Dashboard() {
               {smartReminders.cheque_due.map((r, idx) => (
                 <div
                   key={r.id || idx}
+                  role="button"
+                  tabIndex={0}
+                  aria-label={`اقدام مالی ${r.patient.first_name} ${r.patient.last_name}`}
                   onClick={() => { setDrillDown(null); navigate(r.actionPath || '/billing') }}
+                  onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setDrillDown(null); navigate(r.actionPath || '/billing') } }}
                   className="p-3 rounded-2xl bg-slate-50 dark:bg-slate-800/70 border border-slate-100 dark:border-slate-700/60 hover:bg-slate-100 dark:hover:bg-slate-800 transition-all cursor-pointer flex items-center justify-between gap-3"
                 >
                   <div className="flex items-center gap-3 min-w-0">
@@ -2247,7 +2286,7 @@ export default function Dashboard() {
                     <div className="min-w-0">
                       <p className="text-sm font-bold text-slate-800 dark:text-slate-100 truncate">{r.patient.first_name} {r.patient.last_name}</p>
                       <p className="text-xs text-slate-500 dark:text-slate-400 truncate">{r.extraInfo || r.detail}</p>
-                      {r.dueDate && <p className="text-[11px] text-orange-600 dark:text-orange-400 font-medium mt-0.5">سررسید: {toJalaliStringPretty(r.dueDate)}</p>}
+                      {r.dueDate && <p className="text-2xs text-orange-600 dark:text-orange-400 font-medium mt-0.5">سررسید: {toJalaliStringPretty(r.dueDate)}</p>}
                     </div>
                   </div>
                   <div className="text-left shrink-0">
@@ -2265,7 +2304,7 @@ export default function Dashboard() {
         {drillDown === 'implants' && (
           smartReminders.implant_stage_due.length === 0 ? (
             <div className="text-center py-8">
-              <CheckCircle2 size={36} className="text-sky-500 mx-auto mb-2" />
+              <CheckCircle2 size={32} className="text-sky-500 mx-auto mb-2" />
               <p className="text-sm font-bold text-slate-700 dark:text-slate-200">وضعیت ایمپلنت‌ها پایدار است</p>
               <p className="text-xs text-slate-400 mt-1">هیچ ایمپلنتی در وضعیت معوق یا منتظر اقدام فوری قرار ندارد.</p>
             </div>
@@ -2274,7 +2313,11 @@ export default function Dashboard() {
               {smartReminders.implant_stage_due.map((r, idx) => (
                 <div
                   key={r.id || idx}
+                  role="button"
+                  tabIndex={0}
+                  aria-label={`پرونده ${r.patient.first_name} ${r.patient.last_name}`}
                   onClick={() => { setDrillDown(null); navigate(r.actionPath || '/implants') }}
+                  onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setDrillDown(null); navigate(r.actionPath || '/implants') } }}
                   className="p-3 rounded-2xl bg-slate-50 dark:bg-slate-800/70 border border-slate-100 dark:border-slate-700/60 hover:bg-slate-100 dark:hover:bg-slate-800 transition-all cursor-pointer flex items-center justify-between gap-3"
                 >
                   <div className="flex items-center gap-3 min-w-0">
@@ -2284,7 +2327,7 @@ export default function Dashboard() {
                     <div className="min-w-0">
                       <p className="text-sm font-bold text-slate-800 dark:text-slate-100 truncate">{r.patient.first_name} {r.patient.last_name}</p>
                       <p className="text-xs text-slate-600 dark:text-slate-300 font-medium truncate">{r.detail}</p>
-                      {r.extraInfo && <p className="text-[11px] text-slate-400 mt-0.5">{r.extraInfo}</p>}
+                      {r.extraInfo && <p className="text-2xs text-slate-400 mt-0.5">{r.extraInfo}</p>}
                     </div>
                   </div>
                   <div className="text-left shrink-0">
@@ -2302,7 +2345,7 @@ export default function Dashboard() {
         {drillDown === 'debtors' && (
           smartReminders.debtor.length === 0 ? (
             <div className="text-center py-8">
-              <CheckCircle2 size={36} className="text-emerald-500 mx-auto mb-2" />
+              <CheckCircle2 size={32} className="text-emerald-500 mx-auto mb-2" />
               <p className="text-sm font-bold text-slate-700 dark:text-slate-200">حساب‌ها تسویه است</p>
               <p className="text-xs text-slate-400 mt-1">هیچ بیماری دارای مانده بدهی معوق بالای سقف تعیین‌شده نیست.</p>
             </div>
@@ -2311,7 +2354,11 @@ export default function Dashboard() {
               {smartReminders.debtor.map((r, idx) => (
                 <div
                   key={idx}
+                  role="button"
+                  tabIndex={0}
+                  aria-label={`مشاهده پرونده ${r.patient.first_name} ${r.patient.last_name}`}
                   onClick={() => { setDrillDown(null); navigate(`/patients/${r.patient.id}`) }}
+                  onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setDrillDown(null); navigate(`/patients/${r.patient.id}`) } }}
                   className="p-3 rounded-2xl bg-slate-50 dark:bg-slate-800/70 border border-slate-100 dark:border-slate-700/60 hover:bg-slate-100 dark:hover:bg-slate-800 transition-all cursor-pointer flex items-center justify-between gap-3"
                 >
                   <div className="flex items-center gap-3 min-w-0">
@@ -2325,7 +2372,7 @@ export default function Dashboard() {
                   </div>
                   <div className="text-left shrink-0">
                     <p className="text-sm font-extrabold text-amber-700 dark:text-amber-400">{formatCurrency(r.priority)} ت</p>
-                    <span className="text-[10px] text-slate-400">مشاهده پرونده</span>
+                    <span className="text-3xs text-slate-400">مشاهده پرونده</span>
                   </div>
                 </div>
               ))}
@@ -2337,7 +2384,7 @@ export default function Dashboard() {
         {drillDown === 'ready_lab' && (
           readyLabOrdersForDrill.length === 0 ? (
             <div className="text-center py-8">
-              <CheckCircle2 size={36} className="text-emerald-500 mx-auto mb-2" />
+              <CheckCircle2 size={32} className="text-emerald-500 mx-auto mb-2" />
               <p className="text-sm font-bold text-slate-700 dark:text-slate-200">سفارش معطل‌مانده‌ای نیست</p>
               <p className="text-xs text-slate-400 mt-1">تمامی کارهای لابراتوار به بیماران تحویل شده است.</p>
             </div>
@@ -2349,7 +2396,11 @@ export default function Dashboard() {
                 return (
                   <div
                     key={o.id}
+                    role="button"
+                    tabIndex={0}
+                    aria-label={`سفارش لابراتوار آماده تحویل ${patient ? `${patient.first_name} ${patient.last_name}` : ''}`.trim()}
                     onClick={() => { setDrillDown(null); navigate('/laboratory') }}
+                    onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setDrillDown(null); navigate('/laboratory') } }}
                     className="p-3 rounded-2xl bg-slate-50 dark:bg-slate-800/70 border border-slate-100 dark:border-slate-700/60 hover:bg-slate-100 dark:hover:bg-slate-800 transition-all cursor-pointer flex items-center justify-between gap-3"
                   >
                     <div className="flex items-center gap-3 min-w-0">
@@ -2363,7 +2414,7 @@ export default function Dashboard() {
                         <p className="text-xs text-slate-600 dark:text-slate-300 truncate">
                           {o.work_type || 'کار لابراتوار'}{o.tooth_number ? ` — دندان ${toothLabel(o.tooth_number)}` : ''}
                         </p>
-                        {shelf && <p className="text-[11px] text-emerald-600 dark:text-emerald-400 font-medium mt-0.5">مکان قفسه: {shelf}</p>}
+                        {shelf && <p className="text-2xs text-emerald-600 dark:text-emerald-400 font-medium mt-0.5">مکان قفسه: {shelf}</p>}
                       </div>
                     </div>
                     <div className="text-left shrink-0">
@@ -2382,7 +2433,7 @@ export default function Dashboard() {
         {drillDown === 'overdue_lab' && (
           overdueLabOrdersForDrill.length === 0 ? (
             <div className="text-center py-8">
-              <CheckCircle2 size={36} className="text-emerald-500 mx-auto mb-2" />
+              <CheckCircle2 size={32} className="text-emerald-500 mx-auto mb-2" />
               <p className="text-sm font-bold text-slate-700 dark:text-slate-200">هیچ سفارش تأخیری وجود ندارد</p>
               <p className="text-xs text-slate-400 mt-1">تمام سفارش‌های لابراتوار در موعد مقرر پیگیری شده‌اند.</p>
             </div>
@@ -2393,7 +2444,11 @@ export default function Dashboard() {
                 return (
                   <div
                     key={o.id}
+                    role="button"
+                    tabIndex={0}
+                    aria-label={`سفارش لابراتوار تأخیریافته ${patient ? `${patient.first_name} ${patient.last_name}` : ''}`.trim()}
                     onClick={() => { setDrillDown(null); navigate('/laboratory') }}
+                    onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setDrillDown(null); navigate('/laboratory') } }}
                     className="p-3 rounded-2xl bg-slate-50 dark:bg-slate-800/70 border border-slate-100 dark:border-slate-700/60 hover:bg-slate-100 dark:hover:bg-slate-800 transition-all cursor-pointer flex items-center justify-between gap-3"
                   >
                     <div className="flex items-center gap-3 min-w-0">
@@ -2407,7 +2462,7 @@ export default function Dashboard() {
                         <p className="text-xs text-slate-600 dark:text-slate-300 truncate">
                           {o.work_type || 'کار لابراتوار'}{o.tooth_number ? ` — دندان ${toothLabel(o.tooth_number)}` : ''}
                         </p>
-                        {o.deadline && <p className="text-[11px] text-rose-600 dark:text-rose-400 font-medium mt-0.5">موعد تحویل: {toJalaliStringPretty(o.deadline)}</p>}
+                        {o.deadline && <p className="text-2xs text-rose-600 dark:text-rose-400 font-medium mt-0.5">موعد تحویل: {toJalaliStringPretty(o.deadline)}</p>}
                       </div>
                     </div>
                     <div className="text-left shrink-0">
@@ -2426,7 +2481,7 @@ export default function Dashboard() {
         {drillDown === 'installments' && (
           smartReminders.installment_due.length === 0 ? (
             <div className="text-center py-8">
-              <CheckCircle2 size={36} className="text-violet-500 mx-auto mb-2" />
+              <CheckCircle2 size={32} className="text-violet-500 mx-auto mb-2" />
               <p className="text-sm font-bold text-slate-700 dark:text-slate-200">اقساط به‌روز هستند</p>
               <p className="text-xs text-slate-400 mt-1">هیچ قسط سررسید شده پرداخت‌نشده‌ای در سیستم وجود ندارد.</p>
             </div>
@@ -2435,7 +2490,11 @@ export default function Dashboard() {
               {smartReminders.installment_due.map((r, idx) => (
                 <div
                   key={r.id || idx}
+                  role="button"
+                  tabIndex={0}
+                  aria-label={`تسویه قسط ${r.patient.first_name} ${r.patient.last_name}`}
                   onClick={() => { setDrillDown(null); navigate(r.actionPath || '/billing') }}
+                  onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setDrillDown(null); navigate(r.actionPath || '/billing') } }}
                   className="p-3 rounded-2xl bg-slate-50 dark:bg-slate-800/70 border border-slate-100 dark:border-slate-700/60 hover:bg-slate-100 dark:hover:bg-slate-800 transition-all cursor-pointer flex items-center justify-between gap-3"
                 >
                   <div className="flex items-center gap-3 min-w-0">
@@ -2445,7 +2504,7 @@ export default function Dashboard() {
                     <div className="min-w-0">
                       <p className="text-sm font-bold text-slate-800 dark:text-slate-100 truncate">{r.patient.first_name} {r.patient.last_name}</p>
                       <p className="text-xs text-slate-600 dark:text-slate-300 font-medium truncate">{r.detail}</p>
-                      {r.dueDate && <p className="text-[11px] text-violet-600 dark:text-violet-400 font-medium mt-0.5">سررسید: {toJalaliStringPretty(r.dueDate)}</p>}
+                      {r.dueDate && <p className="text-2xs text-violet-600 dark:text-violet-400 font-medium mt-0.5">سررسید: {toJalaliStringPretty(r.dueDate)}</p>}
                     </div>
                   </div>
                   <div className="text-left shrink-0">
