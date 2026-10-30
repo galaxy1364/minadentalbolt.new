@@ -1,0 +1,15 @@
+{
+  "version": "v1",
+  "hooks": [
+    {
+      "name": "Auto Push After Kiro Task",
+      "trigger": "PostTaskExec",
+      "description": "بعد از هر task که Kiro انجام می‌دهد، خودکار push می‌کند",
+      "action": {
+        "type": "command",
+        "command": "cd \"C:\\Users\\mosta\\Desktop\\dentify-pro\" && git add -A && git diff --cached --quiet || git commit -m \"auto: kiro task completed $(date +%Y-%m-%d)\" && git push origin main",
+        "timeout": 60
+      }
+    }
+  ]
+}

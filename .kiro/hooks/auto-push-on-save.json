@@ -1,0 +1,16 @@
+{
+  "version": "v1",
+  "hooks": [
+    {
+      "name": "Auto Push to GitHub on File Save",
+      "trigger": "PostFileSave",
+      "description": "بعد از هر ذخیره فایل ts/tsx/css/json، خودکار commit و push به GitHub می‌کند — Vercel خودکار build و deploy می‌کند",
+      "matcher": "\\.(tsx|ts|css|json|html|js|md)$",
+      "action": {
+        "type": "command",
+        "command": "cd \"C:\\Users\\mosta\\Desktop\\dentify-pro\" && git add -A && git diff --cached --quiet || git commit -m \"auto: update $(date +%Y-%m-%d %H:%M:%S)\" && git push origin main",
+        "timeout": 60
+      }
+    }
+  ]
+}
