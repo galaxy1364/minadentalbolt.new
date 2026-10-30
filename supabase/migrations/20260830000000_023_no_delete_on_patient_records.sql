@@ -1,0 +1,5 @@
+-- 023_no_delete_on_patient_records.sql
+-- Applied to live Supabase on 1405/06/08. See CHANGELOG MOD-SEC-003.
+-- Replaces the single FOR ALL policy on every record table with explicit
+-- SELECT / INSERT / UPDATE. DELETE is then denied by absence: with RLS
+-- enabled, a command with no matching policy is refused.

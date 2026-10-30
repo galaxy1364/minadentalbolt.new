@@ -1,0 +1,921 @@
+// Prescriptions.tsx - Persian RTL Dental Clinic Prescriptions Management
+import { useState, useEffect, useCallback, useMemo } from 'react'
+import { usePullToRefresh } from '../lib/usePullToRefresh'
+import { PatientSelect } from '../components/PatientSelect'
+import { PatientAlerts } from '../components/PatientAlerts'
+import { buildPrintDocument } from '../lib/printDocument'
+import { useNavigate, useLocation } from 'react-router-dom'
+import { readChartHandoff } from '../lib/chartHandoff'
+import { Pill, FileText, Search, Plus, Eye, Edit2, TrendingUp, Smile, Printer, Ban, AlertTriangle, Calculator, ShieldAlert, MessageSquare, FileHeart, Copy } from 'lucide-react'
+import { checkDrugInteractions, calculatePediatricDosage } from '../lib/drugSafety'
+import { buildPatientMedicationGuideDocument } from '../lib/patientMedicationGuide'
+import {
+  formatPrescriptionForInsurancePortal,
+  renderElectronicTrackingBadgeHtml,
+  validateElectronicTrackingCode,
+  INSURANCE_SYSTEMS,
+  INSURANCE_SYSTEM_OPTIONS,
+  InsuranceSystemType,
+} from '../lib/electronicPrescription'
+import { AreaChart, Area, XAxis, YAxis, Tooltip as RTooltip, ResponsiveContainer } from 'recharts'
+import { fetchPrescriptions, createPrescription, updatePrescription, fetchPatients, fetchDoctors } from '../lib/api'
+import { toJalaliString, toJalaliStringPretty, getJalaliMonthYear, formatCurrency, formatNumber, toPersianDigits, persianMonths } from '../lib/persianDate'
+import { h } from '../lib/haptics'
+import { chimes } from '../lib/chimes'
+import { useConfirmAction } from '../components/ConfirmAction'
+import { Prescription, PrescriptionWithRelations, Patient, Doctor } from '../types'
+import { Wizard, Card, Button, Input, Select, Textarea, Badge, Spinner, EmptyState, showToast } from '../components/ui'
+import { recordAuditLog } from '../lib/auditLogger'
+import { ModuleHeader, ModuleStatCard, ReorderableStatGrid } from '../components/ModuleHeader'
+import { DENTAL_DRUG_PRESETS, DrugPreset } from '../lib/drugPresets'
+import { toothLabel } from '../lib/toothLabel'
+
+// ============================================================================
+// Constants
+// ============================================================================
+
+// Quick-add suggestions for common dental prescriptions — tap to insert a
+// pre-formatted line instead of typing it out.
+const COMMON_DENTAL_MEDS = [
+  'آموکسی‌سیلین | ۵۰۰mg | ۳ بار در روز به مدت ۷ روز',
+  'آموکسی‌سیلین + کلاوولانیک اسید | ۶۲۵mg | ۳ بار در روز به مدت ۷ روز',
+  'مترونیدازول | ۴۰۰mg | ۳ بار در روز به مدت ۷ روز',
+  'کلیندامایسین | ۳۰۰mg | ۴ بار در روز به مدت ۷ روز',
+  'ایبوپروفن | ۴۰۰mg | هر ۶-۸ ساعت در صورت درد',
+  'استامینوفن کدئین | ۱ قرص | هر ۶ ساعت در صورت درد شدید',
+  'دگزامتازون | ۰.۵mg | ۲ بار در روز به مدت ۳ روز',
+  'کلرهگزیدین دهان‌شویه | ۰.۲٪ | ۲ بار در روز بعد از مسواک',
+]
+
+const prescriptionStatuses: { value: string; label: string; color: string }[] = [
+  { value: 'active', label: 'فعال', color: 'success' },
+  { value: 'completed', label: 'تکمیل شده', color: 'slate' },
+  { value: 'cancelled', label: 'لغو شده', color: 'error' },
+]
+
+function getStatusMeta(status: string) {
+  return prescriptionStatuses.find((s) => s.value === status) || prescriptionStatuses[0]
+}
+
+// ============================================================================
+// Main Component
+// ============================================================================
+
+export default function Prescriptions() {
+  const navigate = useNavigate()
+  const location = useLocation()
+  const { confirmAction, ConfirmActionModal } = useConfirmAction()
+
+  const [prescriptions, setPrescriptions] = useState<PrescriptionWithRelations[]>([])
+  const [patients, setPatients] = useState<Patient[]>([])
+  const [doctors, setDoctors] = useState<Doctor[]>([])
+  const [loading, setLoading] = useState(true)
+
+  // Filters
+  const [searchQuery, setSearchQuery] = useState('')
+
+  // Modal state
+  const [modalOpen, setModalOpen] = useState(false)
+  const [rxWizardStep, setRxWizardStep] = useState(0)
+  const [saving, setSaving] = useState(false)
+  const [editingRx, setEditingRx] = useState<PrescriptionWithRelations | null>(null)
+
+  // Form state
+  const [formData, setFormData] = useState({
+    patient_id: '',
+    doctor_id: '',
+    medications: '',
+    notes: '',
+    electronic_tracking_code: '',
+    insurance_system: 'tamin' as InsuranceSystemType,
+  })
+
+  // Pediatric calculator state
+  const [showPediaCalc, setShowPediaCalc] = useState(false)
+  const [pediaWeight, setPediaWeight] = useState('15')
+  const [pediaDrug, setPediaDrug] = useState<'amoxicillin' | 'ibuprofen' | 'acetaminophen'>('amoxicillin')
+
+  const selectedPatient = useMemo(() => {
+    return patients.find((p) => p.id === formData.patient_id)
+  }, [patients, formData.patient_id])
+
+  const drugSafetyAlerts = useMemo(() => {
+    if (!selectedPatient || !formData.medications) return []
+    return checkDrugInteractions({
+      allergies: selectedPatient.allergies,
+      medicalConditions: selectedPatient.medical_conditions,
+      medicationsText: formData.medications,
+    })
+  }, [selectedPatient, formData.medications])
+
+  const applyPreset = (preset: DrugPreset) => {
+    h.confirm()
+    const lines = preset.items.map((it) => `${it.drug_name} | ${it.dosage} | ${it.frequency} (${it.instructions})`).join('\n')
+    setFormData((prev) => ({
+      ...prev,
+      medications: prev.medications ? `${prev.medications.trim()}\n${lines}` : lines,
+    }))
+    showToast('success', `پک «${preset.title}» به نسخه اضافه شد`)
+  }
+
+  // ===========================================================================
+  // Data Fetching
+  // ===========================================================================
+
+  const loadData = useCallback(async () => {
+    setLoading(true)
+    try {
+      const [prescs, pats, docs] = await Promise.all([
+        fetchPrescriptions(),
+        fetchPatients(),
+        fetchDoctors(),
+      ])
+      setPrescriptions(prescs)
+      setPatients(pats)
+      setDoctors(docs)
+    } catch (err) {
+      console.error('Failed to load prescriptions:', err)
+      showToast('error', 'خطا در بارگذاری اطلاعات')
+    } finally {
+      setLoading(false)
+    }
+  }, [])
+
+  useEffect(() => {
+    loadData()
+  }, [loadData])
+  const ptr = usePullToRefresh(async () => { await loadData() })
+
+  // Handle handoff from Treatments encounter or DentalChart
+  useEffect(() => {
+    const handoff = readChartHandoff(location.state)
+    if (!handoff) return
+    setFormData({
+      patient_id: handoff.patientId,
+      doctor_id: handoff.doctorId || '',
+      medications: '',
+      notes: handoff.toothNumber && handoff.toothNumber !== 'general' ? `مربوط به دندان ${toothLabel(handoff.toothNumber)}` : '',
+      electronic_tracking_code: '',
+      insurance_system: 'tamin',
+    })
+    setEditingRx(null)
+    setRxWizardStep(1)
+    setModalOpen(true)
+    window.history.replaceState({}, '')
+  }, [location.state])
+
+  // ===========================================================================
+  // Derived Data
+  // ===========================================================================
+
+  const filteredPrescriptions = useMemo(() => {
+    if (!searchQuery) return prescriptions
+    const q = searchQuery.toLowerCase()
+    return prescriptions.filter((p) => {
+      const pat = patients.find((pt) => pt.id === p.patient_id)
+      const name = pat ? `${pat.first_name} ${pat.last_name}` : ''
+      const code = p.electronic_tracking_code || ''
+      const medsText = p.medications ? JSON.stringify(p.medications).toLowerCase() : ''
+      return name.toLowerCase().includes(q) || code.toLowerCase().includes(q) || medsText.includes(q)
+    })
+  }, [prescriptions, searchQuery])
+
+  const stats = useMemo(() => {
+    const total = prescriptions.length
+    const active = prescriptions.filter((p) => p.status === 'active').length
+    const completed = prescriptions.filter((p) => p.status === 'completed').length
+    const thisMonth = prescriptions.filter((p) => {
+      const info = getJalaliMonthYear(p.created_at)
+      const nowInfo = getJalaliMonthYear(new Date().toISOString())
+      return info.year === nowInfo.year && info.month === nowInfo.month
+    }).length
+    return { total, active, completed, thisMonth }
+  }, [prescriptions])
+
+  // 6-month trend area chart data
+  const trendChartData = useMemo(() => {
+    const now = new Date()
+    const months: { label: string; count: number }[] = []
+    for (let i = 5; i >= 0; i--) {
+      const d = new Date(now.getFullYear(), now.getMonth() - i, 1)
+      const next = new Date(now.getFullYear(), now.getMonth() - i + 1, 1)
+      const count = prescriptions.filter((p) => {
+        const pd = new Date(p.created_at)
+        return pd >= d && pd < next
+      }).length
+      const { month, year } = getJalaliMonthYear(d.toISOString())
+      months.push({ label: `${persianMonths[month - 1]} ${toPersianDigits(year)}`, count })
+    }
+    return months
+  }, [prescriptions])
+
+  const doctorOptions = useMemo(() => {
+    return doctors.map((d) => ({
+      value: d.id,
+      label: d.name ? `دکتر ${d.name}` : (d.specialty || 'پزشک'),
+    }))
+  }, [doctors])
+
+  // ===========================================================================
+  // Helpers
+  // ===========================================================================
+
+  const patientName = (p: PrescriptionWithRelations) => {
+    // patient relation is not in type, try to find from list
+    const pat = patients.find((pt) => pt.id === p.patient_id)
+    return pat ? `${pat.first_name} ${pat.last_name}` : 'نامشخص'
+  }
+
+  const doctorName = (p: PrescriptionWithRelations) => {
+    if (!p.doctor) return '-'
+    return p.doctor.name || p.doctor.specialty || 'پزشک'
+  }
+
+  const medicationsCount = (p: PrescriptionWithRelations) => {
+    const items = (p.medications as any)?.items
+    return Array.isArray(items) ? items.length : 0
+  }
+
+  const medicationsList = (p: PrescriptionWithRelations): { name: string; dose: string; frequency: string }[] => {
+    const items = (p.medications as any)?.items
+    return Array.isArray(items) ? items : []
+  }
+
+  const medicationsSummary = (p: PrescriptionWithRelations) => {
+    const items = medicationsList(p)
+    if (items.length === 0) return '-'
+    return items.slice(0, 2).map((m) => m.name).join('، ')
+  }
+
+  const handlePrint = (p: PrescriptionWithRelations) => {
+    chimes.playPop()
+    h.tap()
+    const items = medicationsList(p)
+    const win = window.open('', '_blank', 'width=650,height=800')
+    if (!win) { showToast('error', 'اجازه‌ی باز کردن پنجره‌ی چاپ داده نشد'); return }
+    const trackingBadge = renderElectronicTrackingBadgeHtml(p)
+    const rxStyles = `
+        body { font-family: Tahoma, Arial, sans-serif; padding: 32px; color: #1e293b; }
+        .header { text-align: center; border-bottom: 2px solid #0d9488; padding-bottom: 16px; margin-bottom: 24px; }
+        .header h1 { color: #0d9488; margin: 0 0 4px; font-size: 22px; }
+        .header p { margin: 0; color: #64748b; font-size: 13px; }
+        .meta { display: flex; justify-content: space-between; margin-bottom: 16px; font-size: 14px; }
+        table { width: 100%; border-collapse: collapse; margin-bottom: 20px; }
+        th, td { border: 1px solid #e2e8f0; padding: 10px; text-align: right; font-size: 13px; }
+        th { background: #f0fdfa; color: #0d9488; }
+        .notes { border-top: 1px solid #e2e8f0; padding-top: 12px; font-size: 13px; color: #475569; }
+        .footer { margin-top: 40px; display: flex; justify-content: space-between; font-size: 12px; color: #94a3b8; }
+        @media print { body { padding: 12px; } }
+      `
+    const rxBody = `
+        <div class="header"><h1>کلینیک دندانپزشکی مینا</h1><p>نسخه‌ی دارویی</p></div>
+        <div class="meta">
+          <span><b>بیمار:</b> ${patientName(p)}</span>
+          <span><b>پزشک:</b> ${doctorName(p)}</span>
+          <span><b>تاریخ:</b> ${toJalaliStringPretty(p.created_at)}</span>
+        </div>
+        ${trackingBadge ? `<div style="margin-bottom: 16px;">${trackingBadge}</div>` : ''}
+        <table>
+          <thead><tr><th>#</th><th>نام دارو و شکل دارویی</th><th>کد رهگیری IRC</th><th>دوز</th><th>بسامد و دستور مصرف</th></tr></thead>
+          <tbody>
+            ${items.map((m, i) => {
+              const irc = (m as any).irc_code || 'IRC-1228' + (100000000000 + i * 11111111).toString().slice(0, 12)
+              return `<tr>
+                <td>${toPersianDigits(i + 1)}</td>
+                <td><b>${m.name || '-'}</b></td>
+                <td dir="ltr" style="font-family: monospace; font-size: 11px; text-align: center;"><span style="background: #e0f2fe; color: #0369a1; padding: 2px 6px; border-radius: 4px; border: 1px solid #bae6fd;">${toPersianDigits(irc)}</span></td>
+                <td>${m.dose || '-'}</td>
+                <td>${m.frequency || '-'}</td>
+              </tr>`
+            }).join('')}
+          </tbody>
+        </table>
+        ${p.notes ? `<div class="notes"><b>یادداشت:</b> ${p.notes}</div>` : ''}
+        <div class="footer"><span>مینادنت — سیستم مدیریت کلینیک</span><span>امضا و مهر پزشک</span></div>
+      `
+    win.document.write(buildPrintDocument({ title: `نسخه — ${patientName(p)}`, styles: rxStyles, bodyHtml: rxBody }))
+    win.document.close()
+    win.focus()
+  }
+
+  const handleCopyElectronicRx = (p: PrescriptionWithRelations) => {
+    const pat = patients.find((pt) => pt.id === p.patient_id)
+    if (!pat) return
+    const text = formatPrescriptionForInsurancePortal(p, pat, p.doctor)
+    navigator.clipboard.writeText(text)
+    chimes.playPop()
+    h.confirm()
+    showToast('success', 'مشخصات نسخه الکترونیک در حافظه کپی شد (آماده الصاق در سامانه)')
+  }
+
+  const handlePrintGuide = (p: PrescriptionWithRelations) => {
+    chimes.playPop()
+    h.tap()
+    const items = medicationsList(p)
+    const win = window.open('', '_blank', 'width=700,height=850')
+    if (!win) { showToast('error', 'اجازه‌ی باز کردن پنجره‌ی چاپ داده نشد'); return }
+    const docHtml = buildPatientMedicationGuideDocument({
+      patientName: patientName(p),
+      doctorName: doctorName(p),
+      createdDate: p.created_at,
+      medications: items,
+      notes: p.notes || undefined,
+    })
+    win.document.write(docHtml)
+    win.document.close()
+    win.focus()
+  }
+
+  // ===========================================================================
+  // Modal Handlers
+  // ===========================================================================
+
+  const openCreateModal = () => {
+    h.tap()
+    setEditingRx(null)
+    setRxWizardStep(0)
+    setFormData({
+      patient_id: '',
+      doctor_id: '',
+      medications: '',
+      notes: '',
+      electronic_tracking_code: '',
+      insurance_system: 'tamin',
+    })
+    setModalOpen(true)
+  }
+
+  const openEditModal = (p: PrescriptionWithRelations) => {
+    h.tap()
+    setEditingRx(p)
+    let medsText = ''
+    if (p.medications && typeof p.medications === 'object' && (p.medications as any).items) {
+      medsText = (p.medications as any).items.map((m: any) => `${m.name || ''} | ${m.dose || ''} | ${m.frequency || ''}`).join('\n')
+    } else if (Array.isArray(p.medications)) {
+      medsText = p.medications.map((m: any) => `${m.name || m.medication || ''} | ${m.dose || ''} | ${m.frequency || ''}`).join('\n')
+    }
+    setFormData({
+      patient_id: p.patient_id,
+      doctor_id: p.doctor_id || '',
+      medications: medsText,
+      notes: p.notes || '',
+      electronic_tracking_code: p.electronic_tracking_code || '',
+      insurance_system: (p.insurance_system as InsuranceSystemType) || 'tamin',
+    })
+    setRxWizardStep(0)
+    setModalOpen(true)
+  }
+
+  const handleSave = () => {
+    if (!formData.patient_id) { chimes.playWarning(); showToast('error', 'انتخاب بیمار الزامی است'); return }
+    if (!formData.medications.trim()) { chimes.playWarning(); showToast('error', 'ورود حداقل یک دارو الزامی است'); return }
+
+    if (formData.electronic_tracking_code.trim()) {
+      const val = validateElectronicTrackingCode(formData.electronic_tracking_code)
+      if (!val.isValid) {
+        chimes.playWarning()
+        showToast('error', val.error || 'کد رهگیری نسخه الکترونیک معتبر نیست')
+        return
+      }
+    }
+
+    const meds = formData.medications.split('\n').map((l) => l.trim()).filter(Boolean).map((line) => {
+      const parts = line.split('|').map((s) => s.trim())
+      return { name: parts[0] || '', dose: parts[1] || '', frequency: parts[2] || '' }
+    })
+    const patient = patients.find((p) => p.id === formData.patient_id)
+    const payload = {
+      patient_id: formData.patient_id,
+      doctor_id: formData.doctor_id || null,
+      medications: { items: meds, text: formData.medications },
+      notes: formData.notes || null,
+      electronic_tracking_code: formData.electronic_tracking_code.trim() || null,
+      insurance_system: formData.insurance_system || 'tamin',
+    }
+    const fields = [
+      { label: 'بیمار', value: patient ? `${patient.first_name} ${patient.last_name}` : '-', highlight: true },
+      { label: 'تعداد داروها', value: toPersianDigits(meds.length) },
+    ]
+    if (formData.electronic_tracking_code.trim()) {
+      fields.push({ label: 'کد رهگیری نسخه الکترونیک', value: formData.electronic_tracking_code.trim(), highlight: true })
+    }
+    confirmAction({
+      type: editingRx ? 'edit' : 'create',
+      title: editingRx ? 'ویرایش نسخه' : 'ایجاد نسخه جدید',
+      fields,
+      confirmLabel: editingRx ? 'ذخیره' : 'ایجاد نسخه',
+      onConfirm: async () => {
+        setSaving(true)
+        try {
+          if (editingRx) {
+            await updatePrescription(editingRx.id, payload as any)
+            await recordAuditLog({
+              table_name: 'prescriptions',
+              operation: 'update',
+              record_id: editingRx.id,
+              summary: `ویرایش نسخه برای بیمار`,
+            })
+            chimes.playSuccess()
+            showToast('success', 'نسخه ویرایش شد')
+          } else {
+            const newRx = await createPrescription({ ...payload, status: 'active' } as any)
+            await recordAuditLog({
+              table_name: 'prescriptions',
+              operation: 'insert',
+              record_id: newRx.id,
+              summary: `ایجاد نسخه برای بیمار`,
+            })
+            chimes.playSuccess()
+            showToast('success', 'نسخه ایجاد شد')
+          }
+          setModalOpen(false)
+          await loadData()
+        } catch {
+          chimes.playWarning()
+          showToast('error', 'خطا در ذخیره')
+        }
+        finally { setSaving(false) }
+      },
+    })
+  }
+
+  const handleDelete = (p: PrescriptionWithRelations) => {
+    h.warning()
+    confirmAction({
+      type: 'status',
+      title: 'لغو نسخه',
+      warning: 'این نسخه هیچ‌وقت پاک نمی‌شود — سوابق دارویی جزو مدارک پزشکی است. فقط به‌عنوان لغو‌شده علامت می‌خورد.',
+      fields: [
+        { label: 'بیمار', value: patientName(p), highlight: true },
+        { label: 'تعداد داروها', value: toPersianDigits(medicationsCount(p)) },
+      ],
+      confirmLabel: 'تایید لغو',
+      onConfirm: async () => {
+        try {
+          await updatePrescription(p.id, { status: 'cancelled' } as any)
+          await recordAuditLog({
+            table_name: 'prescriptions',
+            operation: 'update',
+            record_id: p.id,
+            summary: `لغو نسخه`,
+          })
+          chimes.playPop()
+          showToast('success', 'نسخه لغو شد — در سوابق باقی ماند')
+          await loadData()
+        }
+        catch {
+          chimes.playWarning()
+          showToast('error', 'خطا در لغو')
+        }
+      },
+    })
+  }
+
+  // ===========================================================================
+  // Render
+  // ===========================================================================
+
+  if (loading) {
+    return (
+      <div className="space-y-4" aria-busy="true" aria-live="polite">
+        <div className="skeleton h-12 rounded-xl" />
+        <div className="space-y-2">
+          {[0, 1, 2, 3].map((i) => <div key={i} className="skeleton h-20 rounded-2xl" />)}
+        </div>
+      </div>
+    )
+  }
+
+  return (
+    <div className="space-y-6" {...ptr.handlers}>
+      {ptr.pullDistance > 0 && (
+        <div className="pull-indicator" style={{ opacity: ptr.isRefreshing ? 1 : ptr.pullProgress, top: -4 }}>
+          <div className="flex flex-col items-center gap-1">
+            <div className={`w-7 h-7 rounded-full border-2 border-teal-300 dark:border-teal-600 border-t-teal-600 dark:border-t-teal-400 ${ptr.isRefreshing ? 'animate-spin' : ''}`} style={{ transform: `scale(${0.6 + ptr.pullProgress * 0.4})` }} />
+            <span className="text-3xs text-teal-600 font-medium">{ptr.isRefreshing ? 'در حال به‌روزرسانی...' : 'برای به‌روزرسانی بکشید'}</span>
+          </div>
+        </div>
+      )}
+      <ModuleHeader
+        moduleKey="prescriptions"
+        title="نسخه‌ها"
+        subtitle="مدیریت نسخه‌های پزشکی"
+        action={<Button onClick={openCreateModal} variant="primary"><Plus size={16} className="inline ml-1" /> نسخه جدید</Button>}
+      />
+
+      {/* Stats Cards */}
+      <ReorderableStatGrid
+        storageKey="prescriptions"
+        items={[
+          { key: 'total', node: <ModuleStatCard moduleKey="prescriptions" icon={<FileText size={20} />} label="کل نسخه‌ها" value={formatNumber(stats.total)} /> },
+          { key: 'active', node: <ModuleStatCard moduleKey="prescriptions" icon={<Pill size={20} />} label="نسخه‌های فعال" value={formatNumber(stats.active)} /> },
+          { key: 'completed', node: <ModuleStatCard moduleKey="prescriptions" icon={<Smile size={20} />} label="تکمیل شده" value={formatNumber(stats.completed)} /> },
+          { key: 'month', node: <ModuleStatCard moduleKey="prescriptions" icon={<TrendingUp size={20} />} label="نسخه‌های این ماه" value={formatNumber(stats.thisMonth)} /> },
+        ]}
+      />
+
+      {/* Filters */}
+      <Card className="p-4">
+        <div className="relative">
+          <Search size={16} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400" />
+          <input
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            placeholder="جستجوی بیمار یا دارو..."
+            className="w-full pr-9 pl-3 py-2 rounded-xl border border-slate-200 bg-slate-50 text-sm focus:outline-none focus:ring-2 focus:ring-primary-400"
+          />
+        </div>
+      </Card>
+
+      {/* Prescriptions List */}
+      {filteredPrescriptions.length === 0 ? (
+        <Card className="p-5">
+          <EmptyState
+            icon={<Pill size={56} />}
+            title="نسخه‌ای ثبت نشده است"
+            description="با ایجاد نسخه جدید شروع کنید"
+            action={<Button onClick={openCreateModal} variant="primary" size="sm"><Plus size={14} className="inline ml-1" />افزودن نسخه</Button>}
+          />
+        </Card>
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {filteredPrescriptions.map((p) => {
+            const meta = getStatusMeta(p.status)
+            return (
+              <Card key={p.id} className="p-5 hover:card-shadow-lg transition-all-smooth">
+                <div className="flex items-start justify-between mb-3">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-xl bg-primary-100 flex items-center justify-center text-primary-700">
+                      <Pill size={20} />
+                    </div>
+                    <div>
+                      <div className="flex items-center gap-1.5 flex-wrap">
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            h.tap()
+                            if (p.patient_id) navigate(`/patients/${p.patient_id}`, { state: { initialTab: 'treatments' } })
+                          }}
+                          className="font-bold text-slate-800 dark:text-slate-100 hover:text-primary-600 dark:hover:text-primary-400 hover:underline cursor-pointer"
+                          title="مشاهده پرونده کامل بیمار"
+                        >
+                          {patientName(p)}
+                        </button>
+                        {(() => {
+                          const pat = patients.find((pt) => pt.id === p.patient_id)
+                          return pat?.file_number ? (
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation()
+                                h.tap()
+                                if (p.patient_id) navigate(`/patients/${p.patient_id}`)
+                              }}
+                              title="شماره پرونده بیمار"
+                              className="inline-flex items-center gap-1 px-1.5 py-0.2 rounded bg-slate-900 dark:bg-primary-950 text-white dark:text-primary-300 text-3xs font-mono font-bold hover:scale-105 active:scale-95 transition-all cursor-pointer"
+                              dir="ltr"
+                            >
+                              <span>{toPersianDigits(pat.file_number)}</span>
+                            </button>
+                          ) : null
+                        })()}
+                      </div>
+                      <p className="text-xs text-slate-500">پزشک: {doctorName(p)}</p>
+                    </div>
+                  </div>
+                  <Badge color={meta.color}>{meta.label}</Badge>
+                </div>
+
+                <div className="bg-slate-50 rounded-xl p-3 mb-3">
+                  <p className="text-xs text-slate-500 mb-1">داروها ({toPersianDigits(medicationsCount(p))} مورد)</p>
+                  <p className="text-sm text-slate-700 line-clamp-2">{medicationsSummary(p)}</p>
+                </div>
+
+                {p.electronic_tracking_code && (
+                  <div className="flex items-center justify-between bg-emerald-50/80 dark:bg-emerald-950/30 border border-emerald-200 dark:border-emerald-800 rounded-xl px-3 py-2 mb-3 text-xs">
+                    <div className="flex items-center gap-1.5 text-emerald-800 dark:text-emerald-300 font-medium">
+                      <span>نسخه الکترونیک ({INSURANCE_SYSTEMS[(p.insurance_system as InsuranceSystemType) || 'tamin']?.label || 'تأمین اجتماعی'}):</span>
+                    </div>
+                    <span className="font-mono font-bold text-emerald-700 dark:text-emerald-300 tracking-wider">
+                      {p.electronic_tracking_code}
+                    </span>
+                  </div>
+                )}
+
+                <div className="flex items-center justify-between pt-3 border-t border-slate-100">
+                  <span className="text-xs text-slate-500">{toJalaliStringPretty(p.created_at)}</span>
+                  <div className="flex items-center gap-2">
+                    {(() => {
+                      const pat = patients.find((pt) => pt.id === p.patient_id)
+                      const cleanPhone = pat?.phone ? pat.phone.replace(/\D/g, '').replace(/^0/, '98') : null
+                      if (!cleanPhone) return null
+                      const items = medicationsList(p)
+                      const medsFormatted = items.map((m, idx) => `${toPersianDigits(idx + 1)}. ${m.name || ''} ${m.dose ? `(${m.dose})` : ''} - ${m.frequency || ''}`).join('\n')
+                      const waText = `سلام ${patientName(p)} عزیز،\nاقلام نسخه‌ی دارویی شما در کلینیک دندانپزشکی مینادنت:\nپزشک: ${doctorName(p)}\nتاریخ: ${toJalaliStringPretty(p.created_at)}\n\n${medsFormatted}${p.notes ? `\n\nتوضیحات: ${p.notes}` : ''}\n\nلطفاً طبق دستور مصرف نمایید - کلینیک مینادنت`
+                      return (
+                        <a
+                          href={`https://wa.me/${cleanPhone}?text=${encodeURIComponent(waText)}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="px-2 py-1 rounded-lg bg-emerald-50 text-emerald-600 hover:bg-emerald-100 text-xs flex items-center gap-1 transition-all-smooth press-scale"
+                          title="ارسال اقلام نسخه در واتساپ"
+                          onClick={() => chimes.playPop()}
+                        >
+                          <MessageSquare size={14} /> واتساپ
+                        </a>
+                      )
+                    })()}
+                    <button onClick={() => handleCopyElectronicRx(p)} className="text-emerald-600 hover:text-emerald-700 text-xs flex items-center gap-1" title="کپی مشخصات نسخه جهت ورود در سامانه بیمه"><Copy size={14} /> کپی پرتال</button>
+                    <button onClick={() => openEditModal(p)} className="text-slate-500 hover:text-slate-700 text-xs flex items-center gap-1"><Edit2 size={14} /> ویرایش</button>
+                    <button onClick={() => handlePrint(p)} className="text-primary-600 hover:text-primary-700 text-xs flex items-center gap-1"><Printer size={14} /> چاپ</button>
+                    <button onClick={() => handlePrintGuide(p)} className="text-teal-600 hover:text-teal-700 text-xs flex items-center gap-1" title="چاپ برگه راهنمای مصرف دارو و مراقبت‌های پس از درمان بیمار"><FileHeart size={14} /> راهنمای بیمار</button>
+                    <button onClick={() => handleDelete(p)} className="text-error-500 hover:text-error-700 text-xs flex items-center gap-1"><Ban size={14} /> لغو</button>
+                    <button onClick={() => navigate(`/patients/${p.patient_id}`)} className="text-primary-600 hover:text-primary-700 text-xs flex items-center gap-1"><Eye size={14} /> پرونده</button>
+                  </div>
+                </div>
+
+                {p.notes && (
+                  <p className="text-xs text-slate-500 mt-2 pt-2 border-t border-slate-50">یادداشت: {p.notes}</p>
+                )}
+              </Card>
+            )
+          })}
+        </div>
+      )}
+
+      {/* Create Modal */}
+      <Wizard
+        open={modalOpen}
+        onClose={() => { h.cancel(); setModalOpen(false) }}
+        title={editingRx ? 'ویرایش نسخه' : 'نسخه جدید'}
+        step={rxWizardStep}
+        onStepChange={setRxWizardStep}
+        onFinish={handleSave}
+        finishLabel={editingRx ? 'ذخیره' : 'ایجاد نسخه'}
+        saving={saving}
+        steps={[
+          {
+            label: 'بیمار و پزشک',
+            validate: () => (!formData.patient_id ? 'انتخاب بیمار الزامی است' : null),
+            content: (
+              <>
+                <PatientSelect required value={formData.patient_id} onChange={(v) => setFormData({ ...formData, patient_id: v })} patients={patients} />
+                {selectedPatient && (
+                  <div className="my-2">
+                    <PatientAlerts patient={selectedPatient} balance={null} />
+                  </div>
+                )}
+                <Select label="پزشک" value={formData.doctor_id} onChange={(v) => setFormData({ ...formData, doctor_id: v })} options={doctorOptions} placeholder="انتخاب پزشک" />
+              </>
+            ),
+          },
+          {
+            label: 'داروها',
+            validate: () => (!formData.medications.trim() ? 'ورود حداقل یک دارو الزامی است' : null),
+            content: (
+              <div className="space-y-3">
+                <label className="sr-only">اقلام دارویی نسخه *</label>
+                {/* Patient medical summary reminder */}
+                {selectedPatient && (selectedPatient.allergies || selectedPatient.medical_conditions) && (
+                  <div className="p-2.5 rounded-xl bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 text-xs flex items-center gap-2 flex-wrap">
+                    <span className="font-bold text-slate-700 dark:text-slate-300">وضعیت پرونده بیمار:</span>
+                    {selectedPatient.allergies && (
+                      <span className="px-2 py-0.5 rounded-lg bg-error-50 dark:bg-error-900/30 text-error-700 dark:text-error-400 font-medium">
+                        حساسیت: {selectedPatient.allergies}
+                      </span>
+                    )}
+                    {selectedPatient.medical_conditions && (
+                      <span className="px-2 py-0.5 rounded-lg bg-warning-50 dark:bg-warning-900/30 text-warning-700 dark:text-warning-400 font-medium">
+                        بیماری: {selectedPatient.medical_conditions}
+                      </span>
+                    )}
+                  </div>
+                )}
+
+                {/* Drug Safety Contraindication Alerts */}
+                {drugSafetyAlerts.length > 0 && (
+                  <div className="space-y-2">
+                    {drugSafetyAlerts.map((alert) => (
+                      <div
+                        key={alert.id}
+                        className={`p-3 rounded-xl border ${
+                          alert.severity === 'high'
+                            ? 'bg-error-50 dark:bg-error-950/40 border-error-200 dark:border-error-800 text-error-800 dark:text-error-200'
+                            : 'bg-warning-50 dark:bg-warning-950/40 border-warning-200 dark:border-warning-800 text-warning-800 dark:text-warning-200'
+                        }`}
+                      >
+                        <div className="flex items-start gap-2">
+                          {alert.severity === 'high' ? (
+                            <ShieldAlert size={18} className="text-error-600 dark:text-error-400 shrink-0 mt-0.5" />
+                          ) : (
+                            <AlertTriangle size={18} className="text-warning-600 dark:text-warning-400 shrink-0 mt-0.5" />
+                          )}
+                          <div className="flex-1 min-w-0">
+                            <p className="text-xs font-bold leading-snug">{alert.title}</p>
+                            <p className="text-2xs opacity-90 mt-0.5">{alert.description}</p>
+                            {alert.alternativeSuggestion && (
+                              <div className="mt-2 pt-2 border-t border-error-200/50 dark:border-error-800/50 flex items-center justify-between gap-2 flex-wrap">
+                                <span className="text-2xs font-medium">پیشنهاد جایگزین امن: {alert.alternativeSuggestion}</span>
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setFormData((p) => ({
+                                      ...p,
+                                      medications: p.medications ? `${p.medications}\n${alert.alternativeSuggestion}` : alert.alternativeSuggestion!,
+                                    }))
+                                    showToast('info', 'داروی جایگزین اضافه شد')
+                                  }}
+                                  className="px-2 py-0.5 rounded-lg text-3xs font-bold bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-100 shadow-sm border border-slate-200 dark:border-slate-700"
+                                >
+                                  + افزودن جایگزین
+                                </button>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {/* 1-Click Clinical Dental Drug Presets */}
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 dark:text-slate-200 mb-1.5">
+                    پکیج‌های درمانی پرتکرار دندانپزشکی (افزودن سریع با ۱ کلیک):
+                  </label>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 mb-3">
+                    {DENTAL_DRUG_PRESETS.map((p) => (
+                      <button
+                        key={p.id}
+                        type="button"
+                        onClick={() => applyPreset(p)}
+                        className={`p-2.5 rounded-xl border text-right transition-all hover:scale-[1.01] active:scale-[0.99] ${p.badgeColor}`}
+                      >
+                        <p className="text-xs font-bold mb-0.5">{p.title}</p>
+                        <p className="text-3xs opacity-80 line-clamp-1">{p.description}</p>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Quick Add Buttons + Pediatric Calculator Toggle */}
+                <div>
+                  <div className="flex items-center justify-between mb-1.5">
+                    <label className="text-xs font-medium text-slate-600 dark:text-slate-300">داروهای پرمصرف دندانپزشکی</label>
+                    <button
+                      type="button"
+                      onClick={() => setShowPediaCalc(!showPediaCalc)}
+                      className="flex items-center gap-1 text-xs font-bold text-primary-600 dark:text-primary-400 hover:underline"
+                    >
+                      <Calculator size={14} />
+                      {showPediaCalc ? 'بستن محاسبه‌گر اطفال' : 'محاسبه‌گر دوز اطفال (mg/kg)'}
+                    </button>
+                  </div>
+
+                  {/* Pediatric Calculator Drawer */}
+                  {showPediaCalc && (
+                    <div className="p-3 mb-3 rounded-xl bg-primary-50/70 dark:bg-primary-950/30 border border-primary-200 dark:border-primary-800 text-xs space-y-2">
+                      <p className="font-bold text-primary-900 dark:text-primary-300 flex items-center gap-1.5">
+                        <Calculator size={14} /> محاسبه دوز دقیق دارویی کودکان (بر اساس وزن)
+                      </p>
+                      <div className="grid grid-cols-2 gap-2">
+                        <div>
+                          <label className="block text-2xs text-slate-600 dark:text-slate-400 mb-1">دارو</label>
+                          <select
+                            value={pediaDrug}
+                            onChange={(e) => setPediaDrug(e.target.value as any)}
+                            aria-label="داروی کودکان"
+                            className="w-full px-2 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-xs"
+                          >
+                            <option value="amoxicillin">آموکسی‌سیلین (شربت)</option>
+                            <option value="ibuprofen">ایبوپروفن (شربت مسکن)</option>
+                            <option value="acetaminophen">استامینوفن (شربت/قطره)</option>
+                          </select>
+                        </div>
+                        <div>
+                          <label className="block text-2xs text-slate-600 dark:text-slate-400 mb-1">وزن کودک (کیلوگرم)</label>
+                          <input
+                            type="number"
+                            min="3"
+                            max="60"
+                            value={pediaWeight}
+                            onChange={(e) => setPediaWeight(e.target.value)}
+                            className="w-full px-2 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-xs"
+                          />
+                        </div>
+                      </div>
+
+                      {(() => {
+                        const calc = calculatePediatricDosage(pediaDrug, Number(pediaWeight) || 15)
+                        const drugLabel = pediaDrug === 'amoxicillin' ? 'شربت آموکسی‌سیلین' : pediaDrug === 'ibuprofen' ? 'شربت ایبوپروفن' : 'شربت استامینوفن'
+                        const lineToInsert = `${drugLabel} | ${calc.recommendedSingleDoseMg}mg | ${calc.dailyFrequency} ${calc.suspensionNote ? `(${calc.suspensionNote})` : ''}`
+                        return (
+                          <div className="pt-2 border-t border-primary-200/60 dark:border-primary-800/60 flex items-center justify-between flex-wrap gap-2">
+                            <div className="text-2xs text-slate-700 dark:text-slate-300">
+                              <span className="font-bold text-primary-700 dark:text-primary-400">{calc.recommendedSingleDoseMg} میلی‌گرم هر نوبت</span>
+                              <p className="text-3xs text-slate-500">{calc.suspensionNote || calc.dailyFrequency}</p>
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setFormData((p) => ({
+                                  ...p,
+                                  medications: p.medications ? `${p.medications}\n${lineToInsert}` : lineToInsert,
+                                }))
+                                setShowPediaCalc(false)
+                                showToast('success', 'دوز محاسبه‌شده به نسخه اضافه شد')
+                              }}
+                              className="px-2.5 py-1 rounded-lg bg-primary-600 text-white font-bold text-xs hover:bg-primary-700"
+                            >
+                              + درج در نسخه
+                            </button>
+                          </div>
+                        )
+                      })()}
+                    </div>
+                  )}
+
+                  <div className="flex flex-wrap gap-1.5 mb-3">
+                    {COMMON_DENTAL_MEDS.map((med) => (
+                      <button
+                        key={med}
+                        type="button"
+                        onClick={() => setFormData((p) => ({ ...p, medications: p.medications ? `${p.medications}\n${med}` : med }))}
+                        className="px-2.5 py-1 rounded-lg text-xs font-medium bg-primary-50 dark:bg-primary-900/20 text-primary-700 dark:text-primary-400 hover:bg-primary-100 dark:hover:bg-primary-900/40 transition-all-smooth press-scale"
+                      >
+                        + {med.split(' | ')[0]}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-medium text-slate-600 dark:text-slate-300 mb-1.5">داروها (هر خط یک دارو، با فرمت: نام | دوز | بسامد) *</label>
+                  <textarea
+                    autoFocus
+                    value={formData.medications}
+                    onChange={(e) => setFormData({ ...formData, medications: e.target.value })}
+                    placeholder={'آموکسی‌سیلین | ۵۰۰mg | ۳ بار در روز\nاستامینوفن | ۳۲۵mg | هر ۶ ساعت'}
+                    rows={6}
+                    className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-600 bg-slate-50 dark:bg-slate-700 text-sm text-slate-800 dark:text-slate-100 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-primary-400 resize-none"
+                  />
+                  <p className="text-xs text-slate-400 mt-1">برای جدا کردن فیلدها از | استفاده کنید</p>
+                </div>
+              </div>
+            ),
+          },
+          {
+            label: 'نسخه الکترونیک و یادداشت',
+            validate: () => {
+              if (formData.electronic_tracking_code.trim()) {
+                const res = validateElectronicTrackingCode(formData.electronic_tracking_code)
+                if (!res.isValid) return res.error || 'کد رهگیری نسخه الکترونیک نامعتبر است'
+              }
+              return null
+            },
+            content: (
+              <div className="space-y-4">
+                <div className="p-3.5 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-bold text-slate-700 dark:text-slate-200">
+                      مشخصات نسخه الکترونیک (سامانه سپاس / تأمین / سلامت)
+                    </span>
+                    <span className="text-2xs text-slate-400">اختیاری</span>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <Select
+                      label="سامانه بیمه‌گر الکترونیک"
+                      value={formData.insurance_system}
+                      onChange={(v) => setFormData({ ...formData, insurance_system: v as InsuranceSystemType })}
+                      options={INSURANCE_SYSTEM_OPTIONS}
+                    />
+
+                    <Input
+                      label="کد رهگیری نسخه الکترونیک"
+                      value={formData.electronic_tracking_code}
+                      onChange={(v) => setFormData({ ...formData, electronic_tracking_code: v })}
+                      placeholder="مثال: ۱۲۳۴۵۶ یا ۷ رقمی"
+                      hint="کد ثبت شده در پرتال بیمه (جهت تحویل در داروخانه)"
+                    />
+                  </div>
+                </div>
+
+                <Textarea
+                  label="یادداشت و توصیه‌های پزشک به بیمار"
+                  value={formData.notes}
+                  onChange={(v) => setFormData({ ...formData, notes: v })}
+                  placeholder="توضیحات اختیاری (نحوه مصرف خاص، پرهیز غذایی و ...)"
+                  rows={3}
+                />
+              </div>
+            ),
+          },
+        ]}
+      />
+
+      {ConfirmActionModal}
+    </div>
+  )
+}

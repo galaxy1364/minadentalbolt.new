@@ -1,0 +1,738 @@
+// WaitingList.tsx - Persian RTL Dental Clinic Waiting List Management
+import { useState, useEffect, useCallback, useMemo } from 'react'
+import { usePullToRefresh } from '../lib/usePullToRefresh'
+import { PatientSelect } from '../components/PatientSelect'
+import { PatientAlerts } from '../components/PatientAlerts'
+import { CHART_AXIS_COLOR_STRONG } from '../lib/colorTokens'
+import { useNavigate } from 'react-router-dom'
+import { Clock, Search, Plus, Phone, Bell, CheckCircle2, XCircle, Calendar, Smile, AlertCircle, Edit2, Ban, MessageSquare } from 'lucide-react'
+import { BarChart, Bar, XAxis, YAxis, Tooltip as RTooltip, ResponsiveContainer, Cell } from 'recharts'
+import { fetchWaitingList, createWaitingEntry, updateWaitingEntry, cancelWaitingEntry, fetchPatients, fetchDoctors, createAppointment, fetchUnits, checkConflict } from '../lib/api'
+import { toJalaliDisplay, toJalaliStringPretty, formatTime, formatNumber, toPersianDigits } from '../lib/persianDate'
+import { h } from '../lib/haptics'
+import { chimes } from '../lib/chimes'
+import { useConfirmAction } from '../components/ConfirmAction'
+import { WaitingListEntry, WaitingListEntryWithRelations, Patient, Doctor, Unit } from '../types'
+import { Wizard, Card, Button, Input, Select, Textarea, Badge, Spinner, EmptyState, showToast } from '../components/ui'
+import { PersianDateInput } from '../components/PersianDateInput'
+import { ModuleHeader, ModuleStatCard, ReorderableStatGrid } from '../components/ModuleHeader'
+import { supabase } from '../lib/supabase'
+import { addMinutes } from '../lib/timeSlots'
+import { tileThemes, getHashColor } from '../lib/colors'
+
+// ============================================================================
+// Constants
+// ============================================================================
+
+const waitStatuses: { value: string; label: string; color: string }[] = [
+  { value: 'waiting', label: 'در انتظار', color: 'warning' },
+  { value: 'notified', label: 'اطلاع داده شد', color: 'primary' },
+  { value: 'scheduled', label: 'زمان‌بندی شد', color: 'success' },
+  { value: 'cancelled', label: 'لغو شد', color: 'error' },
+]
+
+const priorityLabels: Record<number, string> = {
+  1: 'کم',
+  2: 'متوسط',
+  3: 'بالا',
+  4: 'فوری',
+}
+
+const priorityColors: Record<number, string> = {
+  1: 'success',
+  2: 'primary',
+  3: 'warning',
+  4: 'error',
+}
+
+const CHART_COLORS = ['#10b981', '#0ea5e9', '#f59e0b', '#ef4444']
+
+function getStatusMeta(status: string) {
+  return waitStatuses.find((s) => s.value === status) || waitStatuses[0]
+}
+
+// ============================================================================
+// Main Component
+// ============================================================================
+
+export default function WaitingList() {
+  const navigate = useNavigate()
+  const { confirmAction, ConfirmActionModal } = useConfirmAction()
+
+  const [entries, setEntries] = useState<WaitingListEntryWithRelations[]>([])
+  const [patients, setPatients] = useState<Patient[]>([])
+  const [doctors, setDoctors] = useState<Doctor[]>([])
+  const [units, setUnits] = useState<Unit[]>([])
+  const [loading, setLoading] = useState(true)
+
+  // Filters
+  const [searchQuery, setSearchQuery] = useState('')
+  const [filterStatus, setFilterStatus] = useState('')
+
+  // Modal state
+  const [modalOpen, setModalOpen] = useState(false)
+  const [wlWizardStep, setWlWizardStep] = useState(0)
+  const [saving, setSaving] = useState(false)
+  const [editingEntry, setEditingEntry] = useState<WaitingListEntryWithRelations | null>(null)
+
+  // Form state
+  const [formData, setFormData] = useState({
+    patient_id: '',
+    doctor_id: '',
+    preferred_date: '',
+    preferred_time: '',
+    reason: '',
+    priority: '2',
+    notes: '',
+  })
+
+  // ===========================================================================
+  // Data Fetching
+  // ===========================================================================
+
+  const loadData = useCallback(async () => {
+    setLoading(true)
+    try {
+      const [wl, pats, docs, uts] = await Promise.all([
+        fetchWaitingList(),
+        fetchPatients(),
+        fetchDoctors(),
+        fetchUnits(),
+      ])
+      setEntries(wl)
+      setPatients(pats)
+      setDoctors(docs)
+      setUnits(uts)
+    } catch (err) {
+      console.error('Error loading waiting list:', err)
+      showToast('error', 'خطا در بارگذاری لیست انتظار')
+    } finally {
+      setLoading(false)
+    }
+  }, [])
+
+  useEffect(() => {
+    loadData()
+  }, [loadData])
+  const ptr = usePullToRefresh(async () => { await loadData() })
+
+  // ===========================================================================
+  // Derived Data
+  // ===========================================================================
+
+  const filteredEntries = useMemo(() => {
+    return entries.filter((e) => {
+      if (searchQuery) {
+        const name = e.patient ? `${e.patient.first_name} ${e.patient.last_name}` : ''
+        const reason = e.reason || ''
+        const q = searchQuery.toLowerCase()
+        if (!name.toLowerCase().includes(q) && !reason.toLowerCase().includes(q)) return false
+      }
+      if (filterStatus && e.status !== filterStatus) return false
+      return true
+    })
+  }, [entries, searchQuery, filterStatus])
+
+  const stats = useMemo(() => {
+    const total = entries.length
+    const waiting = entries.filter((e) => e.status === 'waiting').length
+    const notified = entries.filter((e) => e.status === 'notified').length
+    const scheduled = entries.filter((e) => e.status === 'scheduled').length
+    return { total, waiting, notified, scheduled }
+  }, [entries])
+
+  const priorityChartData = useMemo(() => {
+    const counts: Record<string, number> = { 'کم': 0, 'متوسط': 0, 'بالا': 0, 'فوری': 0 }
+    entries.forEach((e) => {
+      const p = e.priority ?? 2
+      const label = priorityLabels[p] || 'متوسط'
+      counts[label] = (counts[label] || 0) + 1
+    })
+    return Object.entries(counts).map(([name, count]) => ({ name, count }))
+  }, [entries])
+
+  const doctorOptions = useMemo(() => {
+    return doctors.filter((d) => d.is_active).map((d) => ({ value: d.id, label: d.name || d.specialty || 'پزشک' }))
+  }, [doctors])
+
+  const priorityOptions = [
+    { value: '1', label: 'کم' },
+    { value: '2', label: 'متوسط' },
+    { value: '3', label: 'بالا' },
+    { value: '4', label: 'فوری' },
+  ]
+
+  // ===========================================================================
+  // Helpers
+  // ===========================================================================
+
+  const patientName = (e: WaitingListEntryWithRelations) => {
+    return e.patient ? `${e.patient.first_name} ${e.patient.last_name}` : 'نامشخص'
+  }
+
+  const patientPhone = (e: WaitingListEntryWithRelations) => {
+    return e.patient?.phone || null
+  }
+
+  const doctorName = (e: WaitingListEntryWithRelations) => {
+    if (!e.doctor) return '-'
+    return e.doctor.name || e.doctor.specialty || 'پزشک'
+  }
+
+  // ===========================================================================
+  // Status Quick Change
+  // ===========================================================================
+
+  const handleStatusChange = (e: WaitingListEntryWithRelations, newStatus: string) => {
+    h.select()
+    const meta = waitStatuses.find((s) => s.value === newStatus) || waitStatuses[0]
+    confirmAction({
+      type: 'status',
+      title: 'تغییر وضعیت',
+      fields: [
+        { label: 'بیمار', value: patientName(e), highlight: true },
+        { label: 'وضعیت فعلی', value: getStatusMeta(e.status).label },
+        { label: 'وضعیت جدید', value: meta.label, highlight: true },
+      ],
+      confirmLabel: 'تایید',
+      onConfirm: async () => {
+        const updates: Partial<WaitingListEntry> = { status: newStatus }
+        if (newStatus === 'notified') {
+          updates.notified_at = new Date().toISOString()
+          try {
+            const pat = patients.find((p) => p.id === e.patient_id)
+            if (pat?.phone) {
+              await supabase.functions.invoke('send-sms', {
+                body: {
+                  to: pat.phone,
+                  message: `بیمار گرامی ${pat.first_name} ${pat.last_name}، نوبت خالی در کلینیک دندانپزشکی مینا فراهم شد. جهت تعیین وقت با کلینیک تماس حاصل فرمایید.`,
+                  type: 'general',
+                },
+              })
+            }
+          } catch {
+            // SMS failure is silent
+          }
+        }
+        try { 
+          await updateWaitingEntry(e.id, updates as any); 
+          chimes.playSuccess();
+          showToast('success', newStatus === 'notified' ? 'وضعیت به‌روزرسانی و پیامک اطلاع‌رسانی ارسال شد' : 'وضعیت به‌روزرسانی شد'); 
+          await loadData() 
+        }
+        catch { 
+          chimes.playWarning();
+          showToast('error', 'خطا در به‌روزرسانی وضعیت') 
+        }
+      },
+    })
+  }
+
+  const handleDelete = (e: WaitingListEntryWithRelations) => {
+    h.warning()
+    confirmAction({
+      type: 'status',
+      title: 'لغو از لیست انتظار',
+      warning: 'این عملیات قابل بازگشت نیست',
+      fields: [
+        { label: 'بیمار', value: patientName(e), highlight: true },
+        { label: 'دلیل', value: e.reason || '-' },
+      ],
+      confirmLabel: 'تایید لغو',
+      onConfirm: async () => {
+        try { 
+          await cancelWaitingEntry(e.id); 
+          chimes.playPop();
+          showToast('success', 'لغو شد'); 
+          await loadData() 
+        }
+        catch { 
+          chimes.playWarning();
+          showToast('error', 'خطا در لغو') 
+        }
+      },
+    })
+  }
+
+  // ===========================================================================
+  // Convert to Appointment
+  // ===========================================================================
+  const handleConvertToAppointment = (e: WaitingListEntryWithRelations) => {
+    h.tap()
+    confirmAction({
+      type: 'create',
+      title: 'تبدیل به نوبت',
+      fields: [
+        { label: 'بیمار', value: patientName(e), highlight: true },
+        { label: 'تاریخ', value: e.preferred_date || 'امروز', highlight: true },
+        { label: 'ساعت', value: e.preferred_time || '—' },
+      ],
+      confirmLabel: 'ایجاد نوبت',
+      onConfirm: async () => {
+        try {
+          const today = new Date().toISOString().split('T')[0]
+          const startDate = e.preferred_date || today
+          const startTime = e.preferred_time || '09:00'
+          const endTime = addMinutes(startTime, 30)
+          const unitId = units[0]?.id || null
+
+          if (e.doctor_id) {
+            const conflict = await checkConflict(e.doctor_id, startDate, startTime, endTime, undefined, unitId)
+            if (conflict === 'doctor') { 
+              h.error(); 
+              chimes.playWarning();
+              showToast('error', 'این پزشک در این بازه‌ی زمانی نوبت دیگری دارد — تاریخ/ساعت را تغییر دهید'); 
+              return 
+            }
+            if (conflict === 'unit') { 
+              h.error(); 
+              chimes.playWarning();
+              showToast('error', 'یونیت/صندلی در این بازه‌ی زمانی رزرو شده است'); 
+              return 
+            }
+          }
+
+          await createAppointment({
+            patient_id: e.patient_id,
+            doctor_id: e.doctor_id || null,
+            unit_id: unitId,
+            date: startDate,
+            start_time: startTime,
+            end_time: endTime,
+            type: 'checkup',
+            status: 'scheduled',
+            notes: e.reason || '',
+          } as any)
+          await updateWaitingEntry(e.id, { status: 'scheduled' } as any)
+
+          // Send confirmation SMS
+          try {
+            const patient = patients.find((p) => p.id === e.patient_id)
+            const doctor = doctors.find((d) => d.id === e.doctor_id)
+            if (patient?.phone) {
+              const doctorLabel = doctor?.name ? `دکتر ${doctor.name}` : 'پزشک'
+              const dateLabel = toJalaliStringPretty(startDate)
+              const timeLabel = formatTime(startTime)
+              await supabase.functions.invoke('send-sms', {
+                body: {
+                  type: 'booking_confirmation',
+                  to: patient.phone,
+                  patientName: `${patient.first_name} ${patient.last_name}`,
+                  doctorName: doctorLabel,
+                  date: dateLabel,
+                  time: timeLabel,
+                },
+              })
+            }
+          } catch {
+            // SMS failure is silent
+          }
+
+          chimes.playSuccess()
+          showToast('success', 'نوبت ایجاد شد، پیامک به بیمار ارسال شد و از لیست انتظار خارج شد')
+          await loadData()
+        } catch { 
+          chimes.playWarning()
+          showToast('error', 'خطا در ایجاد نوبت') 
+        }
+      },
+    })
+  }
+
+  // ===========================================================================
+  // Modal Handlers
+  // ===========================================================================
+
+  const openCreateModal = () => {
+    h.tap()
+    setEditingEntry(null)
+    setWlWizardStep(0)
+    setFormData({ patient_id: '', doctor_id: '', preferred_date: '', preferred_time: '', reason: '', priority: '2', notes: '' })
+    setModalOpen(true)
+  }
+
+  const openEditModal = (e: WaitingListEntryWithRelations) => {
+    h.tap()
+    setEditingEntry(e)
+    setFormData({
+      patient_id: e.patient_id, doctor_id: e.doctor_id || '',
+      preferred_date: e.preferred_date || '', preferred_time: e.preferred_time || '',
+      reason: e.reason || '', priority: String(e.priority ?? 2), notes: e.notes || '',
+    })
+    setWlWizardStep(0)
+    setModalOpen(true)
+  }
+
+  const handleSave = () => {
+    if (!formData.patient_id) { chimes.playWarning(); showToast('error', 'انتخاب بیمار الزامی است'); return }
+    const patient = patients.find((p) => p.id === formData.patient_id)
+    const payload = {
+      patient_id: formData.patient_id,
+      doctor_id: formData.doctor_id || null,
+      preferred_date: formData.preferred_date || null,
+      preferred_time: formData.preferred_time || null,
+      reason: formData.reason || null,
+      priority: Number(formData.priority),
+      notes: formData.notes || null,
+    }
+    confirmAction({
+      type: editingEntry ? 'edit' : 'create',
+      title: editingEntry ? 'ویرایش لیست انتظار' : 'افزودن به لیست انتظار',
+      fields: [
+        { label: 'بیمار', value: patient ? `${patient.first_name} ${patient.last_name}` : '-', highlight: true },
+        { label: 'اولویت', value: priorityLabels[Number(formData.priority)] || 'متوسط' },
+        { label: 'دلیل', value: formData.reason || '-' },
+      ],
+      confirmLabel: editingEntry ? 'ذخیره' : 'افزودن',
+      onConfirm: async () => {
+        setSaving(true)
+        try {
+          if (editingEntry) { 
+            await updateWaitingEntry(editingEntry.id, payload as any); 
+            chimes.playSuccess();
+            showToast('success', 'ویرایش شد') 
+          }
+          else { 
+            await createWaitingEntry({ ...payload, status: 'waiting' } as any); 
+            chimes.playSuccess();
+            showToast('success', 'افزوده شد') 
+          }
+          setModalOpen(false); 
+          await loadData()
+        } catch { 
+          chimes.playWarning();
+          showToast('error', 'خطا در ذخیره') 
+        }
+        finally { setSaving(false) }
+      },
+    })
+  }
+
+  // ===========================================================================
+  // Render
+  // ===========================================================================
+
+  if (loading) {
+    return (
+      <div className="space-y-4" aria-busy="true" aria-live="polite">
+        <div className="skeleton h-12 rounded-xl" />
+        <div className="space-y-2">
+          {[0, 1, 2, 3].map((i) => <div key={i} className="skeleton h-20 rounded-2xl" />)}
+        </div>
+      </div>
+    )
+  }
+
+  return (
+    <div className="space-y-6" style={{ paddingBottom: 'calc(6rem + env(safe-area-inset-bottom, 0px))' }} {...ptr.handlers}>
+      {ptr.pullDistance > 0 && (
+        <div className="pull-indicator" style={{ opacity: ptr.isRefreshing ? 1 : ptr.pullProgress, top: -4 }}>
+          <div className="flex flex-col items-center gap-1">
+            <div className={`w-7 h-7 rounded-full border-2 border-teal-300 dark:border-teal-600 border-t-teal-600 dark:border-t-teal-400 ${ptr.isRefreshing ? 'animate-spin' : ''}`} style={{ transform: `scale(${0.6 + ptr.pullProgress * 0.4})` }} />
+            <span className="text-3xs text-teal-600 font-medium">{ptr.isRefreshing ? 'در حال به‌روزرسانی...' : 'برای به‌روزرسانی بکشید'}</span>
+          </div>
+        </div>
+      )}
+      <ModuleHeader
+        moduleKey="waitingList"
+        title="لیست انتظار"
+        subtitle="مدیریت بیماران در انتظار نوبت"
+        action={<Button onClick={openCreateModal} variant="primary" className="press-scale"><Plus size={16} className="inline ml-1" /> افزودن به لیست</Button>}
+      />
+
+      {/* Stats Cards */}
+      <ReorderableStatGrid
+        storageKey="waitingList"
+        items={[
+          { key: 'total', node: <ModuleStatCard moduleKey="waitingList" icon={<Clock size={20} />} label="کل لیست" value={formatNumber(stats.total)} /> },
+          { key: 'waiting', node: <ModuleStatCard moduleKey="waitingList" icon={<AlertCircle size={20} />} label="در انتظار" value={formatNumber(stats.waiting)} /> },
+          { key: 'notified', node: <ModuleStatCard moduleKey="waitingList" icon={<Bell size={20} />} label="اطلاع داده شد" value={formatNumber(stats.notified)} /> },
+          { key: 'scheduled', node: <ModuleStatCard moduleKey="waitingList" icon={<CheckCircle2 size={20} />} label="زمان‌بندی شد" value={formatNumber(stats.scheduled)} /> },
+        ]}
+      />
+
+      {/* Filters */}
+      <Card className="p-4">
+        <div className="flex flex-wrap items-center gap-3">
+          <div className="relative flex-1 min-w-[200px]">
+            <Search size={16} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400" />
+            <input
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="جستجوی بیمار یا دلیل..."
+              className="w-full pr-9 pl-3 py-2 rounded-xl border border-slate-200 bg-slate-50 text-sm focus:outline-none focus:ring-2 focus:ring-primary-400"
+            />
+          </div>
+          <select
+            value={filterStatus}
+            onChange={(e) => setFilterStatus(e.target.value)}
+            aria-label="فیلتر وضعیت لیست انتظار"
+            className="px-3 py-2 rounded-xl border border-slate-200 bg-slate-50 text-sm focus:outline-none focus:ring-2 focus:ring-primary-400"
+          >
+            <option value="">همه وضعیت‌ها</option>
+            {waitStatuses.map((s) => (
+              <option key={s.value} value={s.value}>{s.label}</option>
+            ))}
+          </select>
+          {(searchQuery || filterStatus) && (
+            <Button variant="ghost" size="sm" className="press-scale" onClick={() => { h.tap(); chimes.playPop(); setSearchQuery(''); setFilterStatus('') }}>
+              پاک کردن
+            </Button>
+          )}
+        </div>
+      </Card>
+
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        {/* Waiting List */}
+        <div className="lg:col-span-2">
+          {filteredEntries.length === 0 ? (
+            <Card className="p-5">
+              <EmptyState
+                icon={<Clock size={56} />}
+                title="ورودی در لیست انتظار نیست"
+                description="با افزودن بیمار به لیست شروع کنید"
+                action={<Button onClick={openCreateModal} variant="primary" size="sm" className="press-scale"><Plus size={14} className="inline ml-1" />افزودن</Button>}
+              />
+            </Card>
+          ) : (
+            <div className="space-y-3">
+              {filteredEntries.map((e) => {
+                const meta = getStatusMeta(e.status)
+                const priority = e.priority ?? 2
+                const pColor = priorityColors[priority] || 'slate'
+                const pLabel = priorityLabels[priority] || 'متوسط'
+                const colorKey = getHashColor(e.patient_id || e.id)
+                const theme = tileThemes[colorKey]
+
+                return (
+                  <div key={e.id} className="relative group/row rounded-2xl overflow-hidden card-shadow dark:card-shadow bg-white dark:bg-slate-800 transition-all duration-300">
+                    <div className={`absolute inset-0 bg-gradient-to-br ${theme.bg} opacity-100 transition-opacity duration-500`} />
+                    <div className={`absolute -right-20 -top-20 w-64 h-64 bg-gradient-to-br ${theme.blob} rounded-full blur-3xl breathe-slow mix-blend-multiply dark:mix-blend-screen pointer-events-none opacity-40 group-hover/row:opacity-70 transition-opacity duration-700`} />
+                    
+                    <div className="relative z-10 p-4">
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="flex items-center gap-3 min-w-0 flex-1">
+                          <div className={`w-10 h-10 rounded-xl ${theme.iconBg} flex items-center justify-center text-white flex-shrink-0 shadow-inner`}>
+                            <Clock size={20} />
+                          </div>
+                          <div className="min-w-0 flex-1">
+                            <div className="flex items-center gap-1.5 flex-wrap">
+                              <button
+                                type="button"
+                                onClick={(ev) => {
+                                  ev.stopPropagation()
+                                  h.tap()
+                                  if (e.patient_id) navigate(`/patients/${e.patient_id}`)
+                                }}
+                                className="font-bold text-slate-800 dark:text-slate-100 hover:text-primary-600 dark:hover:text-primary-400 hover:underline cursor-pointer text-right"
+                                title="مشاهده پرونده کامل بیمار"
+                              >
+                                {patientName(e)}
+                              </button>
+                              {e.patient?.file_number && (
+                                <button
+                                  type="button"
+                                  onClick={(ev) => {
+                                    ev.stopPropagation()
+                                    h.tap()
+                                    if (e.patient_id) navigate(`/patients/${e.patient_id}`)
+                                  }}
+                                  title="شماره پرونده بیمار"
+                                  className="inline-flex items-center gap-1 px-1.5 py-0.2 rounded bg-slate-900 dark:bg-primary-950 text-white dark:text-primary-300 text-3xs font-mono font-bold hover:scale-105 active:scale-95 transition-all cursor-pointer"
+                                  dir="ltr"
+                                >
+                                  <span>{toPersianDigits(e.patient.file_number)}</span>
+                                </button>
+                              )}
+                              <Badge color={pColor}>{pLabel}</Badge>
+                              <Badge color={meta.color}>{meta.label}</Badge>
+                            </div>
+                            <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">پزشک: {doctorName(e)}</p>
+                            {e.reason && <p className="text-sm text-slate-600 dark:text-slate-300 mt-1">{e.reason}</p>}
+                          </div>
+                        </div>
+                      </div>
+
+                    <div className="flex flex-wrap items-center gap-4 mt-3 pt-3 border-t border-slate-100 dark:border-slate-800/80 text-xs text-slate-500 dark:text-slate-400">
+                      {e.preferred_date && (
+                        <span className="flex items-center gap-1">
+                          <Calendar size={12} />
+                          {toJalaliDisplay(e.preferred_date)}
+                          {e.preferred_time && ` - ${formatTime(e.preferred_time)}`}
+                        </span>
+                      )}
+                      {patientPhone(e) && (
+                        <div className="flex items-center gap-3">
+                          <a
+                            href={`tel:${patientPhone(e)}`}
+                            onClick={(ev) => { ev.stopPropagation(); h.tap(); chimes.playPop() }}
+                            className="flex items-center gap-1 hover:text-primary-600 transition-colors font-mono press-scale"
+                            dir="ltr"
+                            title="تماس تلفنی با بیمار"
+                          >
+                            <Phone size={12} />
+                            {toPersianDigits(patientPhone(e)!)}
+                          </a>
+                          <a
+                            href={`https://wa.me/${patientPhone(e)!.replace(/\D/g, '').replace(/^0/, '98')}?text=${encodeURIComponent(`سلام ${patientName(e)} عزیز، وقت خالی در کلینیک دندانپزشکی مینا برای شما فراهم شد. جهت تعیین و ثبت نوبت، لطفاً با کلینیک تماس حاصل فرمایید.`)}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            onClick={(ev) => { ev.stopPropagation(); h.tap(); chimes.playPop() }}
+                            className="flex items-center gap-1 text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50 dark:hover:bg-emerald-950/30 px-2 py-0.5 rounded-lg text-2xs font-medium transition-colors press-scale"
+                            title="ارسال پیام سریع در پیام‌رسان / واتساپ"
+                          >
+                            <MessageSquare size={12} />
+                            پیام سریع
+                          </a>
+                        </div>
+                      )}
+                      {e.notified_at && (
+                        <span className="flex items-center gap-1 text-success-600">
+                          <Bell size={12} />
+                          اطلاع داده شد
+                        </span>
+                      )}
+                    </div>
+
+                    {/* Quick status buttons */}
+                    <div className="flex flex-wrap gap-2 mt-3">
+                      <button
+                        onClick={() => handleStatusChange(e, 'notified')}
+                        disabled={e.status === 'notified' || e.status === 'scheduled' || e.status === 'cancelled'}
+                        className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-primary-50 text-primary-700 text-xs hover:bg-primary-100 disabled:opacity-40 transition-all-smooth press-scale"
+                      >
+                        <Bell size={12} />
+                        اطلاع
+                      </button>
+                      <button
+                        onClick={() => handleStatusChange(e, 'scheduled')}
+                        disabled={e.status === 'scheduled' || e.status === 'cancelled'}
+                        className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-success-50 text-success-700 text-xs hover:bg-success-100 disabled:opacity-40 transition-all-smooth press-scale"
+                      >
+                        <CheckCircle2 size={12} />
+                        زمان‌بندی
+                      </button>
+                      <button
+                        onClick={() => handleStatusChange(e, 'cancelled')}
+                        disabled={e.status === 'cancelled'}
+                        className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-error-50 text-error-700 text-xs hover:bg-error-100 disabled:opacity-40 transition-all-smooth press-scale"
+                      >
+                        <XCircle size={12} />
+                        لغو
+                      </button>
+                      <button
+                        onClick={() => { h.select(); navigate(`/patients/${e.patient_id}`) }}
+                        className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-slate-50 text-slate-600 text-xs hover:bg-slate-100 transition-all-smooth press-scale mr-auto"
+                      >
+                        <Smile size={12} />
+                        پرونده
+                      </button>
+                      <button
+                        onClick={() => handleConvertToAppointment(e)}
+                        disabled={e.status === 'scheduled' || e.status === 'cancelled'}
+                        className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-primary-50 text-primary-600 text-xs hover:bg-primary-100 disabled:opacity-40 transition-all-smooth press-scale"
+                      >
+                        <Calendar size={12} />
+                        تبدیل به نوبت
+                      </button>
+                      <button
+                        onClick={() => openEditModal(e)}
+                        className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-slate-50 text-slate-600 text-xs hover:bg-slate-100 transition-all-smooth press-scale"
+                      >
+                        <Edit2 size={12} />
+                        ویرایش
+                      </button>
+                      <button
+                        onClick={() => handleDelete(e)}
+                        className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-error-50 text-error-600 text-xs hover:bg-error-100 transition-all-smooth press-scale"
+                      >
+                        <Ban size={12} />
+                        حذف
+                      </button>
+                    </div>
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+          )}
+        </div>
+
+        {/* Priority Chart */}
+        <Card className="p-5">
+          <h3 className="text-sm font-bold text-slate-800 mb-4">توزیع بر اساس اولویت</h3>
+          {priorityChartData.every((d) => d.count === 0) ? (
+            <EmptyState icon={<AlertCircle size={56} />} title="داده‌ای موجود نیست" />
+          ) : (
+            <ResponsiveContainer width="100%" height={300}>
+              <BarChart data={priorityChartData} margin={{ top: 10, right: 10, left: 10, bottom: 0 }}>
+                <XAxis dataKey="name" tick={{ fontSize: 11, fill: CHART_AXIS_COLOR_STRONG }} />
+                <YAxis tick={{ fontSize: 11, fill: CHART_AXIS_COLOR_STRONG }} allowDecimals={false} />
+                <RTooltip formatter={(v: number) => [formatNumber(v), 'تعداد']} contentStyle={{ direction: 'rtl', fontSize: 12, borderRadius: 12, border: 'none', boxShadow: '0 4px 12px rgba(0,0,0,0.1)' }} />
+                <Bar dataKey="count" radius={[6, 6, 0, 0]}>
+                  {priorityChartData.map((_, i) => <Cell key={i} fill={CHART_COLORS[i % CHART_COLORS.length]} />)}
+                </Bar>
+              </BarChart>
+            </ResponsiveContainer>
+          )}
+        </Card>
+      </div>
+
+      {/* Create Wizard */}
+      <Wizard
+        open={modalOpen}
+        onClose={() => { h.cancel(); setModalOpen(false) }}
+        title={editingEntry ? 'ویرایش لیست انتظار' : 'افزودن به لیست انتظار'}
+        step={wlWizardStep}
+        onStepChange={setWlWizardStep}
+        onFinish={handleSave}
+        finishLabel="افزودن به لیست"
+        saving={saving}
+        steps={[
+          {
+            label: 'بیمار و پزشک',
+            validate: () => (!formData.patient_id ? 'انتخاب بیمار الزامی است' : null),
+            content: (
+              <>
+                <PatientSelect required value={formData.patient_id} onChange={(v) => setFormData({ ...formData, patient_id: v })} patients={patients} />
+                {formData.patient_id && (
+                  <div className="my-2">
+                    <PatientAlerts
+                      patient={patients.find((p) => p.id === formData.patient_id) || null}
+                      balance={null}
+                    />
+                  </div>
+                )}
+                <Select label="پزشک" value={formData.doctor_id} onChange={(v) => setFormData({ ...formData, doctor_id: v })} options={doctorOptions} placeholder="انتخاب پزشک" />
+              </>
+            ),
+          },
+          {
+            label: 'زمان و اولویت',
+            content: (
+              <>
+                <div className="grid grid-cols-2 gap-3">
+                  <PersianDateInput label="تاریخ ترجیحی" value={formData.preferred_date} onChange={(v) => setFormData({ ...formData, preferred_date: v })} />
+                  <Input label="ساعت ترجیحی" type="time" value={formData.preferred_time} onChange={(v) => setFormData({ ...formData, preferred_time: v })} />
+                </div>
+                <Select label="اولویت" value={formData.priority} onChange={(v) => setFormData({ ...formData, priority: v })} options={priorityOptions} />
+              </>
+            ),
+          },
+          {
+            label: 'دلیل و یادداشت',
+            validate: () => (!formData.reason.trim() ? 'دلیل ویزیت الزامی است' : null),
+            content: (
+              <>
+                <Textarea label="دلیل ویزیت *" value={formData.reason} onChange={(v) => setFormData({ ...formData, reason: v })} placeholder="علت مراجعه بیمار" />
+                <Textarea label="یادداشت" value={formData.notes} onChange={(v) => setFormData({ ...formData, notes: v })} placeholder="توضیحات اختیاری" />
+              </>
+            ),
+          },
+        ]}
+      />
+
+      {ConfirmActionModal}
+    </div>
+  )
+}

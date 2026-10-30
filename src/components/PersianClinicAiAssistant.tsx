@@ -1,0 +1,770 @@
+import React, { useState, useEffect, useRef } from 'react'
+import { useNavigate } from 'react-router-dom'
+import { useBackDismiss } from '../lib/useBackDismiss'
+
+// iOS edge-swipe-back / Android back gesture closes the AI modal instead of
+// navigating the page underneath it away. A separate component so the hook
+// (which must run unconditionally) doesn't have to sit above the early
+// `isOpen &&` render branches below.
+function AiModalBackDismiss({ open, onClose }: { open: boolean; onClose: () => void }) {
+  useBackDismiss(open, onClose)
+  return null
+}
+import {
+  Sparkles,
+  Mic,
+  MicOff,
+  Send,
+  X,
+  CheckCircle2,
+  AlertTriangle,
+  Calendar,
+  CreditCard,
+  Layers,
+  Activity,
+  ArrowLeft,
+  ChevronRight,
+  User,
+  Clock,
+  Coins,
+} from 'lucide-react'
+import {
+  parseClinicCommand,
+  ParsedAiAction,
+  ClinicAiIntentType,
+} from '../lib/persianClinicNlp'
+import {
+  fetchPatients,
+  createPatient,
+  createAppointment,
+  createPayment,
+  createPaymentPlan,
+  createTreatment,
+  fetchDoctors,
+} from '../lib/api'
+import { buildSchedule } from '../lib/installments'
+import { toPersianDigits, formatCurrency, toJalaliStringPretty } from '../lib/persianDate'
+import { h } from '../lib/haptics'
+import { chimes } from '../lib/chimes'
+import { showToast } from './ui'
+import { CLINIC_ID } from '../lib/supabase'
+
+interface SpeechRecognitionEvent {
+  results: {
+    [index: number]: {
+      [index: number]: {
+        transcript: string
+      }
+    }
+  }
+}
+
+interface SpeechRecognitionInstance {
+  lang: string
+  continuous: boolean
+  interimResults: boolean
+  start: () => void
+  stop: () => void
+  onresult: (event: SpeechRecognitionEvent) => void
+  onerror: (event: unknown) => void
+  onend: () => void
+}
+
+declare global {
+  interface Window {
+    SpeechRecognition?: new () => SpeechRecognitionInstance
+    webkitSpeechRecognition?: new () => SpeechRecognitionInstance
+  }
+}
+
+export function PersianClinicAiAssistant() {
+  const navigate = useNavigate()
+  const [isOpen, setIsOpen] = useState(false)
+  const [inputText, setInputText] = useState('')
+  const [isListening, setIsListening] = useState(false)
+  const [parsedAction, setParsedAction] = useState<ParsedAiAction | null>(null)
+  const [isExecuting, setIsExecuting] = useState(false)
+  const [executionResult, setExecutionResult] = useState<{
+    success: boolean
+    message: string
+    patientId?: string
+  } | null>(null)
+
+  const recognitionRef = useRef<SpeechRecognitionInstance | null>(null)
+  const inputRef = useRef<HTMLInputElement>(null)
+  const triggerRef = useRef<HTMLDivElement>(null)
+
+  // Default floating orb to false so it does not obstruct cards and buttons
+  const [showFloatingOrb, setShowFloatingOrb] = useState<boolean>(() => {
+    try {
+      return localStorage.getItem('minadent_show_floating_orb') === 'true'
+    } catch {
+      return false
+    }
+  })
+
+  // Listen for global open event from header or search bar
+  useEffect(() => {
+    const handleOpenEvent = () => {
+      h.select()
+      chimes.playPop()
+      setIsOpen(true)
+      setTimeout(() => inputRef.current?.focus(), 150)
+    }
+    window.addEventListener('minadent-open-clinic-ai', handleOpenEvent)
+    return () => window.removeEventListener('minadent-open-clinic-ai', handleOpenEvent)
+  }, [])
+
+  // Floating trigger draggable position with persistent localStorage
+  const [pos, setPos] = useState<{ x: number; y: number }>(() => {
+    try {
+      const saved = localStorage.getItem('minadent_ai_trigger_pos')
+      if (saved) {
+        const parsed = JSON.parse(saved)
+        if (typeof parsed.x === 'number' && typeof parsed.y === 'number') {
+          return {
+            x: Math.max(12, Math.min(parsed.x, (typeof window !== 'undefined' ? window.innerWidth : 1024) - 68)),
+            y: Math.max(12, Math.min(parsed.y, (typeof window !== 'undefined' ? window.innerHeight : 768) - 68)),
+          }
+        }
+      }
+    } catch {
+      // ignore
+    }
+    // Default: left-6, and 110px above bottom to never cover bottom dock
+    const defaultY = typeof window !== 'undefined' ? Math.max(80, window.innerHeight - 120) : 600
+    return { x: 24, y: defaultY }
+  })
+
+  const [isDragging, setIsDragging] = useState(false)
+  const dragRef = useRef<{
+    startX: number
+    startY: number
+    initialX: number
+    initialY: number
+    hasMoved: boolean
+  } | null>(null)
+
+  // Keep inside window bounds on resize
+  useEffect(() => {
+    const handleResize = () => {
+      setPos((prev) => {
+        const btnWidth = triggerRef.current?.offsetWidth || 56
+        const btnHeight = triggerRef.current?.offsetHeight || 56
+        const newX = Math.max(12, Math.min(prev.x, window.innerWidth - btnWidth - 12))
+        const newY = Math.max(12, Math.min(prev.y, window.innerHeight - btnHeight - 12))
+        if (newX !== prev.x || newY !== prev.y) {
+          const next = { x: newX, y: newY }
+          try {
+            localStorage.setItem('minadent_ai_trigger_pos', JSON.stringify(next))
+          } catch {}
+          return next
+        }
+        return prev
+      })
+    }
+    window.addEventListener('resize', handleResize)
+    return () => window.removeEventListener('resize', handleResize)
+  }, [])
+
+  const handlePointerDown = (e: React.PointerEvent) => {
+    if (e.button !== 0) return
+    const el = e.currentTarget as HTMLElement
+    try {
+      el.setPointerCapture(e.pointerId)
+    } catch {}
+
+    dragRef.current = {
+      startX: e.clientX,
+      startY: e.clientY,
+      initialX: pos.x,
+      initialY: pos.y,
+      hasMoved: false,
+    }
+  }
+
+  const handlePointerMove = (e: React.PointerEvent) => {
+    if (!dragRef.current) return
+    const dx = e.clientX - dragRef.current.startX
+    const dy = e.clientY - dragRef.current.startY
+
+    if (!dragRef.current.hasMoved && Math.hypot(dx, dy) > 5) {
+      dragRef.current.hasMoved = true
+      setIsDragging(true)
+      h.light()
+    }
+
+    if (dragRef.current.hasMoved) {
+      const btnWidth = triggerRef.current?.offsetWidth || 56
+      const btnHeight = triggerRef.current?.offsetHeight || 56
+      const newX = Math.max(8, Math.min(dragRef.current.initialX + dx, window.innerWidth - btnWidth - 8))
+      const newY = Math.max(8, Math.min(dragRef.current.initialY + dy, window.innerHeight - btnHeight - 8))
+      setPos({ x: newX, y: newY })
+    }
+  }
+
+  const handlePointerUp = (e: React.PointerEvent) => {
+    if (!dragRef.current) return
+    const el = e.currentTarget as HTMLElement
+    try {
+      el.releasePointerCapture(e.pointerId)
+    } catch {}
+
+    if (dragRef.current.hasMoved) {
+      setIsDragging(false)
+      h.confirm()
+      chimes.playPop()
+      try {
+        localStorage.setItem('minadent_ai_trigger_pos', JSON.stringify(pos))
+      } catch {}
+    } else {
+      // Just a tap/click - open the assistant
+      h.select()
+      chimes.playPop()
+      setIsOpen(true)
+      setTimeout(() => inputRef.current?.focus(), 150)
+    }
+    dragRef.current = null
+  }
+
+  // Initialize Web Speech API if supported
+  useEffect(() => {
+    const SpeechClass = window.SpeechRecognition || window.webkitSpeechRecognition
+    if (SpeechClass) {
+      const recognizer = new SpeechClass()
+      recognizer.lang = 'fa-IR'
+      recognizer.continuous = false
+      recognizer.interimResults = false
+
+      recognizer.onresult = (event: SpeechRecognitionEvent) => {
+        const transcript = event.results[0]?.[0]?.transcript
+        if (transcript) {
+          setInputText(transcript)
+          handleParse(transcript)
+        }
+        setIsListening(false)
+        h.confirm()
+        chimes.playPop()
+      }
+
+      recognizer.onerror = () => {
+        setIsListening(false)
+        h.warning()
+        chimes.playWarning()
+      }
+
+      recognizer.onend = () => {
+        setIsListening(false)
+      }
+
+      recognitionRef.current = recognizer
+    }
+  }, [])
+
+  const toggleListening = () => {
+    if (!recognitionRef.current) {
+      chimes.playWarning()
+      showToast('info', 'تشخیص گفتار در این مرورگر پشتیبانی نمی‌شود. لطفاً دستور را تایپ کنید.')
+      return
+    }
+
+    if (isListening) {
+      recognitionRef.current.stop()
+      setIsListening(false)
+      h.tap()
+      chimes.playPop()
+    } else {
+      try {
+        recognitionRef.current.start()
+        setIsListening(true)
+        h.select()
+        chimes.playPop()
+      } catch {
+        setIsListening(false)
+      }
+    }
+  }
+
+  const handleParse = (textToParse: string) => {
+    if (!textToParse.trim()) return
+    h.select()
+    chimes.playPop()
+    const action = parseClinicCommand(textToParse)
+    setParsedAction(action)
+    setExecutionResult(null)
+  }
+
+  const handleQuickPrompt = (prompt: string) => {
+    setInputText(prompt)
+    handleParse(prompt)
+  }
+
+  // Execute Action on IndexedDB after confirmation
+  const handleConfirmAndExecute = async () => {
+    if (!parsedAction) return
+    setIsExecuting(true)
+    h.select()
+
+    try {
+      // 1. Find or create matching patient
+      const allPatients = await fetchPatients()
+      const targetName = (parsedAction.patientName || '').trim().toLowerCase()
+      let patient = allPatients.find(
+        (p) => `${p.first_name} ${p.last_name}`.toLowerCase() === targetName
+      )
+
+      if (!patient) {
+        // Find by partial match
+        patient = allPatients.find(
+          (p) =>
+            `${p.first_name} ${p.last_name}`.toLowerCase().includes(targetName) ||
+            p.last_name.toLowerCase().includes(targetName)
+        )
+      }
+
+      // If patient not found, create one gracefully
+      if (!patient) {
+        const nameParts = targetName.split(' ')
+        const firstName = nameParts[0] || 'بیمار'
+        const lastName = nameParts.slice(1).join(' ') || 'جدید'
+        patient = await createPatient({
+          first_name: firstName,
+          last_name: lastName,
+          phone: '',
+          national_id: null,
+          birth_date: null,
+          gender: 'unknown',
+          address: null,
+          medical_history: null,
+          allergies: null,
+          is_active: true,
+          notes: 'ثبت شده توسط دستیار هوشمند صوتی/متنی مینا',
+        } as any)
+      }
+
+      const doctors = await fetchDoctors()
+      const defaultDoctorId = doctors.length > 0 ? doctors[0].id : null
+
+      // 2. Perform action according to intent
+      switch (parsedAction.intent) {
+        case 'create_appointment': {
+          await createAppointment({
+            clinic_id: CLINIC_ID,
+            patient_id: patient.id,
+            doctor_id: defaultDoctorId,
+            unit_id: null,
+            date: parsedAction.date || new Date().toISOString().slice(0, 10),
+            start_time: parsedAction.time || '17:00',
+            end_time: '17:30',
+            duration_minutes: 30,
+            type: parsedAction.service || 'ویزیت',
+            status: 'scheduled',
+            notes: `ثبت هوشمند: ${parsedAction.rawText}`,
+            reminder_enabled: true,
+          } as any)
+          break
+        }
+
+        case 'record_payment': {
+          await createPayment({
+            clinic_id: CLINIC_ID,
+            patient_id: patient.id,
+            amount: parsedAction.amount || 0,
+            payment_date: new Date().toISOString().slice(0, 10),
+            payment_method: parsedAction.paymentMethod || 'card',
+            reference: 'ثبت صوتی/هوشمند AI',
+            created_by: null,
+            treatment_id: null,
+            doctor_id: defaultDoctorId,
+            encounter_id: null,
+            implant_case_id: null,
+            notes: parsedAction.rawText,
+            status: 'completed',
+          } as any)
+          break
+        }
+
+        case 'create_installment_plan': {
+          const total = parsedAction.amount || 10_000_000
+          const count = parsedAction.installmentsCount || 4
+          const today = new Date().toISOString().slice(0, 10)
+          const schedule = buildSchedule(total, count, today)
+
+          await createPaymentPlan(
+            {
+              clinic_id: CLINIC_ID,
+              patient_id: patient.id,
+              total_amount: total,
+              installment_count: count,
+              start_date: today,
+              status: 'active',
+              encounter_id: null,
+              created_by: null,
+              notes: `طرح اقساط هوشمند: ${parsedAction.rawText}`,
+            } as any,
+            schedule.map((s, idx) => ({
+              clinic_id: CLINIC_ID,
+              installment_number: idx + 1,
+              amount: s.amount,
+              due_date: s.due_date,
+              payment_plan_id: '',
+              patient_id: patient.id,
+              status: 'pending',
+              payment_date: null,
+              reminder_sent: false,
+              notes: null,
+            })) as any
+          )
+          break
+        }
+
+        case 'record_treatment': {
+          await createTreatment({
+            clinic_id: CLINIC_ID,
+            patient_id: patient.id,
+            doctor_id: defaultDoctorId,
+            tooth_number: parsedAction.toothNumber ? String(parsedAction.toothNumber) : null,
+            procedure_name: parsedAction.service || 'درمان دندانپزشکی',
+            cost: parsedAction.amount ?? null,
+            status: 'planned',
+            notes: `ثبت هوشمند: ${parsedAction.rawText}`,
+            encounter_id: '',
+            insurance_share: 0,
+            patient_share: parsedAction.amount || 0,
+            procedure_id: null,
+            discount: 0,
+            discount_type: 'percent',
+            tooth_surface: null,
+            phase_id: null,
+            phase_number: null,
+            color: null,
+            created_by: null,
+          } as any)
+          break
+        }
+
+        default:
+          throw new Error('دستور قابل اجرا تشخیص داده نشد.')
+      }
+
+      h.confirm()
+      chimes.playSuccess()
+      setExecutionResult({
+        success: true,
+        message: `عملیات با موفقیت در پرونده «${patient.first_name} ${patient.last_name}» ثبت گردید.`,
+        patientId: patient.id,
+      })
+      showToast('success', 'عملیات هوشمند با موفقیت انجام شد')
+    } catch (err: any) {
+      h.warning()
+      chimes.playWarning()
+      setExecutionResult({
+        success: false,
+        message: err.message || 'خطا در ثبت اطلاعات در سامانه',
+      })
+      showToast('error', err.message || 'خطا در اجرای دستور')
+    } finally {
+      setIsExecuting(false)
+    }
+  }
+
+  const getIntentIcon = (intent: ClinicAiIntentType) => {
+    switch (intent) {
+      case 'create_appointment':
+        return <Calendar className="text-sky-500" size={20} />
+      case 'record_payment':
+        return <CreditCard className="text-emerald-500" size={20} />
+      case 'create_installment_plan':
+        return <Layers className="text-violet-500" size={20} />
+      case 'record_treatment':
+        return <Activity className="text-amber-500" size={20} />
+      default:
+        return <Sparkles className="text-primary-500" size={20} />
+    }
+  }
+
+  return (
+    <>
+      {/* Floating Draggable 3D Living AI Sphere (Optional, off by default to never obstruct clinical cards) */}
+      {showFloatingOrb && (
+        <div
+          ref={triggerRef}
+          style={{
+            position: 'fixed',
+            left: `${pos.x}px`,
+            top: `${pos.y}px`,
+            zIndex: 45,
+            touchAction: 'none',
+          }}
+          className={`select-none transition-transform duration-75 ${
+            isDragging ? 'cursor-grabbing scale-110' : 'cursor-grab'
+          }`}
+          onPointerDown={handlePointerDown}
+          onPointerMove={handlePointerMove}
+          onPointerUp={handlePointerUp}
+          onPointerCancel={() => {
+            setIsDragging(false)
+            dragRef.current = null
+          }}
+        >
+          <div
+            className="group relative w-12 h-12 sm:w-13 sm:h-13 rounded-full flex items-center justify-center transition-all-smooth hover:scale-110 active:scale-95"
+            title="دستیار هوشمند مینا (برای جابجایی بکشید / برای گفتگو لمس کنید)"
+          >
+            {/* 1. Living Breathing Ambient Glow */}
+            <div className="absolute -inset-1 rounded-full bg-gradient-to-tr from-sky-500/50 via-indigo-500/50 to-purple-500/50 blur-md opacity-75 group-hover:opacity-100 animate-pulse pointer-events-none" />
+
+            {/* 2. Rotating Holographic Spectrum Ring */}
+            <div className="absolute -inset-0.5 rounded-full p-[1.5px] bg-gradient-to-r from-teal-400 via-sky-400 via-indigo-500 to-fuchsia-500 animate-spin-slow opacity-85 pointer-events-none" />
+
+            {/* 3. 3D Crystal Core Sphere */}
+            <div
+              className="relative w-full h-full rounded-full overflow-hidden flex items-center justify-center shadow-2xl ring-1 ring-white/40 dark:ring-white/20"
+              style={{
+                background: 'radial-gradient(circle at 35% 30%, #38bdf8 0%, #6366f1 45%, #8b5cf6 75%, #0f172a 100%)',
+                boxShadow: 'inset 0 2px 4px rgba(255,255,255,0.6), inset 0 -3px 6px rgba(0,0,0,0.5), 0 8px 20px -2px rgba(99,102,241,0.5)',
+              }}
+            >
+              {/* 4. Top 3D Specular Glass Reflection */}
+              <div
+                className="absolute top-1 left-1.5 w-6 h-2.5 rounded-full opacity-65 pointer-events-none"
+                style={{
+                  background: 'radial-gradient(ellipse at center, rgba(255,255,255,0.85) 0%, rgba(255,255,255,0) 80%)',
+                  transform: 'rotate(-20deg)',
+                }}
+              />
+
+              {/* 5. Central AI Star / Sparkles Icon with Glow */}
+              <div className="relative flex items-center justify-center text-white drop-shadow-[0_0_8px_rgba(255,255,255,0.9)] pointer-events-none">
+                <Sparkles size={20} className="animate-spin-slow" />
+              </div>
+
+              {/* 6. Discreet Micro-Grip Dots on bottom edge */}
+              <div className="absolute bottom-1 flex gap-0.5 opacity-40 pointer-events-none">
+                <span className="w-0.5 h-0.5 rounded-full bg-white/70" />
+                <span className="w-0.5 h-0.5 rounded-full bg-white/70" />
+                <span className="w-0.5 h-0.5 rounded-full bg-white/70" />
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* iOS 27 Ultra-Modern AI Modal */}
+      <AiModalBackDismiss open={isOpen} onClose={() => setIsOpen(false)} />
+      {isOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/60 backdrop-blur-md animate-fade-in">
+          <div
+            className="w-full max-w-xl rounded-2xl bg-white/95 dark:bg-slate-900/95 backdrop-blur-2xl border border-slate-200/80 dark:border-slate-800/80 shadow-2xl overflow-hidden flex flex-col max-h-[90vh] animate-scale-in"
+            dir="rtl"
+          >
+            {/* Modal Header */}
+            <div className="flex items-center justify-between p-4 border-b border-slate-100 dark:border-slate-800">
+              <div className="flex items-center gap-2.5">
+                <div className="w-8 h-8 rounded-2xl bg-gradient-to-tr from-primary-600 to-indigo-600 flex items-center justify-center text-white shadow-md">
+                  <Sparkles size={18} />
+                </div>
+                <div>
+                  <h3 className="text-sm font-extrabold text-slate-900 dark:text-slate-100">
+                    دستیار گفتگویی هوش مصنوعی مینا
+                  </h3>
+                  <p className="text-2xs text-slate-400">
+                    ثبت هوشمند نوبت، پرداخت، اقساط و درمان با گفتگوی فارسی عامیانه
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => {
+                  h.tap()
+                  chimes.playPop()
+                  setIsOpen(false)
+                }}
+                aria-label="بستن دستیار هوش مصنوعی"
+                className="w-8 h-8 rounded-full flex items-center justify-center text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition press-scale"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            {/* Modal Body */}
+            <div className="p-5 overflow-y-auto space-y-4 flex-1">
+              {/* Voice / Text Input Box */}
+              <div className="space-y-2">
+                <div className="relative flex items-center">
+                  <input
+                    ref={inputRef}
+                    type="text"
+                    value={inputText}
+                    onChange={(e) => setInputText(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') handleParse(inputText)
+                    }}
+                    placeholder="مثال: برای رضا احمدی فردا ساعت ۱۷ نوبت عصب‌کشی بگذار..."
+                    className="w-full pl-24 pr-4 py-3.5 text-sm rounded-2xl border border-slate-200 dark:border-slate-700 bg-slate-50/80 dark:bg-slate-800/60 text-slate-900 dark:text-slate-100 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-primary-500/50 transition shadow-inner"
+                  />
+
+                  <div className="absolute left-2 flex items-center gap-1">
+                    {/* Voice Mic Button */}
+                    <button
+                      type="button"
+                      onClick={toggleListening}
+                      aria-label={isListening ? 'توقف ضبط صدا' : 'فعال‌سازی ضبط صدا'}
+                      aria-pressed={isListening}
+                      className={`w-9 h-9 rounded-xl flex items-center justify-center transition-all ${
+                        isListening
+                          ? 'bg-red-500 text-white animate-pulse shadow-lg'
+                          : 'bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-300 hover:bg-primary-50 hover:text-primary-600'
+                      }`}
+                      title={isListening ? 'در حال شنیدن...' : 'فعال‌سازی ضبط صدا'}
+                    >
+                      {isListening ? <MicOff size={16} /> : <Mic size={16} />}
+                    </button>
+
+                    {/* Submit Text Button */}
+                    <button
+                      type="button"
+                      onClick={() => handleParse(inputText)}
+                      disabled={!inputText.trim()}
+                      aria-label="ارسال پیام"
+                      className="w-9 h-9 rounded-xl bg-primary-600 hover:bg-primary-700 text-white flex items-center justify-center transition disabled:opacity-40"
+                    >
+                      <Send size={14} />
+                    </button>
+                  </div>
+                </div>
+
+                {isListening && (
+                  <div className="flex items-center justify-center gap-2 py-2 text-xs font-bold text-red-500 animate-pulse">
+                    <span className="w-2 h-2 rounded-full bg-red-500 animate-ping" />
+                    در حال گوش دادن به زبان فارسی... لطفاً صحبت کنید
+                  </div>
+                )}
+              </div>
+
+              {/* Suggested Quick Prompt Chips */}
+              <div className="space-y-1.5">
+                <span className="text-2xs font-bold text-slate-400">
+                  نمونه دستورات پرکاربرد کلینیک:
+                </span>
+                <div className="flex flex-wrap gap-1.5">
+                  {[
+                    'برای رضا احمدی فردا ساعت ۱۷ نوبت عصب‌کشی بگذار',
+                    'علی مرادی ۳ میلیون پرداخت کرد کارتخوان',
+                    'طرح اقساط ۱۰ میلیونی در ۴ قسط با پیش‌پرداخت ۲ میلیون برای مریم حسینی',
+                    'ثبت روکش زیرکونیا برای دندان ۱۶ بیمار رضا احمدی',
+                  ].map((chip, idx) => (
+                    <button
+                      key={idx}
+                      onClick={() => handleQuickPrompt(chip)}
+                      className="text-2xs px-2.5 py-1.5 rounded-xl bg-slate-100 hover:bg-primary-50 dark:bg-slate-800 dark:hover:bg-primary-950/40 text-slate-600 dark:text-slate-300 hover:text-primary-600 dark:hover:text-primary-400 border border-slate-200/60 dark:border-slate-700/60 transition text-right press-scale"
+                    >
+                      {chip}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Parsed Action & Confirmation Card */}
+              {parsedAction && parsedAction.intent !== 'unknown' && !executionResult && (
+                <div className="p-4 rounded-2xl border border-primary-200 dark:border-primary-900/60 bg-gradient-to-b from-primary-50/40 to-transparent dark:from-primary-950/20 space-y-3.5 animate-slide-up">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <div className="w-8 h-8 rounded-xl bg-white dark:bg-slate-800 shadow-sm flex items-center justify-center">
+                        {getIntentIcon(parsedAction.intent)}
+                      </div>
+                      <div>
+                        <h4 className="text-xs font-black text-slate-900 dark:text-slate-100">
+                          {parsedAction.title}
+                        </h4>
+                        <p className="text-2xs text-slate-500 dark:text-slate-400">
+                          {parsedAction.description}
+                        </p>
+                      </div>
+                    </div>
+                    <span className="text-3xs font-bold px-2 py-0.5 rounded-full bg-primary-100 dark:bg-primary-900/60 text-primary-700 dark:text-primary-300">
+                      دقت هوش مصنوعی: ۹۵٪
+                    </span>
+                  </div>
+
+                  {/* Details Grid */}
+                  <div className="grid grid-cols-2 gap-2 p-3 rounded-xl bg-white/80 dark:bg-slate-800/80 border border-slate-200/60 dark:border-slate-700/60 text-xs">
+                    {parsedAction.details.map((d, i) => (
+                      <div key={i} className="flex flex-col">
+                        <span className="text-3xs text-slate-400">{d.label}</span>
+                        <span className="font-bold text-slate-800 dark:text-slate-200">
+                          {d.value}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+
+                  {/* Security Confirmation Callout */}
+                  <div className="flex items-start gap-2 p-2.5 rounded-xl bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800/50 text-amber-800 dark:text-amber-200 text-xs">
+                    <AlertTriangle size={14} className="shrink-0 mt-0.5 text-amber-500" />
+                    <span>
+                      جهت رعایت استانداردهای ایمنی بالینی، لطفاً پارامترهای استخراج‌شده فوق را
+                      بررسی کرده و در صورت تأیید، دکمه ثبت نهایی را بفشارید.
+                    </span>
+                  </div>
+
+                  {/* Action Buttons */}
+                  <div className="flex items-center gap-2 pt-1">
+                    <button
+                      onClick={handleConfirmAndExecute}
+                      disabled={isExecuting}
+                      className="flex-1 py-2.5 rounded-xl bg-primary-600 hover:bg-primary-700 active:scale-95 text-white font-bold text-xs flex items-center justify-center gap-1.5 shadow-md transition disabled:opacity-50 press-scale"
+                    >
+                      <CheckCircle2 size={16} />
+                      {isExecuting ? 'در حال ثبت در پرونده...' : 'تأیید و اعمال نهایی'}
+                    </button>
+                    <button
+                      onClick={() => { chimes.playPop(); setParsedAction(null) }}
+                      className="py-2.5 px-4 rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 font-medium text-xs transition press-scale"
+                    >
+                      ویرایش / انصراف
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {/* Execution Success Result */}
+              {executionResult && (
+                <div
+                  className={`p-4 rounded-2xl border text-xs space-y-3 animate-scale-in ${
+                    executionResult.success
+                      ? 'border-emerald-200 dark:border-emerald-900/60 bg-emerald-50/50 dark:bg-emerald-950/20 text-emerald-800 dark:text-emerald-200'
+                      : 'border-red-200 dark:border-red-900/60 bg-red-50/50 dark:bg-red-950/20 text-red-800 dark:text-red-200'
+                  }`}
+                >
+                  <div className="flex items-center gap-2">
+                    {executionResult.success ? (
+                      <CheckCircle2 size={18} className="text-emerald-500 shrink-0" />
+                    ) : (
+                      <AlertTriangle size={18} className="text-red-500 shrink-0" />
+                    )}
+                    <span className="font-bold">{executionResult.message}</span>
+                  </div>
+
+                  {executionResult.patientId && (
+                    <div className="flex items-center justify-end gap-2 pt-1">
+                      <button
+                        onClick={() => {
+                          setIsOpen(false)
+                          navigate(`/patients/${executionResult.patientId}`)
+                        }}
+                        className="flex items-center gap-1 px-3 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-2xs shadow transition"
+                      >
+                        <span>مشاهده پرونده بیمار</span>
+                        <ChevronRight size={14} className="rotate-180" />
+                      </button>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+    </>
+  )
+}

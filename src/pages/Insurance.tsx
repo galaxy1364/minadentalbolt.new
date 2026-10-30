@@ -1,0 +1,802 @@
+// Insurance.tsx - Persian RTL Dental Clinic Insurance Management
+import { useState, useEffect, useCallback, useMemo } from 'react'
+import { usePullToRefresh } from '../lib/usePullToRefresh'
+import { useNavigate, useLocation } from 'react-router-dom'
+import { Shield, FileText, Search, Building2, Percent, Eye, Plus, Edit2, Phone, MapPin, Wallet, CheckCircle2, Ban, Archive, MessageSquare, Printer } from 'lucide-react'
+import { generateInsuranceClaimPrintData } from '../lib/insurance'
+import { PieChart, Pie, Cell, XAxis, YAxis, Tooltip as RTooltip, ResponsiveContainer, Legend } from 'recharts'
+import {
+  fetchInsuranceCompanies, fetchInsuranceClaims,
+  createInsuranceCompany, updateInsuranceCompany, deactivateInsuranceCompany,
+  createInsuranceClaim, updateInsuranceClaim,
+  fetchPatients, createPayment,
+} from '../lib/api'
+import { toJalaliString, toJalaliStringPretty, formatCurrency, formatNumber, toPersianDigits } from '../lib/persianDate'
+import {
+  InsuranceCompany, InsuranceCompanyInput, InsuranceClaim, InsuranceClaimWithRelations,
+  Patient,
+} from '../types'
+import { Card, Button, Badge, Spinner, EmptyState, Tabs, Wizard, Input, Select, Textarea, showToast } from '../components/ui'
+import { PatientSelect } from '../components/PatientSelect'
+import { ModuleHeader, ModuleStatCard, ReorderableStatGrid } from '../components/ModuleHeader'
+import { CLINIC_ID } from '../lib/supabase'
+import { useConfirmAction } from '../components/ConfirmAction'
+import { h } from '../lib/haptics'
+import { chimes } from '../lib/chimes'
+
+const claimStatuses: { value: string; label: string; color: string }[] = [
+  { value: 'draft', label: 'پیش‌نویس', color: 'slate' },
+  { value: 'submitted', label: 'ارسال شده', color: 'primary' },
+  { value: 'under_review', label: 'در حال بررسی', color: 'warning' },
+  { value: 'approved', label: 'تایید شده', color: 'success' },
+  { value: 'partially_approved', label: 'تایید بخشی', color: 'accent' },
+  { value: 'rejected', label: 'رد شده', color: 'error' },
+  { value: 'paid', label: 'پرداخت شده', color: 'success' },
+  { value: 'cancelled', label: 'لغو شده', color: 'error' },
+]
+
+const CHART_COLORS = ['#0ea5e9', '#8b5cf6', '#f59e0b', '#10b981', '#ef4444', '#6366f1', '#ec4899']
+
+function getClaimStatusMeta(status: string) {
+  return claimStatuses.find((s) => s.value === status) || claimStatuses[0]
+}
+
+export default function Insurance() {
+  const navigate = useNavigate()
+  const location = useLocation()
+  const { confirmAction, ConfirmActionModal } = useConfirmAction()
+
+  const [activeTab, setActiveTab] = useState('companies')
+  const [companies, setCompanies] = useState<InsuranceCompany[]>([])
+  const [claims, setClaims] = useState<InsuranceClaimWithRelations[]>([])
+  const [patients, setPatients] = useState<Patient[]>([])
+  const [loading, setLoading] = useState(true)
+
+  const [searchQuery, setSearchQuery] = useState('')
+  const [filterStatus, setFilterStatus] = useState('')
+
+  // Company modal
+  const [companyModalOpen, setCompanyModalOpen] = useState(false)
+  const [companyWizardStep, setCompanyWizardStep] = useState(0)
+  const [editingCompany, setEditingCompany] = useState<InsuranceCompany | null>(null)
+  const [companyForm, setCompanyForm] = useState({ name: '', code: '', phone: '', address: '', coverage_percentage: '', discount_percentage: '', tier: 'supplementary', is_active: 'true' })
+  const [savingCompany, setSavingCompany] = useState(false)
+
+  // Claim modal
+  const [claimModalOpen, setClaimModalOpen] = useState(false)
+  const [claimWizardStep, setClaimWizardStep] = useState(0)
+  const [editingClaim, setEditingClaim] = useState<InsuranceClaimWithRelations | null>(null)
+  const [claimForm, setClaimForm] = useState({ patient_id: '', company_id: '', amount: '', approved_amount: '', status: 'draft', notes: '' })
+  const [savingClaim, setSavingClaim] = useState(false)
+
+  const loadData = useCallback(async () => {
+    setLoading(true)
+    try {
+      const [comps, cls, pats] = await Promise.all([
+        fetchInsuranceCompanies(),
+        fetchInsuranceClaims(),
+        fetchPatients(),
+      ])
+      setCompanies(comps)
+      setClaims(cls)
+      setPatients(pats)
+    } catch (err) {
+      console.error('Error loading insurance:', err)
+      showToast('error', 'خطا در بارگذاری بیمه‌ها')
+    } finally {
+      setLoading(false)
+    }
+  }, [])
+
+  useEffect(() => { loadData() }, [loadData])
+  const ptr = usePullToRefresh(async () => { await loadData() })
+
+  // Arrived here from the quick-payment wizard's 'روش پرداخت: بیمه'
+  // selection — carries the patient (and suggested amount) straight
+  // into a new claim instead of leaving staff to re-find the patient
+  // and pick everything from scratch.
+  useEffect(() => {
+    const state = location.state as { quickStartPatientId?: string; quickStartAmount?: string } | null
+    if (!state?.quickStartPatientId) return
+    setClaimForm({ patient_id: state.quickStartPatientId, company_id: '', amount: state.quickStartAmount || '', approved_amount: '', status: 'draft', notes: '' })
+    setClaimWizardStep(0)
+    setClaimModalOpen(true)
+    window.history.replaceState({}, '')
+  }, [location.state])
+
+
+  const filteredCompanies = useMemo(() => {
+    if (!searchQuery) return companies
+    const q = searchQuery.toLowerCase()
+    return companies.filter((c) =>
+      c.name.toLowerCase().includes(q) ||
+      (c.code || '').toLowerCase().includes(q)
+    )
+  }, [companies, searchQuery])
+
+  const filteredClaims = useMemo(() => {
+    let result = claims
+    if (filterStatus) {
+      result = result.filter((c) => c.status === filterStatus)
+    }
+    if (searchQuery) {
+      const q = searchQuery.toLowerCase()
+      result = result.filter((c) =>
+        (c.patient ? `${c.patient.first_name} ${c.patient.last_name}`.toLowerCase() : '').includes(q) ||
+        (c.company?.name || '').toLowerCase().includes(q)
+      )
+    }
+    return result
+  }, [claims, filterStatus, searchQuery])
+
+  const claimStats = useMemo(() => {
+    const totalClaims = claims.length
+    const totalAmount = claims.reduce((s, c) => s + (c.amount || 0), 0)
+    const totalApproved = claims.reduce((s, c) => s + (c.approved_amount || 0), 0)
+    const pendingCount = claims.filter((c) => c.status === 'submitted' || c.status === 'under_review').length
+    return { totalClaims, totalAmount, totalApproved, pendingCount }
+  }, [claims])
+
+  const claimsByStatusChart = useMemo(() => {
+    const counts: Record<string, number> = {}
+    claims.forEach((c) => {
+      const label = getClaimStatusMeta(c.status).label
+      counts[label] = (counts[label] || 0) + 1
+    })
+    return Object.entries(counts).map(([name, value]) => ({ name, value }))
+  }, [claims])
+
+  const claimPatientName = (c: InsuranceClaimWithRelations) => {
+    return c.patient ? `${c.patient.first_name} ${c.patient.last_name}` : 'نامشخص'
+  }
+
+  // ── Company CRUD ──────────────────────────────────────────
+  const openCreateCompany = () => {
+    setEditingCompany(null)
+    setCompanyWizardStep(0)
+    setCompanyForm({ name: '', code: '', phone: '', address: '', coverage_percentage: '', discount_percentage: '', tier: 'supplementary', is_active: 'true' })
+    setCompanyModalOpen(true)
+  }
+
+  const openEditCompany = (c: InsuranceCompany) => {
+    setEditingCompany(c)
+    setCompanyForm({
+      name: c.name,
+      code: c.code || '',
+      phone: c.phone || '',
+      address: c.address || '',
+      coverage_percentage: c.coverage_percentage != null ? String(c.coverage_percentage) : '',
+      discount_percentage: c.discount_percentage != null ? String(c.discount_percentage) : '',
+      tier: c.tier || 'supplementary',
+      is_active: c.is_active ? 'true' : 'false',
+    })
+    setCompanyWizardStep(0)
+    setCompanyModalOpen(true)
+  }
+
+
+  const handleSaveCompany = () => {
+    if (!companyForm.name.trim()) {
+      showToast('error', 'نام شرکت الزامی است')
+      chimes.playWarning()
+      return
+    }
+    const payload: InsuranceCompanyInput = {
+      clinic_id: CLINIC_ID,
+      name: companyForm.name.trim(),
+      code: companyForm.code || null,
+      phone: companyForm.phone || null,
+      address: companyForm.address || null,
+      coverage_percentage: companyForm.coverage_percentage ? Number(companyForm.coverage_percentage) : null,
+      discount_percentage: companyForm.discount_percentage ? Number(companyForm.discount_percentage) : null,
+      tier: (companyForm.tier as 'primary' | 'supplementary') || 'supplementary',
+      is_active: companyForm.is_active === 'true',
+    }
+    confirmAction({
+      type: editingCompany ? 'edit' : 'create',
+      title: editingCompany ? 'ویرایش شرکت بیمه' : 'شرکت بیمه جدید',
+      fields: [
+        { label: 'نام شرکت', value: companyForm.name.trim(), highlight: true },
+        { label: 'نوع بیمه', value: companyForm.tier === 'primary' ? 'بیمه پایه' : 'بیمه تکمیلی' },
+        { label: 'کد', value: companyForm.code || '-' },
+        { label: 'تلفن', value: companyForm.phone || '-' },
+        { label: 'درصد پوشش', value: companyForm.coverage_percentage ? `${toPersianDigits(companyForm.coverage_percentage)}٪` : '-' },
+        { label: 'درصد تخفیف', value: companyForm.discount_percentage ? `${toPersianDigits(companyForm.discount_percentage)}٪` : '-' },
+        { label: 'وضعیت', value: companyForm.is_active === 'true' ? 'فعال' : 'غیرفعال' },
+      ],
+      confirmLabel: editingCompany ? 'ذخیره تغییرات' : 'افزودن',
+      onConfirm: async () => {
+        setSavingCompany(true)
+        try {
+          if (editingCompany) {
+            await updateInsuranceCompany(editingCompany.id, payload)
+            showToast('success', 'شرکت بیمه ویرایش شد')
+          } else {
+            await createInsuranceCompany(payload)
+            showToast('success', 'شرکت بیمه اضافه شد')
+          }
+          chimes.playSuccess()
+          setCompanyModalOpen(false)
+          loadData()
+        } catch {
+          showToast('error', 'خطا در ذخیره')
+          chimes.playWarning()
+        } finally {
+          setSavingCompany(false)
+        }
+      },
+    })
+  }
+
+  const handleDeleteCompany = (c: InsuranceCompany) => {
+    h.tap()
+    const hasHistory = claims.some((cl) => cl.company_id === c.id)
+
+    if (hasHistory) {
+      // A company with existing claims must not be hard-deleted — those
+      // claims would lose their company reference (showing as
+      // 'نامشخص' everywhere) and the record of what was submitted/
+      // approved with that insurer would effectively be orphaned.
+      confirmAction({
+        type: 'status',
+        title: 'این شرکت بیمه قابل حذف نیست',
+        warning: 'این شرکت بیمه دارای ادعای ثبت‌شده است — حذف کامل باعث گم شدن ارجاع آن ادعاها می‌شود.',
+        fields: [
+          { label: 'نام', value: c.name, highlight: true },
+          { label: 'پیشنهاد', value: 'غیرفعال کردن به‌جای حذف' },
+        ],
+        confirmLabel: 'غیرفعال کردن شرکت',
+        onConfirm: async () => {
+          await updateInsuranceCompany(c.id, { is_active: false })
+          showToast('success', 'شرکت بیمه غیرفعال شد')
+          chimes.playWarning()
+          loadData()
+        },
+      })
+      return
+    }
+
+    confirmAction({
+      type: 'status',
+      title: 'غیرفعال کردن شرکت بیمه',
+      warning: 'این عملیات قابل بازگشت نیست',
+      fields: [{ label: 'نام', value: c.name, highlight: true }],
+      confirmLabel: 'غیرفعال کن',
+      onConfirm: async () => {
+        await deactivateInsuranceCompany(c.id)
+        showToast('success', 'غیرفعال شد')
+        chimes.playWarning()
+        loadData()
+      },
+    })
+  }
+
+  // ── Claim CRUD ────────────────────────────────────────────
+  const openCreateClaim = () => {
+    setEditingClaim(null)
+    setClaimWizardStep(0)
+    setClaimForm({ patient_id: '', company_id: '', amount: '', approved_amount: '', status: 'draft', notes: '' })
+    setClaimModalOpen(true)
+  }
+
+  const openEditClaim = (c: InsuranceClaimWithRelations) => {
+    setEditingClaim(c)
+    setClaimForm({
+      patient_id: c.patient_id,
+      company_id: c.company_id || '',
+      amount: c.amount != null ? String(c.amount) : '',
+      approved_amount: c.approved_amount != null ? String(c.approved_amount) : '',
+      status: c.status,
+      notes: c.notes || '',
+    })
+    setClaimWizardStep(0)
+    setClaimModalOpen(true)
+  }
+
+  const handleSaveClaim = () => {
+    if (!claimForm.patient_id) {
+      showToast('error', 'انتخاب بیمار الزامی است')
+      chimes.playWarning()
+      return
+    }
+    const payload: any = {
+      clinic_id: CLINIC_ID,
+      patient_id: claimForm.patient_id,
+      company_id: claimForm.company_id || null,
+      encounter_id: null,
+      claim_number: null,
+      amount: claimForm.amount ? Number(claimForm.amount) : null,
+      approved_amount: claimForm.approved_amount ? Number(claimForm.approved_amount) : null,
+      status: claimForm.status,
+      submitted_at: claimForm.status !== 'draft' ? new Date().toISOString() : null,
+      response_at: null,
+      notes: claimForm.notes || null,
+    }
+    const patientObj = patients.find((p) => p.id === claimForm.patient_id)
+    const companyObj = companies.find((c) => c.id === claimForm.company_id)
+    confirmAction({
+      type: editingClaim ? 'edit' : 'create',
+      title: editingClaim ? 'ویرایش ادعا' : 'ادعای بیمه جدید',
+      fields: [
+        { label: 'بیمار', value: patientObj ? `${patientObj.first_name} ${patientObj.last_name}` : '-', highlight: true },
+        { label: 'شرکت بیمه', value: companyObj?.name || '-' },
+        { label: 'مبلغ ادعا', value: claimForm.amount ? `${formatCurrency(Number(claimForm.amount))} ت` : '-' },
+        { label: 'مبلغ تایید شده', value: claimForm.approved_amount ? `${formatCurrency(Number(claimForm.approved_amount))} ت` : '-' },
+        { label: 'وضعیت', value: claimStatuses.find((s) => s.value === claimForm.status)?.label || claimForm.status },
+      ],
+      confirmLabel: editingClaim ? 'ذخیره تغییرات' : 'افزودن',
+      onConfirm: async () => {
+        setSavingClaim(true)
+        try {
+          if (editingClaim) {
+            await updateInsuranceClaim(editingClaim.id, payload)
+            showToast('success', 'ادعا ویرایش شد')
+          } else {
+            await createInsuranceClaim(payload)
+            showToast('success', 'ادعا ثبت شد')
+          }
+          chimes.playSuccess()
+          setClaimModalOpen(false)
+          loadData()
+        } catch {
+          showToast('error', 'خطا در ذخیره')
+          chimes.playWarning()
+        } finally {
+          setSavingClaim(false)
+        }
+      },
+    })
+  }
+
+  const handleDeleteClaim = (c: InsuranceClaimWithRelations) => {
+    h.tap()
+    // Per clinic policy: an insurance claim (a real financial record) is
+    // never permanently deleted, only marked cancelled.
+    confirmAction({
+      type: 'status',
+      title: 'لغو ادعای بیمه',
+      warning: 'این ادعا هیچ‌وقت پاک نمی‌شود — فقط به‌عنوان لغو‌شده علامت می‌خورد و در سوابق باقی می‌ماند.',
+      fields: [{ label: 'بیمار', value: claimPatientName(c), highlight: true }],
+      confirmLabel: 'تایید لغو',
+      onConfirm: async () => {
+        await updateInsuranceClaim(c.id, { status: 'cancelled' } as any)
+        showToast('success', 'ادعا لغو شد — در سوابق باقی ماند')
+        chimes.playWarning()
+        loadData()
+      },
+    })
+  }
+
+  // Whether an approved insurance amount reduces the patient's own
+  // balance (discount-at-source model) or is settled separately with the
+  // insurer (full-charge-to-patient model) genuinely varies by clinic and
+  // even by case — so this is a deliberate one-tap choice per claim
+  // rather than a fixed rule. Recording it as a real Payment reuses the
+  // exact same ledger every other balance calculation already reads
+  // from, instead of a separate flag that would need its own logic.
+  const handleRecordClaimAsPayment = (c: InsuranceClaimWithRelations) => {
+    // Guard: this claim's approved_amount has already been recorded as a
+    // Payment once — recording it again would reduce the patient's
+    // balance twice for the same insurance settlement.
+    if (c.payment_recorded_at) {
+      showToast('error', `این مبلغ قبلاً در ${toJalaliStringPretty(c.payment_recorded_at)} ثبت شده است`)
+      chimes.playWarning()
+      return
+    }
+    h.tap()
+    confirmAction({
+      type: 'create',
+      title: 'ثبت مبلغ بیمه به‌عنوان پرداخت',
+      warning: 'این مبلغ از مانده‌حساب بیمار کسر می‌شود — فقط در صورتی بزنید که تخفیف بیمه باید مانده‌حساب بیمار را کم کند.',
+      fields: [
+        { label: 'بیمار', value: claimPatientName(c), highlight: true },
+        { label: 'شرکت بیمه', value: c.company?.name || '-' },
+        { label: 'مبلغ', value: `${formatCurrency(c.approved_amount || 0)} ت`, highlight: true },
+      ],
+      confirmLabel: 'ثبت و کاهش مانده‌حساب',
+      onConfirm: async () => {
+        try {
+          await createPayment({
+            patient_id: c.patient_id, encounter_id: c.encounter_id || null,
+            amount: c.approved_amount || 0, payment_method: 'insurance',
+            reference: c.claim_number || null,
+            notes: `تسویه بیمه — ${c.company?.name || 'شرکت بیمه'}`,
+            status: 'completed', payment_date: new Date().toISOString().slice(0, 10),
+            created_by: null,
+          } as any)
+          await updateInsuranceClaim(c.id, { payment_recorded_at: new Date().toISOString() } as any)
+          showToast('success', 'ثبت شد و مانده‌حساب بیمار به‌روز شد')
+          chimes.playSuccess()
+          await loadData()
+        } catch {
+          showToast('error', 'خطا در ثبت پرداخت')
+          chimes.playWarning()
+        }
+      },
+    })
+  }
+
+  const handleSendWhatsAppClaim = (c: InsuranceClaimWithRelations) => {
+    h.tap()
+    chimes.playPop()
+    const patient = patients.find((p) => p.id === c.patient_id) || c.patient
+    const phone = patient?.phone
+    if (!phone) {
+      showToast('info', 'شماره تماس بیمار ثبت نشده است')
+      chimes.playWarning()
+      return
+    }
+    const cleanPhone = phone.replace(/\D/g, '')
+    const formattedPhone = cleanPhone.startsWith('0') ? '98' + cleanPhone.slice(1) : cleanPhone
+    const meta = getClaimStatusMeta(c.status)
+    const companyName = c.company?.name || 'بیمه تکمیلی'
+    const amountStr = c.amount ? `${formatCurrency(c.amount)} تومان` : 'مشخص نشده'
+    const approvedStr = c.approved_amount != null ? `${formatCurrency(c.approved_amount)} تومان` : 'در حال بررسی'
+
+    const message = `سلام ${claimPatientName(c)} عزیز\nگزارش وضعیت ادعای بیمه شما در کلینیک دندانپزشکی:\n\n🏢 شرکت بیمه: ${companyName}\n💰 مبلغ درخواستی: ${amountStr}\n✅ مبلغ تایید شده: ${approvedStr}\n📋 وضعیت ادعا: ${meta.label}\n\nبا آرزوی سلامتی شما - کلینیک دندانپزشکی`
+    window.open(`https://wa.me/${formattedPhone}?text=${encodeURIComponent(message)}`, '_blank')
+    showToast('success', 'پیام‌رسان واتساپ باز شد')
+  }
+
+  const handlePrintClaimCertificate = (c: InsuranceClaimWithRelations) => {
+    h.tap()
+    chimes.playPop()
+    const patientObj = patients.find((p) => p.id === c.patient_id) || c.patient
+    const companyObj = companies.find((comp) => comp.id === c.company_id) || c.company
+
+    const claimTotal = c.amount || 0
+    const approvedTotal = c.approved_amount || 0
+    const patientShare = Math.max(0, claimTotal - approvedTotal)
+
+    const printHtml = generateInsuranceClaimPrintData({
+      claimNumber: c.claim_number || `CLM-${c.id.slice(0, 6).toUpperCase()}`,
+      clinicName: 'مرکز تخصصی دندانپزشکی مینادنت',
+      clinicPhone: '۰۲۱-۸۸۰۰۱۱۲۲',
+      clinicAddress: 'تهران، خیابان ولیعصر، مجتمع پزشکی، طبقه ۳',
+      clinicLicense: 'نظام پزشکی: ۷۸۲۹۱ / پروانه: ۱۰۹۲',
+      patientName: claimPatientName(c),
+      nationalId: patientObj?.national_id || 'ثبت در پرونده',
+      insuranceCompany: companyObj?.name || 'بیمه تکمیلی',
+      tierLabel: companyObj?.tier === 'primary' ? 'بیمه پایه درمان' : 'بیمه تکمیلی و درمان مازاد',
+      policyNumber: (c as any).policy_number || patientObj?.phone || '-',
+      claimDate: c.created_at || new Date().toISOString(),
+      doctorName: 'پزشک معالج کلینیک',
+      doctorMedicalCouncilId: 'عضو سازمان نظام پزشکی',
+      items: [
+        {
+          procedureName: c.notes || 'خدمات تشخیصی، ترمیمی و درمانی دندانپزشکی',
+          totalFee: claimTotal,
+          primaryDeduction: companyObj?.tier === 'primary' ? approvedTotal : 0,
+          supplementaryClaimed: companyObj?.tier === 'primary' ? 0 : approvedTotal,
+          patientPaid: patientShare,
+          date: c.created_at ? toJalaliString(c.created_at) : toJalaliString(new Date().toISOString()),
+        },
+      ],
+      notes: c.notes || 'این گواهی جهت ارائه به شرکت بیمه‌گر و ارزیابی خسارت صادر شده و نسخه‌ای از آن در بایگانی اسناد مالی کلینیک نگهداری می‌شود.',
+    })
+
+    const win = window.open('', '_blank', 'width=900,height=950')
+    if (!win) {
+      showToast('error', 'پاپ‌آپ مرورگر مسدود شده است — لطفاً مجوز پنجره جدید را بدهید')
+      return
+    }
+    win.document.write(printHtml)
+    win.document.close()
+    win.focus()
+  }
+
+  if (loading) {
+    return (
+      <div className="space-y-4" aria-busy="true" aria-live="polite">
+        <div className="skeleton h-12 rounded-xl" />
+        <div className="space-y-2">
+          {[0, 1, 2, 3].map((i) => <div key={i} className="skeleton h-20 rounded-2xl" />)}
+        </div>
+      </div>
+    )
+  }
+
+  return (
+    <div className="space-y-6" {...ptr.handlers}>
+      {ptr.pullDistance > 0 && (
+        <div className="pull-indicator" style={{ opacity: ptr.isRefreshing ? 1 : ptr.pullProgress, top: -4 }}>
+          <div className="flex flex-col items-center gap-1">
+            <div className={`w-7 h-7 rounded-full border-2 border-teal-300 dark:border-teal-600 border-t-teal-600 dark:border-t-teal-400 ${ptr.isRefreshing ? 'animate-spin' : ''}`} style={{ transform: `scale(${0.6 + ptr.pullProgress * 0.4})` }} />
+            <span className="text-3xs text-teal-600 font-medium">{ptr.isRefreshing ? 'در حال به‌روزرسانی...' : 'برای به‌روزرسانی بکشید'}</span>
+          </div>
+        </div>
+      )}
+      <ModuleHeader
+        moduleKey="insurance"
+        title="بیمه"
+        subtitle="مدیریت شرکت‌های بیمه و ادعای بیمه"
+        action={activeTab === 'companies' ? <Button variant="primary" onClick={openCreateCompany}><Plus size={16} className="inline ml-1" /> شرکت جدید</Button> : <Button variant="primary" onClick={openCreateClaim}><Plus size={16} className="inline ml-1" /> ادعای جدید</Button>}
+      />
+
+      {/* Stats Cards */}
+      <ReorderableStatGrid
+        storageKey="insurance"
+        items={[
+          { key: 'companies', node: <ModuleStatCard moduleKey="insurance" icon={<Building2 size={20} />} label="شرکت‌های بیمه" value={formatNumber(companies.length)} /> },
+          { key: 'claims', node: <ModuleStatCard moduleKey="insurance" icon={<FileText size={20} />} label="کل ادعاها" value={formatNumber(claimStats.totalClaims)} /> },
+          { key: 'pending', node: <ModuleStatCard moduleKey="insurance" icon={<Shield size={20} />} label="در انتظار بررسی" value={formatNumber(claimStats.pendingCount)} /> },
+          { key: 'approved', node: <ModuleStatCard moduleKey="insurance" icon={<Percent size={20} />} label="مبلغ تایید شده" value={`${formatCurrency(claimStats.totalApproved)} ت`} /> },
+        ]}
+      />
+
+      {/* Tabs */}
+      <Tabs
+        tabs={[
+          { key: 'companies', label: 'شرکت‌های بیمه', icon: <Building2 size={16} /> },
+          { key: 'claims', label: 'ادعاها', icon: <FileText size={16} /> },
+        ]}
+        active={activeTab}
+        onChange={setActiveTab}
+      />
+
+      {/* Filters */}
+      <Card className="p-4">
+        <div className="flex flex-wrap items-center gap-3">
+          <div className="relative flex-1 min-w-[200px]">
+            <Search size={16} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400" />
+            <input
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder={activeTab === 'companies' ? 'جستجوی نام یا کد شرکت...' : 'جستجوی بیمار یا شرکت...'}
+              className="w-full pr-9 pl-3 py-2 rounded-xl border border-slate-200 bg-slate-50 text-sm focus:outline-none focus:ring-2 focus:ring-primary-400"
+            />
+          </div>
+          {activeTab === 'claims' && (
+            <select value={filterStatus} onChange={(e) => setFilterStatus(e.target.value)} className="px-3 py-2 rounded-xl border border-slate-200 bg-slate-50 text-sm focus:outline-none focus:ring-2 focus:ring-primary-400">
+              <option value="">همه وضعیت‌ها</option>
+              {claimStatuses.map((s) => (<option key={s.value} value={s.value}>{s.label}</option>))}
+            </select>
+          )}
+          {(searchQuery || filterStatus) && (
+            <Button variant="ghost" size="sm" onClick={() => { setSearchQuery(''); setFilterStatus('') }}>پاک کردن</Button>
+          )}
+        </div>
+      </Card>
+
+      {/* Companies Tab */}
+      {activeTab === 'companies' && (
+        <div>
+          {filteredCompanies.length === 0 ? (
+            <Card className="p-5">
+              <EmptyState icon={<Building2 size={56} />} title="شرکت بیمه‌ای ثبت نشده است" description="برای افزودن شرکت بیمه کلیک کنید" action={<Button size="sm" onClick={openCreateCompany}><Plus size={16} /> افزودن</Button>} />
+            </Card>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {filteredCompanies.map((c) => (
+                <Card key={c.id} className="p-5 hover:card-shadow-lg transition-all-smooth">
+                  <div className="flex items-start justify-between mb-3">
+                    <div className="flex items-center gap-3">
+                      <div className="w-12 h-12 rounded-xl bg-primary-100 flex items-center justify-center text-primary-700">
+                        <Shield size={20} />
+                      </div>
+                      <div>
+                        <h3 className="font-bold text-slate-800">{c.name}</h3>
+                        {c.code && <p className="text-xs text-slate-500">کد: {toPersianDigits(c.code)}</p>}
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-1">
+                      <Badge color={c.tier === 'primary' ? 'accent' : 'primary'}>
+                        {c.tier === 'primary' ? 'پایه' : 'تکمیلی'}
+                      </Badge>
+                      <Badge color={c.is_active ? 'success' : 'slate'}>{c.is_active ? 'فعال' : 'غیرفعال'}</Badge>
+                      <button onClick={() => openEditCompany(c)} className="p-1.5 rounded-lg text-slate-400 hover:text-primary-600 hover:bg-primary-50 transition-colors"><Edit2 size={14} /></button>
+                      <button onClick={() => handleDeleteCompany(c)} aria-label="غیرفعال کردن شرکت بیمه" title="غیرفعال کردن" className="p-1.5 rounded-lg text-slate-400 hover:text-error-600 hover:bg-error-50 transition-colors"><Archive size={14} /></button>
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-2 gap-3 mt-4">
+                    <div className="bg-slate-50 rounded-xl p-3">
+                      <p className="text-xs text-slate-500 mb-1">درصد پوشش</p>
+                      <p className="text-lg font-bold text-success-600">{c.coverage_percentage != null ? `${toPersianDigits(c.coverage_percentage)}٪` : '-'}</p>
+                    </div>
+                    <div className="bg-slate-50 rounded-xl p-3">
+                      <p className="text-xs text-slate-500 mb-1">درصد تخفیف</p>
+                      <p className="text-lg font-bold text-accent-600">{c.discount_percentage != null ? `${toPersianDigits(c.discount_percentage)}٪` : '-'}</p>
+                    </div>
+                  </div>
+                  {(c.phone || c.address) && (
+                    <div className="mt-3 pt-3 border-t border-slate-100 space-y-1">
+                      {c.phone && <p className="text-xs text-slate-500 flex items-center gap-1"><Phone size={10} /> {toPersianDigits(c.phone)}</p>}
+                      {c.address && <p className="text-xs text-slate-500 truncate flex items-center gap-1"><MapPin size={10} /> {c.address}</p>}
+                    </div>
+                  )}
+                </Card>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Claims Tab */}
+      {activeTab === 'claims' && (
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          <Card className="p-0 overflow-hidden lg:col-span-2">
+            {filteredClaims.length === 0 ? (
+              <EmptyState icon={<FileText size={56} />} title="ادعایی ثبت نشده است" description="برای ثبت ادعای جدید کلیک کنید" action={<Button size="sm" onClick={openCreateClaim}><Plus size={16} /> افزودن</Button>} />
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b border-slate-100 bg-slate-50">
+                      <th className="text-right px-4 py-3 text-xs font-medium text-slate-500">بیمار</th>
+                      <th className="text-right px-4 py-3 text-xs font-medium text-slate-500">شرکت بیمه</th>
+                      <th className="text-right px-4 py-3 text-xs font-medium text-slate-500">مبلغ</th>
+                      <th className="text-right px-4 py-3 text-xs font-medium text-slate-500">تایید شده</th>
+                      <th className="text-right px-4 py-3 text-xs font-medium text-slate-500">وضعیت</th>
+                      <th className="text-right px-4 py-3 text-xs font-medium text-slate-500"></th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {filteredClaims.map((c) => {
+                      const meta = getClaimStatusMeta(c.status)
+                      return (
+                        <tr key={c.id} className="border-b border-slate-50 dark:border-slate-800/60 hover:bg-slate-50/80 dark:hover:bg-slate-800/40 transition-all-smooth">
+                          <td className="px-4 py-3 font-medium text-slate-800 dark:text-slate-100">
+                            <div className="flex items-center gap-2">
+                              <button
+                                type="button"
+                                onClick={() => navigate(`/patients/${c.patient_id}`)}
+                                className="font-bold text-slate-800 dark:text-slate-100 hover:text-primary-600 dark:hover:text-primary-400 transition-colors text-right"
+                                title="مشاهده پرونده جامع بیمار"
+                              >
+                                {claimPatientName(c)}
+                              </button>
+                              {c.patient?.file_number && (
+                                <button
+                                  type="button"
+                                  onClick={() => navigate(`/patients/${c.patient_id}`)}
+                                  className="inline-flex items-center px-1.5 py-0.5 rounded-lg bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 font-mono text-3xs font-bold cursor-pointer hover:bg-primary-50 hover:text-primary-600 transition-colors"
+                                  title="شماره پرونده بیمار"
+                                >
+                                  #{toPersianDigits(c.patient.file_number)}
+                                </button>
+                              )}
+                            </div>
+                          </td>
+                          <td className="px-4 py-3 text-slate-600 dark:text-slate-300">{c.company?.name || '-'}</td>
+                          <td className="px-4 py-3 text-slate-700 dark:text-slate-200 font-medium">{c.amount ? `${formatCurrency(c.amount)} ت` : '-'}</td>
+                          <td className="px-4 py-3 text-slate-700 dark:text-slate-200 font-bold">{c.approved_amount != null ? `${formatCurrency(c.approved_amount)} ت` : '-'}</td>
+                          <td className="px-4 py-3"><Badge color={meta.color}>{meta.label}</Badge></td>
+                          <td className="px-4 py-3">
+                            <div className="flex items-center gap-1 justify-end">
+                              {c.approved_amount != null && c.approved_amount > 0 && (
+                                c.payment_recorded_at ? (
+                                  <span title={`ثبت‌شده در ${toJalaliStringPretty(c.payment_recorded_at)}`} className="text-success-600 p-1.5 flex items-center justify-center"><CheckCircle2 size={16} /></span>
+                                ) : (
+                                  <button onClick={() => handleRecordClaimAsPayment(c)} title="ثبت به‌عنوان پرداخت (کاهش مانده‌حساب بیمار)" className="w-8 h-8 rounded-xl bg-success-50 dark:bg-success-950/40 text-success-600 dark:text-success-400 hover:bg-success-100 dark:hover:bg-success-900/50 flex items-center justify-center transition-all-smooth press-scale border border-success-200/60 dark:border-success-800/40"><Wallet size={14} /></button>
+                                )
+                              )}
+                              <button onClick={() => handlePrintClaimCertificate(c)} aria-label="چاپ گواهی ادعای بیمه" title="چاپ گواهی تأیید خدمات و ادعای بیمه" className="w-8 h-8 rounded-xl bg-blue-50 dark:bg-blue-950/40 text-blue-600 dark:text-blue-400 hover:bg-blue-100 dark:hover:bg-blue-900/50 flex items-center justify-center transition-all-smooth press-scale border border-blue-200/60 dark:border-blue-800/40"><Printer size={14} /></button>
+                              <button onClick={() => handleSendWhatsAppClaim(c)} aria-label="ارسال وضعیت به واتساپ بیمار" title="ارسال وضعیت ادعای بیمه به واتساپ بیمار" className="w-8 h-8 rounded-xl bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-100 dark:hover:bg-emerald-900/50 flex items-center justify-center transition-all-smooth press-scale border border-emerald-200/60 dark:border-emerald-800/40"><MessageSquare size={14} /></button>
+                              <button onClick={() => openEditClaim(c)} aria-label="ویرایش ادعای بیمه" title="ویرایش" className="w-8 h-8 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700 flex items-center justify-center transition-all-smooth press-scale border border-slate-200/60 dark:border-slate-700/60"><Edit2 size={14} /></button>
+                              <button onClick={() => handleDeleteClaim(c)} aria-label="لغو ادعای بیمه" title="لغو ادعا" className="w-8 h-8 rounded-xl bg-rose-50 dark:bg-rose-950/40 text-rose-600 dark:text-rose-400 hover:bg-rose-100 dark:hover:bg-rose-900/50 flex items-center justify-center transition-all-smooth press-scale border border-rose-200/60 dark:border-rose-800/40"><Ban size={14} /></button>
+                              <button onClick={() => navigate(`/patients/${c.patient_id}`)} aria-label="مشاهده پرونده بیمار" title="مشاهده پرونده" className="w-8 h-8 rounded-xl bg-primary-50 dark:bg-primary-950/40 text-primary-600 dark:text-primary-400 hover:bg-primary-100 dark:hover:bg-primary-900/50 flex items-center justify-center transition-all-smooth press-scale border border-primary-200/60 dark:border-primary-800/40"><Eye size={14} /></button>
+                            </div>
+                          </td>
+                        </tr>
+                      )
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </Card>
+
+          <Card className="p-5">
+            <h3 className="text-sm font-bold text-slate-800 mb-4">توزیع ادعاها بر اساس وضعیت</h3>
+            {claimsByStatusChart.length === 0 ? (
+              <EmptyState icon={<Percent size={56} />} title="داده‌ای موجود نیست" />
+            ) : (
+              <ResponsiveContainer width="100%" height={300}>
+                <PieChart>
+                  <Pie data={claimsByStatusChart} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={90} label={(entry: any) => `${entry.name}: ${toPersianDigits(entry.value)}`}>
+                    {claimsByStatusChart.map((_, i) => (<Cell key={i} fill={CHART_COLORS[i % CHART_COLORS.length]} />))}
+                  </Pie>
+                  <RTooltip formatter={(v: number) => formatNumber(v)} contentStyle={{ direction: 'rtl', fontSize: 12, borderRadius: 12, border: 'none', boxShadow: '0 4px 12px rgba(0,0,0,0.1)' }} />
+                </PieChart>
+              </ResponsiveContainer>
+            )}
+          </Card>
+        </div>
+      )}
+
+      {/* Company Wizard */}
+      <Wizard
+        open={companyModalOpen}
+        onClose={() => setCompanyModalOpen(false)}
+        title={editingCompany ? 'ویرایش شرکت بیمه' : 'شرکت بیمه جدید'}
+        step={companyWizardStep}
+        onStepChange={setCompanyWizardStep}
+        onFinish={handleSaveCompany}
+        finishLabel={editingCompany ? 'ذخیره' : 'افزودن'}
+        saving={savingCompany}
+        steps={[
+          {
+            label: 'مشخصات',
+            validate: () => (!companyForm.name.trim() ? 'نام شرکت الزامی است' : null),
+            content: (
+              <>
+                <Input label="نام شرکت *" value={companyForm.name} onChange={(v) => setCompanyForm((p) => ({ ...p, name: v }))} placeholder="نام شرکت بیمه" />
+                <div className="grid grid-cols-2 gap-3">
+                  <Input label="کد" value={companyForm.code} onChange={(v) => setCompanyForm((p) => ({ ...p, code: v }))} placeholder="کد شرکت" dir="ltr" />
+                  <Input label="تلفن" value={companyForm.phone} onChange={(v) => setCompanyForm((p) => ({ ...p, phone: v }))} placeholder="تلفن" dir="ltr" />
+                </div>
+                <Input label="آدرس" value={companyForm.address} onChange={(v) => setCompanyForm((p) => ({ ...p, address: v }))} placeholder="آدرس" />
+              </>
+            ),
+          },
+          {
+            label: 'پوشش و وضعیت',
+            content: (
+              <>
+                <div className="grid grid-cols-2 gap-3">
+                  <Input label="درصد پوشش" value={companyForm.coverage_percentage} onChange={(v) => setCompanyForm((p) => ({ ...p, coverage_percentage: v }))} placeholder="مثال: 70" dir="ltr" />
+                  <Input label="درصد تخفیف" value={companyForm.discount_percentage} onChange={(v) => setCompanyForm((p) => ({ ...p, discount_percentage: v }))} placeholder="مثال: 20" dir="ltr" />
+                </div>
+                <Select
+                  label="سطح و نوع بیمه"
+                  value={companyForm.tier}
+                  onChange={(v) => setCompanyForm((p) => ({ ...p, tier: v }))}
+                  options={[
+                    { value: 'supplementary', label: 'بیمه تکمیلی (ایران، دانا، البرز و...)' },
+                    { value: 'primary', label: 'بیمه پایه (تامین اجتماعی، سلامت، نیروهای مسلح)' },
+                  ]}
+                />
+                <Select label="وضعیت" value={companyForm.is_active} onChange={(v) => setCompanyForm((p) => ({ ...p, is_active: v }))} options={[{ value: 'true', label: 'فعال' }, { value: 'false', label: 'غیرفعال' }]} />
+              </>
+            ),
+          },
+        ]}
+      />
+
+      {/* Claim Wizard */}
+      <Wizard
+        open={claimModalOpen}
+        onClose={() => setClaimModalOpen(false)}
+        title={editingClaim ? 'ویرایش ادعا' : 'ادعای بیمه جدید'}
+        step={claimWizardStep}
+        onStepChange={setClaimWizardStep}
+        onFinish={handleSaveClaim}
+        finishLabel={editingClaim ? 'ذخیره' : 'افزودن'}
+        saving={savingClaim}
+        steps={[
+          {
+            label: 'بیمار و شرکت',
+            validate: () => (!claimForm.patient_id ? 'انتخاب بیمار الزامی است' : !claimForm.company_id ? 'انتخاب شرکت بیمه الزامی است' : null),
+            content: (
+              <>
+                <PatientSelect required value={claimForm.patient_id} onChange={(v) => setClaimForm((p) => ({ ...p, patient_id: v }))} patients={patients} />
+                <Select label="شرکت بیمه *" value={claimForm.company_id} onChange={(v) => setClaimForm((p) => ({ ...p, company_id: v }))} options={companies.map((c) => ({ value: c.id, label: c.name }))} placeholder="انتخاب شرکت" />
+              </>
+            ),
+          },
+          {
+            label: 'مبلغ و وضعیت',
+            validate: () => (!claimForm.amount || Number(claimForm.amount) <= 0 ? 'مبلغ ادعا الزامی است' : null),
+            content: (
+              <>
+                <div className="grid grid-cols-2 gap-3">
+                  <Input label="مبلغ ادعا *" value={claimForm.amount} onChange={(v) => setClaimForm((p) => ({ ...p, amount: v }))} placeholder="مبلغ" dir="ltr" />
+                  <Input label="مبلغ تایید شده" value={claimForm.approved_amount} onChange={(v) => setClaimForm((p) => ({ ...p, approved_amount: v }))} placeholder="مبلغ تایید شده" dir="ltr" />
+                </div>
+                <Select label="وضعیت" value={claimForm.status} onChange={(v) => setClaimForm((p) => ({ ...p, status: v }))} options={claimStatuses.map((s) => ({ value: s.value, label: s.label }))} />
+              </>
+            ),
+          },
+          {
+            label: 'یادداشت',
+            content: (
+              <Textarea label="یادداشت" value={claimForm.notes} onChange={(v) => setClaimForm((p) => ({ ...p, notes: v }))} placeholder="یادداشت..." rows={3} />
+            ),
+          },
+        ]}
+      />
+
+      {ConfirmActionModal}
+    </div>
+  )
+}

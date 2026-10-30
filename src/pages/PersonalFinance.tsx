@@ -1,0 +1,354 @@
+// PersonalFinance.tsx — مالی شخصی: وام، اجاره، چک شخصی، بدهی
+// Deliberately separate from Billing.tsx (clinic business finances) —
+// this tracks the owner's personal financial obligations.
+import { useState, useEffect, useMemo } from 'react'
+import { PiggyBank, Plus, Landmark, Home, Banknote, HandCoins, Edit2, CalendarClock, Ban } from 'lucide-react'
+import {
+  fetchPersonalFinanceItems, createPersonalFinanceItem, updatePersonalFinanceItem, cancelPersonalFinanceItem,
+} from '../lib/api'
+import { toJalaliStringPretty, formatCurrency, toPersianDigits } from '../lib/persianDate'
+import { h } from '../lib/haptics'
+import { chimes } from '../lib/chimes'
+import { useConfirmAction } from '../components/ConfirmAction'
+import type { PersonalFinanceItem } from '../types'
+import { Wizard, Card, Button, Input, Select, Textarea, Badge, EmptyState, Tabs, showToast } from '../components/ui'
+import { PersianDateInput } from '../components/PersianDateInput'
+import { ModuleHeader, ModuleStatCard, ReorderableStatGrid } from '../components/ModuleHeader'
+import { CurrencyInput } from '../components/CurrencyInput'
+import { downloadICSReminder } from '../lib/icsReminder'
+
+const typeTabs: { key: PersonalFinanceItem['item_type']; label: string; icon: JSX.Element }[] = [
+  { key: 'loan', label: 'وام', icon: <Landmark size={16} /> },
+  { key: 'rent', label: 'اجاره', icon: <Home size={16} /> },
+  { key: 'cheque', label: 'چک', icon: <Banknote size={16} /> },
+  { key: 'debt', label: 'بدهی', icon: <HandCoins size={16} /> },
+]
+
+const statusMeta: Record<string, { label: string; color: string }> = {
+  active: { label: 'فعال', color: 'primary' },
+  completed: { label: 'تسویه شده', color: 'success' },
+  overdue: { label: 'سررسید گذشته', color: 'error' },
+  cancelled: { label: 'لغو شده', color: 'slate' },
+}
+
+export default function PersonalFinance() {
+  const { confirmAction, ConfirmActionModal } = useConfirmAction()
+  const [items, setItems] = useState<PersonalFinanceItem[]>([])
+  const [loading, setLoading] = useState(true)
+  const [tab, setTab] = useState<PersonalFinanceItem['item_type']>('loan')
+  const [modalOpen, setModalOpen] = useState(false)
+  const [wizardStep, setWizardStep] = useState(0)
+  const [editing, setEditing] = useState<PersonalFinanceItem | null>(null)
+  const [saving, setSaving] = useState(false)
+
+  const emptyForm = {
+    title: '', counterparty: '', total_amount: '', paid_amount: '', due_date: '',
+    monthly_amount: '', interest_rate: '', cheque_number: '', bank_name: '',
+    status: 'active' as PersonalFinanceItem['status'], notes: '',
+  }
+  const [form, setForm] = useState(emptyForm)
+
+  const loadData = async () => {
+    setLoading(true)
+    try { setItems(await fetchPersonalFinanceItems()) } finally { setLoading(false) }
+  }
+  useEffect(() => { loadData() }, [])
+
+  const itemsForTab = useMemo(() => items.filter((i) => i.item_type === tab), [items, tab])
+
+  const stats = useMemo(() => {
+    const totalOwed = items.filter((i) => i.status === 'active').reduce((s, i) => s + (i.total_amount - i.paid_amount), 0)
+    const totalPaid = items.reduce((s, i) => s + i.paid_amount, 0)
+    const todayStr = new Date().toISOString().slice(0, 10)
+    const overdueCount = items.filter((i) => i.status === 'overdue' || (i.due_date && i.due_date < todayStr && i.status === 'active')).length
+    const activeCount = items.filter((i) => i.status === 'active').length
+    return { totalOwed, totalPaid, overdueCount, activeCount }
+  }, [items])
+
+  const openCreate = () => {
+    h.tap()
+    setEditing(null)
+    // Smart default: loan/rent installments are almost always monthly,
+    // so pre-suggest next month's date instead of leaving the (now
+    // required) due-date field blank — still freely editable. Cheque
+    // and informal debt due dates are real fixed dates on paper with no
+    // sensible pattern to guess, so those stay blank.
+    const suggestedDue = tab === 'loan' || tab === 'rent'
+      ? (() => { const d = new Date(); d.setMonth(d.getMonth() + 1); return d.toISOString().slice(0, 10) })()
+      : ''
+    setForm({ ...emptyForm, due_date: suggestedDue })
+    setWizardStep(0)
+    setModalOpen(true)
+  }
+
+  const openEdit = (item: PersonalFinanceItem) => {
+    setEditing(item)
+    setForm({
+      title: item.title, counterparty: item.counterparty || '',
+      total_amount: String(item.total_amount), paid_amount: String(item.paid_amount),
+      due_date: item.due_date || '', monthly_amount: item.monthly_amount != null ? String(item.monthly_amount) : '',
+      interest_rate: item.interest_rate != null ? String(item.interest_rate) : '',
+      cheque_number: item.cheque_number || '', bank_name: item.bank_name || '',
+      status: item.status, notes: item.notes || '',
+    })
+    setWizardStep(0)
+    setModalOpen(true)
+  }
+
+  const handleSave = () => {
+    if (!form.title.trim()) { showToast('error', 'عنوان الزامی است'); return }
+    if (!form.total_amount) { showToast('error', 'مبلغ کل الزامی است'); return }
+    const payload = {
+      item_type: tab, title: form.title, counterparty: form.counterparty || null,
+      total_amount: Number(form.total_amount), paid_amount: form.paid_amount ? Number(form.paid_amount) : 0,
+      due_date: form.due_date || null,
+      monthly_amount: form.monthly_amount ? Number(form.monthly_amount) : null,
+      interest_rate: form.interest_rate ? Number(form.interest_rate) : null,
+      cheque_number: form.cheque_number || null, bank_name: form.bank_name || null,
+      status: form.status, notes: form.notes || null,
+    } as any
+    confirmAction({
+      type: editing ? 'edit' : 'create',
+      title: editing ? 'ویرایش مورد مالی' : 'افزودن مورد مالی جدید',
+      fields: [
+        { label: 'عنوان', value: form.title, highlight: true },
+        { label: 'مبلغ کل', value: `${formatCurrency(Number(form.total_amount))} ت` },
+        { label: 'پرداخت‌شده', value: form.paid_amount ? `${formatCurrency(Number(form.paid_amount))} ت` : '۰ ت' },
+      ],
+      confirmLabel: editing ? 'ذخیره' : 'افزودن',
+      onConfirm: async () => {
+        setSaving(true)
+        try {
+          if (editing) await updatePersonalFinanceItem(editing.id, payload)
+          else await createPersonalFinanceItem(payload)
+          chimes.playSuccess()
+          showToast('success', editing ? 'ویرایش شد' : 'اضافه شد')
+          setModalOpen(false)
+          await loadData()
+        } catch { 
+          chimes.playWarning()
+          showToast('error', 'خطا در ذخیره') 
+        }
+        finally { setSaving(false) }
+      },
+    })
+  }
+
+  const handleDelete = (item: PersonalFinanceItem) => {
+    h.tap()
+    confirmAction({
+      type: 'status',
+      title: 'لغو مورد مالی',
+      warning: 'این عملیات قابل بازگشت نیست',
+      fields: [{ label: 'عنوان', value: item.title, highlight: true }],
+      confirmLabel: 'تایید حذف',
+      onConfirm: async () => {
+        await cancelPersonalFinanceItem(item.id)
+        chimes.playPop()
+        showToast('success', 'لغو شد — در سوابق باقی ماند')
+        await loadData()
+      },
+    })
+  }
+
+  const quickMarkPaid = (item: PersonalFinanceItem) => {
+    h.tap()
+    confirmAction({
+      type: 'status',
+      title: 'تسویه کامل',
+      fields: [{ label: 'عنوان', value: item.title, highlight: true }],
+      confirmLabel: 'تایید تسویه',
+      onConfirm: async () => {
+        await updatePersonalFinanceItem(item.id, { paid_amount: item.total_amount, status: 'completed' })
+        chimes.playSuccess()
+        showToast('success', 'تسویه شد')
+        await loadData()
+      },
+    })
+  }
+
+  // For recurring items (loan installments, rent — anything with a
+  // monthly_amount): recording this period's payment should roll the
+  // due date forward a month automatically, the way any real recurring-
+  // bill tracker works — instead of staff having to manually retype next
+  // month's date by hand every single time.
+  const quickMarkMonthPaid = (item: PersonalFinanceItem) => {
+    h.tap()
+    const nextDue = item.due_date ? new Date(item.due_date) : new Date()
+    nextDue.setMonth(nextDue.getMonth() + 1)
+    const nextDueStr = nextDue.toISOString().slice(0, 10)
+    const newPaid = item.paid_amount + (item.monthly_amount || 0)
+    const isNowComplete = newPaid >= item.total_amount
+    confirmAction({
+      type: 'status',
+      title: 'ثبت پرداخت این ماه',
+      fields: [
+        { label: 'عنوان', value: item.title, highlight: true },
+        { label: 'مبلغ این ماه', value: `${formatCurrency(item.monthly_amount || 0)} ت` },
+        ...(isNowComplete ? [] : [{ label: 'موعد بعدی', value: toJalaliStringPretty(nextDueStr) }]),
+      ],
+      confirmLabel: 'تایید پرداخت',
+      onConfirm: async () => {
+        await updatePersonalFinanceItem(item.id, {
+          paid_amount: Math.min(newPaid, item.total_amount),
+          due_date: isNowComplete ? item.due_date : nextDueStr,
+          status: isNowComplete ? 'completed' : 'active',
+        })
+        chimes.playSuccess()
+        showToast('success', isNowComplete ? 'تسویه کامل شد' : `ثبت شد — موعد بعدی: ${toJalaliStringPretty(nextDueStr)}`)
+        await loadData()
+      },
+    })
+  }
+
+  if (loading) {
+    return (
+      <div className="space-y-4">
+        <div className="skeleton h-24 rounded-2xl" />
+        <div className="space-y-2">{[0, 1, 2].map((i) => <div key={i} className="skeleton h-20 rounded-2xl" />)}</div>
+      </div>
+    )
+  }
+
+  return (
+    <div className="space-y-4">
+      <ModuleHeader moduleKey="personalFinance" title="مالی شخصی" subtitle="وام، اجاره، چک و بدهی‌های شخصی — جدا از حساب کلینیک" />
+
+      <ReorderableStatGrid
+        storageKey="personal-finance"
+        items={[
+          { key: 'owed', node: <ModuleStatCard moduleKey="personalFinance" icon={<HandCoins size={20} />} label="مانده‌ی بدهی فعال" value={`${formatCurrency(stats.totalOwed)} ت`} /> },
+          { key: 'paid', node: <ModuleStatCard moduleKey="personalFinance" icon={<PiggyBank size={20} />} label="کل پرداخت‌شده" value={`${formatCurrency(stats.totalPaid)} ت`} /> },
+          { key: 'active', node: <ModuleStatCard moduleKey="personalFinance" icon={<Landmark size={20} />} label="موارد فعال" value={toPersianDigits(stats.activeCount)} /> },
+          { key: 'overdue', node: <ModuleStatCard moduleKey="personalFinance" icon={<Banknote size={20} />} label="سررسید گذشته" value={toPersianDigits(stats.overdueCount)} /> },
+        ]}
+      />
+
+      <div className="flex items-center gap-2">
+        <div className="min-w-0 flex-1">
+          <Tabs tabs={typeTabs} active={tab} onChange={(k) => setTab(k as PersonalFinanceItem['item_type'])} />
+        </div>
+        <Button variant="primary" size="sm" onClick={openCreate} className="shrink-0"><Plus size={14} className="inline ml-1" /> افزودن</Button>
+      </div>
+
+      {itemsForTab.length === 0 ? (
+        <EmptyState icon={<PiggyBank size={56} />} title="موردی ثبت نشده" description="وام، اجاره، چک یا بدهی شخصی خود را اینجا ثبت و پیگیری کنید" />
+      ) : (
+        <div className="space-y-2">
+          {itemsForTab.map((item) => {
+            const remaining = item.total_amount - item.paid_amount
+            const progress = item.total_amount > 0 ? Math.min(100, (item.paid_amount / item.total_amount) * 100) : 0
+            const meta = statusMeta[item.status] || statusMeta.active
+            return (
+              <Card key={item.id} className="p-4 rounded-2xl bg-white/90 dark:bg-slate-900/90 backdrop-blur-md border border-slate-200/80 dark:border-slate-800 hover:shadow-md transition-all">
+                <div className="flex items-start justify-between gap-2">
+                  <div className="min-w-0 flex-1">
+                    <p className="text-sm font-bold text-slate-800 dark:text-slate-100 truncate">{item.title}</p>
+                    {item.counterparty && <p className="text-2xs text-slate-400">{item.counterparty}</p>}
+                  </div>
+                  <Badge color={meta.color}>{meta.label}</Badge>
+                </div>
+                <div className="mt-2">
+                  <div className="flex items-center justify-between text-2xs text-slate-500 dark:text-slate-400 mb-1">
+                    <span>{formatCurrency(item.paid_amount)} از {formatCurrency(item.total_amount)} ت</span>
+                    {item.due_date && <span>سررسید: {toJalaliStringPretty(item.due_date)}</span>}
+                  </div>
+                  <div className="w-full h-1.5 rounded-full bg-slate-100 dark:bg-slate-700 overflow-hidden">
+                    <div className="h-full rounded-full bg-success-500 transition-all-smooth" style={{ width: `${progress}%` }} />
+                  </div>
+                </div>
+                {item.monthly_amount != null && <p className="text-2xs text-slate-400 mt-1.5">قسط ماهانه: {formatCurrency(item.monthly_amount)} ت</p>}
+                {item.cheque_number && <p className="text-2xs text-slate-400 mt-0.5">شماره چک: {toPersianDigits(item.cheque_number)} {item.bank_name && `— ${item.bank_name}`}</p>}
+                <div className="flex flex-wrap gap-2 mt-2.5 pt-2.5 border-t border-slate-100 dark:border-slate-800">
+                  {remaining > 0 && item.status === 'active' && (
+                    <button onClick={() => quickMarkPaid(item)} className="px-2.5 py-1 rounded-lg bg-success-50 dark:bg-success-950/40 text-success-700 dark:text-success-300 text-xs font-medium hover:bg-success-100 transition-colors">تسویه کامل</button>
+                  )}
+                  {remaining > 0 && item.status === 'active' && item.monthly_amount != null && item.monthly_amount > 0 && (
+                    <button onClick={() => quickMarkMonthPaid(item)} className="px-2.5 py-1 rounded-lg bg-primary-50 dark:bg-primary-950/40 text-primary-700 dark:text-primary-300 text-xs font-medium hover:bg-primary-100 transition-colors">ثبت پرداخت این ماه</button>
+                  )}
+                  {item.due_date && item.status === 'active' && (
+                    <button
+                      onClick={() => downloadICSReminder({
+                        title: `سررسید ${typeTabs.find((t) => t.key === item.item_type)?.label} — ${item.title}`,
+                        description: `مبلغ باقی‌مانده: ${formatCurrency(remaining)} تومان`,
+                        dueDate: item.due_date!,
+                        filename: `finance-reminder-${item.id}.ics`,
+                      })}
+                      className="px-2.5 py-1 rounded-lg bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 text-xs font-medium hover:bg-slate-200 transition-colors"
+                    >
+                      <CalendarClock size={12} className="inline ml-1" /> یادآوری
+                    </button>
+                  )}
+                  <button onClick={() => openEdit(item)} className="px-2.5 py-1 rounded-lg bg-slate-50 dark:bg-slate-800/80 text-slate-600 dark:text-slate-300 text-xs font-medium hover:bg-slate-100 transition-colors mr-auto"><Edit2 size={12} className="inline ml-1" /> ویرایش</button>
+                  <button onClick={() => handleDelete(item)} className="px-2.5 py-1 rounded-lg bg-error-50 dark:bg-error-950/40 text-error-600 dark:text-error-400 text-xs font-medium hover:bg-error-100 transition-colors"><Ban size={12} className="inline ml-1" /> لغو</button>
+                </div>
+              </Card>
+            )
+          })}
+        </div>
+      )}
+
+      <Wizard
+        open={modalOpen}
+        onClose={() => setModalOpen(false)}
+        title={editing ? 'ویرایش مورد مالی' : `${typeTabs.find((t) => t.key === tab)?.label} جدید`}
+        step={wizardStep}
+        onStepChange={setWizardStep}
+        onFinish={handleSave}
+        saving={saving}
+        steps={[
+          {
+            label: 'اطلاعات پایه',
+            validate: () => (!form.title.trim() ? 'عنوان الزامی است' : null),
+            content: (
+              <>
+                <Input label="عنوان *" value={form.title} onChange={(v) => setForm({ ...form, title: v })} placeholder={tab === 'loan' ? 'مثلاً: وام بانک ملت' : tab === 'rent' ? 'اجاره مطب' : tab === 'cheque' ? 'چک شماره ۱۲۳' : 'بدهی به فلانی'} />
+                <Input label="طرف حساب (بانک/موجر/طلبکار)" value={form.counterparty} onChange={(v) => setForm({ ...form, counterparty: v })} placeholder="نام بانک، موجر یا طرف حساب" />
+                {tab === 'cheque' && (
+                  <div className="grid grid-cols-2 gap-3">
+                    <Input label="شماره چک" value={form.cheque_number} onChange={(v) => setForm({ ...form, cheque_number: v })} dir="ltr" />
+                    <Input label="نام بانک" value={form.bank_name} onChange={(v) => setForm({ ...form, bank_name: v })} />
+                  </div>
+                )}
+              </>
+            ),
+          },
+          {
+            label: 'مبلغ',
+            validate: () => (!form.total_amount || Number(form.total_amount) <= 0 ? 'مبلغ کل الزامی است' : null),
+            content: (
+              <>
+                <div className="grid grid-cols-2 gap-3">
+                  <CurrencyInput label="مبلغ کل (ت) *" value={form.total_amount} onChange={(v) => setForm({ ...form, total_amount: v })} />
+                  <CurrencyInput label="پرداخت‌شده تا الان (ت)" value={form.paid_amount} onChange={(v) => setForm({ ...form, paid_amount: v })} />
+                </div>
+                {tab === 'loan' && (
+                  <div className="grid grid-cols-2 gap-3">
+                    <CurrencyInput label="قسط ماهانه (ت)" value={form.monthly_amount} onChange={(v) => setForm({ ...form, monthly_amount: v })} />
+                    <Input label="نرخ سود (٪)" type="number" value={form.interest_rate} onChange={(v) => setForm({ ...form, interest_rate: v })} placeholder="0" />
+                  </div>
+                )}
+                {tab === 'rent' && (
+                  <CurrencyInput label="اجاره‌ی ماهانه (ت)" value={form.monthly_amount} onChange={(v) => setForm({ ...form, monthly_amount: v })} />
+                )}
+              </>
+            ),
+          },
+          {
+            label: 'سررسید و وضعیت',
+            validate: () => (!form.due_date ? 'تاریخ سررسید الزامی است' : null),
+            content: (
+              <>
+                <PersianDateInput label="تاریخ سررسید *" value={form.due_date} onChange={(v) => setForm({ ...form, due_date: v })} />
+                <Select label="وضعیت" value={form.status} onChange={(v) => setForm({ ...form, status: v as any })} options={Object.entries(statusMeta).map(([k, v]) => ({ value: k, label: v.label }))} />
+                <Textarea label="یادداشت" value={form.notes} onChange={(v) => setForm({ ...form, notes: v })} rows={2} />
+              </>
+            ),
+          },
+        ]}
+      />
+
+      {ConfirmActionModal}
+    </div>
+  )
+}

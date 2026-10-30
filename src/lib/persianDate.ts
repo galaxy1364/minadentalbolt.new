@@ -1,0 +1,380 @@
+import { getLunarHoliday } from './lunarHolidays'
+import { toJalaali, toGregorian as jalaaliToGregorian, isLeapJalaaliYear } from 'jalaali-js'
+import { isValidISODate } from './dateSanitise'
+
+// Jalali (Shamsi) date conversion utilities
+
+export const persianMonths = [
+  'فروردین', 'اردیبهشت', 'خرداد', 'تیر', 'مرداد', 'شهریور',
+  'مهر', 'آبان', 'آذر', 'دی', 'بهمن', 'اسفند',
+]
+
+export const persianWeekdays = [
+  'شنبه', 'یکشنبه', 'دوشنبه', 'سه‌شنبه', 'چهارشنبه', 'پنجشنبه', 'جمعه',
+]
+
+// Iranian week starts on شنبه (Saturday) and ends on جمعه (Friday) — in
+// an RTL grid, array index 0 renders in the RIGHTMOST column, so شنبه
+// must be first here for Friday to correctly land in the last (left)
+// column, matching every real Iranian calendar.
+export const persianWeekdaysShort = ['ش', 'ی', 'د', 'س', 'چ', 'پ', 'ج']
+
+// Converts a JS Date's native getDay() (0=Sunday...6=Saturday) to the
+// Saturday-first index (0=Saturday...6=Friday) used everywhere in this
+// app for weekday-column math and persianWeekdaysShort lookups —
+// centralizing this in one place instead of each caller doing its own
+// (previously inconsistent, sometimes wrong) getDay() math directly.
+export function jsDateToPersianWeekday(date: Date): number {
+  return (date.getDay() + 1) % 7
+}
+
+// Real, thoroughly-tested Gregorian<->Jalali conversion via jalaali-js
+// (the standard, widely-used implementation of the correct algorithm)
+// — the previous hand-rolled version here had a genuine, confirmed bug
+// (off by a full day, and structurally wrong around Nowruz/leap-year
+// boundaries), caught because a user's real device showed a different
+// date than this app computed. Kept the same function names/signatures
+// so every caller in this file needs zero changes.
+export function toJalali(gy: number, gm: number, gd: number): [number, number, number] {
+  const { jy, jm, jd } = toJalaali(gy, gm, gd)
+  return [jy, jm, jd]
+}
+
+function toGregorian(jy: number, jm: number, jd: number): [number, number, number] {
+  const { gy, gm, gd } = jalaaliToGregorian(jy, jm, jd)
+  return [gy, gm, gd]
+}
+
+/**
+ * MOD-FIX-025 | ارقام تاریخ
+ *
+ * The three date formatters split by JOB, not by taste, because mixing
+ * the two jobs is what produced "1405/06/17" sitting next to "۱۵٬۰۰۰٬۰۰۰
+ * ت" in the same table row:
+ *
+ *  - `toJalaliString`  — the machine form. ASCII digits, because it is
+ *    also a lookup key (`getHoliday`), gets `.split('/')` and parsed
+ *    back to numbers in the calendar, and lands in exported CSV. Never
+ *    put this on screen.
+ *  - `toJalaliDisplay` — the same numeric shape for the screen, with
+ *    Persian digits.
+ *  - `toJalaliStringPretty` — the long form for the screen, also with
+ *    Persian digits. It has a Persian month name in it, so it was never
+ *    machine-readable to begin with and has no parsing callers.
+ */
+export function toJalaliString(dateStr: string): string {
+  if (!dateStr) return ''
+  // Parse YYYY-MM-DD components directly to avoid UTC offset shifting the date:
+  // new Date('2026-03-21') is midnight UTC which, in UTC-7, becomes 2026-03-20 17:00 local
+  // — causing toJalali to receive March 20 instead of March 21 (a genuine off-by-one).
+  // Splitting and passing the numbers directly bypasses timezone entirely.
+  const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(dateStr)
+  if (!m) return ''
+  const [jy, jm, jd] = toJalali(Number(m[1]), Number(m[2]), Number(m[3]))
+  return `${jy}/${String(jm).padStart(2, '0')}/${String(jd).padStart(2, '0')}`
+}
+
+/** Screen form of `toJalaliString`. Empty stays empty — an invalid date
+ * must not turn into a plausible-looking one. */
+export function toJalaliDisplay(dateStr: string): string {
+  const s = toJalaliString(dateStr)
+  return s ? toPersianDigits(s) : ''
+}
+
+export function toJalaliStringPretty(dateStr: string): string {
+  if (!dateStr) return ''
+  // Same timezone-safe parsing — see toJalaliString comment above.
+  const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(dateStr)
+  if (!m) return ''
+  const [jy, jm, jd] = toJalali(Number(m[1]), Number(m[2]), Number(m[3]))
+  return toPersianDigits(`${jd} ${persianMonths[jm - 1]} ${jy}`)
+}
+
+export function getJalaliMonthYear(dateStr: string): { year: number; month: number } {
+  // Same timezone-safe parsing — see toJalaliString comment above.
+  const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(dateStr)
+  if (!m) return getJalaliMonthYear(todayLocalISO())
+  const [jy, jm] = toJalali(Number(m[1]), Number(m[2]), Number(m[3]))
+  return { year: jy, month: jm }
+}
+
+export function getJalaliDateInfo(dateStr: string): { year: number; month: number; day: number; weekday: number; monthName: string } {
+  // Same timezone-safe parsing — see toJalaliString comment above.
+  const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(dateStr)
+  if (!m) return getJalaliDateInfo(todayLocalISO())
+  // Weekday needs a real Date — built with local noon (12:00) so timezone
+  // offset never flips it to the previous calendar day.
+  const weekdayDate = new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]), 12, 0, 0)
+  const [jy, jm, jd] = toJalali(Number(m[1]), Number(m[2]), Number(m[3]))
+  return { year: jy, month: jm, day: jd, weekday: jsDateToPersianWeekday(weekdayDate), monthName: persianMonths[jm - 1] }
+}
+
+// ── Jalali leap year calculation ──────────────────────────
+// Algorithm: a year is leap if (year mod 33) is in {1, 5, 9, 13, 17, 22, 26, 30}
+export function isJalaliLeapYear(jy: number): boolean {
+  return isLeapJalaaliYear(jy)
+}
+
+/**
+ * MOD-FIX-014 | طول یک ماه شمسی
+ *
+ * فروردین تا شهریور ۳۱ روز، مهر تا بهمن ۳۰، و اسفند ۲۹ روز — مگر سال
+ * کبیسه که ۳۰ می‌شود.
+ *
+ * Extracted from getJalaliMonthGrid, where it was a local expression.
+ * The instalment scheduler needs exactly this number to clamp a due date
+ * to the end of its month, and re-deriving it there would have put two
+ * copies of the Persian calendar in one codebase — the failure mode this
+ * project has hit three times already.
+ */
+export function jalaliMonthLength(year: number, month: number): number {
+  if (month <= 6) return 31
+  if (month <= 11) return 30
+  return isJalaliLeapYear(year) ? 30 : 29
+}
+
+export function getJalaliMonthGrid(year: number, month: number): (number | null)[][] {
+  const [gy, gm, gd] = toGregorian(year, month, 1)
+  const firstDay = new Date(gy, gm - 1, gd)
+  const startWeekday = jsDateToPersianWeekday(firstDay)
+  const daysInMonth = jalaliMonthLength(year, month)
+  const grid: (number | null)[][] = []
+  let currentDay = 1
+  let week: (number | null)[] = []
+  for (let i = 0; i < startWeekday; i++) week.push(null)
+  while (currentDay <= daysInMonth) {
+    week.push(currentDay)
+    currentDay++
+    if (week.length === 7) { grid.push(week); week = [] }
+  }
+  if (week.length > 0) { while (week.length < 7) week.push(null); grid.push(week) }
+  return grid
+}
+
+// ── Iranian official holidays (Jalali) ─────────────────────
+// Key: "MM-DD" (month-day in Jalali) for fixed holidays, "YYYY-MM-DD" for variable ones
+export interface IranianHoliday {
+  date: string // "MM-DD" or "YYYY-MM-DD"
+  title: string
+  isHoliday: boolean
+}
+
+// Fixed annual holidays (Jalali month-day)
+const fixedHolidays: Record<string, string> = {
+  '01-01': 'نوروز - روز اول',
+  '01-02': 'نوروز - روز دوم',
+  '01-03': 'نوروز - روز سوم',
+  '01-04': 'نوروز - روز چهارم',
+  '01-12': 'روز جمهوری اسلامی',
+  '01-13': 'سیزده‌بدر',
+  '03-14': 'رحلت امام خمینی',
+  '03-15': 'قیام ۱۵ خرداد',
+  '11-22': 'پیروزی انقلاب اسلامی',
+  '12-29': 'پنجشنبه آخر سال - ملی شدن صنعت نفت',
+}
+
+// Variable solar Hijri holidays (approximate — based on official calendar)
+// These are the religious holidays that shift each year
+//
+// ⚠️ Found and fixed a real, serious bug here: the 1405 entries below
+// used to repeat the exact same month/day across every year (1403
+// through 1407) — but lunar Hijri holidays shift roughly 11 days
+// earlier each solar year, so that pattern was mathematically
+// guaranteed to be wrong for every year except at most one. Verified
+// and corrected the full 1405 set against multiple current official
+// Iranian calendar sources (rokna.net, motaharicalendar.com,
+// beytoote.com, banichap.com) — Eid Ghorban, Ghadir Khom, Ashura,
+// Arbaeen, Rehlat-e-Rasool, Imam Reza's martyrdom, etc. were all on
+// the wrong month before this fix. Eid Fetr/Eid Ghorban/Ghadir were
+// also completely MISSING from this table before, not just wrong.
+//
+// The 1403, 1404, 1406, and 1407 entries below still have the exact
+// same unverified copy-pasted-forward pattern and are very likely
+// wrong in the same way — flagged here rather than silently trusted.
+// Only 1405 (the current year) has been verified and corrected.
+const variableHolidays: Record<string, string> = {
+  '1405-01-25': 'شهادت امام جعفر صادق (ع)',
+  '1405-03-06': 'عید سعید قربان',
+  '1405-03-14': 'عید سعید غدیر خم',
+  '1405-04-04': 'عاشورای حسینی (تاسوعا/عاشورا)',
+  '1405-05-13': 'اربعین حسینی',
+  '1405-05-21': 'رحلت رسول اکرم (ص) و شهادت امام حسن مجتبی (ع)',
+  '1405-05-22': 'شهادت امام رضا (ع)',
+  '1405-05-30': 'شهادت امام حسن عسکری (ع)',
+  '1405-06-08': 'میلاد پیامبر اکرم (ص) و امام جعفر صادق (ع)',
+  '1405-08-22': 'شهادت حضرت فاطمه زهرا (س)',
+  '1405-12-09': 'شهادت امام علی (ع)',
+}
+
+export function getHoliday(jalaliDateStr: string): string | null {
+  // jalaliDateStr format: "YYYY/MM/DD" or "YYYY-MM-DD"
+  // replaceAll, not replace: String.replace with a string pattern only
+  // swaps the FIRST occurrence, so "1406/05/01" became "1406-05/01" and
+  // the day parsed as "05/01" — meaning no lookup key ever matched and
+  // getHoliday silently returned null for every slash-formatted date.
+  // This was a pre-existing bug, not introduced here; it surfaced only
+  // because an integration test scanned a full year instead of testing
+  // the function with the dash format it happened to work with.
+  const normalized = jalaliDateStr.replace(/\//g, '-')
+  const parts = normalized.split('-')
+  if (parts.length < 3) return null
+  const year = parts[0]
+  const month = parts[1].padStart(2, '0')
+  const day = parts[2].padStart(2, '0')
+  const fixedKey = `${month}-${day}`
+  const variableKey = `${year}-${month}-${day}`
+
+  const verified = variableHolidays[variableKey] || fixedHolidays[fixedKey]
+  if (verified) return verified
+
+  // MOD-DATA-001 — fall back to computing the lunar holiday from the
+  // Hijri calendar for any year without hand-verified data.
+  //
+  // This replaced 51 hardcoded entries for 1403/1404/1406/1407 that
+  // were copy-pasted forward from 1405 with identical month/day values.
+  // Lunar holidays shift ~11 days earlier per solar year, so those were
+  // mathematically guaranteed wrong — and this data is shown directly
+  // in the appointments UI, meaning a wrong date books a patient on a
+  // holiday or closes the clinic on a working day.
+  //
+  // Deleting wrong data rather than keeping it was deliberate: a
+  // confidently-wrong holiday is worse than a computed approximation,
+  // because staff trust it. Iran determines the lunar calendar by
+  // moon sighting rather than calculation, so these computed dates can
+  // differ from the official announcement by about a day — which is
+  // why they're prefixed as approximate rather than presented as fact.
+  try {
+    const gregorian = jalaliToGregorian(Number(year), Number(month), Number(day))
+    const computed = getLunarHoliday(gregorian)
+    return computed ? `${computed} (تقریبی)` : null
+  } catch {
+    return null
+  }
+}
+
+export function isHoliday(jalaliDateStr: string): boolean {
+  return getHoliday(jalaliDateStr) !== null
+}
+
+export function getGregorianHolidays(year: number, month: number): Map<string, string> {
+  // Returns a map of gregorian date "YYYY-MM-DD" -> holiday title for a given Jalali month
+  const result = new Map<string, string>()
+  const grid = getJalaliMonthGrid(year, month)
+  for (const week of grid) {
+    for (const day of week) {
+      if (day === null) continue
+      const jalaliStr = `${year}/${String(month).padStart(2, '0')}/${String(day).padStart(2, '0')}`
+      const holiday = getHoliday(jalaliStr)
+      if (holiday) {
+        const gregStr = jalaliToGregorian(year, month, day)
+        result.set(gregStr, holiday)
+      }
+    }
+  }
+  return result
+}
+
+export function jalaliToGregorian(jy: number, jm: number, jd: number): string {
+  // Defensive guard: jalaali-js throws on non-finite input (e.g. NaN
+  // year/month, which is exactly what produced a real corrupted
+  // "N-0a-0N"-style date saved to a patient's treatment phase before
+  // this file's toGregorian was replaced with jalaali-js). Falling
+  // back to today instead of letting a malformed string reach a
+  // Postgres `date` column (which silently gets stuck failing to sync
+  // forever) or crashing the calendar outright.
+  try {
+    // MOD-FIX-015: the finiteness check alone let "2-00-02" through and
+    // into a Postgres `date` column, where it stuck two records in the
+    // sync queue forever. 2 and 0 are both perfectly finite; what makes
+    // them invalid is being outside a real calendar. Validating the
+    // *output* rather than trusting the conversion is the only guard
+    // that catches a bad input this function was never given a chance
+    // to reject.
+    const [gy, gm, gd] = toGregorian(jy, jm, jd)
+    const iso = `${gy}-${String(gm).padStart(2, '0')}-${String(gd).padStart(2, '0')}`
+    if (!isValidISODate(iso)) throw new Error(`conversion produced an impossible date: ${iso}`)
+    return iso
+  } catch {
+    return new Date().toISOString().slice(0, 10)
+  }
+}
+
+/**
+ * MOD-FIX-026 | ساعت، یک بار ساخته می‌شود
+ *
+ * `formatTime` returns one display string, so three call sites were
+ * pulling it apart again with `.split(' ')` and `/\d+/` to get the hour
+ * or the period back out. On the appointment card that produced a badge
+ * reading "10:00" in tiny type above "10" in large type — the same
+ * clock twice, neither of them the "صبح/بعدازظهر" the small line was
+ * meant to hold. Parsing a formatted string is also what kept the times
+ * in ASCII: the moment the digits became Persian, `/\d+/` matched
+ * nothing.
+ *
+ * `timeParts` returns the pieces, so nobody has to take the string
+ * apart to get them.
+ */
+export function timeParts(timeStr: string): { clock: string; period: string } {
+  if (!timeStr) return { clock: '', period: '' }
+  const [h, m] = timeStr.split(':')
+  const hour = parseInt(h)
+  if (isNaN(hour)) return { clock: '', period: '' }
+  const period = hour < 12 ? 'صبح' : 'بعدازظهر'
+  const displayHour = hour <= 12 ? hour : hour - 12
+  return { clock: toPersianDigits(`${displayHour}:${m}`), period }
+}
+
+export function formatTime(timeStr: string): string {
+  const { clock, period } = timeParts(timeStr)
+  return clock ? `${clock} ${period}` : ''
+}
+
+export function formatCurrency(amount: number | null | undefined): string {
+  if (amount === null || amount === undefined) return '۰'
+  return toPersianDigits(amount.toLocaleString('en-US'))
+}
+
+export function formatNumber(n: number): string {
+  return toPersianDigits(n.toLocaleString('en-US'))
+}
+
+export function toPersianDigits(s: string | number): string {
+  const persianDigits = ['۰', '۱', '۲', '۳', '۴', '۵', '۶', '۷', '۸', '۹']
+  return String(s).replace(/[0-9]/g, (d) => persianDigits[parseInt(d)])
+}
+
+/** Reverse of toPersianDigits — normalizes Persian/Arabic-Indic digits typed
+ * on a Persian keyboard back to plain ASCII digits, for validating or storing
+ * user-entered numeric codes (e.g. sayad cheque IDs, national IDs). */
+export function toEnglishDigits(s: string | number): string {
+  const persianDigits = '۰۱۲۳۴۵۶۷۸۹'
+  const arabicDigits = '٠١٢٣٤٥٦٧٨٩'
+  return String(s).replace(/[۰-۹٠-٩]/g, (d) => {
+    const pIdx = persianDigits.indexOf(d)
+    if (pIdx !== -1) return String(pIdx)
+    return String(arabicDigits.indexOf(d))
+  })
+}
+
+export function getTodayJalali(): string {
+  // Must use todayLocalISO() here, not new Date().toISOString():
+  // ISO string has a UTC time component; in Iran (UTC+3:30) the UTC date
+  // can be one day behind the local calendar date from midnight to ~3:30 AM.
+  return toJalaliString(todayLocalISO())
+}
+
+/** The correct way to get "today" as a plain YYYY-MM-DD string in the
+ * user's LOCAL calendar day — NOT `new Date().toISOString().slice(0,10)`,
+ * which silently returns YESTERDAY's date for roughly the first few
+ * hours of each local day in any timezone ahead of UTC (Iran is
+ * UTC+3:30, so this bug window was every day from midnight to ~3:30am
+ * local time). That single-line pattern existed in ~50 places across
+ * this codebase; this is the one correct replacement for the "today,
+ * for local calendar/selection purposes" case. */
+export function todayLocalISO(): string {
+  const d = new Date()
+  const y = d.getFullYear()
+  const m = String(d.getMonth() + 1).padStart(2, '0')
+  const day = String(d.getDate()).padStart(2, '0')
+  return `${y}-${m}-${day}`
+}

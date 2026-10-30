@@ -1,0 +1,524 @@
+import { useState, useEffect, useMemo } from 'react'
+import { usePullToRefresh } from '../lib/usePullToRefresh'
+import { toothLabel, toothLabelWithWord } from '../lib/toothLabel'
+import { useNavigate } from 'react-router-dom'
+import { Archive as ArchiveIcon, Search, Users, IdCard, RotateCcw, User, Building2, Syringe, FlaskConical, Settings2, Download, Calendar } from 'lucide-react'
+import { fetchPatients, fetchStaff, updatePatient, updateStaff, fetchInsuranceCompanies, updateInsuranceCompany, fetchImplantCases, updateImplantCase, fetchLabs, updateLab,
+  fetchDoctors, updateDoctor, fetchUnits, updateUnit, fetchProcedures, updateProcedure,
+  fetchInventoryItems, updateInventoryItem, fetchTreatmentPackages, updateTreatmentPackage,
+  fetchSmsTemplates, updateSmsTemplate } from '../lib/api'
+import { toJalaliStringPretty, toJalaliString, toPersianDigits, formatCurrency } from '../lib/persianDate'
+import type { Patient, Staff as StaffType, InsuranceCompany, ImplantCaseWithRelations, Laboratory } from '../types'
+import { Card, Button, Spinner, EmptyState, Tabs, showToast, HighlightText } from '../components/ui'
+import { ModuleHeader } from '../components/ModuleHeader'
+import { useConfirmAction } from '../components/ConfirmAction'
+import { scoreFields } from '../lib/fuzzySearch'
+import { h } from '../lib/haptics'
+import { chimes } from '../lib/chimes'
+
+export default function Archive() {
+  const navigate = useNavigate()
+  const { confirmAction, ConfirmActionModal } = useConfirmAction()
+  const [tab, setTab] = useState<'patients' | 'staff' | 'insurance' | 'implants' | 'labs' | 'config'>('patients')
+  const [patients, setPatients] = useState<Patient[]>([])
+  const [staff, setStaff] = useState<StaffType[]>([])
+  const [companies, setCompanies] = useState<InsuranceCompany[]>([])
+  const [implantCases, setImplantCases] = useState<ImplantCaseWithRelations[]>([])
+  const [labs, setLabs] = useState<Laboratory[]>([])
+  const [selectedYear, setSelectedYear] = useState<string>('all')
+  /** Everything deactivated in Settings. Migration 026 stopped these
+   * being deleted, which left them one-way: you could retire a procedure
+   * or a doctor and had no way to bring it back except through the
+   * database. That is not a safe thing to ship. */
+  const [configRows, setConfigRows] = useState<{ kind: string; label: string; id: string; name: string; restore: (id: string) => Promise<unknown> }[]>([])
+  const [loading, setLoading] = useState(true)
+  const [search, setSearch] = useState('')
+
+  const loadData = async () => {
+    setLoading(true)
+    try {
+      const [pats, st, comps, cases, labList] = await Promise.all([fetchPatients(), fetchStaff(), fetchInsuranceCompanies(), fetchImplantCases(), fetchLabs()])
+      setPatients(pats.filter((p) => !p.is_active))
+      setStaff(st.filter((s) => !s.is_active))
+      setCompanies(comps.filter((c) => !c.is_active))
+      setImplantCases(cases.filter((c) => c.is_active === false))
+      setLabs(labList.filter((l) => !l.is_active))
+
+      const [docs, units, procs, inv, packs, tmpl] = await Promise.all([
+        fetchDoctors().catch(() => []), fetchUnits().catch(() => []),
+        fetchProcedures().catch(() => []), fetchInventoryItems().catch(() => []),
+        fetchTreatmentPackages().catch(() => []), fetchSmsTemplates().catch(() => []),
+      ])
+      const inactive = <T extends { id: string; is_active?: boolean | null }>(
+        rows: T[], kind: string, label: string,
+        name: (r: T) => string, restore: (id: string) => Promise<unknown>,
+      ) => rows.filter((r) => r.is_active === false)
+        .map((r) => ({ kind, label, id: r.id, name: name(r), restore }))
+
+      setConfigRows([
+        ...inactive(docs as any[], 'doctor', 'پزشک', (d: any) => `دکتر ${d.name || ''}`, (id) => updateDoctor(id, { is_active: true } as never)),
+        ...inactive(units as any[], 'unit', 'یونیت', (u: any) => u.name || '', (id) => updateUnit(id, { is_active: true } as never)),
+        ...inactive(procs as any[], 'procedure', 'رویه', (p: any) => `${p.name || ''} (${p.code || ''})`, (id) => updateProcedure(id, { is_active: true } as never)),
+        ...inactive(inv as any[], 'inventory', 'کالا', (i: any) => i.name || '', (id) => updateInventoryItem(id, { is_active: true } as never)),
+        ...inactive(packs as any[], 'package', 'پکیج', (p: any) => p.name || '', (id) => updateTreatmentPackage(id, { is_active: true } as never)),
+        ...inactive(tmpl as any[], 'template', 'قالب پیامک', (t: any) => t.name || '', (id) => updateSmsTemplate(id, { is_active: true } as never)),
+      ])
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  useEffect(() => { loadData() }, [])
+  const ptr = usePullToRefresh(async () => { await loadData() })
+
+  const availableYears = useMemo(() => {
+    const years = new Set<string>()
+    patients.forEach((p) => {
+      const dt = p.created_at || p.updated_at
+      if (dt) {
+        const jYear = toJalaliString(dt).slice(0, 4)
+        if (jYear && jYear.length === 4) years.add(jYear)
+      }
+    })
+    return Array.from(years).sort().reverse()
+  }, [patients])
+
+  const filteredPatients = useMemo(() => {
+    let list = patients
+    if (selectedYear !== 'all') {
+      list = list.filter((p) => {
+        const dt = p.created_at || p.updated_at
+        return dt && toJalaliString(dt).slice(0, 4) === selectedYear
+      })
+    }
+    if (!search.trim()) return list
+    return list
+      .map((p) => ({ p, score: scoreFields(search, [{ value: `${p.first_name} ${p.last_name}`, weight: 1.2 }, { value: p.phone || '' }, { value: p.file_number || '' }]) }))
+      .filter((r) => r.score !== null)
+      .sort((a, b) => (b.score as number) - (a.score as number))
+      .map((r) => r.p)
+  }, [patients, search, selectedYear])
+
+  const handleExportCsv = () => {
+    if (filteredPatients.length === 0) {
+      showToast('info', 'موردی برای خروجی در این فیلتر وجود ندارد')
+      return
+    }
+    h.confirm()
+    chimes.playSuccess()
+    const header = 'نام,نام خانوادگی,شماره پرونده,شماره تماس,کد ملی,تاریخ پذیرش / ثبت\n'
+    const rows = filteredPatients.map((p) => {
+      const dateStr = p.created_at ? toJalaliString(p.created_at) : '-'
+      return `"${p.first_name}","${p.last_name}","${p.file_number || ''}","${p.phone || ''}","${p.national_id || ''}","${dateStr}"`
+    }).join('\n')
+
+    const blob = new Blob(['\uFEFF' + header + rows], { type: 'text/csv;charset=utf-8;' })
+    const url = URL.createObjectURL(blob)
+    const link = document.createElement('a')
+    link.href = url
+    link.download = `minadent-archive-patients-${selectedYear === 'all' ? 'all' : selectedYear}.csv`
+    link.click()
+    URL.revokeObjectURL(url)
+    showToast('success', 'فایل اکسل/CSV بیماران بایگانی با موفقیت دانلود شد')
+  }
+
+  const filteredStaff = useMemo(() => {
+    if (!search.trim()) return staff
+    return staff
+      .map((s) => ({ s, score: scoreFields(search, [{ value: s.full_name, weight: 1.2 }, { value: s.phone || '' }]) }))
+      .filter((r) => r.score !== null)
+      .sort((a, b) => (b.score as number) - (a.score as number))
+      .map((r) => r.s)
+  }, [staff, search])
+
+  const filteredCompanies = useMemo(() => {
+    if (!search.trim()) return companies
+    return companies
+      .map((c) => ({ c, score: scoreFields(search, [{ value: c.name, weight: 1.2 }]) }))
+      .filter((r) => r.score !== null)
+      .sort((a, b) => (b.score as number) - (a.score as number))
+      .map((r) => r.c)
+  }, [companies, search])
+
+  const filteredImplantCases = useMemo(() => {
+    if (!search.trim()) return implantCases
+    return implantCases
+      .map((c) => ({ c, score: scoreFields(search, [{ value: c.patient ? `${c.patient.first_name} ${c.patient.last_name}` : '', weight: 1.2 }, { value: c.brand || '' }]) }))
+      .filter((r) => r.score !== null)
+      .sort((a, b) => (b.score as number) - (a.score as number))
+      .map((r) => r.c)
+  }, [implantCases, search])
+
+  const filteredLabs = useMemo(() => {
+    if (!search.trim()) return labs
+    return labs
+      .map((l) => ({ l, score: scoreFields(search, [{ value: l.name, weight: 1.2 }]) }))
+      .filter((r) => r.score !== null)
+      .sort((a, b) => (b.score as number) - (a.score as number))
+      .map((r) => r.l)
+  }, [labs, search])
+
+  const handleRestorePatient = (p: Patient) => {
+    h.tap()
+    confirmAction({
+      type: 'status',
+      title: 'بازگردانی بیمار',
+      fields: [{ label: 'نام', value: `${p.first_name} ${p.last_name}`, icon: <User size={16} />, highlight: true }],
+      confirmLabel: 'بازگردانی به لیست فعال',
+      onConfirm: async () => {
+        await updatePatient(p.id, { is_active: true })
+        chimes.playSuccess()
+        showToast('success', 'بیمار بازگردانی شد')
+        loadData()
+      },
+    })
+  }
+
+  const handleRestoreStaff = (s: StaffType) => {
+    h.tap()
+    confirmAction({
+      type: 'status',
+      title: 'بازگردانی پرسنل',
+      fields: [{ label: 'نام', value: s.full_name, icon: <User size={16} />, highlight: true }],
+      confirmLabel: 'بازگردانی به لیست فعال',
+      onConfirm: async () => {
+        await updateStaff(s.id, { is_active: true })
+        chimes.playSuccess()
+        showToast('success', 'پرسنل بازگردانی شد')
+        loadData()
+      },
+    })
+  }
+
+  const handleRestoreCompany = (c: InsuranceCompany) => {
+    h.tap()
+    confirmAction({
+      type: 'status',
+      title: 'بازگردانی شرکت بیمه',
+      fields: [{ label: 'نام', value: c.name, icon: <Building2 size={16} />, highlight: true }],
+      confirmLabel: 'بازگردانی به لیست فعال',
+      onConfirm: async () => {
+        await updateInsuranceCompany(c.id, { is_active: true })
+        chimes.playSuccess()
+        showToast('success', 'شرکت بیمه بازگردانی شد')
+        loadData()
+      },
+    })
+  }
+
+  const handleRestoreImplantCase = (c: ImplantCaseWithRelations) => {
+    h.tap()
+    confirmAction({
+      type: 'status',
+      title: 'بازگردانی مورد ایمپلنت',
+      fields: [{ label: 'بیمار', value: c.patient ? `${c.patient.first_name} ${c.patient.last_name}` : '-', icon: <User size={16} />, highlight: true }],
+      confirmLabel: 'بازگردانی به لیست فعال',
+      onConfirm: async () => {
+        await updateImplantCase(c.id, { is_active: true } as any)
+        chimes.playSuccess()
+        showToast('success', 'مورد ایمپلنت بازگردانی شد')
+        loadData()
+      },
+    })
+  }
+
+  const handleRestoreLab = (l: Laboratory) => {
+    h.tap()
+    confirmAction({
+      type: 'status',
+      title: 'بازگردانی لابراتوار',
+      fields: [{ label: 'نام', value: l.name, icon: <Building2 size={16} />, highlight: true }],
+      confirmLabel: 'بازگردانی به لیست فعال',
+      onConfirm: async () => {
+        await updateLab(l.id, { is_active: true } as any)
+        chimes.playSuccess()
+        showToast('success', 'لابراتوار بازگردانی شد')
+        loadData()
+      },
+    })
+  }
+
+  if (loading) {
+    return (
+      <div className="space-y-4" aria-busy="true">
+        <div className="skeleton h-20 rounded-2xl" />
+        <div className="skeleton h-12 rounded-xl" />
+        <div className="space-y-2">
+          {[0, 1, 2].map((i) => <div key={i} className="skeleton h-16 rounded-2xl" />)}
+        </div>
+      </div>
+    )
+  }
+
+  return (
+    <div className="space-y-4" {...ptr.handlers}>
+      {ptr.pullDistance > 0 && (
+        <div className="pull-indicator" style={{ opacity: ptr.isRefreshing ? 1 : ptr.pullProgress, top: -4 }}>
+          <div className="flex flex-col items-center gap-1">
+            <div className={`w-7 h-7 rounded-full border-2 border-teal-300 dark:border-teal-600 border-t-teal-600 dark:border-t-teal-400 ${ptr.isRefreshing ? 'animate-spin' : ''}`} style={{ transform: `scale(${0.6 + ptr.pullProgress * 0.4})` }} />
+            <span className="text-3xs text-teal-600 font-medium">{ptr.isRefreshing ? 'در حال به‌روزرسانی...' : 'برای به‌روزرسانی بکشید'}</span>
+          </div>
+        </div>
+      )}
+      <ModuleHeader
+        moduleKey="archive"
+        title="بایگانی"
+        subtitle={`${toPersianDigits(patients.length + staff.length + companies.length + implantCases.length + labs.length)} مورد غیرفعال‌شده`}
+      />
+
+      <div className="relative">
+        <Search size={16} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400" />
+        <input
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          placeholder="جستجو در بایگانی..."
+          aria-label="جستجو در بایگانی"
+          className="w-full pr-10 pl-3 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-sm focus:outline-none focus:ring-2 focus:ring-primary-400"
+        />
+      </div>
+
+      <Tabs
+        tabs={[
+          { key: 'patients', label: 'بیماران', icon: <Users size={16} /> },
+          { key: 'staff', label: 'پرسنل', icon: <IdCard size={16} /> },
+          { key: 'insurance', label: 'بیمه', icon: <Building2 size={16} /> },
+          { key: 'implants', label: 'ایمپلنت', icon: <Syringe size={16} /> },
+          { key: 'labs', label: 'لابراتوار', icon: <FlaskConical size={16} /> },
+          { key: 'config', label: 'تنظیمات', icon: <Settings2 size={16} /> },
+        ]}
+        active={tab}
+        onChange={(k) => setTab(k as typeof tab)}
+      />
+
+      {tab === 'config' && (
+        configRows.length === 0 ? (
+          <EmptyState icon={<Settings2 size={56} />} title="مورد غیرفعالی نیست" description="پزشک، یونیت، رویه، کالا، پکیج و قالب پیامکِ غیرفعال‌شده اینجا برمی‌گردند" />
+        ) : (
+          <div className="space-y-2">
+            {configRows.map((r) => (
+              <Card key={`${r.kind}:${r.id}`} className="p-3.5 flex items-center gap-3">
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-bold text-slate-800 dark:text-slate-100 truncate">{r.name}</p>
+                  <p className="text-xs text-slate-500">{r.label}</p>
+                </div>
+                <Button
+                  size="sm"
+                  variant="secondary"
+                  onClick={() => {
+                    h.tap()
+                    confirmAction({
+                      type: 'status',
+                      title: 'فعال‌سازی دوباره',
+                      fields: [{ label: r.label, value: r.name, highlight: true }],
+                      confirmLabel: 'فعال کن',
+                      onConfirm: async () => {
+                        await r.restore(r.id)
+                        chimes.playSuccess()
+                        showToast('success', 'فعال شد')
+                        await loadData()
+                      },
+                    })
+                  }}
+                  className="flex items-center gap-1.5 shrink-0"
+                >
+                  <RotateCcw size={14} /> فعال‌سازی
+                </Button>
+              </Card>
+            ))}
+          </div>
+        )
+      )}
+
+      {tab === 'patients' && (
+        <div className="space-y-3">
+          {/* Year Filter & Export Actions Bar */}
+          <div className="flex flex-wrap items-center justify-between gap-2 p-2.5 bg-slate-50 dark:bg-slate-800/60 rounded-2xl border border-slate-200/80 dark:border-slate-700/80">
+            <div className="flex items-center gap-1.5 flex-wrap">
+              <span className="text-xs font-semibold text-slate-500 dark:text-slate-400 flex items-center gap-1 pl-1">
+                <Calendar size={14} className="text-primary-600" />
+                سال پذیرش / ثبت:
+              </span>
+              <button
+                type="button"
+                onClick={() => { h.tap(); setSelectedYear('all') }}
+                className={`px-2.5 py-1 rounded-xl text-xs font-bold transition-all ${
+                  selectedYear === 'all'
+                    ? 'bg-primary-600 text-white shadow-xs'
+                    : 'bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-100 border border-slate-200 dark:border-slate-700'
+                }`}
+              >
+                همه سال‌ها
+              </button>
+              {availableYears.map((yr) => (
+                <button
+                  key={yr}
+                  type="button"
+                  onClick={() => { h.tap(); setSelectedYear(yr) }}
+                  className={`px-2.5 py-1 rounded-xl text-xs font-bold transition-all ${
+                    selectedYear === yr
+                      ? 'bg-primary-600 text-white shadow-xs'
+                      : 'bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-100 border border-slate-200 dark:border-slate-700'
+                  }`}
+                >
+                  سال {toPersianDigits(yr)}
+                </button>
+              ))}
+            </div>
+
+            <Button
+              size="sm"
+              variant="secondary"
+              onClick={handleExportCsv}
+              disabled={filteredPatients.length === 0}
+              className="text-xs"
+            >
+              <Download size={14} className="inline ml-1 text-primary-600" />
+              خروجی اکسل / CSV ({toPersianDigits(filteredPatients.length)})
+            </Button>
+          </div>
+
+          {filteredPatients.length === 0 ? (
+            <EmptyState icon={<ArchiveIcon size={56} />} title="بیماری با این مشخصات در بایگانی یافت نشد" description="فیلتر سال یا متن جستجو را تغییر دهید" />
+          ) : (
+            <div className="space-y-2">
+            {filteredPatients.map((p) => (
+              <Card key={p.id} className="p-3.5 flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-slate-100 dark:bg-slate-700 flex items-center justify-center text-slate-500 dark:text-slate-400 font-bold text-sm shrink-0">
+                  {p.first_name[0]}
+                </div>
+                <div
+                  className="flex-1 min-w-0 cursor-pointer focus:outline-none focus:ring-2 focus:ring-primary-400 rounded-lg"
+                  role="button"
+                  tabIndex={0}
+                  aria-label={`مشاهده پرونده ${p.first_name} ${p.last_name}`}
+                  onClick={() => navigate(`/patients/${p.id}`)}
+                  onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); navigate(`/patients/${p.id}`) } }}
+                >
+                  <p className="text-sm font-bold text-slate-800 dark:text-slate-100 truncate">
+                    <HighlightText text={`${p.first_name} ${p.last_name}`} query={search} />
+                  </p>
+                  <p className="text-2xs text-slate-400">{p.file_number || 'بدون پرونده'} — غیرفعال از {toJalaliStringPretty(p.updated_at)}</p>
+                </div>
+                <Button size="sm" variant="secondary" onClick={() => handleRestorePatient(p)}>
+                  <RotateCcw size={14} className="inline ml-1" /> بازگردانی
+                </Button>
+              </Card>
+            ))}
+          </div>
+          )}
+        </div>
+      )}
+
+      {tab === 'staff' && (
+        filteredStaff.length === 0 ? (
+          <EmptyState icon={<ArchiveIcon size={56} />} title="بایگانی پرسنل خالی است" description="پرسنل غیرفعال‌شده اینجا نمایش داده می‌شوند" />
+        ) : (
+          <div className="space-y-2">
+            {filteredStaff.map((s) => (
+              <Card key={s.id} className="p-3.5 flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-slate-100 dark:bg-slate-700 flex items-center justify-center text-slate-500 dark:text-slate-400 font-bold text-sm shrink-0">
+                  {s.full_name[0]}
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-bold text-slate-800 dark:text-slate-100 truncate">
+                    <HighlightText text={s.full_name} query={search} />
+                  </p>
+                  <p className="text-2xs text-slate-400">غیرفعال از {toJalaliStringPretty(s.updated_at)}</p>
+                </div>
+                <Button size="sm" variant="secondary" onClick={() => handleRestoreStaff(s)}>
+                  <RotateCcw size={14} className="inline ml-1" /> بازگردانی
+                </Button>
+              </Card>
+            ))}
+          </div>
+        )
+      )}
+
+      {tab === 'insurance' && (
+        filteredCompanies.length === 0 ? (
+          <EmptyState icon={<ArchiveIcon size={56} />} title="بایگانی بیمه خالی است" description="شرکت‌های بیمه‌ی غیرفعال‌شده اینجا نمایش داده می‌شوند" />
+        ) : (
+          <div className="space-y-2">
+            {filteredCompanies.map((c) => (
+              <Card key={c.id} className="p-3.5 flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-slate-100 dark:bg-slate-700 flex items-center justify-center text-slate-500 dark:text-slate-400 shrink-0">
+                  <Building2 size={18} />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-bold text-slate-800 dark:text-slate-100 truncate">
+                    <HighlightText text={c.name} query={search} />
+                  </p>
+                  <p className="text-2xs text-slate-400">غیرفعال از {toJalaliStringPretty(c.updated_at)}</p>
+                </div>
+                <Button size="sm" variant="secondary" onClick={() => handleRestoreCompany(c)}>
+                  <RotateCcw size={14} className="inline ml-1" /> بازگردانی
+                </Button>
+              </Card>
+            ))}
+          </div>
+        )
+      )}
+
+      {tab === 'implants' && (
+        filteredImplantCases.length === 0 ? (
+          <EmptyState icon={<ArchiveIcon size={56} />} title="بایگانی ایمپلنت خالی است" description="موارد ایمپلنت آرشیوشده اینجا نمایش داده می‌شوند" />
+        ) : (
+          <div className="space-y-2">
+            {filteredImplantCases.map((c) => (
+              <Card key={c.id} className="p-3.5 flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-slate-100 dark:bg-slate-700 flex items-center justify-center text-slate-500 dark:text-slate-400 shrink-0">
+                  <Syringe size={18} />
+                </div>
+                <div
+                  className="flex-1 min-w-0 cursor-pointer focus:outline-none focus:ring-2 focus:ring-primary-400 rounded-lg"
+                  role="button"
+                  tabIndex={0}
+                  aria-label={`مشاهده پرونده ${c.patient ? `${c.patient.first_name} ${c.patient.last_name}` : 'بیمار حذف‌شده'}`}
+                  onClick={() => navigate(`/patients/${c.patient_id}`)}
+                  onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); navigate(`/patients/${c.patient_id}`) } }}
+                >
+                  <p className="text-sm font-bold text-slate-800 dark:text-slate-100 truncate">
+                    <HighlightText text={c.patient ? `${c.patient.first_name} ${c.patient.last_name}` : 'بیمار حذف‌شده'} query={search} />
+                  </p>
+                  <p className="text-2xs text-slate-400">
+                    {c.brand || 'بدون برند'} — دندان {toothLabel(c.tooth_number) || '-'} — {formatCurrency(c.total_cost || 0)} ت — آرشیو از {toJalaliStringPretty(c.updated_at)}
+                  </p>
+                </div>
+                <Button size="sm" variant="secondary" onClick={() => handleRestoreImplantCase(c)}>
+                  <RotateCcw size={14} className="inline ml-1" /> بازگردانی
+                </Button>
+              </Card>
+            ))}
+          </div>
+        )
+      )}
+
+      {tab === 'labs' && (
+        filteredLabs.length === 0 ? (
+          <EmptyState icon={<ArchiveIcon size={56} />} title="بایگانی لابراتوار خالی است" description="لابراتوارهای غیرفعال‌شده اینجا نمایش داده می‌شوند" />
+        ) : (
+          <div className="space-y-2">
+            {filteredLabs.map((l) => (
+              <Card key={l.id} className="p-3.5 flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-slate-100 dark:bg-slate-700 flex items-center justify-center text-slate-500 dark:text-slate-400 shrink-0">
+                  <FlaskConical size={18} />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-bold text-slate-800 dark:text-slate-100 truncate">
+                    <HighlightText text={l.name} query={search} />
+                  </p>
+                  <p className="text-2xs text-slate-400">غیرفعال از {toJalaliStringPretty(l.updated_at)}</p>
+                </div>
+                <Button size="sm" variant="secondary" onClick={() => handleRestoreLab(l)}>
+                  <RotateCcw size={14} className="inline ml-1" /> بازگردانی
+                </Button>
+              </Card>
+            ))}
+          </div>
+        )
+      )}
+
+      {ConfirmActionModal}
+    </div>
+  )
+}

@@ -1,0 +1,622 @@
+// DentalRadiologyViewer.tsx — Advanced Diagnostic Dental Image & X-Ray Viewer
+// Features: Brightness/Contrast, Negative/Invert, Grayscale, Pan & Zoom, Digital Caliper measurement
+import React, { useState, useRef, useEffect, useCallback, useMemo } from 'react'
+import { createPortal } from 'react-dom'
+import {
+  ZoomIn,
+  ZoomOut,
+  RotateCcw,
+  RotateCw,
+  Sun,
+  Contrast,
+  Sliders,
+  Ruler,
+  Maximize2,
+  Minimize2,
+  Sparkles,
+  Eye,
+  Crosshair,
+  Search,
+} from 'lucide-react'
+import { h } from '../lib/haptics'
+import { chimes } from '../lib/chimes'
+
+interface DentalRadiologyViewerProps {
+  imageUrl: string
+  title?: string
+  toothNumber?: string | null
+  onClose?: () => void
+}
+
+export function DentalRadiologyViewer({
+  imageUrl,
+  title,
+  toothNumber,
+  onClose,
+}: DentalRadiologyViewerProps) {
+  // Image adjustments
+  const [brightness, setBrightness] = useState<number>(100)
+  const [contrast, setContrast] = useState<number>(100)
+  const [isInverted, setIsInverted] = useState<boolean>(false)
+  const [isGrayscale, setIsGrayscale] = useState<boolean>(true) // X-rays default to high-clarity monochrome
+  const [scale, setScale] = useState<number>(1)
+  const [pan, setPan] = useState<{ x: number; y: number }>({ x: 0, y: 0 })
+  const [isDragging, setIsDragging] = useState(false)
+  const dragStartRef = useRef<{ x: number; y: number }>({ x: 0, y: 0 })
+  const [isFullscreen, setIsFullscreen] = useState(false)
+
+  // Caliper measurement tool
+  const [isCaliperActive, setIsCaliperActive] = useState(false)
+  const [caliperPoints, setCaliperPoints] = useState<{ x: number; y: number }[]>([])
+  const containerRef = useRef<HTMLDivElement | null>(null)
+
+  // Diagnostic Loupe tool (DEF-CL-08)
+  const [isLoupeActive, setIsLoupeActive] = useState(false)
+  const [loupePos, setLoupePos] = useState<{ x: number; y: number } | null>(null)
+
+  // Fine Degree Rotation (-45deg to +45deg / 360deg)
+  const [rotation, setRotation] = useState<number>(0)
+
+  const handleReset = () => {
+    h.tap()
+    chimes.playPop()
+    setBrightness(100)
+    setContrast(100)
+    setIsInverted(false)
+    setIsGrayscale(true)
+    setScale(1)
+    setPan({ x: 0, y: 0 })
+    setRotation(0)
+    setCaliperPoints([])
+    setIsCaliperActive(false)
+    setIsLoupeActive(false)
+    setLoupePos(null)
+  }
+
+  // Presets
+  const applyPreset = (preset: 'endo' | 'perio' | 'bone' | 'normal') => {
+    h.tap()
+    chimes.playPop()
+    switch (preset) {
+      case 'endo': // High contrast for root canal files & apex
+        setBrightness(115)
+        setContrast(165)
+        setIsInverted(false)
+        setIsGrayscale(true)
+        break
+      case 'perio': // Inverted view for bone density loss & pocket depths
+        setBrightness(105)
+        setContrast(140)
+        setIsInverted(true)
+        setIsGrayscale(true)
+        break
+      case 'bone': // Subtle bone trabeculae enhancement
+        setBrightness(95)
+        setContrast(180)
+        setIsInverted(false)
+        setIsGrayscale(true)
+        break
+      case 'normal':
+        handleReset()
+        break
+    }
+  }
+
+  // Zoom controls
+  const handleZoom = (delta: number) => {
+    setScale((prev) => Math.min(Math.max(prev + delta, 0.5), 4))
+  }
+
+  const handleWheel = (e: React.WheelEvent) => {
+    e.preventDefault()
+    const delta = e.deltaY < 0 ? 0.15 : -0.15
+    handleZoom(delta)
+  }
+
+  // Pan controls
+  const handleMouseDown = (e: React.MouseEvent) => {
+    if (isLoupeActive) return
+    if (isCaliperActive) {
+      // Handle caliper point placement
+      if (!containerRef.current) return
+      const rect = containerRef.current.getBoundingClientRect()
+      const clickX = e.clientX - rect.left
+      const clickY = e.clientY - rect.top
+
+      h.light()
+      chimes.playPop()
+
+      if (caliperPoints.length >= 2) {
+        setCaliperPoints([{ x: clickX, y: clickY }])
+      } else {
+        setCaliperPoints((prev) => [...prev, { x: clickX, y: clickY }])
+      }
+      return
+    }
+
+    setIsDragging(true)
+    dragStartRef.current = { x: e.clientX - pan.x, y: e.clientY - pan.y }
+  }
+
+  const handleMouseMove = (e: React.MouseEvent) => {
+    if (isLoupeActive && containerRef.current) {
+      const rect = containerRef.current.getBoundingClientRect()
+      setLoupePos({
+        x: Math.max(0, Math.min(rect.width, e.clientX - rect.left)),
+        y: Math.max(0, Math.min(rect.height, e.clientY - rect.top)),
+      })
+    }
+    if (!isDragging || isCaliperActive || isLoupeActive) return
+    setPan({
+      x: e.clientX - dragStartRef.current.x,
+      y: e.clientY - dragStartRef.current.y,
+    })
+  }
+
+  const handleMouseUp = () => {
+    setIsDragging(false)
+  }
+
+  // Distance calculation for Caliper (approximate calibrated mm)
+  const calculatedDistanceMm = useMemo(() => {
+    if (caliperPoints.length < 2) return null
+    const [p1, p2] = caliperPoints
+    const dx = p1.x - p2.x
+    const dy = p1.y - p2.y
+    const pixelDistance = Math.sqrt(dx * dx + dy * dy)
+    // Calibration factor: 100px roughly 10mm at standard zoom (scaled by zoom level)
+    const mm = (pixelDistance / (10 * scale)).toFixed(1)
+    return mm
+  }, [caliperPoints, scale])
+
+  const filterStyle = `
+    brightness(${brightness}%)
+    contrast(${contrast}%)
+    ${isInverted ? 'invert(100%)' : ''}
+    ${isGrayscale ? 'grayscale(100%)' : ''}
+  `.trim()
+
+  const viewer = (
+    <div
+      className={`flex flex-col bg-slate-950 text-slate-100 rounded-2xl overflow-hidden border border-slate-800 shadow-2xl transition-all ${
+        isFullscreen ? 'fixed inset-0 z-50 rounded-none' : 'w-full'
+      }`}
+    >
+      {/* Top Toolbar */}
+      <div className="flex items-center justify-between px-4 py-2.5 bg-slate-900 border-b border-slate-800 text-xs flex-wrap gap-2">
+        <div className="flex items-center gap-2">
+          <span className="font-bold text-slate-200">
+            {title || 'نمایشگر تشخیصی رادیولوژی'}
+          </span>
+          {toothNumber && (
+            <span className="px-2 py-0.5 rounded-lg bg-primary-950/80 text-primary-300 border border-primary-800 font-mono font-bold">
+              دندان #{toothNumber}
+            </span>
+          )}
+        </div>
+
+        {/* Quick Presets */}
+        <div className="flex items-center gap-1 bg-slate-950/60 p-1 rounded-xl border border-slate-800">
+          <span className="text-3xs text-slate-400 px-1 font-medium">فیلتر بالینی:</span>
+          <button
+            type="button"
+            onClick={() => applyPreset('endo')}
+            className="px-2 py-1 rounded-lg text-2xs font-medium bg-slate-800 hover:bg-slate-700 text-amber-300 transition-all press-scale"
+          >
+            کانال/ریشه (Endo)
+          </button>
+          <button
+            type="button"
+            onClick={() => applyPreset('perio')}
+            className="px-2 py-1 rounded-lg text-2xs font-medium bg-slate-800 hover:bg-slate-700 text-cyan-300 transition-all press-scale"
+          >
+            تحلیل استخوان (Perio)
+          </button>
+          <button
+            type="button"
+            onClick={() => applyPreset('bone')}
+            className="px-2 py-1 rounded-lg text-2xs font-medium bg-slate-800 hover:bg-slate-700 text-emerald-300 transition-all press-scale"
+          >
+            تراکم استخوان
+          </button>
+          <button
+            type="button"
+            onClick={() => applyPreset('normal')}
+            className="px-2 py-1 rounded-lg text-2xs font-medium bg-slate-800 hover:bg-slate-700 text-slate-300 transition-all press-scale"
+          >
+            عادی
+          </button>
+        </div>
+
+        {/* Window controls */}
+        <div className="flex items-center gap-1.5">
+          <button
+            type="button"
+            onClick={() => { h.tap(); setIsFullscreen(!isFullscreen) }}
+            className="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 transition-all press-scale"
+            title={isFullscreen ? 'خروج از تمام‌صفحه' : 'تمام‌صفحه'}
+          >
+            {isFullscreen ? <Minimize2 size={14} /> : <Maximize2 size={14} />}
+          </button>
+          {onClose && (
+            <button
+              type="button"
+              onClick={() => { h.cancel(); onClose() }}
+              className="p-1.5 rounded-lg bg-slate-800 hover:bg-rose-900/60 hover:text-rose-200 text-slate-400 transition-all press-scale"
+            >
+              ✕
+            </button>
+          )}
+        </div>
+      </div>
+
+      {/* Main Viewport */}
+      <div
+        ref={containerRef}
+        className={`relative w-full overflow-hidden bg-black flex items-center justify-center select-none ${
+          isFullscreen ? 'flex-1' : 'h-[440px]'
+        } ${isCaliperActive ? 'cursor-crosshair' : isLoupeActive ? 'cursor-none' : 'cursor-grab active:cursor-grabbing'}`}
+        onWheel={handleWheel}
+        onMouseDown={handleMouseDown}
+        onMouseMove={handleMouseMove}
+        onMouseUp={handleMouseUp}
+        onMouseLeave={() => setLoupePos(null)}
+      >
+        {/* The X-Ray Image */}
+        <div
+          style={{
+            transform: `translate(${pan.x}px, ${pan.y}px) scale(${scale}) rotate(${rotation}deg)`,
+            transition: isDragging ? 'none' : 'transform 0.05s ease-out',
+            filter: filterStyle,
+          }}
+          className="pointer-events-none origin-center"
+        >
+          <img
+            src={imageUrl}
+            alt="Dental Radiograph"
+            className="max-h-[85vh] max-w-full object-contain pointer-events-none rounded shadow-2xl"
+            draggable={false}
+          />
+        </div>
+
+        {/* Caliper Measurement Overlay (SVG) */}
+        {caliperPoints.length > 0 && (
+          <svg className="absolute inset-0 w-full h-full pointer-events-none">
+            {caliperPoints.map((pt, idx) => (
+              <circle
+                key={idx}
+                cx={pt.x}
+                cy={pt.y}
+                r={5}
+                fill="#38bdf8"
+                stroke="#0369a1"
+                strokeWidth={2}
+              />
+            ))}
+            {caliperPoints.length === 2 && (
+              <>
+                <line
+                  x1={caliperPoints[0].x}
+                  y1={caliperPoints[0].y}
+                  x2={caliperPoints[1].x}
+                  y2={caliperPoints[1].y}
+                  stroke="#38bdf8"
+                  strokeWidth={2}
+                  strokeDasharray="4 2"
+                />
+                {calculatedDistanceMm && (
+                  <text
+                    x={(caliperPoints[0].x + caliperPoints[1].x) / 2 + 10}
+                    y={(caliperPoints[0].y + caliperPoints[1].y) / 2 - 10}
+                    fill="#38bdf8"
+                    fontSize={13}
+                    fontWeight="bold"
+                    className="drop-shadow"
+                  >
+                    ~{calculatedDistanceMm} mm
+                  </text>
+                )}
+              </>
+            )}
+          </svg>
+        )}
+
+        {/* Diagnostic Loupe Lens Overlay (DEF-CL-08) */}
+        {isLoupeActive && loupePos && containerRef.current && (
+          <div
+            className="absolute pointer-events-none rounded-full overflow-hidden border-2 border-sky-400 shadow-[0_0_25px_rgba(56,189,248,0.55)] z-30 bg-black"
+            style={{
+              width: 140,
+              height: 140,
+              left: loupePos.x - 70,
+              top: loupePos.y - 70,
+            }}
+          >
+            <div
+              className="absolute pointer-events-none origin-top-left flex items-center justify-center"
+              style={{
+                width: containerRef.current.clientWidth,
+                height: containerRef.current.clientHeight,
+                left: -(loupePos.x * 2.5 - 70),
+                top: -(loupePos.y * 2.5 - 70),
+                transform: `translate(${pan.x * 2.5}px, ${pan.y * 2.5}px) scale(${scale * 2.5}) rotate(${rotation}deg)`,
+                filter: filterStyle,
+              }}
+            >
+              <img
+                src={imageUrl}
+                alt=""
+                className="max-h-[85vh] max-w-full object-contain pointer-events-none"
+                draggable={false}
+              />
+            </div>
+            {/* Loupe Crosshair and badge */}
+            <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+              <div className="w-5 h-px bg-sky-400/80" />
+              <div className="w-px h-5 bg-sky-400/80 absolute" />
+              <span className="absolute bottom-1.5 text-4xs font-bold text-sky-200 bg-black/75 px-1.5 py-0.5 rounded-full border border-sky-400/50">
+                2.5×
+              </span>
+            </div>
+          </div>
+        )}
+
+        {/* Measurement HUD */}
+        {isCaliperActive && (
+          <div className="absolute top-3 left-3 px-3 py-1.5 rounded-xl bg-slate-900/90 border border-sky-500/50 backdrop-blur-md text-sky-300 text-xs font-mono flex items-center gap-2">
+            <Crosshair size={14} className="animate-spin text-sky-400" />
+            <span>
+              {caliperPoints.length === 0 && 'نقطه اول را روی تصویر کلیک کنید'}
+              {caliperPoints.length === 1 && 'نقطه دوم را کلیک کنید تا فاصله محاسبه شود'}
+              {caliperPoints.length === 2 && `فاصله تخمینی: ~${calculatedDistanceMm} میلیمتر`}
+            </span>
+            {caliperPoints.length > 0 && (
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation()
+                  setCaliperPoints([])
+                }}
+                className="text-3xs bg-slate-800 hover:bg-slate-700 px-1.5 py-0.5 rounded text-slate-300"
+              >
+                پاک کردن
+              </button>
+            )}
+          </div>
+        )}
+
+        {/* Floating Zoom & Tool Bar */}
+        <div className="absolute bottom-3 left-3 flex items-center gap-1.5 p-1 bg-slate-900/90 backdrop-blur-md rounded-xl border border-slate-800 text-xs">
+          <button
+            type="button"
+            onClick={() => { h.tap(); handleZoom(0.2) }}
+            className="p-1.5 rounded-lg hover:bg-slate-800 text-slate-200 transition-all press-scale"
+            title="بزرگنمایی"
+          >
+            <ZoomIn size={14} />
+          </button>
+          <span className="text-2xs font-mono px-1 text-slate-400">
+            {Math.round(scale * 100)}%
+          </span>
+          <button
+            type="button"
+            onClick={() => { h.tap(); handleZoom(-0.2) }}
+            className="p-1.5 rounded-lg hover:bg-slate-800 text-slate-200 transition-all press-scale"
+            title="کوچکنمایی"
+          >
+            <ZoomOut size={14} />
+          </button>
+
+          <div className="h-4 w-px bg-slate-700 mx-0.5" />
+
+          {/* Caliper Toggle */}
+          <button
+            type="button"
+            onClick={() => {
+              h.select()
+              chimes.playPop()
+              setIsCaliperActive(!isCaliperActive)
+              if (!isCaliperActive) {
+                setCaliperPoints([])
+                setIsLoupeActive(false)
+              }
+            }}
+            className={`p-1.5 rounded-lg transition-all flex items-center gap-1 text-2xs press-scale ${
+              isCaliperActive
+                ? 'bg-sky-600 text-white font-bold'
+                : 'hover:bg-slate-800 text-slate-300'
+            }`}
+            title="خط‌کش کالیپر تشخیصی"
+          >
+            <Ruler size={14} />
+            <span>خط‌کش</span>
+          </button>
+
+          <div className="h-4 w-px bg-slate-700 mx-0.5" />
+
+          {/* Diagnostic Loupe Toggle */}
+          <button
+            type="button"
+            onClick={() => {
+              h.select()
+              chimes.playPop()
+              const next = !isLoupeActive
+              setIsLoupeActive(next)
+              if (next) {
+                setIsCaliperActive(false)
+                setCaliperPoints([])
+              } else {
+                setLoupePos(null)
+              }
+            }}
+            className={`p-1.5 rounded-lg transition-all flex items-center gap-1 text-2xs press-scale ${
+              isLoupeActive
+                ? 'bg-sky-500 text-white font-bold ring-2 ring-sky-300 shadow-sm'
+                : 'hover:bg-slate-800 text-slate-300'
+            }`}
+            title="ذره‌بین تشخیصی ۲.۵ برابر برای آپکس ریشه و مارجین"
+          >
+            <Search size={14} />
+            <span>ذره‌بین ۲.۵×</span>
+          </button>
+
+          <div className="h-4 w-px bg-slate-700 mx-0.5" />
+
+          <button
+            type="button"
+            onClick={handleReset}
+            aria-label="بازنشانی به حالت پیش‌فرض"
+            className="p-1.5 rounded-lg hover:bg-slate-800 text-slate-400 hover:text-slate-200 transition-all press-scale"
+            title="بازنشانی به حالت پیش‌فرض"
+          >
+            <RotateCcw size={14} />
+          </button>
+        </div>
+      </div>
+
+      {/* Bottom Adjustment Controls */}
+      <div className="p-3 bg-slate-900/95 border-t border-slate-800 grid grid-cols-1 md:grid-cols-4 gap-3 text-xs">
+        {/* Brightness */}
+        <div className="space-y-1">
+          <div className="flex items-center justify-between text-slate-400">
+            <span className="flex items-center gap-1">
+              <Sun size={14} className="text-amber-400" />
+              روشنایی (Brightness)
+            </span>
+            <span className="font-mono text-2xs text-slate-300">{brightness}%</span>
+          </div>
+          <input
+            type="range"
+            min="40"
+            max="200"
+            value={brightness}
+            onChange={(e) => setBrightness(Number(e.target.value))}
+            className="w-full accent-amber-500 h-1.5 bg-slate-800 rounded-lg cursor-pointer"
+          />
+        </div>
+
+        {/* Contrast */}
+        <div className="space-y-1">
+          <div className="flex items-center justify-between text-slate-400">
+            <span className="flex items-center gap-1">
+              <Contrast size={14} className="text-cyan-400" />
+              کنتراست (Contrast)
+            </span>
+            <span className="font-mono text-2xs text-slate-300">{contrast}%</span>
+          </div>
+          <input
+            type="range"
+            min="50"
+            max="250"
+            value={contrast}
+            onChange={(e) => setContrast(Number(e.target.value))}
+            className="w-full accent-cyan-500 h-1.5 bg-slate-800 rounded-lg cursor-pointer"
+          />
+        </div>
+
+        {/* Degree-by-Degree Rotation Slider (تراز دقیق با محور دندان) */}
+        <div className="space-y-1">
+          <div className="flex items-center justify-between text-slate-400">
+            <span className="flex items-center gap-1">
+              <RotateCw size={14} className="text-emerald-400" />
+              زاویه محور گرافی (Tilt)
+            </span>
+            <div className="flex items-center gap-1">
+              <span className={`font-mono text-2xs px-1 rounded ${rotation !== 0 ? 'bg-emerald-950 text-emerald-300 border border-emerald-800 font-bold' : 'text-slate-300'}`}>
+                {rotation > 0 ? `+${rotation}°` : `${rotation}°`}
+              </span>
+              {rotation !== 0 && (
+                <button
+                  type="button"
+                  onClick={() => { h.tap(); setRotation(0) }}
+                  className="text-3xs text-slate-400 hover:text-white px-1 py-0.2 rounded bg-slate-800 hover:bg-slate-700"
+                  title="ریست به زاویه صفر"
+                >
+                  ۰°
+                </button>
+              )}
+            </div>
+          </div>
+          <div className="flex items-center gap-1.5">
+            <button
+              type="button"
+              onClick={() => { h.tap(); setRotation((r) => Math.max(r - 1, -180)) }}
+              className="p-1 rounded bg-slate-800 hover:bg-slate-700 text-3xs font-mono text-slate-300 shrink-0 press-scale"
+              title="۱ درجه چرخش پادساعتگرد"
+            >
+              -۱°
+            </button>
+            <input
+              type="range"
+              min="-45"
+              max="45"
+              step="1"
+              value={rotation}
+              onChange={(e) => setRotation(Number(e.target.value))}
+              className="w-full accent-emerald-500 h-1.5 bg-slate-800 rounded-lg cursor-pointer"
+            />
+            <button
+              type="button"
+              onClick={() => { h.tap(); setRotation((r) => Math.min(r + 1, 180)) }}
+              className="p-1 rounded bg-slate-800 hover:bg-slate-700 text-3xs font-mono text-slate-300 shrink-0 press-scale"
+              title="۱ درجه چرخش ساعتگرد"
+            >
+              +۱°
+            </button>
+          </div>
+        </div>
+
+        {/* Toggles & 90deg Quick Rotate */}
+        <div className="flex items-center justify-end gap-1.5 flex-wrap">
+          <button
+            type="button"
+            onClick={() => {
+              h.tap()
+              chimes.playPop()
+              setRotation((r) => (r + 90) % 360)
+            }}
+            className="px-2.5 py-1.5 rounded-xl border border-slate-700 bg-slate-800 text-slate-200 text-xs font-medium hover:bg-slate-700 transition-all press-scale flex items-center gap-1"
+            title="چرخش ۹۰ درجه ساعتگرد"
+          >
+            <RotateCw size={12} className="text-emerald-400" />
+            <span>۹۰°</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => {
+              h.tap()
+              chimes.playPop()
+              setIsInverted(!isInverted)
+            }}
+            className={`px-2.5 py-1.5 rounded-xl border text-xs font-medium transition-all press-scale ${
+              isInverted
+                ? 'bg-amber-500 text-slate-950 border-amber-400 font-bold shadow-md'
+                : 'bg-slate-800 border-slate-700 text-slate-300 hover:bg-slate-700'
+            }`}
+          >
+            {isInverted ? '✓ نگاتیو' : 'نگاتیو'}
+          </button>
+
+          <button
+            type="button"
+            onClick={() => {
+              h.tap()
+              chimes.playPop()
+              setIsGrayscale(!isGrayscale)
+            }}
+            className={`px-2.5 py-1.5 rounded-xl border text-xs font-medium transition-all press-scale ${
+              isGrayscale
+                ? 'bg-sky-600 text-white border-sky-500 font-bold'
+                : 'bg-slate-800 border-slate-700 text-slate-300 hover:bg-slate-700'
+            }`}
+          >
+            سیاه‌وسفید
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+
+  return isFullscreen ? createPortal(viewer, document.body) : viewer
+}
