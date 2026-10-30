@@ -21,7 +21,7 @@
     "@supabase/supabase-js": "^2.118.0",
     "@tailwindcss/vite": "^4.3.3",
     "@vitejs/plugin-react": "^4.3.1",
-    "dexie": "^4.0.11",
+    "dexie": "^4.4.7",
     "dexie-react-hooks": "^1.1.7",
     "dotenv": "^17.2.3",
     "express": "^4.21.2",
@@ -30,7 +30,7 @@
     "react": "^19.0.1",
     "react-dom": "^19.0.1",
     "react-is": "^19.3.1",
-    "react-router-dom": "^7.1.1",
+    "react-router-dom": "^7.18.5",
     "recharts": "^3.10.1",
     "vite": "^5.4.0"
   },
