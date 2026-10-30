@@ -1,0 +1,466 @@
+@import "tailwindcss";
+
+@layer base {
+  body {
+    font-family: 'Vazirmatn', system-ui, -apple-system, sans-serif;
+    -webkit-font-smoothing: antialiased;
+    -webkit-tap-highlight-color: transparent;
+  }
+}
+
+/* Halftone / Dot-matrix glowing ambient background used in the screenshot headers */
+.bg-dot-matrix {
+  background-image: radial-gradient(rgba(204, 255, 0, 0.22) 1.5px, transparent 1.5px);
+  background-size: 14px 14px;
+}
+
+.bg-dot-matrix-subtle {
+  background-image: radial-gradient(rgba(204, 255, 0, 0.12) 1.2px, transparent 1.2px);
+  background-size: 12px 12px;
+}
+
+/* Neon lime glow helpers */
+.glow-lime {
+  box-shadow: 0 0 25px -4px rgba(204, 255, 0, 0.45);
+}
+
+.glow-lime-sm {
+  box-shadow: 0 0 12px -2px rgba(204, 255, 0, 0.35);
+}
+
+/* Hide scrollbar for clean app experience */
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+/* Tactile active button feedback */
+.active-press {
+  transition: transform 0.25s cubic-bezier(0.34, 1.56, 0.64, 1);
+  will-change: transform;
+}
+.active-press:active {
+  transform: scale(0.95) translateY(2px);
+  transition-duration: 0.06s;
+}
+
+/* ==========================================================================
+   Q-BANK AUTHENTIC DASHBOARD MODULE TILES
+   CSS Selector: .dashboard-view .grid .tile
+   Full-width edge-to-edge stretching with high-precision one-sided curvature
+   Enhanced Pronounced 'Active-Press' Animation & Tactile Response for Touch-First Terminals
+   ========================================================================== */
+.dashboard-view {
+  width: 100%;
+}
+
+.dashboard-view .grid {
+  display: grid;
+  width: 100%;
+  box-sizing: border-box;
+  align-items: stretch;
+}
+
+.dashboard-view .grid .tile {
+  width: 100%;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  position: relative;
+  box-sizing: border-box;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+  user-select: none;
+  transform-origin: center center;
+  will-change: transform, filter;
+  /* Spring-back recovery when touched/clicked on tactile dental terminal screens */
+  transition: transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1), 
+              filter 0.22s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+/* Pronounced 'active-press' tactile sink simulating a mechanical terminal key/tile */
+.dashboard-view .grid .tile:active,
+.dashboard-view .grid .tile.is-pressing {
+  transform: scale(0.95) translateY(3.2px);
+  filter: drop-shadow(0 2px 5px rgba(0, 0, 0, 0.15)) brightness(0.97);
+  transition: transform 0.06s cubic-bezier(0.1, 0.9, 0.2, 1), 
+              filter 0.06s ease-out;
+}
+
+/* Coordinated tactile response for the circular chevron action button */
+.dashboard-view .grid .tile:active .tile-action-button,
+.dashboard-view .grid .tile.is-pressing .tile-action-button {
+  transform: scale(0.85) translateY(1.5px);
+  background-color: #c8ff00;
+  color: #000000;
+  border-color: #b8f000;
+  box-shadow: 0 0 12px rgba(200, 255, 0, 0.5);
+  transition: transform 0.06s cubic-bezier(0.1, 0.9, 0.2, 1), 
+              background-color 0.06s ease-out,
+              box-shadow 0.06s ease-out;
+}
+
+/* Coordinated tactile response for the neon icon squircle container */
+.dashboard-view .grid .tile:active .tile-icon-box,
+.dashboard-view .grid .tile.is-pressing .tile-icon-box {
+  transform: scale(0.93) translateY(1px);
+  transition: transform 0.06s cubic-bezier(0.1, 0.9, 0.2, 1);
+}
+
+/* ==========================================================================
+   SUBTLE STAGGERED ENTRANCE ANIMATION FOR .dashboard-view .grid .tile CONTENTS
+   Modern & Premium iOS 27 / Q-Bank tactile dashboard entrance using CSS transitions
+   ========================================================================== */
+@keyframes tile-stagger-fade-in {
+  0% {
+    opacity: 0;
+    transform: translateY(12px) scale(0.985);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes tile-content-entrance {
+  0% {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes tile-icon-entrance {
+  0% {
+    opacity: 0;
+    transform: scale(0.82) rotate(-3deg);
+  }
+  60% {
+    transform: scale(1.05) rotate(0.5deg);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1) rotate(0deg);
+  }
+}
+
+/* Base entrance transition rules for .dashboard-view .grid .tile */
+.dashboard-view .grid .tile {
+  animation: tile-stagger-fade-in 0.45s cubic-bezier(0.16, 1, 0.3, 1) backwards;
+}
+
+/* Contents within .dashboard-view .grid .tile using CSS transitions */
+.dashboard-view .grid .tile .tile-contents {
+  transition: opacity 0.45s cubic-bezier(0.16, 1, 0.3, 1), 
+              transform 0.45s cubic-bezier(0.16, 1, 0.3, 1);
+  will-change: opacity, transform;
+}
+
+.dashboard-view .grid .tile .tile-icon-box {
+  transition: opacity 0.45s cubic-bezier(0.34, 1.56, 0.64, 1), 
+              transform 0.45s cubic-bezier(0.34, 1.56, 0.64, 1);
+  will-change: opacity, transform;
+}
+
+.dashboard-view .grid .tile .tile-action-button {
+  transition: opacity 0.4s cubic-bezier(0.16, 1, 0.3, 1), 
+              transform 0.4s cubic-bezier(0.16, 1, 0.3, 1),
+              background-color 0.2s ease,
+              border-color 0.2s ease;
+  will-change: opacity, transform;
+}
+
+.dashboard-view .grid .tile .tile-title-group,
+.dashboard-view .grid .tile .tile-shelf,
+.dashboard-view .grid .tile .today-revenue-widget {
+  transition: opacity 0.42s cubic-bezier(0.16, 1, 0.3, 1), 
+              transform 0.42s cubic-bezier(0.16, 1, 0.3, 1);
+  will-change: opacity, transform;
+}
+
+/* CSS Transition states when Dashboard loads (is-loading vs is-loaded) */
+.dashboard-view.is-loading .grid .tile .tile-contents {
+  opacity: 0;
+  transform: translateY(8px);
+}
+.dashboard-view.is-loading .grid .tile .tile-icon-box {
+  opacity: 0;
+  transform: scale(0.85);
+}
+.dashboard-view.is-loading .grid .tile .tile-action-button {
+  opacity: 0;
+  transform: translateY(6px) scale(0.9);
+}
+
+.dashboard-view.is-loaded .grid .tile .tile-contents {
+  opacity: 1;
+  transform: translateY(0);
+}
+.dashboard-view.is-loaded .grid .tile .tile-icon-box {
+  opacity: 1;
+  transform: scale(1);
+}
+.dashboard-view.is-loaded .grid .tile .tile-action-button {
+  opacity: 1;
+  transform: translateY(0) scale(1);
+}
+
+/* Staggered CSS transition delays across tiles and their internal contents */
+.dashboard-view .grid .tile:nth-child(1) { animation-delay: 35ms; }
+.dashboard-view .grid .tile:nth-child(1) .tile-contents { transition-delay: 50ms; }
+.dashboard-view .grid .tile:nth-child(1) .tile-icon-box { transition-delay: 75ms; }
+.dashboard-view .grid .tile:nth-child(1) .tile-action-button { transition-delay: 95ms; }
+
+.dashboard-view .grid .tile:nth-child(2) { animation-delay: 75ms; }
+.dashboard-view .grid .tile:nth-child(2) .tile-contents { transition-delay: 90ms; }
+.dashboard-view .grid .tile:nth-child(2) .tile-icon-box { transition-delay: 115ms; }
+.dashboard-view .grid .tile:nth-child(2) .tile-action-button { transition-delay: 135ms; }
+
+.dashboard-view .grid .tile:nth-child(3) { animation-delay: 115ms; }
+.dashboard-view .grid .tile:nth-child(3) .tile-contents { transition-delay: 130ms; }
+.dashboard-view .grid .tile:nth-child(3) .tile-icon-box { transition-delay: 155ms; }
+.dashboard-view .grid .tile:nth-child(3) .tile-action-button { transition-delay: 175ms; }
+
+.dashboard-view .grid .tile:nth-child(4) { animation-delay: 155ms; }
+.dashboard-view .grid .tile:nth-child(4) .tile-contents { transition-delay: 170ms; }
+.dashboard-view .grid .tile:nth-child(4) .tile-icon-box { transition-delay: 195ms; }
+.dashboard-view .grid .tile:nth-child(4) .tile-action-button { transition-delay: 215ms; }
+
+.dashboard-view .grid .tile:nth-child(5) { animation-delay: 195ms; }
+.dashboard-view .grid .tile:nth-child(5) .tile-contents { transition-delay: 210ms; }
+.dashboard-view .grid .tile:nth-child(5) .tile-icon-box { transition-delay: 235ms; }
+.dashboard-view .grid .tile:nth-child(5) .tile-action-button { transition-delay: 255ms; }
+
+.dashboard-view .grid .tile:nth-child(6) { animation-delay: 235ms; }
+.dashboard-view .grid .tile:nth-child(6) .tile-contents { transition-delay: 250ms; }
+.dashboard-view .grid .tile:nth-child(6) .tile-icon-box { transition-delay: 275ms; }
+.dashboard-view .grid .tile:nth-child(6) .tile-action-button { transition-delay: 295ms; }
+
+.dashboard-view .grid .tile:nth-child(7) { animation-delay: 275ms; }
+.dashboard-view .grid .tile:nth-child(7) .tile-contents { transition-delay: 290ms; }
+.dashboard-view .grid .tile:nth-child(7) .tile-icon-box { transition-delay: 315ms; }
+.dashboard-view .grid .tile:nth-child(7) .tile-action-button { transition-delay: 335ms; }
+
+.dashboard-view .grid .tile:nth-child(8) { animation-delay: 315ms; }
+.dashboard-view .grid .tile:nth-child(8) .tile-contents { transition-delay: 330ms; }
+.dashboard-view .grid .tile:nth-child(8) .tile-icon-box { transition-delay: 355ms; }
+.dashboard-view .grid .tile:nth-child(8) .tile-action-button { transition-delay: 375ms; }
+
+.dashboard-view .grid .tile:nth-child(9) { animation-delay: 355ms; }
+.dashboard-view .grid .tile:nth-child(9) .tile-contents { transition-delay: 370ms; }
+.dashboard-view .grid .tile:nth-child(9) .tile-icon-box { transition-delay: 395ms; }
+.dashboard-view .grid .tile:nth-child(9) .tile-action-button { transition-delay: 415ms; }
+
+/* ==========================================================================
+   ANIMATED GEMINI FLUID AURORA KEYFRAMES
+   Smooth, organic, hardware-accelerated movement
+   ========================================================================== */
+@keyframes gemini-aurora-1 {
+  0% {
+    transform: translate3d(0, 0, 0) scale(1) rotate(0deg);
+  }
+  33% {
+    transform: translate3d(8%, 10%, 0) scale(1.15) rotate(40deg);
+  }
+  66% {
+    transform: translate3d(-6%, 8%, 0) scale(0.92) rotate(80deg);
+  }
+  100% {
+    transform: translate3d(4%, -5%, 0) scale(1.08) rotate(120deg);
+  }
+}
+
+@keyframes gemini-aurora-2 {
+  0% {
+    transform: translate3d(0, 0, 0) scale(1) rotate(0deg);
+  }
+  33% {
+    transform: translate3d(-10%, -6%, 0) scale(1.18) rotate(-45deg);
+  }
+  66% {
+    transform: translate3d(6%, -10%, 0) scale(0.95) rotate(-90deg);
+  }
+  100% {
+    transform: translate3d(-4%, 6%, 0) scale(1.12) rotate(-135deg);
+  }
+}
+
+@keyframes gemini-aurora-3 {
+  0% {
+    transform: translate3d(0, 0, 0) scale(0.95);
+    opacity: 0.65;
+  }
+  50% {
+    transform: translate3d(6%, -8%, 0) scale(1.22);
+    opacity: 0.85;
+  }
+  100% {
+    transform: translate3d(-6%, 6%, 0) scale(1);
+    opacity: 0.65;
+  }
+}
+
+.gemini-blob-1 {
+  animation: gemini-aurora-1 22s ease-in-out infinite alternate;
+  will-change: transform;
+}
+
+.gemini-blob-2 {
+  animation: gemini-aurora-2 26s ease-in-out infinite alternate;
+  will-change: transform;
+}
+
+.gemini-blob-3 {
+  animation: gemini-aurora-3 18s ease-in-out infinite alternate;
+  will-change: transform, opacity;
+}
+
+/* Realistic swinging bell animation for notification badge */
+@keyframes bell-ring {
+  0% { transform: rotate(0deg); }
+  8% { transform: rotate(18deg); }
+  16% { transform: rotate(-18deg); }
+  24% { transform: rotate(14deg); }
+  32% { transform: rotate(-14deg); }
+  40% { transform: rotate(8deg); }
+  48% { transform: rotate(-6deg); }
+  56% { transform: rotate(0deg); }
+  100% { transform: rotate(0deg); }
+}
+
+.animate-bell-ring {
+  animation: bell-ring 3s cubic-bezier(0.36, 0.07, 0.19, 0.97) infinite;
+  transform-origin: top center;
+}
+
+/* ==========================================================================
+   CLINICAL ACCESSIBILITY & ERGONOMIC THEMES (WCAG 2.2 AAA)
+   ========================================================================== */
+
+/* 1. Deep OLED Surgical Dark Mode */
+html.theme-dark body,
+body.theme-dark {
+  background-color: #0b0d14 !important;
+  color: #f1f5f9 !important;
+}
+
+html.theme-dark .bg-white {
+  background-color: #121520 !important;
+  color: #f8fafc !important;
+}
+
+html.theme-dark .bg-slate-50 {
+  background-color: #171b29 !important;
+}
+
+html.theme-dark .bg-slate-100 {
+  background-color: #1e2436 !important;
+  color: #e2e8f0 !important;
+}
+
+html.theme-dark .text-slate-900 {
+  color: #f8fafc !important;
+}
+
+html.theme-dark .text-slate-800 {
+  color: #f1f5f9 !important;
+}
+
+html.theme-dark .text-slate-700 {
+  color: #cbd5e1 !important;
+}
+
+html.theme-dark .border-slate-200 {
+  border-color: rgba(255, 255, 255, 0.1) !important;
+}
+
+html.theme-dark .border-slate-100 {
+  border-color: rgba(255, 255, 255, 0.06) !important;
+}
+
+/* 2. Surgical Anti-Glare High-Contrast Mode */
+html.theme-high-contrast body,
+body.theme-high-contrast {
+  background-color: #000000 !important;
+  color: #ffffff !important;
+}
+
+html.theme-high-contrast * {
+  border-color: #404040 !important;
+}
+
+html.theme-high-contrast .bg-white,
+html.theme-high-contrast .bg-slate-50,
+html.theme-high-contrast .bg-slate-100 {
+  background-color: #0a0a0a !important;
+  color: #ffffff !important;
+  border-width: 2px !important;
+  border-color: #525252 !important;
+}
+
+html.theme-high-contrast button {
+  border-width: 2px !important;
+  font-weight: 900 !important;
+}
+
+/* 3. Dynamic Type Scale */
+html.font-scale-large {
+  font-size: 114%;
+}
+
+html.font-scale-xlarge {
+  font-size: 128%;
+}
+
+/* 4. Sterile Glove Touch Friendly Mode */
+html.glove-mode button,
+html.glove-mode .tile,
+html.glove-mode [role="button"],
+html.glove-mode input,
+html.glove-mode select {
+  min-height: 48px !important;
+  min-width: 48px !important;
+}
+
+/* 5. Shimmer animation */
+@keyframes dental-shimmer {
+  0% {
+    background-position: -200% 0;
+  }
+  100% {
+    background-position: 200% 0;
+  }
+}
+
+.dental-shimmer {
+  background: linear-gradient(90deg, rgba(255,255,255,0) 0%, rgba(255,255,255,0.4) 50%, rgba(255,255,255,0) 100%);
+  background-size: 200% 100%;
+  animation: dental-shimmer 2s infinite;
+}
+
+/* 6. Realistic Pendulum Bell Swing Keyframe Animation for Notifications */
+@keyframes real-bell-swing {
+  0% { transform: rotate(0deg); }
+  12% { transform: rotate(20deg); }
+  24% { transform: rotate(-18deg); }
+  36% { transform: rotate(14deg); }
+  48% { transform: rotate(-10deg); }
+  60% { transform: rotate(6deg); }
+  72% { transform: rotate(-3deg); }
+  85% { transform: rotate(0deg); }
+  100% { transform: rotate(0deg); }
+}
+
+.animate-bell-ring {
+  transform-origin: top center !important;
+  animation: real-bell-swing 2.2s cubic-bezier(0.36, 0.07, 0.19, 0.97) infinite !important;
+  will-change: transform;
+}
+
+

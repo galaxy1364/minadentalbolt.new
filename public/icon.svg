@@ -1,0 +1,228 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" fill="none">
+  <defs>
+    <!-- Background Chassis Gradient -->
+    <linearGradient id="pwaBgGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#ffffff"/>
+      <stop offset="40%" stop-color="#faf5ff"/>
+      <stop offset="75%" stop-color="#f3e8ff"/>
+      <stop offset="100%" stop-color="#ede9fe"/>
+    </linearGradient>
+
+    <!-- Outer Squircle Metallic Bevel -->
+    <linearGradient id="pwaBorderBevel" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#ffffff"/>
+      <stop offset="30%" stop-color="#e9d5ff"/>
+      <stop offset="70%" stop-color="#c084fc"/>
+      <stop offset="100%" stop-color="#7e22ce"/>
+    </linearGradient>
+
+    <!-- 3D Tooth Crown Pearl Gradient -->
+    <linearGradient id="toothPearl" x1="180" y1="120" x2="340" y2="400" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#ffffff"/>
+      <stop offset="35%" stop-color="#fdf4ff"/>
+      <stop offset="70%" stop-color="#f3e8ff"/>
+      <stop offset="100%" stop-color="#e9d5ff"/>
+    </linearGradient>
+
+    <!-- 3D Tooth Purple Body Gradient -->
+    <linearGradient id="toothPurpleBody" x1="160" y1="140" x2="360" y2="410" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#d8b4fe"/>
+      <stop offset="25%" stop-color="#a855f7"/>
+      <stop offset="60%" stop-color="#8b5cf6"/>
+      <stop offset="85%" stop-color="#7c3aed"/>
+      <stop offset="100%" stop-color="#581c87"/>
+    </linearGradient>
+
+    <!-- Root Canal / Titanium Core Cyan Gradient -->
+    <linearGradient id="toothBioCyan" x1="256" y1="200" x2="256" y2="390" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#38bdf8"/>
+      <stop offset="50%" stop-color="#06b6d4"/>
+      <stop offset="100%" stop-color="#0284c7"/>
+    </linearGradient>
+
+    <!-- Radiant Gold Sparkle Gradient -->
+    <linearGradient id="goldSparkle" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#fef08a"/>
+      <stop offset="50%" stop-color="#facc15"/>
+      <stop offset="100%" stop-color="#eab308"/>
+    </linearGradient>
+
+    <!-- Radial Enamel Highlight -->
+    <radialGradient id="enamelHighlight" cx="35%" cy="25%" r="65%">
+      <stop offset="0%" stop-color="#ffffff" stop-opacity="0.95"/>
+      <stop offset="45%" stop-color="#ffffff" stop-opacity="0.35"/>
+      <stop offset="100%" stop-color="#ffffff" stop-opacity="0"/>
+    </radialGradient>
+
+    <!-- Multi-Layer Depth Drop Shadow -->
+    <filter id="tooth3dShadow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="24" stdDeviation="28" flood-color="#581c87" flood-opacity="0.38"/>
+      <feDropShadow dx="0" dy="8" stdDeviation="12" flood-color="#7c3aed" flood-opacity="0.25"/>
+    </filter>
+
+    <filter id="sparkleGlow" x="-30%" y="-30%" width="160%" height="160%">
+      <feDropShadow dx="0" dy="4" stdDeviation="8" flood-color="#facc15" flood-opacity="0.55"/>
+    </filter>
+  </defs>
+
+  <!-- iOS / Android Squircle Chassis (Rounded Rect) -->
+  <rect width="512" height="512" rx="124" fill="url(#pwaBgGrad)"/>
+  
+  <!-- Outer Metallic Beveled Border -->
+  <rect x="6" y="6" width="500" height="500" rx="118" stroke="url(#pwaBorderBevel)" stroke-width="10" stroke-opacity="0.85"/>
+
+  <!-- Subtle Concentric Optical Bio-Orbit Rings -->
+  <circle cx="256" cy="256" r="195" stroke="#e9d5ff" stroke-width="4" stroke-dasharray="8 12" stroke-opacity="0.55"/>
+  <circle cx="256" cy="256" r="225" stroke="#c084fc" stroke-width="2" stroke-opacity="0.3"/>
+
+  <!-- Main 3D Anatomical Multi-Color Tooth Structure -->
+  <g filter="url(#tooth3dShadow)">
+    
+    <!-- Base Depth / Ambient Occlusion Shadow Underneath Tooth -->
+    <ellipse cx="256" cy="425" rx="140" ry="24" fill="#3b0764" fill-opacity="0.22"/>
+
+    <!-- 1. Outer Deep Purple Anatomical Silhouette Foundation -->
+    <path
+      d="M256 112
+         C196 112 152 148 142 208
+         C132 268 156 328 190 382
+         C208 410 226 422 238 412
+         C250 402 254 366 256 348
+         C258 366 262 402 274 412
+         C286 422 304 410 322 382
+         C356 328 380 268 370 208
+         C360 148 316 112 256 112Z"
+      fill="url(#toothPurpleBody)"
+      stroke="#c084fc"
+      stroke-width="3"
+    />
+
+    <!-- 2. Mid-Tier Pearl Enamel Body with 3D Bevel -->
+    <path
+      d="M256 122
+         C204 122 164 154 156 208
+         C147 262 170 316 202 366
+         C216 388 230 398 238 390
+         C248 380 252 352 256 338
+         C260 352 264 380 274 390
+         C282 398 296 388 310 366
+         C342 316 365 262 356 208
+         C348 154 308 122 256 122Z"
+      fill="url(#toothPearl)"
+    />
+
+    <!-- 3. Upper Crown Specular Bevel Cusp Arches (3D Depth) -->
+    <!-- Left Cusp Highlight -->
+    <path
+      d="M206 132
+         C170 146 156 180 156 220
+         C156 252 168 288 186 324
+         C174 278 170 236 178 194
+         C184 164 200 142 224 134
+         C216 132 210 132 206 132Z"
+      fill="#ffffff"
+      fill-opacity="0.8"
+    />
+
+    <!-- Right Cusp Pearl Sheen -->
+    <path
+      d="M306 132
+         C342 146 356 180 356 220
+         C356 252 344 288 326 324
+         C338 278 342 236 334 194
+         C328 164 312 142 288 134
+         C296 132 302 132 306 132Z"
+      fill="url(#enamelHighlight)"
+    />
+
+    <!-- 4. Central Pulp Canal & Bio-Tech Health Cross (Cyan & Emerald Light) -->
+    <!-- Soft Cyan Internal Glow -->
+    <path
+      d="M256 176
+         C236 176 224 192 222 214
+         C218 248 230 286 242 320
+         C248 334 252 344 256 348
+         C260 344 264 334 270 320
+         C282 286 294 248 290 214
+         C288 192 276 176 256 176Z"
+      fill="url(#toothBioCyan)"
+      opacity="0.88"
+    />
+
+    <!-- Medical Health Cross within Central Crown Core -->
+    <g>
+      <!-- Vertical Cross Bar -->
+      <rect x="250" y="210" width="12" height="34" rx="4" fill="#ffffff"/>
+      <!-- Horizontal Cross Bar -->
+      <rect x="239" y="221" width="34" height="12" rx="4" fill="#ffffff"/>
+      <!-- Glowing Emerald Center -->
+      <circle cx="256" cy="227" r="4.5" fill="#10b981"/>
+    </g>
+
+    <!-- 5. Anatomical Root Canal Taper Lines (Left and Right Roots) -->
+    <path
+      d="M214 300 C222 340 232 374 238 390"
+      stroke="#7c3aed"
+      stroke-width="5"
+      stroke-linecap="round"
+      opacity="0.6"
+    />
+    <path
+      d="M298 300 C290 340 280 374 274 390"
+      stroke="#7c3aed"
+      stroke-width="5"
+      stroke-linecap="round"
+      opacity="0.6"
+    />
+
+    <!-- 6. Specular Enamel Crest Line (Reflecting Clinical Light) -->
+    <path
+      d="M192 154
+         C220 138 292 138 320 154
+         C298 144 214 144 192 154Z"
+      fill="#ffffff"
+      fill-opacity="0.95"
+    />
+
+    <!-- 7. Radiant Diamond Optical Sparkle on Upper Right Cusp -->
+    <g filter="url(#sparkleGlow)">
+      <!-- Central Brilliant Sparkle -->
+      <path
+        d="M346 160
+           L354 134
+           L362 160
+           L388 168
+           L362 176
+           L354 202
+           L346 176
+           L320 168
+           Z"
+        fill="url(#goldSparkle)"
+        stroke="#ffffff"
+        stroke-width="2.5"
+      />
+      <!-- Sparkle Core -->
+      <circle cx="354" cy="168" r="6" fill="#ffffff"/>
+      <!-- Secondary Mini Sparkle -->
+      <circle cx="380" cy="142" r="4.5" fill="#c084fc"/>
+      <circle cx="380" cy="142" r="2.2" fill="#ffffff"/>
+    </g>
+
+  </g>
+
+  <!-- MinaDental Monogram Text at Base "MINA" -->
+  <g opacity="0.9">
+    <text
+      x="256"
+      y="472"
+      font-family="system-ui, -apple-system, 'SF Pro Display', 'Vazirmatn', sans-serif"
+      font-size="28"
+      font-weight="900"
+      letter-spacing="6"
+      fill="#6b21a8"
+      text-anchor="middle"
+    >
+      MINA DENTAL
+    </text>
+  </g>
+</svg>
