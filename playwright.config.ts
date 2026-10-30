@@ -30,7 +30,7 @@ export default defineConfig({
     { name: 'desktop', use: { ...devices['Desktop Chrome'] } },
   ],
   webServer: {
-    command: `PORT=${port} BASE_PATH=${basePath} pnpm run build && PORT=${port} BASE_PATH=${basePath} pnpm run serve`,
+    command: `PORT=${port} BASE_PATH=${basePath} npm run build && PORT=${port} BASE_PATH=${basePath} npm run serve`,
     url: `http://127.0.0.1:${port}${basePath}`,
     reuseExistingServer: !process.env.CI,
     timeout: 120_000,
