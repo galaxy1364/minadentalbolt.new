@@ -10,14 +10,14 @@ import { getCurrentPersianDate, getRelativePersianDate } from '../utils/jalali';
 const STORAGE_URL_KEY = 'minadental_supabase_url';
 const STORAGE_KEY_KEY = 'minadental_supabase_anon_key';
 
-// Demo fallback / sandbox credentials (can be overridden via UI or env)
-const DEFAULT_SUPABASE_URL = 
-  (typeof import.meta !== 'undefined' && import.meta.env?.VITE_SUPABASE_URL) || 
-  'https://minadental-clinic-db.supabase.co';
+// Read exclusively from env variables — no hardcoded fallbacks.
+// For local dev: set VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY in .env.local
+// For production: set them in your Vercel / hosting dashboard.
+const DEFAULT_SUPABASE_URL =
+  (typeof import.meta !== 'undefined' && import.meta.env?.VITE_SUPABASE_URL) || '';
 
-const DEFAULT_SUPABASE_ANON_KEY = 
-  (typeof import.meta !== 'undefined' && import.meta.env?.VITE_SUPABASE_ANON_KEY) || 
-  'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.e30.demo_placeholder_minadental_key';
+const DEFAULT_SUPABASE_ANON_KEY =
+  (typeof import.meta !== 'undefined' && import.meta.env?.VITE_SUPABASE_ANON_KEY) || '';
 
 export interface SupabaseConfig {
   url: string;
